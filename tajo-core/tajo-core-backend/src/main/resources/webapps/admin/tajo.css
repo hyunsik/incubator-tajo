@@ -1,0 +1,300 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+html, body {
+    margin: 0;
+    padding: 0;
+}
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+blockquote,
+pre,
+a,
+abbr,
+acronym,
+address,
+cite,
+code,
+del,
+dfn,
+em,
+img,
+q,
+s,
+samp,
+small,
+strike,
+strong,
+sub,
+sup,
+tt,
+var,
+dd,
+dl,
+dt,
+li,
+ol,
+ul,
+fieldset,
+form,
+label,
+legend,
+button,
+table,
+caption,
+tbody,
+tfoot,
+thead,
+tr,
+th,
+td {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    font-weight: normal;
+    font-style: normal;
+    font-size: 100%;
+    line-height: 1;
+    font-family: inherit;
+}
+
+
+html, body {
+    background-color: #ffffff;
+}
+body {
+    margin: 0;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    font-weight: normal;
+    line-height: 18px;
+    color: #404040;
+}
+
+.container-tajo {
+    position: relative;
+    min-width: 700px;
+    padding-left: 20px;
+    padding-right: 20px;
+    zoom: 1;
+}
+.container-tajo:before, .container-fluid:after {
+    display: table;
+    content: "";
+    zoom: 1;
+    *display: inline;
+}
+.container-tajo:after {
+    clear: both;
+}
+.container-tajo > .sidebar {
+    float: left;
+    width: 220px;
+}
+.container-tajo > .content {
+    margin-left: 240px;
+}
+
+/*
+ * Tables.less
+ * Tables for, you guessed it, tabular data
+ * ---------------------------------------- */
+table {
+    width: 100%;
+    margin-bottom: 18px;
+    padding: 0;
+    border-collapse: separate;
+    *border-collapse: collapse;
+    /* IE7, collapse table to remove spacing */
+
+    font-size: 13px;
+    border: 1px solid #ddd;
+    -webkit-border-radius: 4px;
+    -moz-border-radius: 4px;
+    border-radius: 4px;
+}
+table th, table td {
+    padding: 10px 10px 9px;
+    line-height: 18px;
+    text-align: left;
+}
+table th {
+    padding-top: 9px;
+    font-weight: bold;
+    vertical-align: middle;
+    border-bottom: 1px solid #ddd;
+}
+table td {
+    vertical-align: top;
+}
+table th + th, table td + td {
+    border-left: 1px solid #ddd;
+}
+table tr + tr td {
+    border-top: 1px solid #ddd;
+}
+table tbody tr:first-child td:first-child {
+    -webkit-border-radius: 4px 0 0 0;
+    -moz-border-radius: 4px 0 0 0;
+    border-radius: 4px 0 0 0;
+}
+table tbody tr:first-child td:last-child {
+    -webkit-border-radius: 0 4px 0 0;
+    -moz-border-radius: 0 4px 0 0;
+    border-radius: 0 4px 0 0;
+}
+table tbody tr:last-child td:first-child {
+    -webkit-border-radius: 0 0 0 4px;
+    -moz-border-radius: 0 0 0 4px;
+    border-radius: 0 0 0 4px;
+}
+table tbody tr:last-child td:last-child {
+    -webkit-border-radius: 0 0 4px 0;
+    -moz-border-radius: 0 0 4px 0;
+    border-radius: 0 0 4px 0;
+}
+.zebra-striped tbody tr:nth-child(odd) td {
+    background-color: #f9f9f9;
+}
+.zebra-striped tbody tr:hover td {
+    background-color: #f5f5f5;
+}
+table .header {
+    cursor: pointer;
+}
+table .header:after {
+    content: "";
+    float: right;
+    margin-top: 7px;
+    border-width: 0 4px 4px;
+    border-style: solid;
+    border-color: #000 transparent;
+    visibility: hidden;
+}
+table .headerSortUp, table .headerSortDown {
+    background-color: rgba(141, 192, 219, 0.25);
+    text-shadow: 0 1px 1px rgba(255, 255, 255, 0.75);
+}
+table .header:hover:after {
+    visibility: visible;
+}
+table .headerSortDown:after, table .headerSortDown:hover:after {
+    visibility: visible;
+    filter: alpha(opacity=60);
+    -khtml-opacity: 0.6;
+    -moz-opacity: 0.6;
+    opacity: 0.6;
+}
+table .headerSortUp:after {
+    border-bottom: none;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 4px solid #000;
+    visibility: visible;
+    -webkit-box-shadow: none;
+    -moz-box-shadow: none;
+    box-shadow: none;
+    filter: alpha(opacity=60);
+    -khtml-opacity: 0.6;
+    -moz-opacity: 0.6;
+    opacity: 0.6;
+}
+table .blue {
+    color: #049cdb;
+    border-bottom-color: #049cdb;
+}
+table .headerSortUp.blue, table .headerSortDown.blue {
+    background-color: #ade6fe;
+}
+table .green {
+    color: #46a546;
+    border-bottom-color: #46a546;
+}
+table .headerSortUp.green, table .headerSortDown.green {
+    background-color: #cdeacd;
+}
+table .red {
+    color: #9d261d;
+    border-bottom-color: #9d261d;
+}
+table .headerSortUp.red, table .headerSortDown.red {
+    background-color: #f4c8c5;
+}
+table .yellow {
+    color: #ffc40d;
+    border-bottom-color: #ffc40d;
+}
+table .headerSortUp.yellow, table .headerSortDown.yellow {
+    background-color: #fff6d9;
+}
+table .orange {
+    color: #f89406;
+    border-bottom-color: #f89406;
+}
+table .headerSortUp.orange, table .headerSortDown.orange {
+    background-color: #fee9cc;
+}
+table .purple {
+    color: #7a43b6;
+    border-bottom-color: #7a43b6;
+}
+table .headerSortUp.purple, table .headerSortDown.purple {
+    background-color: #e2d5f0;
+}
+
+#topbar {
+}
+
+#topbar ul
+{
+    margin: 0px;
+    padding: 0px;
+    list-style-type: none;
+}
+
+#topbar a
+{
+    display: block;
+    width: 10em;
+    color: #000000;
+    text-decoration: none;
+    text-align: center;
+
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    font-weight: normal;
+    line-height: 18px;
+    font-weight: bold;
+    color: #404040;
+}
+
+#topbar a:hover
+{
+    /*background-color: #6666AA;*/
+}
+
+#topbar li
+{
+    float: left;
+    margin-right: 0.5em;
+}
