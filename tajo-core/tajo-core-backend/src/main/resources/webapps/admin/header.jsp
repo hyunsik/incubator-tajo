@@ -1,3 +1,4 @@
+<%@ page import="tajo.conf.TajoConf" %>
   <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
     <html>
     <head>
@@ -7,6 +8,7 @@
       <%
      TajoMaster master = (TajoMaster)application.getAttribute("tajo.master");
      CatalogService catalog = master.getCatalog();
+     TajoConf conf = master.getContext().getConf();
     %>
     </head>
     <body>

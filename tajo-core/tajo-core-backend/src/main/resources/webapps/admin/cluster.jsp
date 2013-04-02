@@ -26,11 +26,39 @@
   <%@ page import="java.net.InetSocketAddress" %>
   <%@ page import="java.net.InetAddress"  %>
   <%@ page import="org.apache.hadoop.conf.Configuration" %>
+  <%@ page import="org.apache.hadoop.yarn.client.YarnClient" %>
+  <%@ page import="org.apache.hadoop.yarn.conf.YarnConfiguration" %>
+  <%@ page import="java.net.InetSocketAddress" %>
+  <%@ page import="org.apache.hadoop.yarn.ipc.YarnRPC" %>
+  <%@ page import="org.apache.hadoop.yarn.api.ClientRMProtocol" %>
+  <%@ page import="org.apache.hadoop.yarn.api.protocolrecords.GetClusterNodesRequest" %>
+  <%@ page import="org.apache.hadoop.yarn.api.protocolrecords.GetClusterNodesResponse" %>
+  <%@ page import="org.apache.hadoop.yarn.api.records.NodeReport" %>
+  <%@ page import="org.apache.hadoop.yarn.util.Records" %>
+  <%@ page import="java.util.List" %>
 
   <%@include file="./header.jsp" %>
-    
+
+  <%
+    InetSocketAddress rmAddress;
+    YarnConfiguration yarnConf = (YarnConfiguration)conf;
+    rmAddress= yarnConf.getSocketAddr(YarnConfiguration.RM_ADDRESS,
+      YarnConfiguration.DEFAULT_RM_ADDRESS, YarnConfiguration.DEFAULT_RM_PORT);
+    YarnRPC rpc = YarnRPC.create(yarnConf);
+
+    ClientRMProtocol proxy = (ClientRMProtocol)rpc.
+      getProxy(ClientRMProtocol.class, rmAddress, yarnConf);
+
+    GetClusterNodesRequest req = Records.newRecord(GetClusterNodesRequest.class);
+    GetClusterNodesResponse res = proxy.getClusterNodes(req);
+
+    List<NodeReport> nodes = res.getNodeReports();
+  %>
     <div class ="container-tajo">
-    <h2 class = "line">Available workers</h2>
+    <h2 class = "line">Available workers: <%=nodes.size()%></h2>
+    <h2 class = "line">Available workers: <%=nodes.get(0).getNumContainers()%></h2>
+  <h2 class = "line">Available workers: <%=nodes.get(0).getCapability().getMemory()%></h2>
+
     </div> <!-- container-tajo -->
   </body>
 </html>

@@ -1,5 +1,4 @@
-<%@ page language="java" contentType="text/html; charset=UTF-8"
-    pageEncoding="UTF-8"%>
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%--
   Licensed to the Apache Software Foundation (ASF) under one
   or more contributor license agreements.  See the NOTICE file
@@ -25,63 +24,94 @@
 <%@ page import="tajo.engine.*" %>
 <%@ page import="java.net.InetSocketAddress" %>
 <%@ page import="java.net.InetAddress"  %>
-<%@ page import="org.apache.hadoop.conf.Configuration" %>
+<%@ page import="org.apache.hadoop.fs.FileSystem" %>
+<%@ page import="org.apache.hadoop.hdfs.DistributedFileSystem" %>
+<%@ page import="org.apache.hadoop.fs.FsStatus" %>
+<%@ page import="org.apache.hadoop.hdfs.protocol.HdfsConstants" %>
+<%@ page import="org.apache.hadoop.hdfs.protocol.HdfsConstants.*" %>
+<%@ page import="org.apache.hadoop.hdfs.protocol.DatanodeInfo" %>
+<%@ page import="org.apache.hadoop.util.StringUtils" %>
+
 
 <%@include file="./header.jsp" %>
 
+  <%
+    DistributedFileSystem dfs = (DistributedFileSystem)FileSystem.get(conf);
+    FsStatus ds = dfs.getStatus();
+    long capacity = ds.getCapacity();
+    long used = ds.getUsed();
+    long remaining = ds.getRemaining();
+    long presentCapacity = used + remaining;
+    boolean safeMode = dfs.isInSafeMode();
 
+    DatanodeInfo[] live = dfs.getDataNodeStats(DatanodeReportType.LIVE);
+    DatanodeInfo[] dead = dfs.getDataNodeStats(DatanodeReportType.DEAD);
+  %>
 
   <div class="container-tajo">
-     <div class = "outbox">
-      <h2 class = "compactline">System Summary</h2>
-      <table align = "center"class = "noborder">
-       <tr>
-        <th class="rightbottom">Cluster Number</th>
-        <th class="rightbottom">Live workers</th>
-        <th class="rightbottom">Table number</th>
-        <th class="rightbottom">Total Disk Size</th>
-        <th class="rightbottom">Available Disk Size</th>
-        <th class="bottom">Running Time</th>
-       </tr>
-       <tr>
-        <td class="rightborder"><%//=map.size()%></td>
-        <td class="rightborder"><%//=curMap.size()%></td>
-        <td class="rightborder"><%//=tableArr.length%></td>
-        <td class="rightborder"><%//=String.format("%.2f", totalDisk/MB)%>TB</td>
-        <td class="rightborder"><%//=String.format("%.2f", availableDisk/MB)%>TB</td>
-        <td class="noborder"><%//=time/3600/24 + "d" + time/3600 + "h" + time/60%60 + "m" + time%60+"s"%></td>
-       </tr>
-      </table>
-     </div>
-    
-     <div class="outbox_order">
-      <h2 class="compactline">Table List</h2>     
-      <table align = "center" class = "new">
+
+  <h2>Tajo Cluster Summary</h2>
+  <table>
+    <tr><th colspan="4">Tajo Summary</th></tr>
+    <tr>
+    <td>Tables</td><td>00</td>
+    <td>Number of Executed Queries</td><td>32</td>
+    </tr>
+
+    <tr>
+    <td>Running Queries</td><td>00</td>
+    <td>&nbsp;</td><td>&nbsp;</td>
+    </tr>
+  </table>
+
+  <table>
+    <tr><th colspan="4">System Summary</th></tr>
+    <tr>
+      <td>Operating System</td><td>Linux 3.2.1-gentoo-r2 (Gentoo Linux)</td>
+      <td>Tajo Version</td><td>0.2.0-SNAPSHOT</td>
+    </tr>
+    <tr>
+      <td>Hadoop HDFS Version</td><td>2.0.3-alpha</td></td>
+      <td>Hadoop Yarn Version</td><td>2.0.3-alpha</td></td>
+    </tr>
+  </table>
+
+  <table>
+    <tr><th colspan="4">HDFS Summary</th></tr>
       <tr>
-       <th style="width:110px">TableName</th>
-       <th>TablePath</th>
+      <td>Configured Capacity</td><td><%=StringUtils.byteDesc(capacity)%></td>
+      <td>Present Capacity</td><td><%=StringUtils.byteDesc(presentCapacity)%></td>
       </tr>
 
       <tr>
-        <td><a href = "catalog.jsp?tablename=<%//=table.getId()%>" class = "tablelink"><%//=table.getId()%></a></td>
-        <td><%//=table.getPath()%></td>
-      </tr>	
-
-      </table>
-     </div>
-     <div style="float:left; width:6px">&nbsp;</div>
-     <div class="outbox_order">
-      <h2 class="compactline">Worker List</h2>
-      <table align="center" class = "new">
-      <tr>
-        <th style="width:90px">Status</th>
-        <th>Worker Name</th>
+      <td>DFS Remaining</td><td><%=StringUtils.byteDesc(remaining)%></td>
+      <td>DFS Used</td><td><%=StringUtils.byteDesc(used)%></td>
       </tr>
-     </table> 
-    </div>
-    <div style="clear:both"></div>
-  </div>
 
-  </div>
+      <tr>
+      <td>DFS Used%</td><td><%=StringUtils.formatPercent(used/(double)presentCapacity, 2)%></td>
+      <td>&nbsp;</td><td>&nbsp;</td>
+      </tr>
+
+      <tr>
+      <td>Datanodes available</td><td><%=live.length%></td>
+      <td>Total Datanodes</td><td><%=(live.length + dead.length)%></td>
+      </tr>
+  </table>
+
+  <table>
+    <tr><th colspan="4">Resource Summary</th></tr>
+    <tr>
+    <td>Active Nodes</td><td>32</td>
+    <td>Running Nodes</td><td>32</td>
+    </tr>
+
+    <tr>
+    <td>Memory Used</td><td></td>
+    <td>Total Memory</td><td></td>
+    </tr>
+  </table>
+
+  </div> <!-- container-tajo -->
   </body>
 </html>
