@@ -18,7 +18,6 @@
 
 package tajo.master;
 
-import com.google.common.collect.Maps;
 import com.google.protobuf.ServiceException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -29,6 +28,7 @@ import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.Clock;
 import org.apache.hadoop.yarn.SystemClock;
+import org.apache.hadoop.yarn.client.AMRMClient;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.AsyncDispatcher;
 import org.apache.hadoop.yarn.event.EventHandler;
@@ -61,6 +61,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 public class TajoMaster extends CompositeService {
 
@@ -84,6 +85,7 @@ public class TajoMaster extends CompositeService {
   private AsyncDispatcher dispatcher;
   private ClientService clientService;
   private YarnRPC yarnRPC;
+  private AMRMClient amrmClient;
 
   //Web Server
   private StaticHttpServer webServer;
@@ -361,7 +363,8 @@ public class TajoMaster extends CompositeService {
   }
 
   public class MasterContext {
-    private final Map<QueryId, QueryMaster> queries = Maps.newConcurrentMap();
+    private final Map<QueryId, QueryMaster> queries =
+        new ConcurrentSkipListMap<QueryId, QueryMaster>();
     private final TajoConf conf;
 
     public MasterContext(TajoConf conf) {

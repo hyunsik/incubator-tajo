@@ -169,6 +169,9 @@ public class RMContainerAllocator extends RMCommunicator
     AMResponse response = allocateResponse.getAMResponse();
     lastResponseID = response.getResponseId();
     availableResources = response.getAvailableResources();
+    context.setAvailableCores(availableResources.getVirtualCores());
+    context.setAvailableMemory(availableResources.getMemory());
+
     lastClusterNmCount = clusterNmCount;
     clusterNmCount = allocateResponse.getNumClusterNodes();
 

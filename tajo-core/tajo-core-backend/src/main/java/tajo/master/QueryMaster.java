@@ -226,6 +226,9 @@ public class QueryMaster extends CompositeService implements EventHandler {
     public Map<ContainerId, Container> containers = new ConcurrentHashMap<ContainerId, Container>();
     int minCapability;
     int maxCapability;
+    long availableMemory;
+    int availableCores;
+    int usedContainers;
 
     public QueryContext(QueryConf conf) {
       this.conf = conf;
@@ -317,6 +320,30 @@ public class QueryMaster extends CompositeService implements EventHandler {
 
     public int getMinContainerCapability() {
       return this.minCapability;
+    }
+
+    public void setAvailableCores(int cores) {
+      availableCores = cores;
+    }
+
+    public int getAvailableCores() {
+      return availableCores;
+    }
+
+    public void setAvailableMemory(long memory) {
+      availableMemory = memory;
+    }
+
+    public long getAvailableMemory() {
+      return availableMemory;
+    }
+
+    public void setUsedContainers(int usedContainers) {
+      this.usedContainers = usedContainers;
+    }
+
+    public int getUsedContainers() {
+      return this.usedContainers;
     }
 
     public boolean isCreateTableQuery() {

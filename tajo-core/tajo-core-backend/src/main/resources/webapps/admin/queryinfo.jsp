@@ -20,43 +20,39 @@
 
   <%@ page import="java.util.*" %>
   <%@ page import="tajo.webapp.StaticHttpServer" %>
+  <%@ page import="tajo.*" %>
   <%@ page import="tajo.catalog.*" %>
   <%@ page import="tajo.master.TajoMaster" %>
   <%@ page import="tajo.master.QueryMaster" %>
   <%@ page import="tajo.engine.*" %>
+  <%@ page import="tajo.util.TajoIdUtils" %>
   <%@ page import="java.net.InetSocketAddress" %>
   <%@ page import="java.net.InetAddress"  %>
   <%@ page import="org.apache.hadoop.conf.Configuration" %>
-  <%@ page import="java.util.Map.Entry" %>
-  <%@ page import="tajo.QueryId" %>
+
 
   <%@include file="./header.jsp" %>
+
+  <%
+    String queryIdStr = request.getParameter("qid");
+    QueryId qid = TajoIdUtils.createQueryId(queryIdStr);
+    QueryMaster qm = master.getContext().getQuery(qid);
+   %>
+
+  <% if (qm == null) { %>
+  <h2>No Such Query Id: <%=queryIdStr%></h2>
+  <% } else { %>
 
   <div class ="container-tajo">
 
   <table>
-    <tr><th colspan="2">Running Queries</th></tr>
-    <%
-    for (Entry<QueryId, QueryMaster> query : master.getContext().getAllQueries().entrySet()) {
-    %>
-    <tr>
-      <th>Query Id</th><th></th>
-    </tr>
-    <tr>
-    <td><a href="queryinfo.jsp?qid=<%=query.getKey()%>"><%=query.getKey()%></a></td><td>&nbsp;</td>
-    </tr>
-    <% } %>
-  </table>
+    <tr><th colspan="2">Query Info (<%=queryIdStr%></th></tr>
 
-    <div class = "command" >
-      <form method="post" action="./queries.jsp">
-	    <textarea name="command"  class = "command">insert query</textarea>
-	    <br />
-	    <br />
-	    <br />
-	    <input type="submit" value="submit" />
-      </form>
-    </div>
+    <tr>
+    <td>aaa</td><td>&nbsp;</td>
+    </tr>
+  </table>
+  <% } %>
   </div> <!-- container-tajo -->
   </body>
 </html>

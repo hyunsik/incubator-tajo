@@ -116,6 +116,9 @@ public abstract class RMCommunicator extends AbstractService {
     try {
       AllocateResponse allocateResponse = scheduler.allocate(allocateRequest);
       context.setNumClusterNode(allocateResponse.getNumClusterNodes());
+      Resource availableResource = allocateResponse.getAMResponse().getAvailableResources();
+      context.setAvailableCores(availableResource.getVirtualCores());
+      context.setAvailableMemory(availableResource.getMemory());
     } catch (YarnRemoteException e) {
       e.printStackTrace();
     }

@@ -49,12 +49,40 @@
     ClientRMProtocol proxy = (ClientRMProtocol)rpc.
       getProxy(ClientRMProtocol.class, rmAddress, yarnConf);
 
+    AMRMClient amClient = (AMRMClient)rpc.
+      getProxy(AMRMClient.class, rmAddress, yarnConf);
+
     GetClusterNodesRequest req = Records.newRecord(GetClusterNodesRequest.class);
     GetClusterNodesResponse res = proxy.getClusterNodes(req);
 
     List<NodeReport> nodes = res.getNodeReports();
+
+    long unusedNodeCapacity;
+    long availNodeCapacity;
+    long totalNodeCapacity;
+    int numContainers;
+
+    for (NodeReport node : nodes) {
+      usedNodeCapacity += report.getUsedResource().getMemory();
+      availNodeCapacity += report.getAvailableResource().getMemory();
+      totalNodeCapacity += ni.getTotalCapability().getMemory();
+      numContainers += fs.getNodeReport(ni.getNodeID()).getNumContainers();
+    }
   %>
     <div class ="container-tajo">
+
+    <table>
+      <tr><th colspan="4">Cluster Summary</th></tr>
+      <tr>
+      <td>Physical Nodes</td><td><%=nodes.size();%></td>
+      <td>Containers</td><td><%=numContainers%></td>
+      </tr>
+      <tr>
+      <td>Format</td><td><%=meta.getStoreType()%></td>
+      <td>Volume</td><td><%=volume + " (" + StringUtils.byteDesc(volume) +")"%></td>
+      </tr>
+    </table>
+
     <h2 class = "line">Available workers: <%=nodes.size()%></h2>
     <h2 class = "line">Available workers: <%=nodes.get(0).getNumContainers()%></h2>
   <h2 class = "line">Available workers: <%=nodes.get(0).getCapability().getMemory()%></h2>

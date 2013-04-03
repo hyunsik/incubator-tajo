@@ -21,42 +21,57 @@
   <%@ page import="java.util.*" %>
   <%@ page import="tajo.webapp.StaticHttpServer" %>
   <%@ page import="tajo.catalog.*" %>
+  <%@ page import="tajo.catalog.statistics.TableStat" %>
   <%@ page import="tajo.master.TajoMaster" %>
-  <%@ page import="tajo.master.QueryMaster" %>
   <%@ page import="tajo.engine.*" %>
   <%@ page import="java.net.InetSocketAddress" %>
   <%@ page import="java.net.InetAddress"  %>
   <%@ page import="org.apache.hadoop.conf.Configuration" %>
-  <%@ page import="java.util.Map.Entry" %>
-  <%@ page import="tajo.QueryId" %>
+  <%@ page import="org.apache.hadoop.util.StringUtils" %>
 
   <%@include file="./header.jsp" %>
 
-  <div class ="container-tajo">
+   <%
+    String tableName = request.getParameter("tablename");
+    TableDesc desc = catalog.getTableDesc(tableName);
+    TableMeta meta = desc.getMeta();
+    TableStat stat = meta.getStat();
+    long volume = meta.getStat().getNumBytes();
+   %>
+
+  <div class="container-tajo">
+  <h2><%=tableName%></h2>
 
   <table>
-    <tr><th colspan="2">Running Queries</th></tr>
-    <%
-    for (Entry<QueryId, QueryMaster> query : master.getContext().getAllQueries().entrySet()) {
-    %>
-    <tr>
-      <th>Query Id</th><th></th>
-    </tr>
-    <tr>
-    <td><a href="queryinfo.jsp?qid=<%=query.getKey()%>"><%=query.getKey()%></a></td><td>&nbsp;</td>
-    </tr>
-    <% } %>
+  <tr><th colspan="4">Table Summary</th></tr>
+  <tr>
+    <td>Name</td><td><%=tableName%></td>
+    <td>Path</td><td><%=desc.getPath()%></td>
+  </tr>
+  <tr>
+    <td>Format</td><td><%=meta.getStoreType()%></td>
+    <td>Volume</td><td><%=volume + " (" + StringUtils.byteDesc(volume) +")"%></td>
+  </tr>
   </table>
 
-    <div class = "command" >
-      <form method="post" action="./queries.jsp">
-	    <textarea name="command"  class = "command">insert query</textarea>
-	    <br />
-	    <br />
-	    <br />
-	    <input type="submit" value="submit" />
-      </form>
-    </div>
+  <table>
+  <tr><th colspan="2">Table Schema</th></tr>
+  <tr>
+    <th>Name</th>
+    <th>Domain</th>
+  </tr>
+    <%
+    for (Column column : meta.getSchema().getColumns()) {
+    %>
+      <tr>
+        <td><%=column.getColumnName()%></td><td><%=column.getDataType()%></td>
+      </tr>
+    <%
+    }
+    %>
+  </table>
+
   </div> <!-- container-tajo -->
-  </body>
+</body>
 </html>
+
