@@ -61,6 +61,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
 public class TajoMaster extends CompositeService {
@@ -377,6 +378,10 @@ public class TajoMaster extends CompositeService {
 
     public Clock getClock() {
       return clock;
+    }
+
+    public QueryMaster getLastQuery() {
+      return (QueryMaster) ((ConcurrentNavigableMap)queries).lastEntry().getValue();
     }
 
     public QueryMaster getQuery(QueryId queryId) {
