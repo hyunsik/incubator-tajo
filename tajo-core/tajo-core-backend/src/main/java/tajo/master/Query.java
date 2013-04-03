@@ -151,7 +151,39 @@ public class Query implements EventHandler<QueryEvent> {
   }
 
   public float getProgress() {
+    computeProgress();
     return progress;
+  }
+
+  private void computeProgress() {
+    int idx = 0;
+    float [] progress = new float[subqueries.size()];
+    boolean finished = true;
+    for (SubQuery subquery: subqueries.values()) {
+      if (subquery.getStateMachine().getCurrentState() != SubQueryState.NEW) {
+        progress[idx] = subquery.getProgress();
+        if (finished == true && subquery.getState() != SubQueryState.SUCCEEDED) {
+          finished = false;
+        }
+      } else {
+        progress[idx] = 0.0f;
+      }
+      idx++;
+    }
+
+    if (finished == true) {
+      this.progress = 1.0f;
+      return;
+    }
+
+    float totalProgress = 0;
+    float proportion = 1.0f / (float)subqueries.size();
+
+    for (int i = 0; i < progress.length; i++) {
+      totalProgress += progress[i] * proportion;
+    }
+
+    this.progress = totalProgress;
   }
 
   public long getAppSubmitTime() {

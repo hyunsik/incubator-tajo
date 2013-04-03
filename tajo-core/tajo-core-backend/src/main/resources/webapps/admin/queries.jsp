@@ -29,34 +29,51 @@
   <%@ page import="org.apache.hadoop.conf.Configuration" %>
   <%@ page import="java.util.Map.Entry" %>
   <%@ page import="tajo.QueryId" %>
+  <%@ page import="java.text.SimpleDateFormat" %>
+  <%@ page import="java.util.Date" %>
+  <%@ page import="tajo.TajoProtos" %>
+
 
   <%@include file="./header.jsp" %>
 
   <div class ="container-tajo">
 
   <table>
-    <tr><th colspan="2">Running Queries</th></tr>
+    <tr><th colspan="6">Running Queries</th></tr>
+    <tr>
+    <th>Query Id</th>
+    <th>Progress</th>
+    <th>Start Time</th>
+    <th>Finish Time</th>
+    <th>Response Time</th>
+    <th>Final State</th>
+    </tr>
     <%
+    SimpleDateFormat df = new SimpleDateFormat("HH:mm:ss");
+
     for (Entry<QueryId, QueryMaster> query : master.getContext().getAllQueries().entrySet()) {
+      QueryMaster qm = query.getValue();
+      float progress = qm.getContext().getProgress();
+      long startTime = qm.getContext().getStartTime();
+      long finishTime = qm.getContext().getFinishTime();
+      TajoProtos.QueryState finalState = qm.getContext().getQuery().getState();
+      String responseTime;
+      if (finalState == TajoProtos.QueryState.QUERY_SUCCEEDED) {
+        responseTime = ((finishTime - startTime) / 1000) + " sec";
+      } else {
+        responseTime = "Nil";
+      }
     %>
     <tr>
-      <th>Query Id</th><th></th>
-    </tr>
-    <tr>
-    <td><a href="queryinfo.jsp?qid=<%=query.getKey()%>"><%=query.getKey()%></a></td><td>&nbsp;</td>
+    <td><a href="queryinfo.jsp?qid=<%=query.getKey()%>"><%=query.getKey()%></a></td>
+    <td><%=progress%></td>
+    <td><%=df.format(startTime)%></td>
+    <td><%=df.format(finishTime)%></td>
+    <td><%=responseTime%></td>
+    <td><%=finalState%></td>
     </tr>
     <% } %>
   </table>
-
-    <div class = "command" >
-      <form method="post" action="./queries.jsp">
-	    <textarea name="command"  class = "command">insert query</textarea>
-	    <br />
-	    <br />
-	    <br />
-	    <input type="submit" value="submit" />
-      </form>
-    </div>
   </div> <!-- container-tajo -->
   </body>
 </html>

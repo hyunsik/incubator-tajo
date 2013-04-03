@@ -165,6 +165,31 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
     stateMachine = stateMachineFactory.make(this);
   }
 
+  public long getStartTime() {
+    return this.startTime;
+  }
+
+  public long getFinishTime() {
+    return this.finishTime;
+  }
+
+  public float getProgress() {
+    readLock.lock();
+    try {
+      if (getStateMachine().getCurrentState() == SubQueryState.NEW) {
+        return 0;
+      } else {
+        if (completedTaskCount == 0) {
+          return 0.0f;
+        } else {
+          return (float)completedTaskCount / (float)tasks.size();
+        }
+      }
+    } finally {
+      readLock.unlock();
+    }
+  }
+
   public void setQueryContext(QueryContext context) {
     this.queryContext = context;
   }
