@@ -30,6 +30,15 @@
   <%@include file="./header.jsp" %>
 
   <div class ="container-tajo">
+  <div>
+  <button>Q1</button>
+  <button>Q2</button>
+  <button>Q3</button>
+  <button>Q6</button>
+  <button>Q10</button>
+  <button>Q12</button>
+  <button>Q14</button>
+  </div>
     <div class = "command" >
       <form method="post" action="./queries.jsp">
 	    <textarea name="command"  class = "command">insert query</textarea>

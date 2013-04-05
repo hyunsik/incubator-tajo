@@ -54,8 +54,8 @@
   <table>
     <tr><th colspan="4">Tajo Summary</th></tr>
     <tr>
-    <td>Tables</td><td>00</td>
-    <td>Number of Executed Queries</td><td>32</td>
+    <td>Tables</td><td><%=catalog.getAllTableNames().size()%></td>
+    <td>Number of Submitted Queries</td><td><%=master.getContext().getAllQueries().size()%></td>
     </tr>
 
     <tr>

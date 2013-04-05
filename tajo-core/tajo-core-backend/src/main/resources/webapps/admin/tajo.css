@@ -342,7 +342,7 @@ table .headerSortUp.purple, table .headerSortDown.purple {
 {
     display: block;
     width: 10em;
-    color: #000000;
+    color: white;
     text-decoration: none;
     text-align: center;
 
@@ -351,16 +351,16 @@ table .headerSortUp.purple, table .headerSortDown.purple {
     font-weight: normal;
     line-height: 18px;
     font-weight: bold;
-    color: #404040;
+    background-color: #08c;
 }
 
 #topbar a:hover
 {
-    /*background-color: #6666AA;*/
+    background-color: #09c;
 }
 
 #topbar li
 {
     float: left;
-    margin-right: 0.5em;
+    /*margin-right: 0.5em;*/
 }
