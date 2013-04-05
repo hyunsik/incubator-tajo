@@ -53,7 +53,7 @@
 
     for (Entry<QueryId, QueryMaster> query : master.getContext().getAllQueries().entrySet()) {
       QueryMaster qm = query.getValue();
-      float progress = qm.getContext().getProgress();
+      float progress = qm.getContext().getProgress()*100;
       long startTime = qm.getContext().getStartTime();
       long finishTime = qm.getContext().getFinishTime();
       TajoProtos.QueryState finalState = qm.getContext().getQuery().getState();
@@ -66,7 +66,7 @@
     %>
     <tr>
     <td><a href="queryinfo.jsp?qid=<%=query.getKey()%>"><%=query.getKey()%></a></td>
-    <td><%=progress%></td>
+    <td><%=progress%>%</td>
     <td><%=df.format(startTime)%></td>
     <td><%=df.format(finishTime)%></td>
     <td><%=responseTime%></td>
