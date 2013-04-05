@@ -1,0 +1,39 @@
+#demo {
+    width:80%;
+    height:50em;
+    margin-left:3em;
+    margin-top:3em;
+    position:relative;
+}
+
+.window {
+    border:3px solid;
+    width:15em;
+    height:3em;
+    z-index:20;
+    position:absolute;
+}
+
+.component {
+    opacity:0.8;
+    filter:alpha(opacity=80);
+    background-color:white;
+    color:black;
+    font-family:helvetica;
+    padding:0.5em;
+}
+
+.label {
+    border:1px solid #346789;
+    padding:8px;
+    padding:8px;
+}
+
+.label:hover {
+    border-color:#5d94a6;
+}
+
+.textborder {
+    border: 1px solid;
+    padding: 2px;
+}

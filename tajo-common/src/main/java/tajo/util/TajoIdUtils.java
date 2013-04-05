@@ -45,7 +45,7 @@ public class TajoIdUtils {
     String[] split = queryId.split(QueryId.SEPARATOR);
     ApplicationId appId = BuilderUtils.newApplicationId(Long.valueOf(split[1]),
         Integer.parseInt(split[2]));
-    int idInt = Integer.parseInt(split[2]);
+    int idInt = Integer.parseInt(split[3]);
     return newQueryId(appId, idInt);
   }
 
