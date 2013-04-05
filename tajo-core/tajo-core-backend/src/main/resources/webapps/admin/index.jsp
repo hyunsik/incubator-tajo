@@ -60,7 +60,7 @@
 
     <tr>
     <td>Running Queries</td><td>00</td>
-    <td>&nbsp;</td><td>&nbsp;</td>
+    <td>tajo.rootdir</td><td><%=conf.get("tajo.rootdir")%></td>
     </tr>
   </table>
 
@@ -78,6 +78,10 @@
 
   <table>
     <tr><th colspan="4">HDFS Summary</th></tr>
+      <tr>
+        <td>fs.defaultFS</td>
+        <td><%=conf.get("fs.defaultFS")%></td>
+      </tr>
       <tr>
       <td>Configured Capacity</td><td><%=StringUtils.byteDesc(capacity)%></td>
       <td>Present Capacity</td><td><%=StringUtils.byteDesc(presentCapacity)%></td>

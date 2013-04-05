@@ -30,6 +30,7 @@
   <%@ page import="java.util.Map.Entry" %>
   <%@ page import="tajo.QueryId" %>
   <%@ page import="java.text.SimpleDateFormat" %>
+  <%@ page import="java.text.DecimalFormat" %>
   <%@ page import="java.util.Date" %>
   <%@ page import="tajo.TajoProtos" %>
 
@@ -66,9 +67,9 @@
     %>
     <tr>
     <td><a href="queryinfo.jsp?qid=<%=query.getKey()%>"><%=query.getKey()%></a></td>
-    <td><%=progress%>%</td>
+    <td><%=new DecimalFormat("##.##").format(progress)%>%</td>
     <td><%=df.format(startTime)%></td>
-    <td><%=df.format(finishTime)%></td>
+    <td><%=finalState == TajoProtos.QueryState.QUERY_SUCCEEDED ? df.format(finishTime) : "Nil"%></td>
     <td><%=responseTime%></td>
     <td><%=finalState%></td>
     </tr>

@@ -31,6 +31,7 @@
   <%@ page import="java.net.InetSocketAddress" %>
   <%@ page import="java.net.InetAddress"  %>
   <%@ page import="java.text.SimpleDateFormat" %>
+  <%@ page import="java.text.DecimalFormat" %>
   <%@ page import="org.apache.hadoop.conf.Configuration" %>
 
 
@@ -74,21 +75,24 @@
   <div class ="container-tajo">
 
   <table>
-    <tr><th colspan="2">Query Info : <%=queryIdStr%></th></tr>
-
+  <tr><th colspan="6">Running Query Detail: <%=queryIdStr%></th></tr>
+  <tr>
+      <th>Progress</th>
+      <th>Start Time</th>
+      <th>Finish Time</th>
+      <th>Response Time</th>
+      <th>Final State</th>
+    </tr>
     <tr>
-    <td><%=progress%>%</td>
-    <td><%=df.format(startTime)%></td>
-    <td><%=df.format(finishTime)%></td>
-    <td><%=responseTime%></td>
-    <td><%=finalState%></td>
+      <td><%=new DecimalFormat("##.##").format(progress)%>%</td>
+      <td><%=df.format(startTime)%></td>
+      <td><%=finalState == TajoProtos.QueryState.QUERY_SUCCEEDED ? df.format(finishTime) : "Nil"%></td>
+      <td><%=responseTime%></td>
+      <td><%=finalState%></td>
     </tr>
   </table>
   <% } %>
 
-
-  <script type='text/javascript' src='http://ajax.googleapis.com/ajax/libs/jquery/1.8.1/jquery.min.js'></script>
-  <script type='text/javascript' src='http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.23/jquery-ui.min.js'></script>
   <script type='text/javascript' src='js/jquery.jsPlumb-1.3.16-all-min.js'></script>
 
   <!--
@@ -138,7 +142,7 @@
       %>
 
       <div class="component window" id="<%=curIdStr%>" style="left:<%=x%>em;top:<%=y%>em;">
-        <p><b>SubQuery</b></p><br/>
+        <p><b>SubQuery</b> (<%=new DecimalFormat("##.##").format(cur.subQuery.getProgress() * 100)%>%)</p><br/>
         <p><a style="font-size:0.8em;" href="./subqueryinfo.jsp?subqid=<%=curIdStr%>"><%=curIdStr%></a></p>
       </div>
 
