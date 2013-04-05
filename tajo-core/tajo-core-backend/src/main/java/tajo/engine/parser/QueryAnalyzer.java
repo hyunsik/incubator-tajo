@@ -868,29 +868,30 @@ public final class QueryAnalyzer {
         column = schema.getColumn(table+"."+columnName);
         count++;
       }
+    }
 
-      if (tree instanceof QueryBlock) {
-        QueryBlock block = ((QueryBlock)tree);
-        if (block.getTargetList() != null) {
-          for (Target target : block.getTargetList()) {
-            if (target.hasAlias() && target.getAlias().equals(columnName)) {
-              try {
-                column = (Column) target.getColumnSchema().clone();
-                column.setName(target.getAlias());
-              } catch (CloneNotSupportedException e) {
-                e.printStackTrace();
-              }
-              count++;
+    if (tree instanceof QueryBlock) {
+      QueryBlock block = ((QueryBlock)tree);
+      if (block.getTargetList() != null) {
+        for (Target target : block.getTargetList()) {
+          if (target.hasAlias() && target.getAlias().equals(columnName)) {
+            try {
+              column = (Column) target.getColumnSchema().clone();
+              column.setName(target.getAlias());
+            } catch (CloneNotSupportedException e) {
+              e.printStackTrace();
             }
+            count++;
           }
         }
       }
-
-      // if there are more than one column, we cannot expect
-      // that this column belongs to which table.
-      if(count > 1)
-        throw new AmbiguousFieldException(columnName);
     }
+
+    // if there are more than one column, we cannot expect
+    // that this column belongs to which table.
+    if(count > 1)
+      throw new AmbiguousFieldException(columnName);
+
 
     if(column == null) { // if there are no matched column
       throw new InvalidQueryException("ERROR: column \"" + columnName

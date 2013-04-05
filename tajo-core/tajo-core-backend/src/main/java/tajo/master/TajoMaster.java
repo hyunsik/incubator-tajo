@@ -104,7 +104,7 @@ public class TajoMaster extends CompositeService {
 
 
     try {
-      webServer = StaticHttpServer.getInstance(this ,"admin", null, 8080,
+      webServer = StaticHttpServer.getInstance(this ,"admin", null, 10080,
           true, null, context.getConf(), null);
       webServer.start();
 
