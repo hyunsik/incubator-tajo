@@ -45,7 +45,7 @@
     function fill_Q3() {
       var volume = document.getElementById("volume").value;
       document.getElementById("sql").value =
-      "select l_orderkey,  sum(l_extendedprice*(1-l_discount)) as revenue, o_orderdate, o_shippriority from customer"+volume+", orders+"volume+", lineitem"+volume+" where c_mktsegment = 'BUILDING' and c_custkey = o_custkey and l_orderkey = o_orderkey and o_orderdate < '1995-03-15' and l_shipdate > '1995-03-15' group by l_orderkey, o_orderdate, o_shippriority order by revenue desc, o_orderdate";
+      "select l_orderkey,  sum(l_extendedprice*(1-l_discount)) as revenue, o_orderdate, o_shippriority from customer"+volume+", orders"+volume+", lineitem"+volume+" where c_mktsegment = 'BUILDING' and c_custkey = o_custkey and l_orderkey = o_orderkey and o_orderdate < '1995-03-15' and l_shipdate > '1995-03-15' group by l_orderkey, o_orderdate, o_shippriority order by revenue desc, o_orderdate";
     }
 
     function fill_Q6() {
@@ -97,7 +97,7 @@
         },
         error: function(XMLHttpRequest, textStatus, errorThrown) {
           $("#sql").text="";
-          $("#message").value("<h4>" + textStatus + "</h4>");
+          $("#message").value = "<h4>" + textStatus + "</h4>";
           $("#message").fadeIn("slow");
         }
       });
