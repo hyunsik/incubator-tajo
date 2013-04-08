@@ -386,10 +386,7 @@ public class PullServerAuxService extends AbstractService
       List<String> taskIds = splitMaps(taskIdList);
 
       // the working dir of tajo worker for each query
-      String base =
-          ContainerLocalizer.USERCACHE + "/" + userName + "/"
-              + ContainerLocalizer.APPCACHE + "/"
-              + appId + "/output" + "/";
+      String base = appId + "/output";
 
       // if a subquery requires a range partitioning
       if (repartitionType.equals("r")) {

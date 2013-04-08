@@ -110,10 +110,7 @@ public class TaskRunner extends AbstractService {
     try {
       this.workerContext = new WorkerContext();
 
-      baseDir =
-          ContainerLocalizer.USERCACHE + "/" + taskOwner.getShortUserName() + "/"
-              + ContainerLocalizer.APPCACHE + "/"
-              + ConverterUtils.toString(appId)
+      baseDir = ConverterUtils.toString(appId)
               + "/output" + "/" + subQueryId.getId();
 
       // Setup LocalDirAllocator
