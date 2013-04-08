@@ -287,7 +287,7 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
 
   public PhysicalExec createSortPlan(TaskAttemptContext ctx, SortNode sortNode,
                                      PhysicalExec subOp) throws IOException {
-    return new ExternalSortExec(ctx, sm, sortNode, subOp);
+    return new MemSortExec(ctx, sortNode, subOp);
   }
 
   public PhysicalExec createIndexWritePlan(StorageManager sm,

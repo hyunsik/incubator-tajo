@@ -278,7 +278,7 @@ public class TaskRunnerLauncherImpl extends AbstractService implements TaskRunne
     //LOG.info("Setting up app master command");
     vargs.add("${JAVA_HOME}" + "/bin/java");
     // Set Xmx based on am memory size
-    vargs.add("-Xmx2000m");
+    vargs.add("-Xmx"+event.getContainer().getResource().getMemory()+"m");
     // Set Remote Debugging
     //if (!context.getQuery().getSubQuery(event.getSubQueryId()).isLeafQuery()) {
     //vargs.add("-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005");

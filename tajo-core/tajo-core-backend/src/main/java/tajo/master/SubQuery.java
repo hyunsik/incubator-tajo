@@ -584,7 +584,7 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
                 RecordFactoryProvider.getRecordFactory(null).newRecordInstance(
                     Resource.class);
             if (tasks.length <= subQuery.queryContext.getNumClusterNode()) {
-              resource.setMemory(subQuery.queryContext.getMaxContainerCapability());
+              resource.setMemory(6096);
             } else {
               resource.setMemory(2000);
             }
