@@ -220,7 +220,7 @@ public class PullServerAuxService extends AbstractService
           Executors.newCachedThreadPool(workerFactory));
 
       localFS = new LocalFileSystem();
-      LOG.info("==> TaskLocalDir: "+ConfVars.TASK_LOCAL_DIR.varname);
+      LOG.info("==> TaskLocalDir: " + conf.get(ConfVars.TASK_LOCAL_DIR.varname));
       super.init(new Configuration(conf));
     } catch (Throwable t) {
       LOG.error(t);
