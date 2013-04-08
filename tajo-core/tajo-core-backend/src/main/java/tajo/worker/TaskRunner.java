@@ -251,11 +251,15 @@ public class TaskRunner extends AbstractService {
                       continue;
                     }
 
-                    Path taskTempDir = localFS.makeQualified(
+                    Path taskTempDir = localFS.makeQualified(new Path(
+                        "/disk1/tajo-localdir/"+baseDir +
+                            "/" + taskAttemptId.getQueryUnitId().getId()
+                            + "_" + taskAttemptId.getId()));
+                        /*
                         lDirAllocator.getLocalPathForWrite(baseDir +
                             "/" + taskAttemptId.getQueryUnitId().getId()
-                            + "_" + taskAttemptId.getId(), conf));
-
+                            + "_" + taskAttemptId.getId(), conf));*/
+                    localFS.mkdirs(taskTempDir);
                     LOG.info("Initializing: " + taskAttemptId);
                     Task task = new Task(taskAttemptId, workerContext, master,
                         new QueryUnitRequestImpl(taskRequest), taskTempDir);

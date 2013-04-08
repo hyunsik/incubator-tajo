@@ -391,9 +391,11 @@ public class PullServerAuxService extends AbstractService
       // if a subquery requires a range partitioning
       if (repartitionType.equals("r")) {
         String ta = taskIds.get(0);
-        Path path = localFS.makeQualified(
-            lDirAlloc.getLocalPathToRead(base + "/" + sid + "/"
-                + ta + "/output/", conf));
+        Path path = localFS.makeQualified(new Path(
+            "/disk1/tajo-localdir/"+base + "/" + sid + "/"
+                + ta + "/output/"));
+            /*lDirAlloc.getLocalPathToRead(base + "/" + sid + "/"
+                + ta + "/output/", conf));*/
 
         String startKey = params.get("start").get(0);
         String endKey = params.get("end").get(0);

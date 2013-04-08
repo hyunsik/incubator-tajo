@@ -187,9 +187,10 @@ public class Task {
 
   public void init() throws IOException {
     if (request.getFetches().size() > 0) {
-      inputTableBaseDir = localFS.makeQualified(
-          lDirAllocator.getLocalPathForWrite(
-              getTaskAttemptDir(context.getTaskId()).toString() + "/in", conf));
+      inputTableBaseDir = localFS.makeQualified(new Path(
+          "/disk1/tajo-localdir/"+getTaskAttemptDir(context.getTaskId()).toString() + "/in"));
+          /*lDirAllocator.getLocalPathForWrite(
+              getTaskAttemptDir(context.getTaskId()).toString() + "/in", conf));*/
       localFS.mkdirs(inputTableBaseDir);
       Path tableDir;
       for (String inputTable : context.getInputTables()) {
@@ -522,9 +523,11 @@ public class Task {
                                         List<Fetch> fetches) throws IOException {
 
     if (fetches.size() > 0) {
-      Path inputDir = lDirAllocator.
-          getLocalPathToRead(
-              getTaskAttemptDir(ctx.getTaskId()).toString() + "/in", conf);
+      Path inputDir =
+          new Path("/disk1/tajo-localdir/"+getTaskAttemptDir(ctx.getTaskId()).toString() + "/in");
+          //lDirAllocator.
+//          getLocalPathToRead(
+//              getTaskAttemptDir(ctx.getTaskId()).toString() + "/in", conf);
       File storeDir;
 
       int i = 0;
