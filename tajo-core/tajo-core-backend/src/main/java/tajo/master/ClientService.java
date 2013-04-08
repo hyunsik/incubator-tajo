@@ -327,7 +327,8 @@ public class ClientService extends AbstractService {
         throws ServiceException {
       String tableName = tableNameProto.getValue();
       if (!catalog.existsTable(tableName)) {
-        throw new NoSuchTableException(tableName);
+        LOG.info("No Such a Table: " + tableName);
+        return BOOL_TRUE;
       }
 
       Path path = catalog.getTableDesc(tableName).getPath();
