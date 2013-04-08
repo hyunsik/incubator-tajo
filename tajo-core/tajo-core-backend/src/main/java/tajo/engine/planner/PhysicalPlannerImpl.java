@@ -261,12 +261,12 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
     } else {
       String [] outerLineage = PlannerUtil.getLineage(groupbyNode.getSubNode());
       long estimatedSize = estimateSizeRecursive(ctx, outerLineage);
-      final long threshold = 1048576 * 256;
+      final long threshold = 1048576 * 512;
 
       // if the relation size is less than the reshold,
       // the hash aggregation will be used.
       if (estimatedSize <= threshold) {
-        LOG.info("The planner chooses HashAggregationExec");
+        LOG.info("The planner chooses HashAggregationExec (input size:"+ estimatedSize +")");
         return new HashAggregateExec(ctx, groupbyNode, subOp);
       } else {
         SortSpec[] specs = new SortSpec[grpColumns.length];
@@ -279,7 +279,7 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
         // SortExec sortExec = new SortExec(sortNode, child);
         ExternalSortExec sortExec = new ExternalSortExec(ctx, sm, sortNode,
             subOp);
-        LOG.info("The planner chooses SortAggregationExec");
+        LOG.info("The planner chooses SortAggregationExec (input size:" + estimatedSize +")");
         return new SortAggregateExec(ctx, groupbyNode, sortExec);
       }
     }
