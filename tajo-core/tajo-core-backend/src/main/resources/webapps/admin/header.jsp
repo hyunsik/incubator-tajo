@@ -49,6 +49,7 @@
     <li><a href="./cluster.jsp" class="headline">Cluster</a></li>
     <li><a href="./queries.jsp" class="headline">Queries</a></li>
     <li><a href="./tpch.jsp" class="headline">TPC-H Benchmark</a></li>
+    <li><a href="./hive.jsp" class="headline">TPC-H for Hive</a></li>
     </ul>
     </div>
     </div>
