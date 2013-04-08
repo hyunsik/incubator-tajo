@@ -417,8 +417,11 @@ public class PullServerAuxService extends AbstractService
       } else if (repartitionType.equals("h")) {
         for (String ta : taskIds) {
           Path path = localFS.makeQualified(
+              new Path("/disk1/tajo-localdir/"+base + "/" + sid + "/" +
+                  ta + "/output/" + partitionId));
+              /*
               lDirAlloc.getLocalPathToRead(base + "/" + sid + "/" +
-                  ta + "/output/" + partitionId, conf));
+                  ta + "/output/" + partitionId, conf));*/
           File file = new File(path.toUri());
           FileChunk chunk = new FileChunk(file, 0, file.length());
           chunks.add(chunk);
