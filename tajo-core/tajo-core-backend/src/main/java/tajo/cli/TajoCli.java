@@ -269,7 +269,7 @@ public class TajoCli {
   }
 
   private void dropTable(String [] cmd) throws Exception {
-    if (cmd.length != 2) {
+    if (cmd.length != 3) {
       System.out.println("usage: drop table tablename");
     } else {
       client.dropTable(cmd[2]);

@@ -101,7 +101,7 @@ public class ResultSetImpl implements ResultSet {
 
     @Override
     public int compare(FileStatus f1, FileStatus f2) {
-      return f2.getPath().getName().compareTo(f1.getPath().getName());
+      return f1.getPath().getName().compareTo(f2.getPath().getName());
     }
   }
 

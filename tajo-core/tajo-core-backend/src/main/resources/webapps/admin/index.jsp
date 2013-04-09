@@ -59,7 +59,7 @@
     </tr>
 
     <tr>
-    <td>Running Queries</td><td>00</td>
+    <td>Running Queries</td><td>&nbsp;</td>
     <td>tajo.rootdir</td><td><%=conf.get("tajo.rootdir")%></td>
     </tr>
   </table>
@@ -101,19 +101,6 @@
       <td>Datanodes available</td><td><%=live.length%></td>
       <td>Total Datanodes</td><td><%=(live.length + dead.length)%></td>
       </tr>
-  </table>
-
-  <table>
-    <tr><th colspan="4">Resource Summary</th></tr>
-    <tr>
-    <td>Active Nodes</td><td>32</td>
-    <td>Running Nodes</td><td>32</td>
-    </tr>
-
-    <tr>
-    <td>Memory Used</td><td></td>
-    <td>Total Memory</td><td></td>
-    </tr>
   </table>
 
   </div> <!-- container-tajo -->

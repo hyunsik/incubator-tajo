@@ -60,9 +60,6 @@
     </tr>
     <% } %>
   </table>
-    
-  <h2 class = "line">Function List</h2>
-  </div> <!-- container-tajo -->
 </body>
 </html>
 
