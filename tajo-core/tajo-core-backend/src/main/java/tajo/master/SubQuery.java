@@ -695,7 +695,7 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
       LOG.info("SubQuery (" + subQuery.getId() + ") has " + subQuery.i + " containers!");
       subQuery.eventHandler.handle(
           new TaskRunnerEvent(EventType.CONTAINER_REMOTE_LAUNCH,
-              subQuery.getId(), subQuery.containers.values()));
+              subQuery.getId(), allocationEvent.getAllocatedContainer()));
 
       subQuery.eventHandler.handle(new SubQueryEvent(subQuery.getId(),
           SubQueryEventType.SQ_START));
