@@ -320,8 +320,8 @@ public class PullServerAuxService extends AbstractService
 
     private final Configuration conf;
 //    private final IndexCache indexCache;
-    private final LocalDirAllocator lDirAlloc =
-      new LocalDirAllocator(ConfVars.TASK_LOCAL_DIR.varname);
+//    private final LocalDirAllocator lDirAlloc =
+//      new LocalDirAllocator(ConfVars.TASK_LOCAL_DIR.varname);
     private int port;
 
     public PullServer(Configuration conf) {
@@ -390,9 +390,9 @@ public class PullServerAuxService extends AbstractService
       // if a subquery requires a range partitioning
       if (repartitionType.equals("r")) {
         String ta = taskIds.get(0);
-        Path path = localFS.makeQualified(
-            lDirAlloc.getLocalPathToRead(queryBaseDir + "/" + sid + "/"
-                + ta + "/output/", conf));
+        Path path = localFS.makeQualified(new Path(
+            "/disk1/tajo-localdir/" + queryBaseDir + "/" + sid + "/"
+                + ta + "/output/"));
 
         String startKey = params.get("start").get(0);
         String endKey = params.get("end").get(0);
@@ -413,9 +413,9 @@ public class PullServerAuxService extends AbstractService
         // if a subquery requires a hash repartition
       } else if (repartitionType.equals("h")) {
         for (String ta : taskIds) {
-          Path path = localFS.makeQualified(
-              lDirAlloc.getLocalPathToRead(queryBaseDir + "/" + sid + "/" +
-                  ta + "/output/" + partitionId, conf));
+          Path path = localFS.makeQualified(new Path(
+              "/disk1/tajo-localdir/"+queryBaseDir + "/" + sid + "/" +
+                  ta + "/output/" + partitionId));
           File file = new File(path.toUri());
           FileChunk chunk = new FileChunk(file, 0, file.length());
           chunks.add(chunk);

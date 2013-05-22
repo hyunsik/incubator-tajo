@@ -72,7 +72,6 @@ public class Task {
   private final FileSystem localFS;
   private final WorkerContext workerContext;
   private final Interface masterProxy;
-  private final LocalDirAllocator lDirAllocator;
   private final QueryUnitAttemptId taskId;
 
   private final Path taskDir;
@@ -139,7 +138,6 @@ public class Task {
     this.workerContext = worker;
     this.masterProxy = masterProxy;
     this.localFS = worker.getLocalFS();
-    this.lDirAllocator = worker.getLocalDirAllocator();
     this.taskDir = StorageUtil.concatPath(workerContext.getBaseDir(),
         taskId.getQueryUnitId().getId() + "_" + taskId.getId());
 
@@ -193,11 +191,10 @@ public class Task {
   public void init() throws IOException {
     // initialize a task temporal dir
     localFS.mkdirs(taskDir);
+    localFS.mkdirs(new Path(taskDir, "output"));
 
     if (request.getFetches().size() > 0) {
-      inputTableBaseDir = localFS.makeQualified(
-          lDirAllocator.getLocalPathForWrite(
-              getTaskAttemptDir(context.getTaskId()).toString() + "/in", conf));
+      inputTableBaseDir = new Path(taskDir, "in");
       localFS.mkdirs(inputTableBaseDir);
       Path tableDir;
       for (String inputTable : context.getInputTables()) {
@@ -520,9 +517,7 @@ public class Task {
                                         List<Fetch> fetches) throws IOException {
 
     if (fetches.size() > 0) {
-      Path inputDir = lDirAllocator.
-          getLocalPathToRead(
-              getTaskAttemptDir(ctx.getTaskId()).toString() + "/in", conf);
+      Path inputDir = new Path(taskDir, "in");
       File storeDir;
 
       int i = 0;

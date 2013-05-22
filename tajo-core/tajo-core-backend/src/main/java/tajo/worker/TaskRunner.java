@@ -22,7 +22,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocalDirAllocator;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -90,7 +89,6 @@ public class TaskRunner extends AbstractService {
   // It keeps all of the query unit attempts while a TaskRunner is running.
   private final Map<QueryUnitAttemptId, Task> tasks =
       new ConcurrentHashMap<QueryUnitAttemptId, Task>();
-  private LocalDirAllocator lDirAllocator;
 
   // A thread to receive each assigned query unit and execute the query unit
   private Thread taskLauncher;
@@ -134,9 +132,9 @@ public class TaskRunner extends AbstractService {
           + "/output" + "/" + subQueryId.getId();
 
       // initialize LocalDirAllocator
-      lDirAllocator = new LocalDirAllocator(ConfVars.TASK_LOCAL_DIR.varname);
-
-      baseDirPath = localFS.makeQualified(lDirAllocator.getLocalPathForWrite(baseDir, conf));
+      baseDirPath = localFS.makeQualified(new Path(
+          "/disk1/tajo-localdir/" + baseDir));
+      localFS.mkdirs(baseDirPath);
       LOG.info("TaskRunner basedir is created (" + baseDir +")");
 
       // Setup QueryEngine according to the query plan
@@ -196,10 +194,6 @@ public class TaskRunner extends AbstractService {
 
     public FileSystem getDefaultFS() {
       return defaultFS;
-    }
-
-    public LocalDirAllocator getLocalDirAllocator() {
-      return lDirAllocator;
     }
 
     public TajoQueryEngine getTQueryEngine() {
