@@ -385,7 +385,7 @@ public final class QueryAnalyzer {
   }
 
   /**
-   * EBNF: CREATE (UNIQUE?) INDEX n=ID ON t=ID LEFT_PAREN s=sort_specifier_list 
+   * EBNF: CREATE (UNIQUE?) INDEX n=ID ON t=ID LEFT_PAREN s=sort_specifier_list
    * RIGHT_PAREN p=param_clause? <br />
    * AST:  ^(CREATE_INDEX $n $t $s $p)
    *
@@ -635,7 +635,7 @@ public final class QueryAnalyzer {
   /**
    * This method parses the select list of a query statement.
    * <pre>
-   * EBNF: 
+   * EBNF:
    *
    * selectList
    * : MULTIPLY -> ^(SEL_LIST ALL)
@@ -746,7 +746,7 @@ public final class QueryAnalyzer {
   /**
    * Should be given Params Node
    *
-   * EBNF: WITH LEFT_PAREN param (COMMA param)* RIGHT_PAREN 
+   * EBNF: WITH LEFT_PAREN param (COMMA param)* RIGHT_PAREN
    * AST: ^(PARAMS param+)
    *
    * @param ast
@@ -781,7 +781,7 @@ public final class QueryAnalyzer {
     Column column;
 
     // Each child has the following EBNF and AST:
-    // EBNF: fn=fieldName a=order_specification? o=null_ordering? 
+    // EBNF: fn=fieldName a=order_specification? o=null_ordering?
     // AST: ^(SORT_KEY $fn $a? $o?)
     for (int i = 0; i < numSortKeys; i++) {
       node = (CommonTree) ast.getChild(i);
@@ -905,29 +905,30 @@ public final class QueryAnalyzer {
         column = schema.getColumn(table+"."+columnName);
         count++;
       }
+    }
 
-      if (tree instanceof QueryBlock) {
-        QueryBlock block = ((QueryBlock)tree);
-        if (block.getTargetList() != null) {
-          for (Target target : block.getTargetList()) {
-            if (target.hasAlias() && target.getAlias().equals(columnName)) {
-              try {
-                column = (Column) target.getColumnSchema().clone();
-                column.setName(target.getAlias());
-              } catch (CloneNotSupportedException e) {
-                e.printStackTrace();
-              }
-              count++;
+    if (tree instanceof QueryBlock) {
+      QueryBlock block = ((QueryBlock)tree);
+      if (block.getTargetList() != null) {
+        for (Target target : block.getTargetList()) {
+          if (target.hasAlias() && target.getAlias().equals(columnName)) {
+            try {
+              column = (Column) target.getColumnSchema().clone();
+              column.setName(target.getAlias());
+            } catch (CloneNotSupportedException e) {
+              e.printStackTrace();
             }
+            count++;
           }
         }
       }
-
-      // if there are more than one column, we cannot expect
-      // that this column belongs to which table.
-      if(count > 1)
-        throw new AmbiguousFieldException(columnName);
     }
+
+    // if there are more than one column, we cannot expect
+    // that this column belongs to which table.
+    if(count > 1)
+      throw new AmbiguousFieldException(columnName);
+
 
     if(column == null) { // if there are no matched column
       throw new InvalidQueryException("ERROR: column \"" + columnName

@@ -620,7 +620,7 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
       if (tasks.length <= numClusterNodes) {
         resource.setMemory(subQuery.context.getMaxContainerCapability());
       } else {
-        resource.setMemory(2000);
+        resource.setMemory(3000);
       }
 
       Priority priority = Records.newRecord(Priority.class);

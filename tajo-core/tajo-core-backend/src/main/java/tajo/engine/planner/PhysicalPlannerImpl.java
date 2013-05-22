@@ -245,6 +245,12 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
 
   public PhysicalExec createScanPlan(TaskAttemptContext ctx, ScanNode scanNode)
       throws IOException {
+    LOG.info("ScanNode Table: " + scanNode.getTableId());
+    StringBuilder sb = new StringBuilder();
+    for (String table : ctx.getInputTables()) {
+      sb.append(table).append(" ");
+    }
+    LOG.info("Current CTX Tables: " + sb.toString());
     Preconditions.checkNotNull(ctx.getTable(scanNode.getTableId()),
         "Error: There is no table matched to %s", scanNode.getTableId());
 
@@ -261,7 +267,7 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
     } else {
       String [] outerLineage = PlannerUtil.getLineage(groupbyNode.getSubNode());
       long estimatedSize = estimateSizeRecursive(ctx, outerLineage);
-      final long threshold = 1048576 * 256;
+      final long threshold = 1048576 * 2000;
 
       // if the relation size is less than the reshold,
       // the hash aggregation will be used.
@@ -287,7 +293,8 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
 
   public PhysicalExec createSortPlan(TaskAttemptContext ctx, SortNode sortNode,
                                      PhysicalExec subOp) throws IOException {
-    return new ExternalSortExec(ctx, sm, sortNode, subOp);
+    //return new ExternalSortExec(ctx, sm, sortNode, subOp);
+    return new MemSortExec(ctx, sortNode, subOp);
   }
 
   public PhysicalExec createIndexWritePlan(StorageManager sm,
