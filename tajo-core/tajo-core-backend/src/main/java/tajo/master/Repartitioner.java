@@ -18,8 +18,10 @@
 
 package tajo.master;
 
+import com.google.common.base.Preconditions;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import tajo.QueryIdFactory;
 import tajo.SubQueryId;
@@ -70,8 +72,13 @@ public class Repartitioner {
       // TODO - temporarily tables should be stored in temporarily catalog for each query
       if (scans[i].getTableId().startsWith(SubQueryId.PREFIX)) {
         tablePath = subQuery.getStorageManager().getTablePath(scans[i].getTableId());
+        // Getting a table stat for each scan
+        stats[i] = subQuery.getChildQuery(scans[i]).getTableStat();
       } else {
-        tablePath = catalog.getTableDesc(scans[i].getTableId()).getPath();
+        TableDesc desc = catalog.getTableDesc(scans[i].getTableId());
+        tablePath = desc.getPath();
+        // Getting a table stat for each scan
+        stats[i] = desc.getMeta().getStat();
       }
 
       if (scans[i].isLocal()) { // it only requires a dummy fragment.
@@ -83,21 +90,29 @@ public class Repartitioner {
             catalog.getTableDesc(scans[i].getTableId()).getMeta(),
             new Path(tablePath, "data")).get(0);
       }
-
-      // Getting a table stat for each scan
-      stats[i] = subQuery.getChildQuery(scans[i]).getTableStat();
     }
 
     // Assigning either fragments or fetch urls to query units
     QueryUnit [] tasks;
-    if (scans[0].isBroadcast() || scans[1].isBroadcast()) {
+    if (scans[0].isBroadcast() && scans[1].isBroadcast()) {
+      LOG.info("[Distributed Join Strategy] : Immediate Two Way Join on Single Machine");
       tasks = new QueryUnit[1];
       tasks[0] = new QueryUnit(QueryIdFactory.newQueryUnitId(subQuery.getId(), 0),
           false, subQuery.getEventHandler());
       tasks[0].setLogicalPlan(execBlock.getPlan());
       tasks[0].setFragment(scans[0].getTableId(), fragments[0]);
       tasks[0].setFragment(scans[1].getTableId(), fragments[1]);
+    } if (scans[0].isBroadcast() ^ scans[1].isBroadcast()) {
+      LOG.info("[Distributed Join Strategy] : Broadcast Join");
+      int broadcastIdx = scans[0].isBroadcast() ? 0 : 1;
+      int baseScanIdx = scans[0].isBroadcast() ? 1 : 0;
+
+      LOG.info("Broadcasting Table Volume: " + stats[broadcastIdx].getNumBytes());
+      LOG.info("Base Table Volume: " + stats[baseScanIdx].getNumBytes());
+
+      tasks = createLeafTasksWithBroadcastTable(subQuery, baseScanIdx, fragments[broadcastIdx]);
     } else {
+      LOG.info("[Distributed Join Strategy] : Repartition Join");
       // The hash map is modeling as follows:
       // <Partition Id, <Table Name, Intermediate Data>>
       Map<Integer, Map<String, List<IntermediateEntry>>> hashEntries =
@@ -173,6 +188,50 @@ public class Repartitioner {
     }
 
     return tasks;
+  }
+
+  private static QueryUnit [] createLeafTasksWithBroadcastTable(SubQuery subQuery, int baseScanId, Fragment broadcasted)
+      throws IOException {
+    ExecutionBlock execBlock = subQuery.getBlock();
+    ScanNode[] scans = execBlock.getScanNodes();
+    Preconditions.checkArgument(scans.length == 2, "Must be Join Query");
+    TableMeta meta;
+    Path inputPath;
+
+    ScanNode scan = scans[baseScanId];
+    TableDesc desc = subQuery.getContext().getCatalog().getTableDesc(scan.getTableId());
+    inputPath = desc.getPath();
+    meta = desc.getMeta();
+
+    // TODO - should be change the inner directory
+    Path oldPath = new Path(inputPath, "data");
+    FileSystem fs = inputPath.getFileSystem(subQuery.getContext().getConf());
+    if (fs.exists(oldPath)) {
+      inputPath = oldPath;
+    }
+    List<Fragment> fragments = subQuery.getStorageManager().getSplits(scan.getTableId(), meta, inputPath);
+
+    QueryUnit queryUnit;
+    List<QueryUnit> queryUnits = new ArrayList<QueryUnit>();
+
+    int i = 0;
+    for (Fragment fragment : fragments) {
+      queryUnit = newQueryUnit(subQuery, i++, fragment);
+      queryUnit.setFragment2(broadcasted);
+      queryUnits.add(queryUnit);
+    }
+
+    return queryUnits.toArray(new QueryUnit[queryUnits.size()]);
+  }
+
+  private static QueryUnit newQueryUnit(SubQuery subQuery, int taskId, Fragment fragment) {
+    ExecutionBlock execBlock = subQuery.getBlock();
+    QueryUnit unit = new QueryUnit(
+        QueryIdFactory.newQueryUnitId(subQuery.getId(), taskId), execBlock.isLeafBlock(),
+        subQuery.getEventHandler());
+    unit.setLogicalPlan(execBlock.getPlan());
+    unit.setFragment2(fragment);
+    return unit;
   }
 
   private static QueryUnit [] newEmptyJoinTask(SubQuery subQuery, Fragment [] fragments, int taskNum) {
@@ -538,6 +597,7 @@ public class Repartitioner {
   }
 
   public static SubQuery setPartitionNumberForTwoPhase(SubQuery subQuery, final int n) {
+    LOG.info(">>>>> SetPartitionNumForTwoPhase Enter (" + n +")");
     ExecutionBlock execBlock = subQuery.getBlock();
     Column[] keys = null;
     // if the next query is join,
@@ -545,7 +605,9 @@ public class Repartitioner {
     // TODO: the union handling is required when a join has unions as its child
     ExecutionBlock parentBlock = execBlock.getParentBlock();
     if (parentBlock != null) {
+      LOG.info(">>>>> SetPartitionNumForTwoPhase | parentBlock != NULL");
       if (parentBlock.getStoreTableNode().getSubNode().getType() == ExprType.JOIN) {
+        LOG.info(">>>>> SetPartitionNumForTwoPhase | getSubNode().getType() == ExprType.JOIN");
         execBlock.getStoreTableNode().setPartitions(execBlock.getPartitionType(),
             execBlock.getStoreTableNode().getPartitionKeys(), n);
         keys = execBlock.getStoreTableNode().getPartitionKeys();

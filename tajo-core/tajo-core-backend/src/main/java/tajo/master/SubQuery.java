@@ -489,6 +489,7 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
      * @return
      */
     public static int calculatePartitionNum(SubQuery subQuery) {
+      LOG.info(">>>>> calculatePartitionNum Enter");
       TajoConf conf = subQuery.context.getConf();
       ExecutionBlock parent = subQuery.getBlock().getParentBlock();
 
@@ -500,6 +501,7 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
 
       // Is this subquery the first step of join?
       if (parent != null && parent.getScanNodes().length == 2) {
+        LOG.info("[Join is Detected]");
         Iterator<ExecutionBlock> child = parent.getChildBlocks().iterator();
 
         // for inner
@@ -512,16 +514,24 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
         LOG.info("Outer volume: " + Math.ceil((double)outerVolume / 1048576));
         LOG.info("Inner volume: " + Math.ceil((double)innerVolume / 1048576));
 
-        long smaller = Math.min(outerVolume, innerVolume);
+        long threshold = 8 * 1048576;
 
-        int mb = (int) Math.ceil((double)smaller / 1048576);
-        LOG.info("Smaller Table's volume is approximately " + mb + " MB");
+        long baseTableVolume;
+        if (outerVolume < threshold ^ innerVolume < threshold) {
+          baseTableVolume = Math.max(outerVolume, innerVolume);
+          LOG.info("Choose A Larger Table as a Base Table");
+        } else {
+          baseTableVolume = Math.min(outerVolume, innerVolume);
+          LOG.info("Choose A Smaller Table as a Base Table");
+        }
+
+        int mb = (int) Math.ceil((double)baseTableVolume / 1048576);
+        LOG.info("Base Table's volume is approximately " + mb + " MB");
         // determine the number of task
         int taskNum = (int) Math.ceil((double)mb /
             conf.getIntVar(ConfVars.JOIN_PARTITION_VOLUME));
         LOG.info("The determined number of join partitions is " + taskNum);
         return taskNum;
-
         // Is this subquery the first step of group-by?
       } else if (grpNode != null) {
 

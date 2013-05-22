@@ -38,10 +38,7 @@ import tajo.datum.DatumFactory;
 import tajo.engine.parser.QueryAnalyzer;
 import tajo.engine.planner.*;
 import tajo.engine.planner.logical.LogicalNode;
-import tajo.engine.planner.physical.ExternalSortExec;
-import tajo.engine.planner.physical.IndexedStoreExec;
-import tajo.engine.planner.physical.PhysicalExec;
-import tajo.engine.planner.physical.ProjectionExec;
+import tajo.engine.planner.physical.*;
 import tajo.storage.*;
 import tajo.storage.index.bst.BSTIndex;
 import tajo.util.CommonTestingUtil;
@@ -143,7 +140,7 @@ public class TestRangeRetrieverHandler {
     PhysicalExec exec = phyPlanner.createPlan(ctx, plan);
 
     ProjectionExec proj = (ProjectionExec) exec;
-    ExternalSortExec sort = (ExternalSortExec) proj.getChild();
+    MemSortExec sort = (MemSortExec) proj.getChild();
 
     SortSpec[] sortSpecs = sort.getPlan().getSortKeys();
     IndexedStoreExec idxStoreExec = new IndexedStoreExec(ctx, sm, sort, sort.getSchema(),
@@ -254,7 +251,7 @@ public class TestRangeRetrieverHandler {
     PhysicalExec exec = phyPlanner.createPlan(ctx, plan);
 
     ProjectionExec proj = (ProjectionExec) exec;
-    ExternalSortExec sort = (ExternalSortExec) proj.getChild();
+    MemSortExec sort = (MemSortExec) proj.getChild();
     SortSpec[] sortSpecs = sort.getPlan().getSortKeys();
     IndexedStoreExec idxStoreExec = new IndexedStoreExec(ctx, sm, sort,
         sort.getSchema(), sort.getSchema(), sortSpecs);

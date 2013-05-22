@@ -154,7 +154,7 @@ public class GlobalPlanner {
         // the first phase of two-phase join can be any logical nodes
         JoinNode join = (JoinNode) node;
 
-        /*
+
         if (join.getOuterNode().getType() == ExprType.SCAN &&
             join.getInnerNode().getType() == ExprType.SCAN) {
           ScanNode outerScan = (ScanNode) join.getOuterNode();
@@ -165,7 +165,7 @@ public class GlobalPlanner {
               catalog.getTableDesc(outerScan.getTableId()).getMeta();
           TableMeta innerMeta =
               catalog.getTableDesc(innerScan.getTableId()).getMeta();
-          long threshold = conf.getLongVar(ConfVars.BROADCAST_JOIN_THRESHOLD);
+          long threshold = conf.getLongVar(TajoConf.ConfVars.BROADCAST_JOIN_THRESHOLD);
 
 
           // if the broadcast join is available
@@ -210,7 +210,7 @@ public class GlobalPlanner {
           if (outerScan.isBroadcast() || innerScan.isBroadcast()) {
             return;
           }
-        } */
+        }
 
         // insert stores for the first phase
         if (join.getOuterNode().getType() != ExprType.UNION &&

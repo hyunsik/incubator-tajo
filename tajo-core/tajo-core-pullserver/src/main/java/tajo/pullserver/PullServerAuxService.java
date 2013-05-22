@@ -91,7 +91,7 @@ public class PullServerAuxService extends AbstractService
     implements AuxServices.AuxiliaryService {
 
   private static final Log LOG = LogFactory.getLog(PullServerAuxService.class);
-  
+
   public static final String SHUFFLE_MANAGE_OS_CACHE = "tajo.pullserver.manage.os.cache";
   public static final boolean DEFAULT_SHUFFLE_MANAGE_OS_CACHE = true;
 
@@ -114,7 +114,7 @@ public class PullServerAuxService extends AbstractService
   private boolean manageOsCache;
   private int readaheadLength;
   private ReadaheadPool readaheadPool = ReadaheadPool.getInstance();
-   
+
 
   public static final String PULLSERVER_SERVICEID = "tajo.pullserver";
 
@@ -270,7 +270,7 @@ public class PullServerAuxService extends AbstractService
   @Override
   public synchronized ByteBuffer getMeta() {
     try {
-      return serializeMetaData(port); 
+      return serializeMetaData(port);
     } catch (IOException e) {
       LOG.error("Error during getMeta", e);
       // TODO add API to AuxiliaryServices to report failures
@@ -330,7 +330,7 @@ public class PullServerAuxService extends AbstractService
       this.port = conf.getInt(ConfVars.PULLSERVER_PORT.varname,
           ConfVars.PULLSERVER_PORT.defaultIntVal);
     }
-    
+
     public void setPort(int port) {
       this.port = port;
     }
