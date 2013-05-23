@@ -72,7 +72,7 @@ public class CSVFile {
         throw new AlreadyExistsStorageException(path);
       }
 
-      fos = fs.create(path);
+      fos = fs.create(path, true, 65535);
 
       if (enabledStats) {
         this.stats = new TableStatistics(this.schema);

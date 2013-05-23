@@ -99,8 +99,8 @@ public class TaskRunner extends AbstractService {
   private UserGroupInformation taskOwner;
 
   // for the local temporal dir
-  private String baseDir;
-  private Path baseDirPath;
+  //private String baseDir;
+  //private Path baseDirPath;
 
   public TaskRunner(
       final SubQueryId subQueryId,
@@ -128,14 +128,14 @@ public class TaskRunner extends AbstractService {
       localFS = FileSystem.getLocal(conf);
 
       // the base dir for an output dir
-      baseDir = ConverterUtils.toString(appId)
-          + "/output" + "/" + subQueryId.getId();
+//      baseDir = ConverterUtils.toString(appId)
+//          + "/output" + "/" + subQueryId.getId();
 
       // initialize LocalDirAllocator
-      baseDirPath = localFS.makeQualified(new Path(
-          "/disk1/tajo-localdir/" + baseDir));
-      localFS.mkdirs(baseDirPath);
-      LOG.info("TaskRunner basedir is created (" + baseDir +")");
+//      baseDirPath = localFS.makeQualified(new Path(
+//          "/disk1/tajo-localdir/" + baseDir));
+//      localFS.mkdirs(baseDirPath);
+//      LOG.info("TaskRunner basedir is created (" + baseDir +")");
 
       // Setup QueryEngine according to the query plan
       // Here, we can setup row-based query engine or columnar query engine.
@@ -180,6 +180,14 @@ public class TaskRunner extends AbstractService {
       return conf;
     }
 
+    public ApplicationId getAppId() {
+      return appId;
+    }
+
+    public SubQueryId getSubQueryId() {
+      return subQueryId;
+    }
+
     public String getNodeId() {
       return nodeId.toString();
     }
@@ -210,10 +218,6 @@ public class TaskRunner extends AbstractService {
 
     public ExecutorService getFetchLauncher() {
       return fetchLauncher;
-    }
-
-    public Path getBaseDir() {
-      return baseDirPath;
     }
   }
 

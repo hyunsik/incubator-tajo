@@ -107,14 +107,14 @@ public class TajoConf extends YarnConfiguration {
     //////////////////////////////////////////
     // Distributed Query Execution Parameters
     //////////////////////////////////////////
-    SORT_BUFFER_SIZE("tajo.sort.mb", 128),
-    JOIN_TASK_VOLUME("tajo.join.task-volume.mb", 128),
-    SORT_TASK_VOLUME("tajo.sort.task-volume.mb", 256),
-    AGGREGATION_TASK_VOLUME("tajo.task-aggregation.volume.mb", 128),
+    SORT_BUFFER_SIZE("tajo.sort.mb", 512),
+    JOIN_TASK_VOLUME("tajo.join.task-volume.mb", 512),
+    SORT_TASK_VOLUME("tajo.sort.task-volume.mb", 512),
+    AGGREGATION_TASK_VOLUME("tajo.task-aggregation.volume.mb", 512),
 
-    JOIN_PARTITION_VOLUME("tajo.join.part-volume.mb", 64),
-    SORT_PARTITION_VOLUME("tajo.sort.part-volume.mb", 256),
-    AGGREGATION_PARTITION_VOLUME("tajo.aggregation.part-volume.mb", 256),
+    JOIN_PARTITION_VOLUME("tajo.join.part-volume.mb", 512),
+    SORT_PARTITION_VOLUME("tajo.sort.part-volume.mb", 512),
+    AGGREGATION_PARTITION_VOLUME("tajo.aggregation.part-volume.mb", 512),
 
     //////////////////////////////////
     // The Below is reserved

@@ -138,8 +138,21 @@ public class Task {
     this.workerContext = worker;
     this.masterProxy = masterProxy;
     this.localFS = worker.getLocalFS();
-    this.taskDir = StorageUtil.concatPath(workerContext.getBaseDir(),
-        taskId.getQueryUnitId().getId() + "_" + taskId.getId());
+
+    int diskId = (taskId.getQueryUnitId().getId() % 2) + 1;
+    // the base dir for an output dir
+    // application_xxxxxx_xxxx/output/xxx
+    String baseDir = ConverterUtils.toString(workerContext.getAppId())
+          + "/output" + "/" + workerContext.getSubQueryId().getId();
+
+    String tajoTmpDir = "/disk"+diskId +"/tajo-localdir";
+
+    // initialize LocalDirAllocator
+    Path baseDirPath = localFS.makeQualified(new Path(tajoTmpDir, baseDir));
+    localFS.mkdirs(baseDirPath);
+    LOG.info("TaskRunner basedir is created (" + baseDir +")");
+
+    this.taskDir = StorageUtil.concatPath(baseDirPath, taskId.getQueryUnitId().getId() + "_" + taskId.getId());
 
     this.context = new TaskAttemptContext(conf, taskId,
         request.getFragments().toArray(new Fragment[request.getFragments().size()]),

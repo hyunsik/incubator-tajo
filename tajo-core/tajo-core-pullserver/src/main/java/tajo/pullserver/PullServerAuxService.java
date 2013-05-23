@@ -215,9 +215,12 @@ public class PullServerAuxService extends AbstractService
           .setNameFormat("PullServerAuxService Netty Worker #%d")
           .build();
 
+//      selector = new NioServerSocketChannelFactory(
+//          Executors.newCachedThreadPool(bossFactory),
+//          Executors.newCachedThreadPool(workerFactory));
       selector = new NioServerSocketChannelFactory(
-          Executors.newCachedThreadPool(bossFactory),
-          Executors.newCachedThreadPool(workerFactory));
+          Executors.newFixedThreadPool(4),
+          Executors.newFixedThreadPool(32));
 
       localFS = new LocalFileSystem();
       super.init(new Configuration(conf));
@@ -386,12 +389,13 @@ public class PullServerAuxService extends AbstractService
 
       // the working dir of tajo worker for each query
       String queryBaseDir = appId + "/output" + "/";
-
       // if a subquery requires a range partitioning
       if (repartitionType.equals("r")) {
         String ta = taskIds.get(0);
+        int taskId = Integer.valueOf(ta.split("_")[0]);
+        int diskId = (taskId % 2) + 1;
         Path path = localFS.makeQualified(new Path(
-            "/disk1/tajo-localdir/" + queryBaseDir + "/" + sid + "/"
+            "/disk" + diskId + "/tajo-localdir/" + queryBaseDir + "/" + sid + "/"
                 + ta + "/output/"));
 
         String startKey = params.get("start").get(0);
@@ -413,8 +417,10 @@ public class PullServerAuxService extends AbstractService
         // if a subquery requires a hash repartition
       } else if (repartitionType.equals("h")) {
         for (String ta : taskIds) {
+          int taskId = Integer.valueOf(ta.split("_")[0]);
+          int diskId = (taskId % 2) + 1;
           Path path = localFS.makeQualified(new Path(
-              "/disk1/tajo-localdir/"+queryBaseDir + "/" + sid + "/" +
+              "/disk" + diskId + "/tajo-localdir/"+queryBaseDir + "/" + sid + "/" +
                   ta + "/output/" + partitionId));
           File file = new File(path.toUri());
           FileChunk chunk = new FileChunk(file, 0, file.length());
