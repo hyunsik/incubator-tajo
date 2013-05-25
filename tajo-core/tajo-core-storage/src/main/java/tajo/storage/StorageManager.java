@@ -204,25 +204,6 @@ public class StorageManager {
     return split(tableName, tablePath, fragmentSize);
   }
 
-  public Fragment [] splitBroadcastTable(Path tablePath) throws IOException {
-    FileSystem fs = tablePath.getFileSystem(conf);
-    TableMeta meta = getTableMeta(tablePath);
-    List<Fragment> listTablets = new ArrayList<Fragment>();
-    Fragment tablet;
-
-    FileStatus[] fileLists = fs.listStatus(new Path(tablePath, "data"));
-    for (FileStatus file : fileLists) {
-      tablet = new Fragment(tablePath.getName(), file.getPath(), meta, 0,
-          file.getLen(), null);
-      listTablets.add(tablet);
-    }
-
-    Fragment[] tablets = new Fragment[listTablets.size()];
-    listTablets.toArray(tablets);
-
-    return tablets;
-  }
-
   public Fragment[] split(Path tablePath) throws IOException {
     FileSystem fs = tablePath.getFileSystem(conf);
     return split(tablePath.getName(), tablePath, fs.getDefaultBlockSize());
@@ -241,7 +222,7 @@ public class StorageManager {
     List<Fragment> listTablets = new ArrayList<Fragment>();
     Fragment tablet;
 
-    FileStatus[] fileLists = fs.listStatus(new Path(tablePath, "data"));
+    FileStatus[] fileLists = fs.listStatus(tablePath);
     for (FileStatus file : fileLists) {
       long remainFileSize = file.getLen();
       long start = 0;
@@ -314,16 +295,9 @@ public class StorageManager {
   public long calculateSize(Path tablePath) throws IOException {
     FileSystem fs = tablePath.getFileSystem(conf);
     long totalSize = 0;
-    Path oldPath = new Path(tablePath, "data");
-    Path dataPath;
-    if (fs.exists(oldPath)) {
-      dataPath = oldPath;
-    } else {
-      dataPath = tablePath;
-    }
 
-    if (fs.exists(dataPath)) {
-      for (FileStatus status : fs.listStatus(dataPath)) {
+    if (fs.exists(tablePath)) {
+      for (FileStatus status : fs.listStatus(tablePath)) {
         totalSize += status.getLen();
       }
     }
@@ -496,6 +470,7 @@ public class StorageManager {
    * @throws IOException
    */
   public List<Fragment> getSplits(String tableName, TableMeta meta, Path inputPath) throws IOException {
+    LOG.info("getSplits(" + inputPath +")");
     long minSize = Math.max(getFormatMinSplitSize(), getMinSplitSize());
     long maxSize = getMaxSplitSize();
 

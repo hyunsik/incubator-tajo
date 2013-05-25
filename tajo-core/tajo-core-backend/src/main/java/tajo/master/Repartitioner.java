@@ -87,8 +87,7 @@ public class Repartitioner {
             0, 0, null);
       } else {
         fragments[i] = subQuery.getStorageManager().getSplits(scans[i].getTableId(),
-            catalog.getTableDesc(scans[i].getTableId()).getMeta(),
-            new Path(tablePath, "data")).get(0);
+            catalog.getTableDesc(scans[i].getTableId()).getMeta(), tablePath).get(0);
       }
     }
 
@@ -204,11 +203,7 @@ public class Repartitioner {
     meta = desc.getMeta();
 
     // TODO - should be change the inner directory
-    Path oldPath = new Path(inputPath, "data");
     FileSystem fs = inputPath.getFileSystem(subQuery.getContext().getConf());
-    if (fs.exists(oldPath)) {
-      inputPath = oldPath;
-    }
     List<Fragment> fragments = subQuery.getStorageManager().getSplits(scan.getTableId(), meta, inputPath);
 
     QueryUnit queryUnit;

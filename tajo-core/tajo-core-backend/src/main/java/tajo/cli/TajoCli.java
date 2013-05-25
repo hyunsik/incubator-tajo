@@ -140,6 +140,8 @@ public class TajoCli {
         attachTable(cmd);
       } else if (cmd[0].equalsIgnoreCase("detach")) {
         detachTable(cmd);
+      } else if (cmd[0].equalsIgnoreCase("drop")) {
+        dropTable(cmd);
       } else if (cmd[0].equalsIgnoreCase("history")) {
 
       } else {
@@ -297,6 +299,15 @@ public class TajoCli {
     } else {
       client.detachTable(cmd[1]);
       sout.println("detached " + cmd[1] + " from tajo");
+    }
+  }
+
+  private void dropTable(String [] cmd) throws Exception {
+    if (cmd.length != 3) {
+      System.out.println("usage: drop table tablename");
+    } else {
+      client.dropTable(cmd[2]);
+      sout.println("dropped " + cmd[2] + " from tajo");
     }
   }
 
