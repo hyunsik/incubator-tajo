@@ -521,8 +521,17 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
           baseTableVolume = Math.max(outerVolume, innerVolume);
           LOG.info("Choose A Larger Table as a Base Table");
         } else {
-          baseTableVolume = Math.min(outerVolume, innerVolume);
-          LOG.info("Choose A Smaller Table as a Base Table");
+          // If the volume of a table is larger 5 times than smaller one
+          // it causes too small tasks number in the join execution block.
+          // The below condition can avoid that situation
+          if ((outerVolume < innerVolume && outerVolume * 5 < innerVolume) ||
+          (outerVolume > innerVolume && outerVolume > innerVolume * 5)) {
+            baseTableVolume = (outerVolume + innerVolume) / 2;
+            LOG.info("Choose A partition volume from the average of both tables");
+          } else {
+            baseTableVolume = Math.min(outerVolume, innerVolume);
+            LOG.info("Choose A Smaller Table as a Base Table");
+          }
         }
 
         int mb = (int) Math.ceil((double)baseTableVolume / 1048576);
@@ -655,11 +664,7 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
       meta = desc.getMeta();
 
       // TODO - should be change the inner directory
-      Path oldPath = new Path(inputPath, "data");
       FileSystem fs = inputPath.getFileSystem(subQuery.context.getConf());
-      if (fs.exists(oldPath)) {
-        inputPath = oldPath;
-      }
       List<Fragment> fragments = subQuery.getStorageManager().getSplits(scan.getTableId(), meta, inputPath);
 
       QueryUnit queryUnit;

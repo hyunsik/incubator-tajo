@@ -76,6 +76,7 @@ public class Repartitioner {
         stats[i] = subQuery.getChildQuery(scans[i]).getTableStat();
       } else {
         TableDesc desc = catalog.getTableDesc(scans[i].getTableId());
+        LOG.info(">>> TableId: " + scans[i].getTableId() + " path: " + desc.getPath());
         tablePath = desc.getPath();
         // Getting a table stat for each scan
         stats[i] = desc.getMeta().getStat();
