@@ -48,14 +48,13 @@ import tajo.engine.planner.logical.GroupbyNode;
 import tajo.engine.planner.logical.ScanNode;
 import tajo.engine.planner.logical.StoreTableNode;
 import tajo.master.QueryMaster.QueryContext;
-import tajo.master.TaskRunnerEvent.EventType;
+import tajo.master.TaskRunnerGroupEvent.EventType;
 import tajo.master.event.*;
 import tajo.storage.Fragment;
 import tajo.storage.StorageManager;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -377,7 +376,7 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
 
   private void releaseContainers() {
     // If there are still live TaskRunners, try to kill the containers.
-    eventHandler.handle(new TaskRunnerEvent(EventType.CONTAINER_REMOTE_CLEANUP ,getId(),
+    eventHandler.handle(new TaskRunnerGroupEvent(EventType.CONTAINER_REMOTE_CLEANUP ,getId(),
         containers.values()));
   }
 
@@ -489,7 +488,6 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
      * @return
      */
     public static int calculatePartitionNum(SubQuery subQuery) {
-      LOG.info(">>>>> calculatePartitionNum Enter");
       TajoConf conf = subQuery.context.getConf();
       ExecutionBlock parent = subQuery.getBlock().getParentBlock();
 
@@ -501,7 +499,6 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
 
       // Is this subquery the first step of join?
       if (parent != null && parent.getScanNodes().length == 2) {
-        LOG.info("[Join is Detected]");
         Iterator<ExecutionBlock> child = parent.getChildBlocks().iterator();
 
         // for inner
@@ -514,33 +511,16 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
         LOG.info("Outer volume: " + Math.ceil((double)outerVolume / 1048576));
         LOG.info("Inner volume: " + Math.ceil((double)innerVolume / 1048576));
 
-        long threshold = 8 * 1048576;
+        long smaller = Math.min(outerVolume, innerVolume);
 
-        long baseTableVolume;
-        if (outerVolume < threshold ^ innerVolume < threshold) {
-          baseTableVolume = Math.max(outerVolume, innerVolume);
-          LOG.info("Choose A Larger Table as a Base Table");
-        } else {
-          // If the volume of a table is larger 5 times than smaller one
-          // it causes too small tasks number in the join execution block.
-          // The below condition can avoid that situation
-          if ((outerVolume < innerVolume && outerVolume * 5 < innerVolume) ||
-          (outerVolume > innerVolume && outerVolume > innerVolume * 5)) {
-            baseTableVolume = (outerVolume + innerVolume) / 2;
-            LOG.info("Choose A partition volume from the average of both tables");
-          } else {
-            baseTableVolume = Math.min(outerVolume, innerVolume);
-            LOG.info("Choose A Smaller Table as a Base Table");
-          }
-        }
-
-        int mb = (int) Math.ceil((double)baseTableVolume / 1048576);
-        LOG.info("Base Table's volume is approximately " + mb + " MB");
+        int mb = (int) Math.ceil((double)smaller / 1048576);
+        LOG.info("Smaller Table's volume is approximately " + mb + " MB");
         // determine the number of task
         int taskNum = (int) Math.ceil((double)mb /
             conf.getIntVar(ConfVars.JOIN_PARTITION_VOLUME));
         LOG.info("The determined number of join partitions is " + taskNum);
         return taskNum;
+
         // Is this subquery the first step of group-by?
       } else if (grpNode != null) {
 
@@ -639,7 +619,7 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
       if (tasks.length <= numClusterNodes) {
         resource.setMemory(subQuery.context.getMaxContainerCapability());
       } else {
-        resource.setMemory(3000);
+        resource.setMemory(2000);
       }
 
       Priority priority = Records.newRecord(Priority.class);
@@ -664,7 +644,11 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
       meta = desc.getMeta();
 
       // TODO - should be change the inner directory
+      Path oldPath = new Path(inputPath, "data");
       FileSystem fs = inputPath.getFileSystem(subQuery.context.getConf());
+      if (fs.exists(oldPath)) {
+        inputPath = oldPath;
+      }
       List<Fragment> fragments = subQuery.getStorageManager().getSplits(scan.getTableId(), meta, inputPath);
 
       QueryUnit queryUnit;
@@ -709,7 +693,7 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
       }
       LOG.info("SubQuery (" + subQuery.getId() + ") has " + subQuery.i + " containers!");
       subQuery.eventHandler.handle(
-          new TaskRunnerEvent(EventType.CONTAINER_REMOTE_LAUNCH,
+          new TaskRunnerGroupEvent(EventType.CONTAINER_REMOTE_LAUNCH,
               subQuery.getId(), allocationEvent.getAllocatedContainer()));
 
       subQuery.eventHandler.handle(new SubQueryEvent(subQuery.getId(),

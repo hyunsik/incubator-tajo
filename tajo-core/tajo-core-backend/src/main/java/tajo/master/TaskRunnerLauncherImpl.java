@@ -47,7 +47,7 @@ import tajo.QueryConf;
 import tajo.SubQueryId;
 import tajo.conf.TajoConf;
 import tajo.master.QueryMaster.QueryContext;
-import tajo.master.TaskRunnerEvent.EventType;
+import tajo.master.TaskRunnerGroupEvent.EventType;
 import tajo.master.event.QueryEvent;
 import tajo.master.event.QueryEventType;
 import tajo.pullserver.PullServerAuxService;
@@ -82,12 +82,17 @@ public class TaskRunnerLauncherImpl extends AbstractService implements TaskRunne
   final public static FsPermission QUERYCONF_FILE_PERMISSION =
       FsPermission.createImmutable((short) 0644); // rw-r--r--
 
+  /** for launching TaskRunners in parallel */
+  private final ExecutorService executorService;
+
   public TaskRunnerLauncherImpl(QueryContext context) {
     super(TaskRunnerLauncherImpl.class.getName());
     this.context = context;
     taskListenerHost = context.getTaskListener().getHostName();
     taskListenerPort = context.getTaskListener().getPort();
     yarnRPC = context.getYarnRPC();
+    executorService = Executors.newFixedThreadPool(
+        context.getConf().getIntVar(TajoConf.ConfVars.AM_TASKRUNNER_LAUNCH_PARALLEL_NUM));
   }
 
   public void start() {
@@ -100,15 +105,13 @@ public class TaskRunnerLauncherImpl extends AbstractService implements TaskRunne
   }
 
   @Override
-  public void handle(TaskRunnerEvent event) {
+  public void handle(TaskRunnerGroupEvent event) {
     if (event.getType() == EventType.CONTAINER_REMOTE_LAUNCH) {
      launchTaskRunners(event.subQueryId, event.getContainers());
     } else if (event.getType() == EventType.CONTAINER_REMOTE_CLEANUP) {
       killTaskRunners(event.getContainers());
     }
   }
-
-  ExecutorService executorService = Executors.newFixedThreadPool(16);
 
   private void launchTaskRunners(SubQueryId subQueryId, Collection<Container> containers) {
     for (Container container : containers) {

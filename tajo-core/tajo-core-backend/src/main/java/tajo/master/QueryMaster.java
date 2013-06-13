@@ -140,7 +140,7 @@ public class QueryMaster extends CompositeService implements EventHandler {
 
       taskRunnerLauncher = new TaskRunnerLauncherImpl(queryContext);
       addIfService(taskRunnerLauncher);
-      dispatcher.register(TaskRunnerEvent.EventType.class, taskRunnerLauncher);
+      dispatcher.register(TaskRunnerGroupEvent.EventType.class, taskRunnerLauncher);
 
 
     } catch (Throwable t) {
