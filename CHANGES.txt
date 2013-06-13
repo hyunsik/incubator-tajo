@@ -10,6 +10,9 @@ Release 0.2.0 - unreleased
 
   IMPROVEMENTS
 
+    TAJO-39 Remove the unused package tajo.engine.plan.global and all files 
+    inside the directory. (hsaputra)
+
     TAJO-37: Remove obsolete classes WorkerEventDispatcher, WorkerEvent and 
     WorkerEventType. (sunny.1324 via hyunsik)
 
@@ -39,11 +42,18 @@ Release 0.2.0 - unreleased
 
   BUG FIXES
 
-    TAJO-48: BufferUnderflowException occurs during the initialization of RowFile. (jihoon)
+    TAJO-65: Invalid pom.xml configurations for source directories. 
+    (Takuya Ueshin via hyunsik)
+
+    TAJO-48: BufferUnderflowException occurs during the initialization of 
+    RowFile. (jihoon)
 
     TAJO-58: Remove obsolete methods in GlobalPlanner. (hyunsik)
 
     TAJO-54: SubQuery::allocateContainers() may ask 0 containers. (hyunsik)
+
+    TAJO-41: Storage handler name row in storage-default.xml must be rowfile. 
+    (hsaputra)
 
     TAJO-47: RowFile has the duplicated initialization problem and unflipped 
     ByteBuffer problem. (jihoon)
