@@ -36,7 +36,6 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <tajo.version>0.2.0-SNAPSHOT</tajo.version>
-    <hadoop.version>2.0.5-alpha</hadoop.version>
   </properties>
 
   <licenses>
@@ -223,6 +222,13 @@
       <snapshots>
         <enabled>true</enabled>
       </snapshots>
+    </repository>
+    <repository>
+      <id>cloudera cdh</id>
+      <url>https://repository.cloudera.com/artifactory/cloudera-repos</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
     </repository>
     <repository>
       <id>eclipse-jetty</id>
@@ -770,6 +776,21 @@
     </dependencies>
   </dependencyManagement>
   <profiles>
+    <profile>
+      <id>hadoop_asf-2.0.5</id>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
+      <properties>
+        <hadoop.version>2.0.5-alpha</hadoop.version>
+      </properties>
+    </profile>
+    <profile>
+      <id>hadoop_cdh-4.3.0</id>
+      <properties>
+        <hadoop.version>2.0.0-cdh4.3.0</hadoop.version>
+      </properties>
+    </profile>
     <profile>
       <id>docs</id>
       <activation>

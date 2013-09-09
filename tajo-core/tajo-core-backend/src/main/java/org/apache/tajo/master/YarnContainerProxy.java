@@ -270,8 +270,11 @@ public class YarnContainerProxy extends ContainerProxy {
         environment.put(
             ApplicationConstants.Environment.HADOOP_HDFS_HOME.name(),
             System.getenv("HADOOP_HOME"));
+//        environment.put(
+//            ApplicationConstants.Environment.HADOOP_YARN_HOME.name(),
+//            System.getenv("HADOOP_HOME"));
         environment.put(
-            ApplicationConstants.Environment.HADOOP_YARN_HOME.name(),
+            ApplicationConstants.Environment.YARN_HOME.name(),
             System.getenv("HADOOP_HOME"));
       }
 
