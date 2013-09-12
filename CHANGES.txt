@@ -4,6 +4,8 @@ Release 0.2.0 - unreleased
 
   NEW FEATURES
 
+    TAJO-101: HiveQL converter. (jaehwa)
+
     TAJO-144: Implement INSERT OVERWRITE clause. (hyunsik)
 
     TAJO-139: TAJO-139: In predicate support. (hyunsik)
@@ -130,6 +132,16 @@ Release 0.2.0 - unreleased
     TAJO-2: remove all @author tags and update license header. (hyunsik)
 
   BUG FIXES
+
+    TAJO-177: Call by reference bug in MergeJoinExec. (jihoon)
+
+    TAJO-171: BitArray always returned false. (jinho)
+
+    TAJO-172: TajoWorker allocate wrong container slots.(jinho)
+
+    TAJO-174: SQL error handler sometimes occurred NPE. (jinho)
+
+    TAJO-170: mvn compile error when building tar file. (jaehwa)
 
     TAJO-154: Query calculates wrong progress in multiple step queries.
     (hyunsik)
