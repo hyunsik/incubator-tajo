@@ -410,9 +410,12 @@ public class StorageManager {
       } else {
         for (FileStatus globStat : matches) {
           if (globStat.isDirectory()) {
-            for (FileStatus stat : fs.listStatus(globStat.getPath(),
-                inputFilter)) {
-              result.add(stat);
+            for (FileStatus stat : fs.listStatus(globStat.getPath(), inputFilter)) {
+              if (stat.isFile()) {
+                result.add(stat);
+              } else {
+                LOG.info("Skip " + stat.getPath() + " because it is an inner directory.");
+              }
             }
           } else {
             result.add(globStat);
@@ -645,8 +648,20 @@ public class StorageManager {
   }
 
   private class InvalidInputException extends IOException {
+    private List<IOException> errors;
     public InvalidInputException(
         List<IOException> errors) {
+      this.errors = errors;
+    }
+
+    @Override
+    public String getMessage() {
+      StringBuilder sb = new StringBuilder();
+      for (IOException ioe : errors) {
+        sb.append(ioe.getMessage()).append("\n");
+      }
+
+      return sb.toString();
     }
   }
 
