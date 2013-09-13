@@ -224,11 +224,8 @@
       </snapshots>
     </repository>
     <repository>
-      <id>cloudera cdh</id>
-      <url>https://repository.cloudera.com/artifactory/cloudera-repos</url>
-      <releases>
-        <enabled>true</enabled>
-      </releases>
+      <id>cloudera</id>
+      <url>https://repository.cloudera.com/artifactory/cloudera-repos/</url>
     </repository>
     <repository>
       <id>eclipse-jetty</id>
