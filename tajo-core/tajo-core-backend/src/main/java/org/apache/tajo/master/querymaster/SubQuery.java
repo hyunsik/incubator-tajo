@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -49,8 +48,8 @@ import org.apache.tajo.engine.planner.logical.StoreTableNode;
 import org.apache.tajo.master.*;
 import org.apache.tajo.master.TaskRunnerGroupEvent.EventType;
 import org.apache.tajo.master.event.*;
+import org.apache.tajo.storage.AbstractStorageManager;
 import org.apache.tajo.storage.Fragment;
-import org.apache.tajo.storage.StorageManager;
 
 import java.io.IOException;
 import java.util.*;
@@ -74,7 +73,7 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
   private int priority;
   private TableMeta meta;
   private EventHandler eventHandler;
-  private final StorageManager sm;
+  private final AbstractStorageManager sm;
   private TaskSchedulerImpl taskScheduler;
   private QueryMasterTask.QueryMasterTaskContext context;
 
@@ -136,7 +135,7 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
 
   private int completedTaskCount = 0;
 
-  public SubQuery(QueryMasterTask.QueryMasterTaskContext context, ExecutionBlock block, StorageManager sm) {
+  public SubQuery(QueryMasterTask.QueryMasterTaskContext context, ExecutionBlock block, AbstractStorageManager sm) {
     this.context = context;
     this.block = block;
     this.sm = sm;
@@ -231,7 +230,7 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
     return this.priority;
   }
 
-  public StorageManager getStorageManager() {
+  public AbstractStorageManager getStorageManager() {
     return sm;
   }
   
@@ -625,7 +624,7 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
 
       final Resource resource = Records.newRecord(Resource.class);
 
-      resource.setMemory(2048);
+      resource.setMemory(2000);
 
       LOG.info("Request Container for " + subQuery.getId() + " containers=" + numRequest);
 

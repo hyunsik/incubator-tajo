@@ -25,6 +25,9 @@ Release 0.2.0 - unreleased
 
   IMPROVEMENTS
 
+    TAJO-178: Implements StorageManager for scanning asynchronously. 
+    (hyoungjunkim via hyunsik)
+
     TAJO-167: Implement GeneralSetFunctionExpr to represent all SQL standard
     set functions. (hyunsik)
 
@@ -132,6 +135,11 @@ Release 0.2.0 - unreleased
     TAJO-2: remove all @author tags and update license header. (hyunsik)
 
   BUG FIXES
+
+    TAJO-168: infinite loop occurs when QueryMaster is stopping. (jinho)
+
+    TAJO-180: Better error messages for 
+    StorageManager.listStatus$InvalidInputException. (hyunsik)
 
     TAJO-177: Call by reference bug in MergeJoinExec. (jihoon)
 
