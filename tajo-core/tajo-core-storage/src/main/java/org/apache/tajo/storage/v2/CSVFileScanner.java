@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -38,17 +39,16 @@ import org.apache.tajo.catalog.TableMeta;
 import org.apache.tajo.datum.Datum;
 import org.apache.tajo.datum.DatumFactory;
 import org.apache.tajo.exception.UnsupportedException;
-import org.apache.tajo.storage.Fragment;
-import org.apache.tajo.storage.SeekableScanner;
-import org.apache.tajo.storage.Tuple;
-import org.apache.tajo.storage.VTuple;
+import org.apache.tajo.storage.*;
 import org.apache.tajo.storage.compress.CodecPool;
 import org.apache.tajo.storage.json.StorageGsonHelper;
+import org.apache.tajo.util.Bytes;
 
 public class CSVFileScanner extends FileScannerV2 {
   public static final String DELIMITER = "csvfile.delimiter";
   public static final String DELIMITER_DEFAULT = "|";
   public static final byte LF = '\n';
+  public static int EOF = -1;
   private static final Log LOG = LogFactory.getLog(CSVFileScanner.class);
 
   private final static int DEFAULT_BUFFER_SIZE = 256 * 1024;
@@ -63,7 +63,7 @@ public class CSVFileScanner extends FileScannerV2 {
   private boolean splittable = true;
   private long startOffset, length;
   private byte[] buf = null;
-  private String[] tuples = null;
+  private byte[][] tuples = null;
   private long[] tupleOffsets = null;
   private int currentIdx = 0, validIdx = 0;
   private byte[] tail = null;
@@ -128,7 +128,7 @@ public class CSVFileScanner extends FileScannerV2 {
       is = fis;
     }
 
-    tuples = new String[0];
+    tuples = new byte[0][];
     if (targets == null) {
       targets = schema.toArray();
     }
@@ -194,41 +194,43 @@ public class CSVFileScanner extends FileScannerV2 {
     buf = new byte[bufSize];
     rbyte = is.read(buf);
 
-    if (rbyte < 0) {
-      eof = true; // EOF
-      return;
-    }
-
     if (prevTailLen == 0) {
+      if(rbyte == EOF){
+        eof = true; //EOF
+        return;
+      }
+
       tail = new byte[0];
-      tuples = StringUtils.split(new String(buf, 0, rbyte), (char) LF);
+      tuples = Bytes.splitPreserveAllTokens(buf, rbyte, (char) LF);
     } else {
-      tuples = StringUtils.split(new String(tail)
-          + new String(buf, 0, rbyte), (char) LF);
+      byte[] lastRow = ArrayUtils.addAll(tail, buf);
+      tuples = Bytes.splitPreserveAllTokens(lastRow, rbyte + tail.length, (char) LF);
       tail = null;
     }
 
     // Check tail
     if ((char) buf[rbyte - 1] != LF) {
-      if ((fragmentable() < 1 || rbyte != bufSize)) {
-        int cnt = 0;
+      // splittable bzip2 compression returned 1 byte when sync maker found
+      if (isSplittable() && (fragmentable() < 1 || rbyte != bufSize)) {
+        int lineFeedPos = 0;
         byte[] temp = new byte[DEFAULT_BUFFER_SIZE];
-        // Read bytes
-        while ((temp[cnt] = (byte) is.read()) != LF) {
-          cnt++;
+
+        // find line feed
+        while ((temp[lineFeedPos] = (byte)is.read()) != (byte)LF) {
+          lineFeedPos++;
         }
 
-        // Replace tuple
-        tuples[tuples.length - 1] = tuples[tuples.length - 1]
-            + new String(temp, 0, cnt);
+        tuples[tuples.length - 1] = ArrayUtils.addAll(tuples[tuples.length - 1],
+            ArrayUtils.subarray(temp, 0, lineFeedPos));
         validIdx = tuples.length;
+
       } else {
-        tail = tuples[tuples.length - 1].getBytes();
+        tail = tuples[tuples.length - 1];
         validIdx = tuples.length - 1;
       }
     } else {
       tail = new byte[0];
-      validIdx = tuples.length;
+      validIdx = tuples.length - 1;   //remove last empty row ( .... \n .... \n  length is 3)
     }
 
     if(!isCompress()) makeTupleOffset();
@@ -239,9 +241,7 @@ public class CSVFileScanner extends FileScannerV2 {
     this.tupleOffsets = new long[this.validIdx];
     for (int i = 0; i < this.validIdx; i++) {
       this.tupleOffsets[i] = curTupleOffset + this.pageStart;
-      curTupleOffset += this.tuples[i].getBytes().length + 1;// tuple byte
-      // + 1byte
-      // line feed
+      curTupleOffset += this.tuples[i].length + 1;//tuple byte +  1byte line feed
     }
   }
 
@@ -266,69 +266,8 @@ public class CSVFileScanner extends FileScannerV2 {
         offset = this.tupleOffsets[currentIdx];
       }
 
-      String[] cells = StringUtils.splitPreserveAllTokens(tuples[currentIdx++], delimiter);
-
-      int targetLen = targets.length;
-
-      VTuple tuple = new VTuple(columnNum);
-      Column field;
-      tuple.setOffset(offset);
-      for (int i = 0; i < targetLen; i++) {
-        field = targets[i];
-        int tid = targetColumnIndexes[i];
-        if (cells.length <= tid) {
-          tuple.put(tid, DatumFactory.createNullDatum());
-        } else {
-          String cell = cells[tid].trim();
-
-          if (cell.equals("")) {
-            tuple.put(tid, DatumFactory.createNullDatum());
-          } else {
-            switch (field.getDataType().getType()) {
-              case BOOLEAN:
-                tuple.put(tid, DatumFactory.createBool(cell));
-                break;
-              case BIT:
-                tuple.put(tid, DatumFactory.createBit(Base64.decodeBase64(cell)[0]));
-                break;
-              case CHAR:
-                String trimmed = cell.trim();
-                tuple.put(tid, DatumFactory.createChar(trimmed));
-                break;
-              case BLOB:
-                tuple.put(tid, DatumFactory.createBlob(Base64.decodeBase64(cell)));
-                break;
-              case INT2:
-                tuple.put(tid, DatumFactory.createInt2(cell));
-                break;
-              case INT4:
-                tuple.put(tid, DatumFactory.createInt4(cell));
-                break;
-              case INT8:
-                tuple.put(tid, DatumFactory.createInt8(cell));
-                break;
-              case FLOAT4:
-                tuple.put(tid, DatumFactory.createFloat4(cell));
-                break;
-              case FLOAT8:
-                tuple.put(tid, DatumFactory.createFloat8(cell));
-                break;
-              case TEXT:
-                tuple.put(tid, DatumFactory.createText(cell));
-                break;
-              case INET4:
-                tuple.put(tid, DatumFactory.createInet4(cell));
-                break;
-              case ARRAY:
-                Datum data = StorageGsonHelper.getInstance().fromJson(cell,
-                    Datum.class);
-                tuple.put(tid, data);
-                break;
-            }
-          }
-        }
-      }
-      return tuple;
+      byte[][] cells = Bytes.splitPreserveAllTokens(tuples[currentIdx++], delimiter, targetColumnIndexes);
+      return new LazyTuple(schema, cells, offset);
     } catch (Throwable t) {
       LOG.error(t.getMessage(), t);
     }
