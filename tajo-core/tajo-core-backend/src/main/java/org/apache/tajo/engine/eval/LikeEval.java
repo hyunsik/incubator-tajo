@@ -74,7 +74,7 @@ public class LikeEval extends BinaryEval {
       fieldId = schema.getColumnId(column.getQualifiedName());
       compile(this.pattern);
     }    
-    Datum str = tuple.getString(fieldId);
+    Datum str = tuple.get(fieldId);
     if (not) {
       result.setValue(!(str instanceof NullDatum) && !compiled.matcher(str.asChars()).matches());
     } else {
