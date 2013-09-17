@@ -79,9 +79,9 @@ public class LikeEval extends BinaryEval {
     }    
     TextDatum str = tuple.getString(fieldId);
     if (not) {
-      result.setValue(!compiled.matcher(str.asChars()).matches());      
+      result.setValue(str != null && !compiled.matcher(str.asChars()).matches());
     } else {
-      result.setValue(compiled.matcher(str.asChars()).matches());
+      result.setValue(str != null && compiled.matcher(str.asChars()).matches());
     }
   }
 
