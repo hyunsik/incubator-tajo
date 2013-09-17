@@ -128,7 +128,7 @@ public abstract class Datum implements Comparable<Datum>, GsonObject {
   }
 	
 	public BooleanDatum equalsTo(Datum datum) {
-    if (datum == null || this instanceof NullDatum || datum instanceof NullDatum) {
+    if (this instanceof NullDatum || datum instanceof NullDatum) {
     // TODO - comparing any value against null will be always unknown
       return DatumFactory.createBool(false);
     } else {

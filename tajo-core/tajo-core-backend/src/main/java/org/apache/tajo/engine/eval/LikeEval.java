@@ -24,10 +24,7 @@ import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.common.TajoDataTypes;
 import org.apache.tajo.common.TajoDataTypes.DataType;
-import org.apache.tajo.datum.BooleanDatum;
-import org.apache.tajo.datum.Datum;
-import org.apache.tajo.datum.DatumFactory;
-import org.apache.tajo.datum.TextDatum;
+import org.apache.tajo.datum.*;
 import org.apache.tajo.storage.Tuple;
 
 import java.util.regex.Pattern;
@@ -77,11 +74,11 @@ public class LikeEval extends BinaryEval {
       fieldId = schema.getColumnId(column.getQualifiedName());
       compile(this.pattern);
     }    
-    TextDatum str = tuple.getString(fieldId);
+    Datum str = tuple.getString(fieldId);
     if (not) {
-      result.setValue(str != null && !compiled.matcher(str.asChars()).matches());
+      result.setValue(!(str instanceof NullDatum) && !compiled.matcher(str.asChars()).matches());
     } else {
-      result.setValue(str != null && compiled.matcher(str.asChars()).matches());
+      result.setValue(!(str instanceof NullDatum) && compiled.matcher(str.asChars()).matches());
     }
   }
 
