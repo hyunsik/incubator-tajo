@@ -95,7 +95,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     PlanContext context = new PlanContext(plan, rootBlock);
     subroot = visitChild(context, stack, expr);
 
-    LogicalRootNode root = new LogicalRootNode();
+    LogicalRootNode root = new LogicalRootNode(plan.newPID());
     root.setInSchema(subroot.getOutSchema());
     root.setOutSchema(subroot.getOutSchema());
     root.setChild(subroot);
@@ -139,13 +139,14 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     }
   }
 
-  public TableSubQueryNode visitTableSubQuery(PlanContext context, Stack<OpType> stack, TableSubQuery expr) throws PlanningException {
+  public TableSubQueryNode visitTableSubQuery(PlanContext context, Stack<OpType> stack, TableSubQuery expr)
+      throws PlanningException {
     QueryBlock newBlock = context.plan.newAndGetBlock(expr.getName());
     PlanContext newContext = new PlanContext(context.plan, newBlock);
     Stack<OpType> newStack = new Stack<OpType>();
     LogicalNode child = visitChild(newContext, newStack, expr.getSubQuery());
     context.plan.connectBlocks(newContext.block, context.block, BlockType.TableSubQuery);
-    return new TableSubQueryNode(expr.getName(), child);
+    return new TableSubQueryNode(context.plan.newPID(), expr.getName(), child);
   }
 
 
@@ -161,9 +162,9 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
     ScanNode scanNode;
     if (relation.hasAlias()) {
-      scanNode = new ScanNode(desc, relation.getAlias());
+      scanNode = new ScanNode(context.plan.newPID(), desc, relation.getAlias());
     } else {
-      scanNode = new ScanNode(desc);
+      scanNode = new ScanNode(context.plan.newPID(), desc);
     }
 
     return scanNode;
@@ -185,7 +186,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       for (int i = 1; i < relations.size(); i++) {
         left = current;
         right = visitChild(context, stack, relations.getRelations()[i]);
-        current = createCatasianProduct(left, right);
+        current = createCatasianProduct(context.plan, left, right);
       }
     }
 
@@ -206,7 +207,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     stack.pop();
 
     // Phase 3: build this plan
-    JoinNode joinNode = new JoinNode(join.getJoinType(), left, right);
+    JoinNode joinNode = new JoinNode(plan.newPID(), join.getJoinType(), left, right);
 
     // Set A merged input schema
     Schema merged;
@@ -254,8 +255,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     return njQual;
   }
 
-  private static LogicalNode createCatasianProduct(LogicalNode left, LogicalNode right) {
-    JoinNode join = new JoinNode(JoinType.CROSS, left, right);
+  private static LogicalNode createCatasianProduct(LogicalPlan plan, LogicalNode left, LogicalNode right) {
+    JoinNode join = new JoinNode(plan.newPID(), JoinType.CROSS, left, right);
     Schema joinSchema = SchemaUtil.merge(
         join.getLeftChild().getOutSchema(),
         join.getRightChild().getOutSchema());
@@ -321,24 +322,24 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     PlanContext leftContext = new PlanContext(plan, plan.newAnonymousBlock());
     Stack<OpType> leftStack = new Stack<OpType>();
     LogicalNode left = visitChild(leftContext, leftStack, setOperation.getLeft());
-    TableSubQueryNode leftSubQuery = new TableSubQueryNode(leftContext.block.getName(), left);
+    TableSubQueryNode leftSubQuery = new TableSubQueryNode(plan.newPID(), leftContext.block.getName(), left);
     context.plan.connectBlocks(leftContext.block, context.block, BlockType.TableSubQuery);
 
     PlanContext rightContext = new PlanContext(plan, plan.newAnonymousBlock());
     Stack<OpType> rightStack = new Stack<OpType>();
     LogicalNode right = visitChild(rightContext, rightStack, setOperation.getRight());
-    TableSubQueryNode rightSubQuery = new TableSubQueryNode(rightContext.block.getName(), right);
+    TableSubQueryNode rightSubQuery = new TableSubQueryNode(plan.newPID(), rightContext.block.getName(), right);
     context.plan.connectBlocks(rightContext.block, context.block, BlockType.TableSubQuery);
 
     verifySetStatement(setOperation.getType(), leftContext.block, rightContext.block);
 
     BinaryNode setOp;
     if (setOperation.getType() == OpType.Union) {
-      setOp = new UnionNode(leftSubQuery, rightSubQuery);
+      setOp = new UnionNode(plan.newPID(), leftSubQuery, rightSubQuery);
     } else if (setOperation.getType() == OpType.Except) {
-      setOp = new ExceptNode(leftSubQuery, rightSubQuery);
+      setOp = new ExceptNode(plan.newPID(), leftSubQuery, rightSubQuery);
     } else if (setOperation.getType() == OpType.Intersect) {
-      setOp = new IntersectNode(leftSubQuery, rightSubQuery);
+      setOp = new IntersectNode(plan.newPID(), leftSubQuery, rightSubQuery);
     } else {
       throw new VerifyException("Invalid Type: " + setOperation.getType());
     }
@@ -394,7 +395,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
     // 3. build this plan:
     EvalNode searchCondition = createEvalTree(plan, block, selection.getQual());
-    SelectionNode selectionNode = new SelectionNode(searchCondition);
+    SelectionNode selectionNode = new SelectionNode(plan.newPID(), searchCondition);
 
     // 4. set child plan, update input/output schemas:
     selectionNode.setChild(child);
@@ -434,7 +435,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
             groupElements[i].getType(),
             annotateGroupingColumn(plan, block.getName(), groupElements[i].getColumns(), null));
       }
-      GroupbyNode groupingNode = new GroupbyNode(annotatedElements[0].getColumns());
+      GroupbyNode groupingNode = new GroupbyNode(plan.newPID(), annotatedElements[0].getColumns());
       if (aggregation.hasHavingCondition()) {
         groupingNode.setHavingCondition(
             createEvalTree(plan, block, aggregation.getHavingCondition()));
@@ -470,7 +471,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     UnionNode union;
     try {
       if ((cuboids.size() - idx) > 2) {
-        GroupbyNode g1 = new GroupbyNode(cuboids.get(idx));
+        GroupbyNode g1 = new GroupbyNode(plan.newPID(), cuboids.get(idx));
         Target[] clone = cloneTargets(block.getCurrentTargets());
 
         g1.setTargets(clone);
@@ -480,13 +481,13 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         g1.setOutSchema(outSchema);
 
         LogicalNode right = createGroupByUnion(plan, block, subNode, cuboids, idx+1);
-        union = new UnionNode(g1, right);
+        union = new UnionNode(plan.newPID(), g1, right);
         union.setInSchema(g1.getOutSchema());
         union.setOutSchema(g1.getOutSchema());
 
         return union;
       } else {
-        GroupbyNode g1 = new GroupbyNode(cuboids.get(idx));
+        GroupbyNode g1 = new GroupbyNode(plan.newPID(), cuboids.get(idx));
         Target[] clone = cloneTargets(block.getCurrentTargets());
         g1.setTargets(clone);
         g1.setChild((LogicalNode) subNode.clone());
@@ -494,14 +495,14 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         Schema outSchema = getProjectedSchema(plan, clone);
         g1.setOutSchema(outSchema);
 
-        GroupbyNode g2 = new GroupbyNode(cuboids.get(idx+1));
+        GroupbyNode g2 = new GroupbyNode(plan.newPID(), cuboids.get(idx+1));
         clone = cloneTargets(block.getCurrentTargets());
         g2.setTargets(clone);
         g2.setChild((LogicalNode) subNode.clone());
         g2.setInSchema(g1.getChild().getOutSchema());
         outSchema = getProjectedSchema(plan, clone);
         g2.setOutSchema(outSchema);
-        union = new UnionNode(g1, g2);
+        union = new UnionNode(plan.newPID(), g1, g2);
         union.setInSchema(g1.getOutSchema());
         union.setOutSchema(g1.getOutSchema());
 
@@ -574,7 +575,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     // 2. Build Child Plans:
     stack.push(OpType.Sort);
     LogicalNode child = visitChild(context, stack, sort.getChild());
-    child = insertGroupbyNodeIfUnresolved(block, child, stack);
+    child = insertGroupbyNodeIfUnresolved(plan, block, child, stack);
     stack.pop();
 
     // 3. Build this plan:
@@ -586,7 +587,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       annotatedSortSpecs[i] = new SortSpec(column, sortSpecs[i].isAscending(),
           sortSpecs[i].isNullFirst());
     }
-    SortNode sortNode = new SortNode(annotatedSortSpecs);
+    SortNode sortNode = new SortNode(context.plan.newPID(), annotatedSortSpecs);
 
     // 4. Set Child Plan, Update Input/Output Schemas:
     sortNode.setChild(child);
@@ -610,7 +611,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     // build limit plan
     EvalNode firstFetchNum = createEvalTree(plan, block, limit.getFetchFirstNum());
     firstFetchNum.eval(null, null, null);
-    LimitNode limitNode = new LimitNode(firstFetchNum.terminate(null).asInt8());
+    LimitNode limitNode = new LimitNode(context.plan.newPID(), firstFetchNum.terminate(null).asInt8());
 
     // set child plan and update input/output schemas.
     limitNode.setChild(child);
@@ -637,7 +638,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
     if (!projection.hasChild()) {
       EvalExprNode evalOnly =
-          new EvalExprNode(annotateTargets(plan, block, projection.getTargets()));
+          new EvalExprNode(context.plan.newPID(), annotateTargets(plan, block, projection.getTargets()));
       evalOnly.setOutSchema(getProjectedSchema(plan, evalOnly.getExprs()));
       block.setProjectionNode(evalOnly);
       for (int i = 0; i < evalOnly.getTargets().length; i++) {
@@ -649,7 +650,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     // 2: Build Child Plans
     stack.push(OpType.Projection);
     LogicalNode child = visitChild(context, stack, projection.getChild());
-    child = insertGroupbyNodeIfUnresolved(block, child, stack);
+    child = insertGroupbyNodeIfUnresolved(plan, block, child, stack);
     stack.pop();
 
     // All targets must be evaluable before the projection.
@@ -658,9 +659,9 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
     ProjectionNode projectionNode;
     if (projection.isAllProjected()) {
-      projectionNode = new ProjectionNode(PlannerUtil.schemaToTargets(child.getOutSchema()));
+      projectionNode = new ProjectionNode(context.plan.newPID(), PlannerUtil.schemaToTargets(child.getOutSchema()));
     } else {
-      projectionNode = new ProjectionNode(block.getCurrentTargets());
+      projectionNode = new ProjectionNode(context.plan.newPID(), block.getCurrentTargets());
     }
 
     block.setProjectionNode(projectionNode);
@@ -673,7 +674,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     } else {
       if (projection.isDistinct()) {
         Schema outSchema = projectionNode.getOutSchema();
-        GroupbyNode dupRemoval = new GroupbyNode(outSchema.toArray());
+        GroupbyNode dupRemoval = new GroupbyNode(plan.newPID(), outSchema.toArray());
         dupRemoval.setTargets(block.getTargetListManager().getTargets());
         dupRemoval.setInSchema(child.getOutSchema());
         dupRemoval.setOutSchema(outSchema);
@@ -689,11 +690,11 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
    * Insert a group-by operator before a sort or a projection operator.
    * It is used only when a group-by clause is not given.
    */
-  private LogicalNode insertGroupbyNodeIfUnresolved(QueryBlock block,
+  private LogicalNode insertGroupbyNodeIfUnresolved(LogicalPlan plan, QueryBlock block,
                                                     LogicalNode child, Stack<OpType> stack) throws PlanningException {
 
     if (!block.isGroupingResolved()) {
-      GroupbyNode groupbyNode = new GroupbyNode(new Column[] {});
+      GroupbyNode groupbyNode = new GroupbyNode(plan.newPID(), new Column[] {});
       groupbyNode.setTargets(block.getCurrentTargets());
       groupbyNode.setChild(child);
       groupbyNode.setInSchema(child.getOutSchema());
@@ -730,7 +731,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       stack.add(OpType.CreateTable);
       LogicalNode subQuery = visitChild(context, stack, expr.getSubQuery());
       stack.pop();
-      StoreTableNode storeNode = new StoreTableNode(tableName);
+      StoreTableNode storeNode = new StoreTableNode(context.plan.newPID(), tableName);
       storeNode.setCreateTable();
       storeNode.setChild(subQuery);
 
@@ -758,7 +759,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
       return storeNode;
     } else {
-      CreateTableNode createTableNode = new CreateTableNode(expr.getTableName(),
+      CreateTableNode createTableNode = new CreateTableNode(context.plan.newPID(), expr.getTableName(),
           convertTableElementsSchema(expr.getTableElements()));
 
       if (expr.isExternal()) {
@@ -835,25 +836,25 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     return column;
   }
 
-  protected LogicalNode visitInsert(PlanContext ctx, Stack<OpType> stack, Insert expr) throws PlanningException {
+  protected LogicalNode visitInsert(PlanContext context, Stack<OpType> stack, Insert expr) throws PlanningException {
     stack.push(expr.getType());
-    QueryBlock newQueryBlock = ctx.plan.newAnonymousBlock();
-    PlanContext newContext = new PlanContext(ctx.plan, newQueryBlock);
+    QueryBlock newQueryBlock = context.plan.newAnonymousBlock();
+    PlanContext newContext = new PlanContext(context.plan, newQueryBlock);
     Stack<OpType> subStack = new Stack<OpType>();
     LogicalNode subQuery = visitChild(newContext, subStack, expr.getSubQuery());
-    ctx.plan.connectBlocks(newQueryBlock, ctx.block, BlockType.TableSubQuery);
+    context.plan.connectBlocks(newQueryBlock, context.block, BlockType.TableSubQuery);
     stack.pop();
 
     InsertNode insertNode = null;
     if (expr.hasTableName()) {
       TableDesc desc = catalog.getTableDesc(expr.getTableName());
-      ctx.block.addRelation(new ScanNode(desc));
+      context.block.addRelation(new ScanNode(context.plan.newPID(), desc));
 
       Schema targetSchema = new Schema();
       if (expr.hasTargetColumns()) {
         String [] targetColumnNames = expr.getTargetColumns();
         for (int i = 0; i < targetColumnNames.length; i++) {
-          Column targetColumn = ctx.plan.resolveColumn(ctx.block, null, new ColumnReferenceExpr(targetColumnNames[i]));
+          Column targetColumn = context.plan.resolveColumn(context.block, null, new ColumnReferenceExpr(targetColumnNames[i]));
           targetSchema.addColumn(targetColumn);
         }
       } else {
@@ -864,13 +865,13 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       }
 
       ensureDomains(targetSchema, subQuery.getOutSchema());
-      insertNode = new InsertNode(desc, subQuery);
+      insertNode = new InsertNode(context.plan.newPID(), desc, subQuery);
       insertNode.setTargetSchema(targetSchema);
       insertNode.setOutSchema(targetSchema);
     }
 
     if (expr.hasLocation()) {
-      insertNode = new InsertNode(new Path(expr.getLocation()), subQuery);
+      insertNode = new InsertNode(context.plan.newPID(), new Path(expr.getLocation()), subQuery);
       if (expr.hasStorageType()) {
         insertNode.setStorageType(CatalogUtil.getStoreType(expr.getStorageType()));
       }
@@ -905,7 +906,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
   @Override
   public LogicalNode visitDropTable(PlanContext context, Stack<OpType> stack, DropTable dropTable) {
-    DropTableNode dropTableNode = new DropTableNode(dropTable.getTableName());
+    DropTableNode dropTableNode = new DropTableNode(context.plan.newPID(), dropTable.getTableName());
     return dropTableNode;
   }
 

@@ -44,8 +44,9 @@ public class LogicalPlan {
   public static final String TABLE_SELF = VIRTUAL_TABLE_PREFIX + "SELF";
 
   public static final String ANONYMOUS_TABLE_PREFIX = VIRTUAL_TABLE_PREFIX + "NONAME_";
-  public static Integer anonymousBlockId = 0;
-  public static Integer anonymousColumnId = 0;
+  private int nextPid = 0;
+  public Integer anonymousBlockId = 0;
+  public Integer anonymousColumnId = 0;
 
   /** a map from between a block name to a block plan */
   private Map<String, QueryBlock> queryBlocks = new LinkedHashMap<String, QueryBlock>();
@@ -67,6 +68,10 @@ public class LogicalPlan {
     QueryBlock block = new QueryBlock(blockName);
     queryBlocks.put(blockName, block);
     return block;
+  }
+
+  public int newPID() {
+    return nextPid++;
   }
 
   public QueryBlock newAnonymousBlock() {

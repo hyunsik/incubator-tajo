@@ -191,13 +191,6 @@ public class PlannerUtil {
     return child;
   }
   
-  private static LogicalNode insertStore(LogicalNode parent, String tableName) {
-    StoreTableNode store = new StoreTableNode(tableName);
-    insertNode(parent, store);
-    
-    return parent;
-  }
-  
   /**
    * Find the top logical node matched to type from the given node
    * 
