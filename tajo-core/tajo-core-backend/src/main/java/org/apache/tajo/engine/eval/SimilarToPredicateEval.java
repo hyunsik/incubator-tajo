@@ -18,7 +18,26 @@
 
 package org.apache.tajo.engine.eval;
 
-@Deprecated
-public interface EvalNodeVisitor {
-  public void visit(EvalNode node);
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
+
+public class SimilarToPredicateEval extends PatternMatchPredicateEval {
+  private static final String SIMILARTO_ESCAPE_SPATIAL_CHARACTERS = "([.])";
+
+  public SimilarToPredicateEval(boolean not, EvalNode field, ConstEval pattern) {
+    super(EvalType.SIMILAR_TO, not, field, pattern);
+  }
+
+  @Override
+  protected void compile(String pattern) throws PatternSyntaxException {
+    String regex = pattern.replaceAll(SIMILARTO_ESCAPE_SPATIAL_CHARACTERS, "\\\\$1");
+    regex = regex.replace("_", ".").replace("%", ".*"); // transform some special characters to be 'like'.
+
+    this.compiled = Pattern.compile(regex, Pattern.DOTALL);
+  }
+  
+  @Override
+  public String toString() {
+    return leftExpr.toString() + " SIMILAR TO '" + pattern + "'";
+  }
 }

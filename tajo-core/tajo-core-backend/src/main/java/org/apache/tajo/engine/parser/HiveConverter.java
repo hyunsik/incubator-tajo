@@ -117,7 +117,9 @@ public class HiveConverter extends HiveParserBaseVisitor<Expr>{
 
             if(ctx.havingClause() != null) {
                 Expr havingCondition = visitHavingClause(ctx.havingClause());
-                aggregation.setHavingCondition(havingCondition);
+                Having having = new Having(havingCondition);
+                having.setChild(current);
+                current = having;
             }
         }
 
@@ -213,8 +215,10 @@ public class HiveConverter extends HiveParserBaseVisitor<Expr>{
                 current = aggregation;
 
                 if(ctx.havingClause() != null) {
-                    Expr havingCondition = visitHavingClause(ctx.havingClause());
-                    aggregation.setHavingCondition(havingCondition);
+                  Expr havingCondition = visitHavingClause(ctx.havingClause());
+                  Having having = new Having(havingCondition);
+                  having.setChild(current);
+                  current = having;
                 }
             }
 
@@ -325,8 +329,10 @@ public class HiveConverter extends HiveParserBaseVisitor<Expr>{
             current = aggregation;
 
             if(ctx.havingClause() != null) {
-                Expr havingCondition = visitHavingClause(ctx.havingClause());
-                aggregation.setHavingCondition(havingCondition);
+              Expr havingCondition = visitHavingClause(ctx.havingClause());
+              Having having = new Having(havingCondition);
+              having.setChild(current);
+              current = having;
             }
         }
 
@@ -543,7 +549,7 @@ public class HiveConverter extends HiveParserBaseVisitor<Expr>{
         if(targets.length == 1) {
             if(targets[0].getExpr().getType().equals(OpType.Column)) {
                 ColumnReferenceExpr columnReferenceExprs = (ColumnReferenceExpr)targets[0].getExpr();
-                if(columnReferenceExprs.getTableName() == null && columnReferenceExprs.getName().equals("*"))
+                if(columnReferenceExprs.getQualifier() == null && columnReferenceExprs.getName().equals("*"))
                     projection.setAll();;
             }
         }
@@ -575,7 +581,7 @@ public class HiveConverter extends HiveParserBaseVisitor<Expr>{
 
         columnReference = new ColumnReferenceExpr(itemName);
         if(!tableName.equals(""))
-            columnReference.setTableName(tableName);
+            columnReference.setQualifier(tableName);
 
         if(ctx.selectExpression() != null) {
             if(ctx.selectExpression().expression() != null) {
@@ -699,10 +705,7 @@ public class HiveConverter extends HiveParserBaseVisitor<Expr>{
 
     /**
      * This method parse operators for equals expressions as follows:
-     *   =, <>, !=, >=, >, <=, <, IN, NOT IN, LIKE
-     *
-     * And Tajo doesn't provide some operators as follows:
-     *   REGEXP, RLIKE
+     *   =, <>, !=, >=, >, <=, <, IN, NOT IN, LIKE, REGEXP, RLIKE
      *
      * In this case, this make RuntimeException>
      *
@@ -757,9 +760,9 @@ public class HiveConverter extends HiveParserBaseVisitor<Expr>{
                 } else if(keyword.equals("!=")) {
                     type = OpType.NotEquals;
                 } else if(keyword.equals("REGEXP")) {
-                    throw new RuntimeException("Unexpected operator : REGEXP");
+                    type = OpType.Regexp;
                 } else if(keyword.equals("RLIKE")) {
-                    throw new RuntimeException("Unexpected operator : RLIKE");
+                    type = OpType.Regexp;
                 } else if(keyword.equals("LIKE")) {
                     type = OpType.LikePredicate;
                 }
@@ -768,8 +771,12 @@ public class HiveConverter extends HiveParserBaseVisitor<Expr>{
 
         if(type != null && right != null) {
             if(type.equals(OpType.LikePredicate)) {
-                LikePredicate like = new LikePredicate(isNot, (ColumnReferenceExpr)left, (LiteralValue)right);
+                PatternMatchPredicate like = new PatternMatchPredicate(OpType.LikePredicate,
+                    isNot, left, right);
                 current = like;
+            } else if (type.equals(OpType.Regexp)) {
+              PatternMatchPredicate regex = new PatternMatchPredicate(OpType.Regexp, isNot, left, right);
+              current = regex;
             } else {
                 BinaryOperator binaryOperator = new BinaryOperator(type, left, right);
                 current = binaryOperator;
@@ -1049,7 +1056,7 @@ public class HiveConverter extends HiveParserBaseVisitor<Expr>{
         if(ctx.DOT().size() > 0) {
             ColumnReferenceExpr column = new ColumnReferenceExpr(ctx.identifier(0).getText());
             ColumnReferenceExpr table = (ColumnReferenceExpr)current;
-            column.setTableName(table.getName());
+            column.setQualifier(table.getName());
             current = column;
         }
         return current;

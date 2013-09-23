@@ -4,6 +4,10 @@ Release 0.2.0 - unreleased
 
   NEW FEATURES
 
+    TAJO-185: Implement split_part function. (hyunsik)
+
+    TAJO-193: Add string pattern matching operators. (hyunsik)
+
     TAJO-101: HiveQL converter. (jaehwa)
 
     TAJO-144: Implement INSERT OVERWRITE clause. (hyunsik)
@@ -25,7 +29,8 @@ Release 0.2.0 - unreleased
 
   IMPROVEMENTS
 
-    TAJO-183: Creating too many TableMetaProto objects might lead a potential memory leak. (jihoon)
+    TAJO-183: Creating too many TableMetaProto objects might lead a potential 
+    memory leak. (jihoon)
 
     TAJO-184: Refactor GlobalPlanner and global plan data structure. (hyunsik)
 
@@ -141,6 +146,13 @@ Release 0.2.0 - unreleased
     TAJO-2: remove all @author tags and update license header. (hyunsik)
 
   BUG FIXES
+
+    TAJO-187: The exception 'Some targets cannot be evaluated' is caused in 
+    nested joins. (hyunsik)
+
+    TAJO-46: The "having" clause does not work properly. (hyunsik)
+
+    TAJO-186: Improve column resolving method. (hyunsik)
 
     TAJO-168: infinite loop occurs when QueryMaster is stopping. (jinho)
 

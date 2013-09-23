@@ -18,6 +18,7 @@
 
 package org.apache.tajo.catalog;
 
+import com.google.common.collect.ImmutableList;
 import com.google.gson.annotations.Expose;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -52,16 +53,17 @@ public class Schema implements ProtoObject<SchemaProto>, Cloneable, GsonObject {
     this.fieldsByQialifiedName = new HashMap<String, Integer>();
     this.fieldsByName = new HashMap<String, List<Integer>>();
     for(ColumnProto colProto : proto.getFieldsList()) {
-      fields.add(new Column(colProto));
-      if (colProto.hasQualifier()) {
-        fieldsByQialifiedName.put(colProto.getQualifier() + "." + colProto.getColumnName(), fields.size() - 1);
+      Column tobeAdded = new Column(colProto);
+      fields.add(tobeAdded);
+      if (tobeAdded.hasQualifier()) {
+        fieldsByQialifiedName.put(tobeAdded.getQualifier() + "." + tobeAdded.getColumnName(), fields.size() - 1);
       } else {
-        fieldsByQialifiedName.put(colProto.getColumnName(), fields.size() - 1);
+        fieldsByQialifiedName.put(tobeAdded.getColumnName(), fields.size() - 1);
       }
-      if (fieldsByName.containsKey(colProto.getColumnName())) {
-        fieldsByName.get(colProto.getColumnName()).add(fields.size() - 1);
+      if (fieldsByName.containsKey(tobeAdded.getColumnName())) {
+        fieldsByName.get(tobeAdded.getColumnName()).add(fields.size() - 1);
       } else {
-        fieldsByName.put(colProto.getColumnName(), TUtil.newList(fields.size() - 1));
+        fieldsByName.put(tobeAdded.getColumnName(), TUtil.newList(fields.size() - 1));
       }
     }
   }
@@ -80,10 +82,31 @@ public class Schema implements ProtoObject<SchemaProto>, Cloneable, GsonObject {
     }
   }
 
+  /**
+   * Set a qualifier to this schema.
+   * This changes the qualifier of all columns except for not-qualified columns.
+   *
+   * @param qualifier The qualifier
+   */
   public void setQualifier(String qualifier) {
+    setQualifier(qualifier, false);
+  }
+
+  /**
+   * Set a qualifier to this schema. This changes the qualifier of all columns if force is true.
+   * Otherwise, it changes the qualifier of all columns except for non-qualified columns
+   *
+   * @param qualifier The qualifier
+   * @param force If true, all columns' qualifiers will be changed. Otherwise, only qualified columns' qualifiers will
+   *              be changed.
+   */
+  public void setQualifier(String qualifier, boolean force) {
     fieldsByQialifiedName.clear();
 
     for (int i = 0; i < getColumnNum(); i++) {
+      if (!force && fields.get(i).hasQualifier()) {
+        continue;
+      }
       fields.get(i).setQualifier(qualifier);
       fieldsByQialifiedName.put(fields.get(i).getQualifiedName(), i);
     }
@@ -93,8 +116,12 @@ public class Schema implements ProtoObject<SchemaProto>, Cloneable, GsonObject {
 		return this.fields.size();
 	}
 
-	public Column getColumnByFQN(String colName) {
-		Integer cid = fieldsByQialifiedName.get(colName.toLowerCase());
+  public Column getColumn(int id) {
+    return fields.get(id);
+  }
+
+	public Column getColumnByFQN(String qualifiedName) {
+		Integer cid = fieldsByQialifiedName.get(qualifiedName.toLowerCase());
 		return cid != null ? fields.get(cid) : null;
 	}
 	
@@ -123,12 +150,8 @@ public class Schema implements ProtoObject<SchemaProto>, Cloneable, GsonObject {
     }
 	}
 	
-	public Column getColumn(int id) {
-	  return fields.get(id);
-	}
-	
-	public int getColumnId(String colName) {
-	  return fieldsByQialifiedName.get(colName.toLowerCase());
+	public int getColumnId(String qualifiedName) {
+	  return fieldsByQialifiedName.get(qualifiedName.toLowerCase());
 	}
 
   public int getColumnIdByName(String colName) {
@@ -140,12 +163,8 @@ public class Schema implements ProtoObject<SchemaProto>, Cloneable, GsonObject {
     return -1;
   }
 	
-	public Collection<Column> getColumns() {
-		return fields;
-	}
-	
-	public void alter(int idx, Column column) {
-	  this.fields.set(idx, column);
+	public List<Column> getColumns() {
+		return ImmutableList.copyOf(fields);
 	}
 	
 	public boolean contains(String colName) {
@@ -164,13 +183,13 @@ public class Schema implements ProtoObject<SchemaProto>, Cloneable, GsonObject {
   }
 
   public synchronized Schema addColumn(String name, DataType dataType) {
-		String nomalized = name.toLowerCase();
-		if(fieldsByQialifiedName.containsKey(nomalized)) {
-		  LOG.error("Already exists column " + nomalized);
-			throw new AlreadyExistsFieldException(nomalized);
+		String normalized = name.toLowerCase();
+		if(fieldsByQialifiedName.containsKey(normalized)) {
+		  LOG.error("Already exists column " + normalized);
+			throw new AlreadyExistsFieldException(normalized);
 		}
 			
-		Column newCol = new Column(nomalized, dataType);
+		Column newCol = new Column(normalized, dataType);
 		fields.add(newCol);
 		fieldsByQialifiedName.put(newCol.getQualifiedName(), fields.size() - 1);
     fieldsByName.put(newCol.getColumnName(), TUtil.newList(fields.size() - 1));

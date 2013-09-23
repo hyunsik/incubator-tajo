@@ -42,16 +42,20 @@ public enum EvalType {
   AGG_FUNCTION(AggFuncCallEval.class),
   FUNCTION(FuncCallEval.class),
 
-  // Predicate
-  LIKE(LikeEval.class),
+  // String pattern matching
+  LIKE(LikePredicateEval.class),
+  SIMILAR_TO(SimilarToPredicateEval.class),
+  Regex(RegexPredicateEval.class),
+
+  // Other predicates
   CASE(CaseWhenEval.class),
-  WHEN(CaseWhenEval.WhenEval.class),
+  IF_THEN(CaseWhenEval.IfThenEval.class),
   IN(InEval.class),
 
   // Value or Reference
   FIELD(FieldEval.class),
   CONST(ConstEval.class),
-  ROW_CONSTANT(RowConstant.class);
+  ROW_CONSTANT(RowConstantEval.class);
 
   private Class<? extends EvalNode> baseClass;
 

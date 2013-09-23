@@ -27,6 +27,7 @@ public enum OpType {
   // relational operators
   Relation(Relation.class),
   RelationList(RelationList.class),
+  Rename,
   TableSubQuery(TableSubQuery.class),
   Except(SetOperation.class),
   Having(Having.class),
@@ -34,7 +35,6 @@ public enum OpType {
   Intersect(SetOperation.class),
   Join(Join.class),
   Projection(Projection.class),
-  Rename,
   Filter(Selection.class),
   Sort(Sort.class),
   Union(SetOperation.class),
@@ -64,9 +64,13 @@ public enum OpType {
   CaseWhen(CaseWhenPredicate.class),
   IsNullPredicate(IsNullPredicate.class),
   InPredicate(InPredicate.class),
-  LikePredicate(LikePredicate.class),
   ValueList(ValueListExpr.class),
   Is,
+
+  // pattern matching predicates
+  LikePredicate(PatternMatchPredicate.class),
+  SimilarToPredicate(PatternMatchPredicate.class),
+  Regexp(PatternMatchPredicate.class),
 
   // arithmetic operators
   Plus(BinaryOperator.class),
