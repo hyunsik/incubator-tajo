@@ -189,7 +189,7 @@ public class TestMergeJoinExec {
           employeeSchema.getColumnByName("empId"));
       outerSortKeys[1] = new SortSpec(
           employeeSchema.getColumnByName("memId"));
-      SortNode outerSort = new SortNode(plan.newPID(), outerSortKeys);
+      SortNode outerSort = new SortNode(plan.getPID(), outerSortKeys);
       outerSort.setInSchema(outerScan.getSchema());
       outerSort.setOutSchema(outerScan.getSchema());
 
@@ -199,7 +199,7 @@ public class TestMergeJoinExec {
           peopleSchema.getColumnByName("empId"));
       innerSortKeys[1] = new SortSpec(
           peopleSchema.getColumnByName("fk_memid"));
-      SortNode innerSort = new SortNode(plan.newPID(), innerSortKeys);
+      SortNode innerSort = new SortNode(plan.getPID(), innerSortKeys);
       innerSort.setInSchema(innerScan.getSchema());
       innerSort.setOutSchema(innerScan.getSchema());
 

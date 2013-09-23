@@ -41,7 +41,7 @@ public abstract class LogicalNode implements Cloneable, GsonObject {
     this.type = type;
 	}
 
-  public int newPID() {
+  public int getPID() {
     return pid;
   }
 	
