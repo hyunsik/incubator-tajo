@@ -16,9 +16,16 @@
  * limitations under the License.
  */
 
-package org.apache.tajo.engine.planner.logical;
+package org.apache.tajo.engine.planner;
 
-public enum PipeType {
-  PULL,
-  PUSH
+import java.io.IOException;
+
+public class PhysicalPlanningException extends IOException {
+  public PhysicalPlanningException(String message) {
+    super(message);
+  }
+
+  public PhysicalPlanningException(Throwable t) {
+    super(t);
+  }
 }

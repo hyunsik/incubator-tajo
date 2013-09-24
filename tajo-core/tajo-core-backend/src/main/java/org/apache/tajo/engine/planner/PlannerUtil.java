@@ -66,21 +66,6 @@ public class PlannerUtil {
     return tableNames;
   }
   
-  public static LogicalNode insertNode(LogicalNode parent, LogicalNode newNode) {
-    Preconditions.checkArgument(parent instanceof UnaryNode);
-    Preconditions.checkArgument(newNode instanceof UnaryNode);
-    
-    UnaryNode p = (UnaryNode) parent;
-    LogicalNode c = p.getChild();
-    UnaryNode m = (UnaryNode) newNode;
-    m.setInSchema(c.getOutSchema());
-    m.setOutSchema(c.getOutSchema());
-    m.setChild(c);
-    p.setChild(m);
-    
-    return p;
-  }
-  
   /**
    * Delete the logical node from a plan.
    *
@@ -191,13 +176,6 @@ public class PlannerUtil {
     return child;
   }
   
-  private static LogicalNode insertStore(LogicalNode parent, String tableName) {
-    StoreTableNode store = new StoreTableNode(tableName);
-    insertNode(parent, store);
-    
-    return parent;
-  }
-  
   /**
    * Find the top logical node matched to type from the given node
    * 
@@ -246,7 +224,7 @@ public class PlannerUtil {
    * @param type to find
    * @return the parent node of a found logical node
    */
-  public static LogicalNode findTopParentNode(LogicalNode node, NodeType type) {
+  public static <T extends LogicalNode> T findTopParentNode(LogicalNode node, NodeType type) {
     Preconditions.checkNotNull(node);
     Preconditions.checkNotNull(type);
     
@@ -256,7 +234,7 @@ public class PlannerUtil {
     if (finder.getFoundNodes().size() == 0) {
       return null;
     }
-    return finder.getFoundNodes().get(0);
+    return (T) finder.getFoundNodes().get(0);
   }
 
   public static boolean canBeEvaluated(EvalNode eval, LogicalNode node) {

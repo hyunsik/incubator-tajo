@@ -25,5 +25,5 @@ option java_generate_equals_and_hash = true;
 import "CatalogProtos.proto";
 
 message TupleComparatorProto {
-  repeated SortSpecProto sortSpecs = 1;
+  repeated TupleComparatorSpecProto compSpecs = 1;
 }

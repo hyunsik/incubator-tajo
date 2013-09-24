@@ -373,7 +373,8 @@ public class GlobalEngine extends AbstractService {
         queryContext.setFileOutput();
       }
 
-      storeNode = new StoreTableNode(outputTableName);
+      storeNode = new StoreTableNode(plan.newPID(), outputTableName);
+      storeNode.setOptions(new Options());
       queryContext.setOutputPath(outputPath);
 
       if (insertNode.isOverwrite()) {
@@ -388,6 +389,8 @@ public class GlobalEngine extends AbstractService {
       Schema subQueryOutSchema = subQuery.getOutSchema();
 
       if (insertNode.hasTargetTable()) { // if a target table is given, it computes the proper schema.
+        storeNode.getOptions().putAll(insertNode.getTargetTable().getMeta().getOptions());
+
         Schema targetTableSchema = insertNode.getTargetTable().getMeta().getSchema();
         Schema targetProjectedSchema = insertNode.getTargetSchema();
 
@@ -416,7 +419,7 @@ public class GlobalEngine extends AbstractService {
         }
 
 
-        ProjectionNode projectionNode = new ProjectionNode(targets);
+        ProjectionNode projectionNode = new ProjectionNode(plan.newPID(), targets);
         projectionNode.setInSchema(insertNode.getSubQuery().getOutSchema());
         projectionNode.setOutSchema(PlannerUtil.targetToSchema(targets));
         List<LogicalPlan.QueryBlock> blocks = plan.getChildBlocks(plan.getRootBlock());
@@ -436,7 +439,7 @@ public class GlobalEngine extends AbstractService {
         storeNode.setStorageType(insertNode.getStorageType());
       }
       if (insertNode.hasOptions()) {
-        storeNode.setOptions(insertNode.getOptions());
+        storeNode.getOptions().putAll(insertNode.getOptions());
       }
 
       // find a subquery query of insert node and merge root block and subquery into one query block.
