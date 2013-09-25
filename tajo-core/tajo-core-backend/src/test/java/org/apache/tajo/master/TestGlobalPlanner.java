@@ -182,4 +182,9 @@ public class TestGlobalPlanner {
         "union " +
         "select * from lineitem ) l group by l_orderkey");
   }
+
+  @Test
+  public void testInsertOverwriteWithUnion1() throws Exception {
+    buildPlan(FileUtil.readTextFile(new File("src/test/queries/complex_union_3.sql")));
+  }
 }

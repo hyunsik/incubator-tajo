@@ -48,6 +48,7 @@ import org.apache.tajo.engine.planner.global.MasterPlan;
 import org.apache.tajo.engine.planner.logical.GroupbyNode;
 import org.apache.tajo.engine.planner.logical.NodeType;
 import org.apache.tajo.engine.planner.logical.ScanNode;
+import org.apache.tajo.ipc.TajoWorkerProtocol;
 import org.apache.tajo.master.ExecutionBlock;
 import org.apache.tajo.master.TaskRunnerGroupEvent;
 import org.apache.tajo.master.TaskRunnerGroupEvent.EventType;
@@ -65,6 +66,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static org.apache.tajo.conf.TajoConf.ConfVars;
+import static org.apache.tajo.ipc.TajoWorkerProtocol.PartitionType;
 
 
 /**
@@ -422,7 +424,8 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
           subQuery.finish();
           state = SubQueryState.SUCCEEDED;
         } else {
-          DataChannel channel = subQuery.getMasterPlan().getOutgoingChannels(subQuery.getId()).get(0);
+          ExecutionBlock parent = subQuery.getMasterPlan().getParent(subQuery.getBlock());
+          DataChannel channel = subQuery.getMasterPlan().getChannel(subQuery.getId(), parent.getId());
           setRepartitionIfNecessary(subQuery, channel);
           createTasks(subQuery);
 
@@ -458,7 +461,7 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
      * methods and the number of partitions to a given subquery.
      */
     private static void setRepartitionIfNecessary(SubQuery subQuery, DataChannel channel) {
-      if (subQuery.getBlock().hasParentBlock()) {
+      if (channel.getPartitionType() != PartitionType.NONE_PARTITION) {
         int numTasks = calculatePartitionNum(subQuery, channel);
         Repartitioner.setPartitionNumberForTwoPhase(subQuery, numTasks, channel);
       }
@@ -473,7 +476,8 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
      */
     public static int calculatePartitionNum(SubQuery subQuery, DataChannel channel) {
       TajoConf conf = subQuery.context.getConf();
-      ExecutionBlock parent = subQuery.getBlock().getParentBlock();
+      MasterPlan masterPlan = subQuery.getMasterPlan();
+      ExecutionBlock parent = masterPlan.getParent(subQuery.getBlock());
 
       GroupbyNode grpNode = null;
       if (parent != null) {
@@ -482,14 +486,14 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
 
       // Is this subquery the first step of join?
       if (parent != null && parent.getScanNodes().length == 2) {
-        Iterator<ExecutionBlock> child = parent.getChildBlocks().iterator();
+        List<ExecutionBlock> childs = masterPlan.getChilds(parent);
 
         // for inner
-        ExecutionBlock outer = child.next();
+        ExecutionBlock outer = childs.get(0);
         long outerVolume = getInputVolume(subQuery.masterPlan, subQuery.context, outer);
 
         // for inner
-        ExecutionBlock inner = child.next();
+        ExecutionBlock inner = childs.get(1);
         long innerVolume = getInputVolume(subQuery.masterPlan, subQuery.context, inner);
         LOG.info("Outer volume: " + Math.ceil((double)outerVolume / 1048576));
         LOG.info("Inner volume: " + Math.ceil((double)innerVolume / 1048576));

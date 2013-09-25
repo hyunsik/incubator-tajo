@@ -27,6 +27,8 @@ import org.junit.experimental.categories.Category;
 
 import java.io.IOException;
 import java.sql.ResultSet;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.junit.Assert.*;
 
@@ -78,6 +80,19 @@ public class TestTableSubQuery {
         "FROM\n" +
         "(SELECT * FROM nation WHERE n_name LIKE 'A%') A " +
         "JOIN region B ON A.n_regionkey=B.r_regionkey");
-    System.out.println(ResultSetUtil.prettyFormat(res));
+
+    Map<String,String> expected = new HashMap<String, String>();
+    expected.put("ARGENTINA", "AMERICA");
+    expected.put("ALGERIA", "AFRICA");
+    try {
+      assertNotNull(res);
+      assertTrue(res.next());
+      assertTrue(expected.get(res.getString("n_name")).equals(res.getString("r_name")));
+      assertTrue(res.next());
+      assertTrue(expected.get(res.getString("n_name")).equals(res.getString("r_name")));
+      assertFalse(res.next());
+    } finally {
+      res.close();
+    }
   }
 }
