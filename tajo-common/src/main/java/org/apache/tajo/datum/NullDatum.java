@@ -110,11 +110,13 @@ public class NullDatum extends Datum {
   }
 
   public static boolean isNull(String val){
-    return val == null || val.length() == 0 || ((val.length() == NULL_CHAR.length) && NULL_STRING.equals(val));
+    return val == null || val.length() == 0 || ((val.length() == 2) && "\\N".equals(val))
+        || ((val.length() == NULL_CHAR.length) && NULL_STRING.equals(val));
   }
 
   public static boolean isNull(byte[] val){
-    return val == null || val.length == 0 || ((val.length == NULL_CHAR.length) && Bytes.equals(val, NULL_CHAR));
+    return val == null || val.length == 0 || ((val.length == 2) && Bytes.equals(val, "\\N".getBytes()))
+        || ((val.length == NULL_CHAR.length) && Bytes.equals(val, NULL_CHAR));
   }
 
   public static boolean isNotNull(String val){
