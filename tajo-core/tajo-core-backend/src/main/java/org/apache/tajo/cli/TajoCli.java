@@ -451,7 +451,7 @@ public class TajoCli {
               true)).append("\n");
     }
     sb.append("Options: \n");
-    for(Map.Entry<String, String> entry : desc.getMeta().getOptions().entrySet()){
+    for(Map.Entry<String, String> entry : desc.getMeta().toMap().entrySet()){
       sb.append("\t").append("'").append(entry.getKey()).append("'").append("=")
           .append("'").append(entry.getValue()).append("'").append("\n");
     }
