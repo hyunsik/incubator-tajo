@@ -22,6 +22,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.tajo.algebra.*;
 import org.apache.tajo.algebra.CreateTable.ColumnDefinition;
@@ -42,6 +44,7 @@ import org.apache.tajo.engine.query.exception.UndefinedFunctionException;
 import org.apache.tajo.engine.utils.SchemaUtil;
 import org.apache.tajo.exception.InternalException;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Stack;
 
@@ -161,7 +164,6 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     // 3. build scan plan
     Relation relation = expr;
     TableDesc desc = catalog.getTableDesc(relation.getName());
-
     ScanNode scanNode;
     if (relation.hasAlias()) {
       scanNode = new ScanNode(context.plan.newPID(), desc, relation.getAlias());

@@ -39,6 +39,7 @@ public class TableStat implements ProtoObject<TableStatProto>, Cloneable, GsonOb
 
   @Expose private Long numRows = null; // required
   @Expose private Long numBytes = null; // required
+  @Expose private Integer numFiles = null; // required
   @Expose private Integer numBlocks = null; // optional
   @Expose private Integer numPartitions = null; // optional
   @Expose private Long avgRows = null; // optional
@@ -47,6 +48,7 @@ public class TableStat implements ProtoObject<TableStatProto>, Cloneable, GsonOb
   public TableStat() {
     numRows = 0l;
     numBytes = 0l;
+    numFiles = 0;
     numBlocks = 0;
     numPartitions = 0;
     avgRows = 0l;
@@ -56,6 +58,7 @@ public class TableStat implements ProtoObject<TableStatProto>, Cloneable, GsonOb
   public TableStat(TableStatProto proto) {
     this.numRows = proto.getNumRows();
     this.numBytes = proto.getNumBytes();
+    //this.numFiles =
 
     if (proto.hasNumBlocks()) {
       this.numBlocks = proto.getNumBlocks();

@@ -382,11 +382,6 @@ public class TajoMasterClientService extends AbstractService {
 
   private long calculateSize(Path path) throws IOException {
     FileSystem fs = path.getFileSystem(conf);
-    long totalSize = 0;
-    for (FileStatus status : fs.listStatus(path)) {
-      totalSize += status.getLen();
-    }
-
-    return totalSize;
+    return fs.getContentSummary(path).getSpaceConsumed();
   }
 }
