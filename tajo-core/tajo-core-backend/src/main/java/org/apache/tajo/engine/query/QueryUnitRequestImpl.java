@@ -18,6 +18,15 @@
 
 package org.apache.tajo.engine.query;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
 import org.apache.tajo.DataChannel;
 import org.apache.tajo.QueryUnitAttemptId;
 import org.apache.tajo.engine.planner.enforce.Enforcer;
@@ -27,13 +36,12 @@ import org.apache.tajo.ipc.TajoWorkerProtocol.QueryUnitRequestProtoOrBuilder;
 import org.apache.tajo.ipc.protocolrecords.QueryUnitRequest;
 import org.apache.tajo.master.QueryContext;
 import org.apache.tajo.storage.Fragment;
+import org.xerial.snappy.Snappy;
 
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
+import com.google.protobuf.ByteString;
 
 public class QueryUnitRequestImpl implements QueryUnitRequest {
-	
+
   private QueryUnitAttemptId id;
   private List<Fragment> fragments;
   private String outputTable;
@@ -43,34 +51,36 @@ public class QueryUnitRequestImpl implements QueryUnitRequest {
 	private Boolean interQuery;
 	private List<Fetch> fetches;
   private Boolean shouldDie;
+  private List<Integer> joinKeys;
+  private Map<Integer, Long> histogram;
   private QueryContext queryContext;
   private DataChannel dataChannel;
   private Enforcer enforcer;
-	
+
 	private QueryUnitRequestProto proto = QueryUnitRequestProto.getDefaultInstance();
 	private QueryUnitRequestProto.Builder builder = null;
 	private boolean viaProto = false;
-	
+
 	public QueryUnitRequestImpl() {
 		builder = QueryUnitRequestProto.newBuilder();
 		this.id = null;
 		this.isUpdated = false;
 	}
-	
+
 	public QueryUnitRequestImpl(QueryUnitAttemptId id, List<Fragment> fragments,
 			String outputTable, boolean clusteredOutput,
 			String serializedData, QueryContext queryContext, DataChannel channel, Enforcer enforcer) {
 		this();
 		this.set(id, fragments, outputTable, clusteredOutput, serializedData, queryContext, channel, enforcer);
 	}
-	
+
 	public QueryUnitRequestImpl(QueryUnitRequestProto proto) {
 		this.proto = proto;
 		viaProto = true;
 		id = null;
 		isUpdated = false;
 	}
-	
+
 	public void set(QueryUnitAttemptId id, List<Fragment> fragments,
 			String outputTable, boolean clusteredOutput,
 			String serializedData, QueryContext queryContext, DataChannel dataChannel, Enforcer enforcer) {
@@ -161,7 +171,7 @@ public class QueryUnitRequestImpl implements QueryUnitRequest {
 		this.serializedData = p.getSerializedData();
 		return this.serializedData;
 	}
-	
+
 	public boolean isInterQuery() {
 	  QueryUnitRequestProtoOrBuilder p = viaProto ? proto : builder;
     if (interQuery != null) {
@@ -173,12 +183,12 @@ public class QueryUnitRequestImpl implements QueryUnitRequest {
     this.interQuery = p.getInterQuery();
     return this.interQuery;
 	}
-	
+
 	public void setInterQuery() {
 	  maybeInitBuilder();
 	  this.interQuery = true;
 	}
-	
+
 	public void addFetch(String name, URI uri) {
 	  maybeInitBuilder();
 	  initFetches();
@@ -186,7 +196,7 @@ public class QueryUnitRequestImpl implements QueryUnitRequest {
 	  Fetch.newBuilder()
 	    .setName(name)
 	    .setUrls(uri.toString()).build());
-	  
+
 	}
 
   public QueryContext getQueryContext() {
@@ -238,11 +248,11 @@ public class QueryUnitRequestImpl implements QueryUnitRequest {
   }
 
   public List<Fetch> getFetches() {
-	  initFetches();    
+	  initFetches();
 
     return this.fetches;
 	}
-	
+
 	private void initFetches() {
 	  if (this.fetches != null) {
       return;
@@ -279,7 +289,7 @@ public class QueryUnitRequestImpl implements QueryUnitRequest {
 		}
 		viaProto = true;
 	}
-	
+
 	private void mergeLocalToBuilder() {
 		if (id != null) {
 			builder.setId(this.id.getProto());
@@ -307,6 +317,23 @@ public class QueryUnitRequestImpl implements QueryUnitRequest {
     if (this.shouldDie != null) {
       builder.setShouldDie(this.shouldDie);
     }
+    if (this.joinKeys != null) {
+      builder.addAllJoinKeys(this.joinKeys);
+    }
+    if (this.histogram != null) {
+      // serializing
+      try {
+        ByteArrayOutputStream byteOut = new ByteArrayOutputStream();
+        ObjectOutputStream out = new ObjectOutputStream(byteOut);
+        out.writeObject(histogram);
+        // builder.setHistogram(ByteString.copyFrom(Snappy.compress(byteOut.toByteArray())));
+        byte[] histogramBytes = Snappy.compress(byteOut.toByteArray());
+        builder.setHistogram(ByteString.copyFrom(histogramBytes));
+      } catch (Exception e) {
+        // TODO log exception
+        e.printStackTrace();
+      }
+    }
     if (this.queryContext != null) {
       builder.setQueryContext(queryContext.getProto());
     }
@@ -325,5 +352,45 @@ public class QueryUnitRequestImpl implements QueryUnitRequest {
 		mergeLocalToBuilder();
 		proto = builder.build();
 		viaProto = true;
+  }
+
+  @Override
+  public void setJoinKeys(List<Integer> joinKeys) {
+    this.joinKeys = joinKeys;
+  }
+
+  @Override
+  public List<Integer> getJoinKeys() {
+    if (joinKeys == null) {
+      QueryUnitRequestProtoOrBuilder p = viaProto ? proto : builder;
+      joinKeys = new ArrayList<Integer>();
+      for (Integer i : p.getJoinKeysList()) {
+        joinKeys.add(i);
+      }
+    }
+    return joinKeys;
+  }
+
+  @Override
+  public Map<Integer, Long> getHistogram() {
+    if (histogram == null && proto.hasHistogram()) {
+      byte[] histogramBytes = proto.getHistogram().toByteArray();
+
+      // deserializing
+      try {
+        ByteArrayInputStream byteIn = new ByteArrayInputStream(Snappy.uncompress(histogramBytes));
+        ObjectInputStream in = new ObjectInputStream(byteIn);
+        return (Map<Integer, Long>) in.readObject();
+      } catch (Exception e) {
+        // TODO log exception
+        e.printStackTrace();
+      }
+    }
+    return histogram;
+  }
+
+  @Override
+  public void setHistogram(Map<Integer, Long> histogram) {
+    this.histogram = histogram;
 	}
 }

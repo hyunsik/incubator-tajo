@@ -100,6 +100,7 @@ public final class PartitionedStoreExec extends UnaryPhysicalExec {
       }
       appender = StorageManagerFactory.getStorageManager(context.getConf()).getAppender(meta, dataFile);
       appender.enableStats();
+      appender.setJoinKeys(context.getJoinKeys());
       appender.init();
       appenderMap.put(partition, appender);
     } else {

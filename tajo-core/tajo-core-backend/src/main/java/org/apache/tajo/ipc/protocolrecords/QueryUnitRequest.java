@@ -31,6 +31,7 @@ import org.apache.tajo.storage.Fragment;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 
 public interface QueryUnitRequest extends ProtoObject<TajoWorkerProtocol.QueryUnitRequestProto> {
 
@@ -45,6 +46,10 @@ public interface QueryUnitRequest extends ProtoObject<TajoWorkerProtocol.QueryUn
 	public List<TajoWorkerProtocol.Fetch> getFetches();
   public boolean shouldDie();
   public void setShouldDie();
+  public List<Integer> getJoinKeys();
+  public void setJoinKeys(List<Integer> joinKeys);
+  public void setHistogram(Map<Integer, Long> histogram);
+  public Map<Integer, Long> getHistogram();
   public QueryContext getQueryContext();
   public DataChannel getDataChannel();
   public Enforcer getEnforcer();

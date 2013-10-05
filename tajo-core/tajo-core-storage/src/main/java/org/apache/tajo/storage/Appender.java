@@ -22,18 +22,21 @@ import org.apache.tajo.catalog.statistics.TableStat;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.List;
 
 public interface Appender extends Closeable {
 
   void init() throws IOException;
 
   void addTuple(Tuple t) throws IOException;
-  
+
   void flush() throws IOException;
-  
+
   void close() throws IOException;
 
   void enableStats();
-  
+
   TableStat getStats();
+
+  void setJoinKeys(List<Integer> joinKeys);
 }

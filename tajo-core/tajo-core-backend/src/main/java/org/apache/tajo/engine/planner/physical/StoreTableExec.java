@@ -69,6 +69,7 @@ public class StoreTableExec extends UnaryPhysicalExec {
       appender = StorageManagerFactory.getStorageManager(context.getConf()).getAppender(meta, context.getOutputPath());
     }
     appender.enableStats();
+    appender.setJoinKeys(context.getJoinKeys());
     appender.init();
   }
 

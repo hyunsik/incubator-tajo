@@ -15,7 +15,9 @@
 package org.apache.tajo.master;
 
 import org.apache.tajo.ExecutionBlockId;
+import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Schema;
+import org.apache.tajo.engine.planner.PlannerUtil;
 import org.apache.tajo.engine.planner.enforce.Enforcer;
 import org.apache.tajo.engine.planner.logical.*;
 
@@ -42,6 +44,9 @@ public class ExecutionBlock {
 
   private boolean hasJoinPlan;
   private boolean hasUnionPlan;
+  private List<Column[]> joinKeyPairs = null;
+  // histogram that is maintained for the smaller relation of a join
+  private Map<Integer, Long> histogram = null;
 
   private Set<String> broadcasted = new HashSet<String>();
 
@@ -75,6 +80,11 @@ public class ExecutionBlock {
         BinaryNode binary = (BinaryNode) node;
         if (binary.getType() == NodeType.JOIN) {
           hasJoinPlan = true;
+          JoinNode joinNode = (JoinNode) node;
+          if (joinNode.getJoinQual() != null) {
+            joinKeyPairs = PlannerUtil.getJoinKeyPairs(joinNode.getJoinQual(), joinNode.getLeftChild().getOutSchema(),
+                joinNode.getRightChild().getOutSchema());
+          }
         } else if (binary.getType() == NodeType.UNION) {
           hasUnionPlan = true;
         }
@@ -136,6 +146,18 @@ public class ExecutionBlock {
 
   public boolean hasUnion() {
     return hasUnionPlan;
+  }
+
+  public List<Column[]> getJoinKeyPairs() {
+    return joinKeyPairs;
+  }
+
+  public Map<Integer, Long> getHistogram() {
+    return histogram;
+  }
+
+  public void setHistogram(Map<Integer, Long> histogram) {
+    this.histogram = histogram;
   }
 
   public void addBroadcastTables(Collection<String> tableNames) {

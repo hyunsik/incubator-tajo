@@ -137,8 +137,9 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
         TableSubQueryNode subQueryNode = (TableSubQueryNode) logicalNode;
         leftExec = createPlanRecursive(ctx, subQueryNode.getSubQuery());
         return leftExec;
+      }
 
-      } case SCAN:
+      case SCAN:
         leftExec = createScanPlan(ctx, (ScanNode) logicalNode);
         return leftExec;
 
@@ -434,6 +435,24 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
           LOG.info("Join (" + plan.getPID() +") chooses [Sort Merge Join]");
           return createMergeJoin(context, plan, leftExec, rightExec);
         case HYBRID_HASH_JOIN:
+
+
+        String[] leftLineage = PlannerUtil.getLineage(plan.getLeftChild());
+        String[] rightLineage = PlannerUtil.getLineage(plan.getRightChild());
+        long leftSize = estimateSizeRecursive(context, leftLineage);
+        long rightSize = estimateSizeRecursive(context, rightLineage);
+
+        PhysicalExec selectedOuter;
+        PhysicalExec selectedInner;
+        if (leftSize <= rightSize) {
+          selectedInner = leftExec;
+          selectedOuter = rightExec;
+        } else {
+          selectedInner = rightExec;
+          selectedOuter = leftExec;
+        }
+          LOG.info("Join (" + plan.getPID() + ") chooses [Hybrid Hash Join]");
+        return new HybridHashJoinExec(context, plan, selectedOuter, selectedInner);
 
         default:
           LOG.error("Invalid Inner Join Algorithm Enforcer: " + algorithm.name());

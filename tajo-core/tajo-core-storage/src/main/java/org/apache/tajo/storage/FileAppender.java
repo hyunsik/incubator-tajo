@@ -18,6 +18,9 @@
 
 package org.apache.tajo.storage;
 
+import java.io.IOException;
+import java.util.List;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.tajo.catalog.Schema;
@@ -34,7 +37,9 @@ public abstract class FileAppender implements Appender {
   protected final Path path;
 
   protected boolean enabledStats;
-  
+
+  protected List<Integer> joinKeys;
+
   public FileAppender(Configuration conf, TableMeta meta, Path path) {
     this.conf = conf;
     this.meta = meta;
@@ -55,6 +60,10 @@ public abstract class FileAppender implements Appender {
     }
 
     this.enabledStats = true;
+  }
+
+  public void setJoinKeys(List<Integer> joinKeys) {
+	  this.joinKeys = joinKeys;
   }
 
   public abstract long getOffset() throws IOException;

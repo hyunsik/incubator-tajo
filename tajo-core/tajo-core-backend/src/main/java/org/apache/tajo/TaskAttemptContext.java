@@ -30,7 +30,12 @@ import org.apache.tajo.engine.planner.enforce.Enforcer;
 import org.apache.tajo.storage.Fragment;
 
 import java.io.File;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CountDownLatch;
 
@@ -55,6 +60,8 @@ public class TaskAttemptContext {
   private boolean stopped = false;
   private boolean interQuery = false;
   private Path outputPath;
+  private List<Integer> joinKeys;
+  private Map<Integer, Long> histogram;
   private DataChannel dataChannel;
   private Enforcer enforcer;
 
@@ -228,4 +235,21 @@ public class TaskAttemptContext {
       return false;
     }
   }
+
+  public List<Integer> getJoinKeys() {
+	return joinKeys;
+  }
+
+  public void setJoinKeys(List<Integer> joinKeys) {
+	this.joinKeys = joinKeys;
+  }
+
+  public Map<Integer, Long> getHistogram() {
+	return histogram;
+  }
+
+  public void setHistogram(Map<Integer, Long> histogram) {
+	this.histogram = histogram;
+  }
+
 }

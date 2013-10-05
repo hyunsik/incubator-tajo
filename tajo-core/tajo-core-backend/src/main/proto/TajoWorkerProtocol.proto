@@ -59,9 +59,11 @@ message QueryUnitRequestProto {
     optional bool interQuery = 6 [default = false];
     repeated Fetch fetches = 7;
     optional bool shouldDie = 8;
-    optional KeyValueSetProto queryContext = 9;
-    optional DataChannelProto dataChannel = 10;
-    optional EnforcerProto enforcer = 11;
+    repeated int32 joinKeys = 9;
+    optional bytes histogram = 10; 
+    optional KeyValueSetProto queryContext = 11;
+    optional DataChannelProto dataChannel = 12;
+    optional EnforcerProto enforcer = 13;
 }
 
 message Fetch {

@@ -30,7 +30,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.util.ConverterUtils;
-import org.apache.tajo.DataChannel;
 import org.apache.tajo.QueryUnitAttemptId;
 import org.apache.tajo.TajoConstants;
 import org.apache.tajo.TajoProtos.TaskAttemptState;
@@ -150,6 +149,8 @@ public class Task {
     this.context = new TaskAttemptContext(systemConf, taskId,
         request.getFragments().toArray(new Fragment[request.getFragments().size()]),
         taskDir);
+    this.context.setJoinKeys(request.getJoinKeys());
+    this.context.setHistogram(request.getHistogram());
     this.context.setDataChannel(request.getDataChannel());
     this.context.setEnforcer(request.getEnforcer());
 

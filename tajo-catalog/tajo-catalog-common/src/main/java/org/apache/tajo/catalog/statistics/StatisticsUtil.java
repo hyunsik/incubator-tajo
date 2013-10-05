@@ -18,13 +18,16 @@
 
 package org.apache.tajo.catalog.statistics;
 
-import com.google.common.collect.Lists;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
+import com.google.common.collect.Lists;
 
 public class StatisticsUtil {
   private static final Log LOG = LogFactory.getLog(StatisticsUtil.class);
@@ -45,11 +48,17 @@ public class StatisticsUtil {
   }
 
   public static TableStat aggregateTableStat(List<TableStat> tableStats) {
-    if(tableStats == null || tableStats.size() == 0 || tableStats.get(0) == null)
+    if (tableStats == null || tableStats.size() == 0 || tableStats.get(0) == null)
       return null;
     TableStat aggregated = new TableStat();
 
-    ColumnStat [] css = null;
+    Map<Integer, Long> histogram = null;
+    if (tableStats.get(0).getHistogram() != null) {
+      histogram = new TreeMap<Integer, Long>();
+      aggregated.setHistogram(histogram);
+    }
+
+    ColumnStat[] css = null;
     if (tableStats.size() > 0) {
       for (TableStat ts : tableStats) {
         // A TableStats cannot contain any ColumnStat if there is no output.
@@ -92,9 +101,18 @@ public class StatisticsUtil {
       aggregated.setNumBytes(aggregated.getNumBytes() + ts.getNumBytes());
       aggregated.setNumBlocks(aggregated.getNumBlocks() + ts.getNumBlocks());
       aggregated.setNumPartitions(aggregated.getNumPartitions() + ts.getNumPartitions());
+
+      if (ts.getHistogram() != null) {
+        for (int key : ts.getHistogram().keySet()) {
+          Long value = histogram.get(key);
+          if (value == null) {
+            value = 0L;
+          }
+          histogram.put(key, value + ts.getHistogram().get(key));
+        }
+      }
     }
 
-    //aggregated.setAvgRows(aggregated.getNumRows() / tableStats.size());
     if (css != null) {
       aggregated.setColumnStats(Lists.newArrayList(css));
     }

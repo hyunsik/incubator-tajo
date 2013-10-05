@@ -29,7 +29,12 @@ import org.apache.hadoop.yarn.util.RackResolver;
 import org.apache.tajo.ExecutionBlockId;
 import org.apache.tajo.QueryIdFactory;
 import org.apache.tajo.QueryUnitAttemptId;
+import org.apache.tajo.algebra.JoinType;
+import org.apache.tajo.catalog.Column;
+import org.apache.tajo.engine.planner.logical.JoinNode;
+import org.apache.tajo.engine.planner.logical.LogicalNode;
 import org.apache.tajo.engine.planner.logical.ScanNode;
+import org.apache.tajo.engine.planner.logical.UnaryNode;
 import org.apache.tajo.engine.query.QueryUnitRequestImpl;
 import org.apache.tajo.ipc.TajoWorkerProtocol;
 import org.apache.tajo.ipc.protocolrecords.QueryUnitRequest;
@@ -467,6 +472,11 @@ public class TaskSchedulerImpl extends AbstractService
               task.getLogicalPlan().toJson(),
               context.getQueryContext(),
               subQuery.getDataChannel(), subQuery.getBlock().getEnforcer());
+
+          ExecutionBlock executionBlock = context.getQuery()
+              .getSubQuery(attemptId.getQueryUnitId().getExecutionBlockId()).getBlock();
+          taskAssign.setJoinKeys(getJoinKeys(executionBlock));
+
           if (!subQuery.getBlock().isRoot()) {
             taskAssign.setInterQuery();
           }
@@ -485,6 +495,27 @@ public class TaskSchedulerImpl extends AbstractService
 
       LOG.debug("HostLocalAssigned / Total: " + hostLocalAssigned + " / " + totalAssigned);
       LOG.debug("RackLocalAssigned: " + rackLocalAssigned + " / " + totalAssigned);
+    }
+
+    private List<Integer> getJoinKeys(ExecutionBlock executionBlock) {
+      ExecutionBlock parent = executionBlock.getParentBlock();
+
+      if (parent != null && parent.hasJoin()) {
+        JoinNode joinNode = (JoinNode) ((UnaryNode) parent.getPlan()).getChild();
+        if (joinNode.getJoinType() == JoinType.INNER) {
+
+          LogicalNode node = executionBlock.getPlan();
+          List<Column[]> joinKeyPairs = parent.getJoinKeyPairs();
+          int index = node.getOutSchema().equals(joinNode.getLeftChild().getInSchema()) ? 0 : 1;
+          List<Integer> joinKeys = new ArrayList<Integer>();
+          for (Column[] column : joinKeyPairs) {
+            joinKeys.add(node.getOutSchema().getColumnId(column[index].getQualifiedName()));
+          }
+
+          return joinKeys;
+        }
+      }
+      return null;
     }
 
     public void assignToNonLeafTasks(List<TaskRequestEvent> taskRequests) {
@@ -514,6 +545,17 @@ public class TaskSchedulerImpl extends AbstractService
               context.getQueryContext(),
               subQuery.getDataChannel(),
               subQuery.getBlock().getEnforcer());
+
+          ExecutionBlock executionBlock = context.getSubQuery(attemptId.getQueryUnitId().getExecutionBlockId())
+              .getBlock();
+
+          if (executionBlock.hasJoin()) {
+            LogicalNode child = executionBlock.getPlan();
+            if (child instanceof JoinNode && ((JoinNode) child).getJoinType() == JoinType.INNER) {
+              taskAssign.setHistogram(executionBlock.getHistogram());
+            }
+          }
+
           if (!subQuery.getBlock().isRoot()) {
             taskAssign.setInterQuery();
           }

@@ -108,4 +108,10 @@
     <value>4</value>
     <description>The number of CPU cores on a worker</description>
   </property>
+  
+  <property>
+    <name>tajo.hybrid-hash-join.memory-mb</name>
+    <value>128</value>
+    <description>The maximum memory in MB for a bucket</description>
+  </property>
 </configuration>

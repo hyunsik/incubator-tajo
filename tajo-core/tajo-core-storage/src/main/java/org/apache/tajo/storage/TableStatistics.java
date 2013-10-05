@@ -18,6 +18,10 @@
 
 package org.apache.tajo.storage;
 
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.catalog.statistics.ColumnStat;
 import org.apache.tajo.catalog.statistics.TableStat;
@@ -30,6 +34,9 @@ import org.apache.tajo.datum.NullDatum;
  * This class is not thread-safe.
  */
 public class TableStatistics {
+  private final static int HISTOGRAM_BASE_GRANULARITY = 100;
+  private final static int HISTOGRAM_MAX_SIZE = 50000;
+
   private Schema schema;
   private Tuple minValues;
   private Tuple maxValues;
@@ -37,8 +44,18 @@ public class TableStatistics {
   private long numRows = 0;
   private long numBytes = 0;
 
-
   private boolean [] comparable;
+
+  private List<Integer> joinKeys;
+
+  private Map<Integer, Long> histogram;
+
+  private long tupleSize = 0;
+
+  private Tuple keyTuple;
+
+  private int keyTupleIdx = 0;
+
 
   public TableStatistics(Schema schema) {
     this.schema = schema;
@@ -95,6 +112,28 @@ public class TableStatistics {
         minValues.put(idx, datum);
       }
     }
+
+    tupleSize += datum.size();
+    if (joinKeys != null) {
+      if (joinKeys.contains(idx)) {
+        keyTuple.put(keyTupleIdx++, datum);
+      }
+
+      if (idx == schema.getColumnNum() - 1) {
+        int key = keyTuple.hashCode() + HISTOGRAM_BASE_GRANULARITY - (keyTuple.hashCode() % HISTOGRAM_BASE_GRANULARITY);
+
+        Long accumulated = histogram.get(key);
+        if (accumulated != null) {
+          histogram.put(key, accumulated + tupleSize);
+        } else {
+          histogram.put(key, tupleSize);
+        }
+
+        keyTupleIdx = 0;
+        keyTuple.clear();
+        tupleSize = 0;
+      }
+    }
   }
 
   public TableStat getTableStat() {
@@ -112,6 +151,39 @@ public class TableStatistics {
     stat.setNumRows(this.numRows);
     stat.setNumBytes(this.numBytes);
 
+    if (histogram != null) {
+      int granularity = HISTOGRAM_BASE_GRANULARITY;
+
+      // decrease granularity of histogram if its size is above a given
+      // threshold
+      while (histogram.size() > HISTOGRAM_MAX_SIZE) {
+        double multiplier = (double) histogram.size() / (double) HISTOGRAM_MAX_SIZE;
+        granularity = (int) Math.ceil(((double) granularity * multiplier));
+
+        Map<Integer, Long> newHistogram = new TreeMap<Integer, Long>();
+
+        for (Integer originalKey : histogram.keySet()) {
+          long value = histogram.get(originalKey);
+          int key = originalKey + granularity - (originalKey % granularity);
+
+          Long accumulated = newHistogram.get(key);
+          if (accumulated != null) {
+            newHistogram.put(key, accumulated + value);
+          } else {
+            newHistogram.put(key, value);
+          }
+        }
+        histogram = newHistogram;
+      }
+      stat.setHistogram(histogram);
+    }
+
     return stat;
+  }
+
+  public void setJoinKeys(List<Integer> joinKeys) {
+    this.joinKeys = joinKeys;
+    keyTuple = new VTuple(joinKeys.size());
+    histogram = new TreeMap<Integer, Long>();
   }
 }

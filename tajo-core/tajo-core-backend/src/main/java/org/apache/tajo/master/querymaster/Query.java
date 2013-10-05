@@ -37,6 +37,7 @@ import org.apache.tajo.catalog.CatalogService;
 import org.apache.tajo.catalog.TableDesc;
 import org.apache.tajo.catalog.TableDescImpl;
 import org.apache.tajo.catalog.TableMeta;
+import org.apache.tajo.catalog.statistics.TableStat;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.engine.planner.global.MasterPlan;
 import org.apache.tajo.master.ExecutionBlock;
@@ -229,11 +230,11 @@ public class Query implements EventHandler<QueryEvent> {
   public StateMachine<QueryState, QueryEventType, QueryEvent> getStateMachine() {
     return stateMachine;
   }
-  
+
   public void addSubQuery(SubQuery subquery) {
     subqueries.put(subquery.getId(), subquery);
   }
-  
+
   public QueryId getId() {
     return this.id;
   }
@@ -289,6 +290,10 @@ public class Query implements EventHandler<QueryEvent> {
   public static class SubQueryCompletedTransition implements
       MultipleArcTransition<Query, QueryEvent, QueryState> {
 
+    private int histogramCount = 0;
+    private Long histogramBytes = Long.MAX_VALUE;
+    private Map<Integer, Long> histogram;
+
     @Override
     public QueryState transition(Query query, QueryEvent event) {
       // increase the count for completed subqueries
@@ -301,6 +306,25 @@ public class Query implements EventHandler<QueryEvent> {
         ExecutionBlock nextBlock = cursor.nextBlock();
         if (!query.getPlan().isTerminal(nextBlock) || !query.getPlan().isRoot(nextBlock)) {
           SubQuery nextSubQuery = new SubQuery(query.context, query.getPlan(), nextBlock, query.sm);
+
+          TableStat tableStat = ((SubQuerySucceeEvent) event).getTableMeta().getStat();
+          if (tableStat != null && tableStat.getHistogram() != null && tableStat.getHistogram().size() > 0) {
+            histogramCount++;
+            if (tableStat.getNumBytes() < histogramBytes) {
+              histogram = tableStat.getHistogram();
+              histogramBytes = tableStat.getNumBytes();
+            }
+          }
+
+          if (nextBlock.hasJoin()) {
+            if (histogramCount == 2) {
+              nextBlock.setHistogram(histogram);
+              histogramBytes = Long.MAX_VALUE;
+              histogram = null;
+              histogramCount = 0;
+            }
+          }
+
           nextSubQuery.setPriority(query.priority--);
           query.addSubQuery(nextSubQuery);
           nextSubQuery.handle(new SubQueryEvent(nextSubQuery.getId(),
@@ -330,10 +354,17 @@ public class Query implements EventHandler<QueryEvent> {
             query.setResultDesc(finalTableDesc);
             query.eventHandler.handle(new QueryFinishEvent(query.getId()));
           }
+          histogramBytes = Long.MAX_VALUE;
+          histogram = null;
+          histogramCount = 0;
 
           return query.finished(QueryState.QUERY_SUCCEEDED);
         }
       } else {
+        histogramBytes = Long.MAX_VALUE;
+        histogram = null;
+        histogramCount = 0;
+
         // if at least one subquery is failed, the query is also failed.
         return QueryState.QUERY_FAILED;
       }

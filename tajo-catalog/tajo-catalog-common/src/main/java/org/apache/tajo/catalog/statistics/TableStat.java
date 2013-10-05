@@ -24,32 +24,39 @@ package org.apache.tajo.catalog.statistics;
 import com.google.common.base.Objects;
 import com.google.gson.Gson;
 import com.google.gson.annotations.Expose;
-import org.apache.tajo.common.TajoDataTypes;
-import org.apache.tajo.json.GsonObject;
+import com.google.protobuf.ByteString;
 import org.apache.tajo.catalog.json.CatalogGsonHelper;
 import org.apache.tajo.catalog.proto.CatalogProtos.ColumnStatProto;
 import org.apache.tajo.catalog.proto.CatalogProtos.TableStatProto;
 import org.apache.tajo.common.ProtoObject;
+import org.apache.tajo.common.TajoDataTypes;
+import org.apache.tajo.json.GsonObject;
 import org.apache.tajo.util.TUtil;
+import org.xerial.snappy.Snappy;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 public class TableStat implements ProtoObject<TableStatProto>, Cloneable, GsonObject {
   private TableStatProto.Builder builder = TableStatProto.newBuilder();
 
   @Expose private Long numRows = null; // required
   @Expose private Long numBytes = null; // required
-  @Expose private Integer numFiles = null; // required
   @Expose private Integer numBlocks = null; // optional
   @Expose private Integer numPartitions = null; // optional
   @Expose private Long avgRows = null; // optional
   @Expose private List<ColumnStat> columnStats = null; // repeated
+  private Map<Integer, Long> histogram = null;
 
   public TableStat() {
     numRows = 0l;
     numBytes = 0l;
-    numFiles = 0;
     numBlocks = 0;
     numPartitions = 0;
     avgRows = 0l;
@@ -78,6 +85,20 @@ public class TableStat implements ProtoObject<TableStatProto>, Cloneable, GsonOb
       }
       columnStats.add(new ColumnStat(colProto));
     }
+
+    if (proto.hasHistogram()) {
+      byte[] histogramBytes = proto.getHistogram().toByteArray();
+      // deserializing
+      try {
+        ByteArrayInputStream byteIn = new ByteArrayInputStream(Snappy.uncompress(histogramBytes));
+        ObjectInputStream in = new ObjectInputStream(byteIn);
+        this.histogram = (TreeMap<Integer, Long>) in.readObject();
+      } catch (Exception e) {
+        // TODO log exception
+        e.printStackTrace();
+      }
+    }
+
   }
 
   public Long getNumRows() {
@@ -199,6 +220,28 @@ public class TableStat implements ProtoObject<TableStatProto>, Cloneable, GsonOb
         builder.addColStat(colStat.getProto());
       }
     }
+    if (this.histogram != null && histogram.size() > 0) {
+      // serializing
+      try {
+        ByteArrayOutputStream byteOut = new ByteArrayOutputStream();
+        ObjectOutputStream out = new ObjectOutputStream(byteOut);
+        out.writeObject(histogram);
+        builder.setHistogram(ByteString.copyFrom(Snappy.compress(byteOut.toByteArray())));
+      } catch (Exception e) {
+        // TODO log exception
+        e.printStackTrace();
+      }
+    }
+
     return builder.build();
   }
+
+  public Map<Integer, Long> getHistogram() {
+    return histogram;
+  }
+
+  public void setHistogram(Map<Integer, Long> histogram) {
+    this.histogram = histogram;
+  }
+
 }

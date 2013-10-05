@@ -112,6 +112,7 @@ public class TajoConf extends YarnConfiguration {
     INMEMORY_HASH_TABLE_DEFAULT_SIZE("tajo.join.inmemory.table.num", (long)1000000),
     INMEMORY_HASH_JOIN_THRESHOLD("tajo.join.memhash, threshold", (long)256 * 1048576),
     INMEMORY_HASH_AGGREGATION_THRESHOLD("tajo.aggregation.hash.threshold", (long)256 * 1048576),
+    HYBRID_HASH_JOIN_MEMORY("tajo.hybrid-hash-join.memory-mb", 128),
 
     //////////////////////////////////////////
     // Distributed Query Execution Parameters
