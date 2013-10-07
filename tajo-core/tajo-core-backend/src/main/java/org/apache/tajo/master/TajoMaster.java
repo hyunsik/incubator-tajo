@@ -44,8 +44,7 @@ import org.apache.tajo.conf.TajoConf.ConfVars;
 import org.apache.tajo.engine.function.Country;
 import org.apache.tajo.engine.function.InCountry;
 import org.apache.tajo.engine.function.builtin.*;
-import org.apache.tajo.engine.function.string.RegexpReplace;
-import org.apache.tajo.engine.function.string.SplitPart;
+import org.apache.tajo.engine.function.string.*;
 import org.apache.tajo.master.querymaster.QueryJobManager;
 import org.apache.tajo.master.rm.WorkerResourceManager;
 import org.apache.tajo.master.rm.YarnTajoResourceManager;
@@ -311,9 +310,50 @@ public class TajoMaster extends CompositeService {
             CatalogUtil.newSimpleDataTypeArray(Type.INT4)));
 
     sqlFuncs.add(
+        new FunctionDesc("upper", Upper.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.TEXT),
+            CatalogUtil.newSimpleDataTypeArray(Type.TEXT)));
+    sqlFuncs.add(
+        new FunctionDesc("lower", Lower.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.TEXT),
+            CatalogUtil.newSimpleDataTypeArray(Type.TEXT)));
+
+    sqlFuncs.add(
         new FunctionDesc("split_part", SplitPart.class, FunctionType.GENERAL,
             CatalogUtil.newSimpleDataType(Type.TEXT),
             CatalogUtil.newSimpleDataTypeArray(Type.TEXT, Type.TEXT, Type.INT4)));
+    sqlFuncs.add(
+        new FunctionDesc("trim", BTrim.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.TEXT),
+            CatalogUtil.newSimpleDataTypeArray(Type.TEXT)));
+    sqlFuncs.add(
+        new FunctionDesc("trim", BTrim.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.TEXT),
+            CatalogUtil.newSimpleDataTypeArray(Type.TEXT, Type.TEXT)));
+    sqlFuncs.add(
+        new FunctionDesc("btrim", BTrim.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.TEXT),
+            CatalogUtil.newSimpleDataTypeArray(Type.TEXT)));
+    sqlFuncs.add(
+        new FunctionDesc("btrim", BTrim.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.TEXT),
+            CatalogUtil.newSimpleDataTypeArray(Type.TEXT, Type.TEXT)));
+    sqlFuncs.add(
+        new FunctionDesc("ltrim", LTrim.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.TEXT),
+            CatalogUtil.newSimpleDataTypeArray(Type.TEXT)));
+    sqlFuncs.add(
+        new FunctionDesc("ltrim", LTrim.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.TEXT),
+            CatalogUtil.newSimpleDataTypeArray(Type.TEXT, Type.TEXT)));
+    sqlFuncs.add(
+        new FunctionDesc("rtrim", RTrim.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.TEXT),
+            CatalogUtil.newSimpleDataTypeArray(Type.TEXT)));
+    sqlFuncs.add(
+        new FunctionDesc("rtrim", RTrim.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.TEXT),
+            CatalogUtil.newSimpleDataTypeArray(Type.TEXT, Type.TEXT)));
     sqlFuncs.add(
         new FunctionDesc("regexp_replace", RegexpReplace.class, FunctionType.GENERAL,
             CatalogUtil.newSimpleDataType(Type.TEXT),

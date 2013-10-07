@@ -21,8 +21,6 @@
  */
 package org.apache.tajo.catalog.store;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.tajo.catalog.*;
@@ -44,135 +42,32 @@ import java.util.Map.Entry;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-public class DBStore implements CatalogStore {
-  private final Log LOG = LogFactory.getLog(DBStore.class); 
-  private final Configuration conf;
-  private final String driver;
-  private final String jdbcUri;
-  private Connection conn;  
+public class DerbyStore extends AbstractDBStore {
+  private static final String JDBC_DRIVER="org.apache.derby.jdbc.EmbeddedDriver";
+  protected Lock rlock;
+  protected Lock wlock;
 
-  private static final int VERSION = 1;
-
-  private static final String TB_META = "META";
-  private static final String TB_TABLES = "TABLES";
-  private static final String TB_COLUMNS = "COLUMNS";
-  private static final String TB_OPTIONS = "OPTIONS";
-  private static final String TB_INDEXES = "INDEXES";
-  private static final String TB_STATISTICS = "STATS";
+  protected String getJDBCDriverName(){
+    return JDBC_DRIVER;
+  }
   
-  private static final String C_TABLE_ID = "TABLE_ID";
-  
-  private ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
-  private Lock rlock = lock.readLock();
-  private Lock wlock = lock.writeLock();
-  
-  public DBStore(final Configuration conf)
+  public DerbyStore(final Configuration conf)
       throws InternalException {
-    this.conf = conf;
-    
-    this.driver =
-        this.conf.get(CatalogConstants.JDBC_DRIVER, CatalogConstants.DEFAULT_JDBC_DRIVER);
-    this.jdbcUri =
-        this.conf.get(CatalogConstants.JDBC_URI);
 
-    try {
-      Class.forName(driver).newInstance();
-      LOG.info("Loaded the JDBC driver (" + driver +")");
-    } catch (Exception e) {
-      throw new InternalException("Cannot load JDBC driver " + driver, e);
-    }
-
-    try {
-      LOG.info("Trying to connect database (" + jdbcUri + ")");
-      conn = DriverManager.getConnection(jdbcUri + ";create=true");
-      LOG.info("Connected to database (" + jdbcUri +")");
-    } catch (SQLException e) {
-      throw new InternalException("Cannot connect to database (" + jdbcUri
-          +")", e);
-    }
-
-    try {
-      if (!isInitialized()) {
-        LOG.info("The base tables of CatalogServer are created.");
-        createBaseTable();
-      } else {
-        LOG.info("The base tables of CatalogServer already is initialized.");
-      }
-    } catch (SQLException se) {
-      throw new InternalException(
-          "Cannot initialize the persistent storage of Catalog", se);
-    }
-
-    int dbVersion = 0;
-    try {
-      dbVersion = needUpgrade();
-    } catch (SQLException e) {
-      throw new InternalException(
-          "Cannot check if the DB need to be upgraded", e);
-    }
-
-//    if (dbVersion < VERSION) {
-//      LOG.info("DB Upgrade is needed");
-//      try {
-//        upgrade(dbVersion, VERSION);
-//      } catch (SQLException e) {
-//        LOG.error(e.getMessage());
-//        throw new InternalException("DB upgrade is failed.", e);
-//      }
-//    }
+    super(conf);
   }
 
-  private int needUpgrade() throws SQLException {
-    String sql = "SELECT VERSION FROM " + TB_META;
-    Statement stmt = conn.createStatement();
-    ResultSet res = stmt.executeQuery(sql);
-
-    if (!res.next()) { // if this db version is 0
-      insertVersion();
-      return 0;
-    } else {
-      return res.getInt(1);
-    }
-  }
-
-  private void insertVersion() throws SQLException {
-    String sql = "INSERT INTO " + TB_META + " values (0)";
-    Statement stmt = conn.createStatement();
-    stmt.executeUpdate(sql);
-    stmt.close();
-  }
-
-  private void upgrade(int from, int to) throws SQLException {
-    String sql;
-    Statement stmt;
-    if (from == 0 ) {
-      if (to == 1) {
-        sql = "DROP INDEX idx_options_key";
-        LOG.info(sql);
-
-        stmt = conn.createStatement();
-        stmt.addBatch(sql);
-
-        sql =
-            "CREATE INDEX idx_options_key on " + TB_OPTIONS + " (" + C_TABLE_ID + ")";
-        stmt.addBatch(sql);
-        LOG.info(sql);
-        stmt.executeBatch();
-        stmt.close();
-
-        LOG.info("DB Upgraded from " + from + " to " + to);
-      } else {
-        LOG.info("DB Upgraded from " + from + " to " + to);
-      }
-    }
+  protected Connection createConnection(Configuration conf) throws SQLException {
+    return DriverManager.getConnection(getJDBCUri());
   }
 
   // TODO - DDL and index statements should be renamed
-  private void createBaseTable() throws SQLException {
+  protected void createBaseTable() throws SQLException {
     wlock.lock();
+    Statement stmt = null;
     try {
       // META
-      Statement stmt = conn.createStatement();
+      stmt = conn.createStatement();
       String meta_ddl = "CREATE TABLE " + TB_META + " (version int NOT NULL)";
       if (LOG.isDebugEnabled()) {
         LOG.debug(meta_ddl);
@@ -181,14 +76,12 @@ public class DBStore implements CatalogStore {
       LOG.info("Table '" + TB_META + " is created.");
 
       // TABLES
-      stmt = conn.createStatement();
       String tables_ddl = "CREATE TABLE "
           + TB_TABLES + " ("
           + "TID int NOT NULL GENERATED ALWAYS AS IDENTITY (START WITH 1, INCREMENT BY 1), "
-          + C_TABLE_ID + " VARCHAR(256) NOT NULL CONSTRAINT TABLE_ID_UNIQ UNIQUE, "
+          + C_TABLE_ID + " VARCHAR(255) NOT NULL CONSTRAINT TABLE_ID_UNIQ UNIQUE, "
           + "path VARCHAR(1024), "
           + "store_type CHAR(16), "
-          + "options VARCHAR(32672), "
           + "CONSTRAINT TABLES_PK PRIMARY KEY (TID)" +
           ")";
       if (LOG.isDebugEnabled()) {
@@ -212,14 +105,13 @@ public class DBStore implements CatalogStore {
       LOG.info("Table '" + TB_TABLES + "' is created.");
 
       // COLUMNS
-      stmt = conn.createStatement();
       String columns_ddl = 
           "CREATE TABLE " + TB_COLUMNS + " ("
           + "TID INT NOT NULL REFERENCES " + TB_TABLES + " (TID) ON DELETE CASCADE, "
-          + C_TABLE_ID + " VARCHAR(256) NOT NULL REFERENCES " + TB_TABLES + "("
+          + C_TABLE_ID + " VARCHAR(255) NOT NULL REFERENCES " + TB_TABLES + "("
           + C_TABLE_ID + ") ON DELETE CASCADE, "
           + "column_id INT NOT NULL,"
-          + "column_name VARCHAR(256) NOT NULL, " + "data_type CHAR(16), " + "type_length INTEGER, "
+          + "column_name VARCHAR(255) NOT NULL, " + "data_type CHAR(16), " + "type_length INTEGER, "
           + "CONSTRAINT C_COLUMN_ID UNIQUE (" + C_TABLE_ID + ", column_name))";
       if (LOG.isDebugEnabled()) {
         LOG.debug(columns_ddl);
@@ -237,12 +129,11 @@ public class DBStore implements CatalogStore {
       LOG.info("Table '" + TB_COLUMNS + " is created.");
 
       // OPTIONS
-      stmt = conn.createStatement();
       String options_ddl = 
           "CREATE TABLE " + TB_OPTIONS +" ("
-          + C_TABLE_ID + " VARCHAR(256) NOT NULL REFERENCES TABLES (" + C_TABLE_ID +") "
+          + C_TABLE_ID + " VARCHAR(255) NOT NULL REFERENCES TABLES (" + C_TABLE_ID +") "
           + "ON DELETE CASCADE, "
-          + "key_ VARCHAR(256) NOT NULL, value_ VARCHAR(256) NOT NULL)";
+          + "key_ VARCHAR(255) NOT NULL, value_ VARCHAR(255) NOT NULL)";
       if (LOG.isDebugEnabled()) {
         LOG.debug(options_ddl);
       }
@@ -265,13 +156,12 @@ public class DBStore implements CatalogStore {
       LOG.info("Table '" + TB_OPTIONS + " is created.");
       
       // INDEXES
-      stmt = conn.createStatement();
       String indexes_ddl = "CREATE TABLE " + TB_INDEXES +"("
-          + "index_name VARCHAR(256) NOT NULL PRIMARY KEY, "
-          + C_TABLE_ID + " VARCHAR(256) NOT NULL REFERENCES TABLES (" + C_TABLE_ID + ") "
+          + "index_name VARCHAR(255) NOT NULL PRIMARY KEY, "
+          + C_TABLE_ID + " VARCHAR(255) NOT NULL REFERENCES TABLES (" + C_TABLE_ID + ") "
           + "ON DELETE CASCADE, "
-          + "column_name VARCHAR(256) NOT NULL, "
-          + "data_type VARCHAR(256) NOT NULL, "
+          + "column_name VARCHAR(255) NOT NULL, "
+          + "data_type VARCHAR(255) NOT NULL, "
           + "index_type CHAR(32) NOT NULL, "
           + "is_unique BOOLEAN NOT NULL, "
           + "is_clustered BOOLEAN NOT NULL, "
@@ -298,7 +188,7 @@ public class DBStore implements CatalogStore {
       LOG.info("Table '" + TB_INDEXES + "' is created.");
 
       String stats_ddl = "CREATE TABLE " + TB_STATISTICS + "("
-          + C_TABLE_ID + " VARCHAR(256) NOT NULL REFERENCES TABLES (" + C_TABLE_ID + ") "
+          + C_TABLE_ID + " VARCHAR(255) NOT NULL REFERENCES TABLES (" + C_TABLE_ID + ") "
           + "ON DELETE CASCADE, "
           + "num_rows BIGINT, "
           + "num_bytes BIGINT)";
@@ -318,14 +208,21 @@ public class DBStore implements CatalogStore {
 
     } finally {
       wlock.unlock();
+      CatalogUtil.closeSQLWrapper(stmt);
     }
   }
-  
-  private boolean isInitialized() throws SQLException {
+
+  @Override
+  protected boolean isInitialized() throws SQLException {
+    ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+    this.rlock = lock.readLock();
+    this.wlock = lock.writeLock();
+
     wlock.lock();
+    ResultSet res = null;
     try {
       boolean found = false;
-      ResultSet res = conn.getMetaData().getTables(null, null, null, 
+      res = conn.getMetaData().getTables(null, null, null,
           new String [] {"TABLE"});
       
       String resName;
@@ -340,15 +237,17 @@ public class DBStore implements CatalogStore {
       }
     } finally {
       wlock.unlock();
+      CatalogUtil.closeSQLWrapper(res);
     }    
     return false;
   }
   
   final boolean checkInternalTable(final String tableName) throws SQLException {
     rlock.lock();
+    ResultSet res = null;
     try {
       boolean found = false;
-      ResultSet res = conn.getMetaData().getTables(null, null, null, 
+      res = conn.getMetaData().getTables(null, null, null,
               new String [] {"TABLE"});
       while(res.next() && !found) {
         if (tableName.equals(res.getString("TABLE_NAME")))
@@ -358,13 +257,14 @@ public class DBStore implements CatalogStore {
       return found;
     } finally {
       rlock.unlock();
+      CatalogUtil.closeSQLWrapper(res);
     }
   }
   
   @Override
   public final void addTable(final TableDesc table) throws IOException {
     Statement stmt = null;
-    ResultSet res;
+    ResultSet res = null;
 
     String sql = 
         "INSERT INTO " + TB_TABLES + " (" + C_TABLE_ID + ", path, store_type) "
@@ -379,10 +279,8 @@ public class DBStore implements CatalogStore {
       if (LOG.isDebugEnabled()) {
         LOG.debug(sql);
       }
-      stmt.addBatch(sql);
-      stmt.executeBatch();
-      
-      stmt = conn.createStatement();
+      stmt.executeUpdate(sql);
+
       sql = "SELECT TID from " + TB_TABLES + " WHERE " + C_TABLE_ID 
           + " = '" + table.getName() + "'";
       if (LOG.isDebugEnabled()) {
@@ -424,17 +322,13 @@ public class DBStore implements CatalogStore {
         if (LOG.isDebugEnabled()) {
           LOG.debug(sql);
         }
-        stmt.addBatch(sql);
-        stmt.executeBatch();
+        stmt.executeUpdate(sql);
       }
     } catch (SQLException se) {
       throw new IOException(se.getMessage(), se);
     } finally {
       wlock.unlock();
-      try {
-        stmt.close();
-      } catch (SQLException e) {
-      }      
+      CatalogUtil.closeSQLWrapper(res, stmt);
     }
   }
   
@@ -479,6 +373,7 @@ public class DBStore implements CatalogStore {
     .append("'");
 
     Statement stmt = null;
+    ResultSet res = null;
     boolean exist = false;
     rlock.lock();
     try {
@@ -486,18 +381,13 @@ public class DBStore implements CatalogStore {
       if (LOG.isDebugEnabled()) {
         LOG.debug(sql.toString());
       }
-      ResultSet res = stmt.executeQuery(sql.toString());
+      res = stmt.executeQuery(sql.toString());
       exist = res.next();
     } catch (SQLException se) {
       throw new IOException(se);
     } finally {
       rlock.unlock();
-      try {
-        if (stmt != null) {
-          stmt.close();
-        }
-      } catch (SQLException e) {
-      }         
+      CatalogUtil.closeSQLWrapper(res, stmt);
     }
     
     return exist;
@@ -509,76 +399,48 @@ public class DBStore implements CatalogStore {
     String sql = null;
     try {
       wlock.lock();
+      stmt = conn.createStatement();
       try {
-        stmt = conn.createStatement();
         sql = "DELETE FROM " + TB_COLUMNS +
             " WHERE " + C_TABLE_ID + " = '" + name + "'";
         LOG.info(sql);
         stmt.execute(sql);
       } catch (SQLException se) {
         throw new IOException(se);
-      } finally {
-        try {
-          if (stmt != null) {
-            stmt.close();
-          }
-        } catch (SQLException e) {
-        }
       }
 
       try {
         sql = "DELETE FROM " + TB_OPTIONS +
             " WHERE " + C_TABLE_ID + " = '" + name + "'";
         LOG.info(sql);
-        stmt = conn.createStatement();
         stmt.execute(sql);
       } catch (SQLException se) {
         throw new IOException(se);
-      } finally {
-        try {
-          if (stmt != null) {
-            stmt.close();
-          }
-        } catch (SQLException e) {
-        }
       }
 
       try {
         sql = "DELETE FROM " + TB_STATISTICS +
             " WHERE " + C_TABLE_ID + " = '" + name + "'";
         LOG.info(sql);
-        stmt = conn.createStatement();
         stmt.execute(sql);
       } catch (SQLException se) {
         throw new IOException(se);
-      } finally {
-        try {
-          if (stmt != null) {
-            stmt.close();
-          }
-        } catch (SQLException e) {
-        }
       }
 
       try {
         sql = "DELETE FROM " + TB_TABLES +
             " WHERE " + C_TABLE_ID +" = '" + name + "'";
         LOG.info(sql);
-        stmt = conn.createStatement();
         stmt.execute(sql);
       } catch (SQLException se) {
         throw new IOException(se);
-      } finally {
-        try {
-          if (stmt != null) {
-            stmt.close();
-          }
-        } catch (SQLException e) {
-        }
       }
 
+    } catch (SQLException se) {
+      throw new IOException(se);
     } finally {
       wlock.unlock();
+      CatalogUtil.closeSQLWrapper(stmt);
     }
   }
 
@@ -593,8 +455,10 @@ public class DBStore implements CatalogStore {
     Options options;
     TableStat stat = null;
 
-    rlock.lock();
     try {
+      rlock.lock();
+      stmt = conn.createStatement();
+
       try {
         String sql = 
             "SELECT " + C_TABLE_ID + ", path, store_type from " + TB_TABLES
@@ -602,7 +466,7 @@ public class DBStore implements CatalogStore {
         if (LOG.isDebugEnabled()) {
           LOG.debug(sql);
         }
-        stmt = conn.createStatement();
+
         res = stmt.executeQuery(sql);
         if (!res.next()) { // there is no table of the given name.
           return null;
@@ -613,8 +477,7 @@ public class DBStore implements CatalogStore {
       } catch (SQLException se) { 
         throw new IOException(se);
       } finally {
-        stmt.close();
-        res.close();
+        CatalogUtil.closeSQLWrapper(res);
       }
       
       Schema schema = null;
@@ -622,7 +485,6 @@ public class DBStore implements CatalogStore {
         String sql = "SELECT column_name, data_type, type_length from " + TB_COLUMNS
             + " WHERE " + C_TABLE_ID + "='" + name + "' ORDER by column_id asc";
 
-        stmt = conn.createStatement();
         if (LOG.isDebugEnabled()) {
           LOG.debug(sql);
         }
@@ -644,15 +506,14 @@ public class DBStore implements CatalogStore {
       } catch (SQLException se) {
         throw new IOException(se);
       } finally {
-        stmt.close();
-        res.close();
+        CatalogUtil.closeSQLWrapper(res);
       }
       
       options = Options.create();
       try {
         String sql = "SELECT key_, value_ from " + TB_OPTIONS
             + " WHERE " + C_TABLE_ID + "='" + name + "'";
-        stmt = conn.createStatement();
+
         if (LOG.isDebugEnabled()) {
           LOG.debug(sql);
         }
@@ -666,8 +527,7 @@ public class DBStore implements CatalogStore {
       } catch (SQLException se) {
         throw new IOException(se);
       } finally {
-        stmt.close();
-        res.close();
+        CatalogUtil.closeSQLWrapper(res);
       }
 
       try {
@@ -676,7 +536,7 @@ public class DBStore implements CatalogStore {
         if (LOG.isDebugEnabled()) {
           LOG.debug(sql);
         }
-        stmt = conn.createStatement();
+
         res = stmt.executeQuery(sql);
 
         if (res.next()) {
@@ -687,8 +547,7 @@ public class DBStore implements CatalogStore {
       } catch (SQLException se) {
         throw new IOException(se);
       } finally {
-        stmt.close();
-        res.close();
+        CatalogUtil.closeSQLWrapper(res);
       }
 
       TableMeta meta = new TableMetaImpl(schema, storeType, options);
@@ -702,6 +561,7 @@ public class DBStore implements CatalogStore {
       throw new IOException(se);
     } finally {
       rlock.unlock();
+      CatalogUtil.closeSQLWrapper(stmt);
     }
   }
   
@@ -719,7 +579,7 @@ public class DBStore implements CatalogStore {
     String sql = "SELECT " + C_TABLE_ID + " from " + TB_TABLES;
     
     Statement stmt = null;
-    ResultSet res;
+    ResultSet res = null;
     
     List<String> tables = new ArrayList<String>();
     rlock.lock();
@@ -736,12 +596,7 @@ public class DBStore implements CatalogStore {
       throw new IOException(se);
     } finally {
       rlock.unlock();
-      try {
-        if (stmt != null) {
-          stmt.close();
-        }
-      } catch (SQLException e) {
-      }
+      CatalogUtil.closeSQLWrapper(res, stmt);
     }
     return tables;
   }
@@ -773,12 +628,7 @@ public class DBStore implements CatalogStore {
       throw new IOException(se);
     } finally {
       wlock.unlock();
-      try {
-        if (stmt != null) {
-          stmt.close();
-        }
-      } catch (SQLException e) {     
-      }
+      CatalogUtil.closeSQLWrapper(stmt);
     }
   }
   
@@ -802,19 +652,14 @@ public class DBStore implements CatalogStore {
         throw new IOException(se);
       } finally {
         wlock.unlock();
-        try {
-          if (stmt != null) {
-            stmt.close();
-          }
-        } catch (SQLException e) {
-        }      
+        CatalogUtil.closeSQLWrapper(stmt);
       }
   }
   
   public final IndexDescProto getIndex(final String indexName) 
       throws IOException {
-    ResultSet res;
-    PreparedStatement stmt;
+    ResultSet res = null;
+    PreparedStatement stmt = null;
     
     IndexDescProto proto = null;
     
@@ -837,6 +682,7 @@ public class DBStore implements CatalogStore {
     } catch (SQLException se) {
     } finally {
       rlock.unlock();
+      CatalogUtil.closeSQLWrapper(res, stmt);
     }
     
     return proto;
@@ -844,8 +690,8 @@ public class DBStore implements CatalogStore {
   
   public final IndexDescProto getIndex(final String tableName, 
       final String columnName) throws IOException {
-    ResultSet res;
-    PreparedStatement stmt;
+    ResultSet res = null;
+    PreparedStatement stmt = null;
     
     IndexDescProto proto = null;
     
@@ -871,6 +717,7 @@ public class DBStore implements CatalogStore {
       new IOException(se);
     } finally {
       rlock.unlock();
+      CatalogUtil.closeSQLWrapper(res, stmt);
     }
     
     return proto;
@@ -884,6 +731,7 @@ public class DBStore implements CatalogStore {
     }
 
     PreparedStatement stmt = null;
+    ResultSet res = null;
     boolean exist = false;
     rlock.lock();
     try {
@@ -892,16 +740,13 @@ public class DBStore implements CatalogStore {
       if (LOG.isDebugEnabled()) {
         LOG.debug(sql);
       }
-      ResultSet res = stmt.executeQuery();
+      res = stmt.executeQuery();
       exist = res.next();
     } catch (SQLException se) {
       
     } finally {
       rlock.unlock();
-      try {
-        stmt.close();
-      } catch (SQLException e) {
-      }         
+      CatalogUtil.closeSQLWrapper(res, stmt);
     }
     
     return exist;
@@ -917,6 +762,7 @@ public class DBStore implements CatalogStore {
     }
 
     PreparedStatement stmt = null;
+    ResultSet res = null;
     boolean exist = false;
     rlock.lock();
     try {
@@ -926,16 +772,13 @@ public class DBStore implements CatalogStore {
       if (LOG.isDebugEnabled()) {
         LOG.debug(sql);
       }
-      ResultSet res = stmt.executeQuery();
+      res = stmt.executeQuery();
       exist = res.next();
     } catch (SQLException se) {
       
     } finally {
       rlock.unlock();
-      try {
-        stmt.close();
-      } catch (SQLException e) {
-      }         
+      CatalogUtil.closeSQLWrapper(res, stmt);
     }
     
     return exist;
@@ -943,8 +786,8 @@ public class DBStore implements CatalogStore {
   
   public final IndexDescProto [] getIndexes(final String tableName) 
       throws IOException {
-    ResultSet res;
-    PreparedStatement stmt;
+    ResultSet res = null;
+    PreparedStatement stmt = null;
     
     List<IndexDescProto> protos = new ArrayList<IndexDescProto>();
     
@@ -965,6 +808,7 @@ public class DBStore implements CatalogStore {
     } catch (SQLException se) {
     } finally {
       rlock.unlock();
+      CatalogUtil.closeSQLWrapper(res, stmt);
     }
     
     return protos.toArray(new IndexDescProto [protos.size()]);
@@ -1037,6 +881,6 @@ public class DBStore implements CatalogStore {
   
   public static void main(final String[] args) throws IOException {
     @SuppressWarnings("unused")
-    DBStore store = new DBStore(new TajoConf());
+    DerbyStore store = new DerbyStore(new TajoConf());
   }
 }

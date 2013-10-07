@@ -4,6 +4,13 @@ Release 0.2.0 - unreleased
 
   NEW FEATURES
 
+    TAJO-179: Support MySQL CatalogStore. (jinho)
+
+    TAJO-147: Implement trim(text), ltrim(text), and rtrim(text) function.
+    (hyunsik)
+
+    TAJO-148: Implement UPPER(text), LOWER(text) function. (hyunsik)
+
     TAJO-220: Implement catalog dump feature. (hyunsik)
 
     TAJO-216: Improve FilterPushDownRule and Implement physical operators 
@@ -182,6 +189,8 @@ Release 0.2.0 - unreleased
     TAJO-2: remove all @author tags and update license header. (hyunsik)
 
   BUG FIXES
+
+    TAJO-226: Can't use group by column alias. (hyunsik)
 
     TAJO-203: Field delimiter does not work correctly. (jinho)
 
