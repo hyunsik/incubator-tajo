@@ -19,7 +19,7 @@
 package org.apache.tajo.engine.function.builtin;
 
 import org.apache.tajo.catalog.Column;
-import org.apache.tajo.catalog.function.FunctionContext;
+import org.apache.tajo.engine.function.FunctionContext;
 import org.apache.tajo.common.TajoDataTypes.Type;
 import org.apache.tajo.datum.NullDatum;
 import org.apache.tajo.storage.Tuple;
@@ -34,6 +34,7 @@ public final class CountValue extends CountRows {
         new Column("col", Type.ANY)
     });
   }
+
   @Override
   public void eval(FunctionContext ctx, Tuple params) {
     if (!(params.get(0) instanceof NullDatum)) {

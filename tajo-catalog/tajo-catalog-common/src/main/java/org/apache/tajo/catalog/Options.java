@@ -58,17 +58,25 @@ public class Options implements ProtoObject<KeyValueSetProto>, Cloneable, GsonOb
 	public static Options create(Options options) {
     return new Options(options);
   }
+
+  public int size() {
+    return keyVals.size();
+  }
 	
 	public void put(String key, String val) {
 		this.keyVals.put(key, val);
 	}
 
   public void putAll(Map<String, String> keyValues) {
-    this.keyVals.putAll(keyValues);
+    if (keyValues != null) {
+      this.keyVals.putAll(keyValues);
+    }
   }
 	
 	public void putAll(Options options) {
-	  this.keyVals.putAll(options.keyVals);
+    if (options != null) {
+	    this.keyVals.putAll(options.keyVals);
+    }
 	}
 	
 	public String get(String key) {

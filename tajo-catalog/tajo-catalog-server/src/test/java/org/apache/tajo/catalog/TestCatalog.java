@@ -19,18 +19,16 @@
 package org.apache.tajo.catalog;
 
 import org.apache.hadoop.fs.Path;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.apache.tajo.catalog.function.GeneralFunction;
+import org.apache.tajo.catalog.function.Function;
 import org.apache.tajo.catalog.proto.CatalogProtos.FunctionType;
 import org.apache.tajo.catalog.proto.CatalogProtos.IndexMethod;
 import org.apache.tajo.catalog.proto.CatalogProtos.StoreType;
 import org.apache.tajo.common.TajoDataTypes;
 import org.apache.tajo.common.TajoDataTypes.Type;
 import org.apache.tajo.conf.TajoConf;
-import org.apache.tajo.datum.Datum;
-import org.apache.tajo.storage.Tuple;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
 import java.io.IOException;
 
@@ -50,7 +48,7 @@ public class TestCatalog {
 	public static void setUp() throws Exception {
     TajoConf conf = new TajoConf();
 
-    conf.set(CatalogConstants.JDBC_URI, "jdbc:derby:target/test-data/TestCatalog/db");
+    conf.set(CatalogConstants.JDBC_URI, "jdbc:derby:target/test-data/TestCatalog/db;create=true");
     conf.setVar(TajoConf.ConfVars.CATALOG_ADDRESS, "127.0.0.1:0");
 
 	  server = new CatalogServer();
@@ -81,8 +79,6 @@ public class TestCatalog {
 		assertFalse(catalog.existsTable("getTable"));
 		catalog.addTable(meta);
 		assertTrue(catalog.existsTable("getTable"));
-		
-		TableDesc meta2 = catalog.getTableDesc("getTable");
 		
 		catalog.deleteTable("getTable");
 		assertFalse(catalog.existsTable("getTable"));
@@ -145,7 +141,7 @@ public class TestCatalog {
 	  catalog.deleteTable(desc.getName());
 	}
 	
-	public static class TestFunc1 extends GeneralFunction {
+	public static class TestFunc1 extends Function {
 		public TestFunc1() {
 			super(					
 					new Column [] {
@@ -153,15 +149,9 @@ public class TestCatalog {
 					}
 			);
 		}
-
-    @Override
-    public Datum eval(Tuple params) {
-      return params.get(0);
-    }
 	}
 
-  public static class TestFunc2 extends GeneralFunction {
-    private Datum param;
+  public static class TestFunc2 extends Function {
     public TestFunc2() {
       super(
           new Column [] {
@@ -170,49 +160,40 @@ public class TestCatalog {
           }
       );
     }
-
-    @Override
-    public Datum eval(Tuple params) {
-      return params.get(1);
-    }
   }
 
 	@Test
 	public final void testRegisterFunc() throws Exception { 
-		assertFalse(catalog.containFunction("test2"));
-		FunctionDesc meta = new FunctionDesc("test2", TestFunc1.class, FunctionType.GENERAL,
-        CatalogUtil.newDataTypesWithoutLen(Type.INT4),
-        CatalogUtil.newDataTypesWithoutLen(Type.INT4));
+		assertFalse(catalog.containFunction("test2", FunctionType.UDF));
+		FunctionDesc meta = new FunctionDesc("test2", TestFunc1.class, FunctionType.UDF,
+        CatalogUtil.newSimpleDataType(Type.INT4),
+        CatalogUtil.newSimpleDataTypeArray(Type.INT4));
 
-    catalog.registerFunction(meta);
-		assertTrue(catalog.containFunction("test2", CatalogUtil.newDataTypesWithoutLen(Type.INT4)));
-		FunctionDesc retrived = catalog.getFunction("test2", CatalogUtil.newDataTypesWithoutLen(Type.INT4));
+    catalog.createFunction(meta);
+		assertTrue(catalog.containFunction("test2", CatalogUtil.newSimpleDataTypeArray(Type.INT4)));
+		FunctionDesc retrived = catalog.getFunction("test2", CatalogUtil.newSimpleDataTypeArray(Type.INT4));
 
 		assertEquals(retrived.getSignature(),"test2");
 		assertEquals(retrived.getFuncClass(),TestFunc1.class);
-		assertEquals(retrived.getFuncType(),FunctionType.GENERAL);
+		assertEquals(retrived.getFuncType(),FunctionType.UDF);
 	}
 
   @Test
-  public final void testUnregisterFunc() throws Exception {    
-    assertFalse(catalog
-        .containFunction("test3", CatalogUtil.newDataTypesWithoutLen(Type.INT4)));
-    FunctionDesc meta = new FunctionDesc("test3", TestFunc1.class, FunctionType.GENERAL,
-        CatalogUtil.newDataTypesWithoutLen(Type.INT4),
-        CatalogUtil.newDataTypesWithoutLen(Type.INT4 ));
-    catalog.registerFunction(meta);
-    assertTrue(catalog.containFunction("test3", CatalogUtil.newDataTypesWithoutLen(Type.INT4)));
-    catalog.unregisterFunction("test3", CatalogUtil.newDataTypesWithoutLen(Type.INT4));
-    assertFalse(catalog
-        .containFunction("test3", CatalogUtil.newDataTypesWithoutLen(Type.INT4)));
+  public final void testDropFunction() throws Exception {
+    assertFalse(catalog.containFunction("test3", CatalogUtil.newSimpleDataTypeArray(Type.INT4)));
+    FunctionDesc meta = new FunctionDesc("test3", TestFunc1.class, FunctionType.UDF,
+        CatalogUtil.newSimpleDataType(Type.INT4),
+        CatalogUtil.newSimpleDataTypeArray(Type.INT4));
+    catalog.createFunction(meta);
+    assertTrue(catalog.containFunction("test3", CatalogUtil.newSimpleDataTypeArray(Type.INT4)));
+    catalog.dropFunction("test3");
+    assertFalse(catalog.containFunction("test3", CatalogUtil.newSimpleDataTypeArray(Type.INT4)));
 
-    assertFalse(catalog.containFunction("test3",
-        CatalogUtil.newDataTypesWithoutLen(Type.INT4, Type.BLOB)));
+    assertFalse(catalog.containFunction("test3", CatalogUtil.newSimpleDataTypeArray(Type.INT4, Type.BLOB)));
     FunctionDesc overload = new FunctionDesc("test3", TestFunc2.class, FunctionType.GENERAL,
-        CatalogUtil.newDataTypesWithoutLen(Type.INT4),
-        CatalogUtil.newDataTypesWithoutLen(Type.INT4, Type.BLOB));
-    catalog.registerFunction(overload);
-    assertTrue(catalog.containFunction("test3",
-        CatalogUtil.newDataTypesWithoutLen(Type.INT4, Type.BLOB)));
+        CatalogUtil.newSimpleDataType(Type.INT4),
+        CatalogUtil.newSimpleDataTypeArray(Type.INT4, Type.BLOB));
+    catalog.createFunction(overload);
+    assertTrue(catalog.containFunction("test3", CatalogUtil.newSimpleDataTypeArray(Type.INT4, Type.BLOB)));
   }
 }

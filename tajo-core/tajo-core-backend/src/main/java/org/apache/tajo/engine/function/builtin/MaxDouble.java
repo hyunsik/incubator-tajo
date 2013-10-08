@@ -20,8 +20,8 @@ package org.apache.tajo.engine.function.builtin;
 
 import org.apache.tajo.catalog.CatalogUtil;
 import org.apache.tajo.catalog.Column;
-import org.apache.tajo.catalog.function.AggFunction;
-import org.apache.tajo.catalog.function.FunctionContext;
+import org.apache.tajo.engine.function.AggFunction;
+import org.apache.tajo.engine.function.FunctionContext;
 import org.apache.tajo.common.TajoDataTypes.DataType;
 import org.apache.tajo.common.TajoDataTypes.Type;
 import org.apache.tajo.datum.Datum;
@@ -54,8 +54,8 @@ public class MaxDouble extends AggFunction<Float8Datum> {
   }
 
   @Override
-  public DataType[] getPartialResultType() {
-    return CatalogUtil.newDataTypesWithoutLen(Type.FLOAT8);
+  public DataType getPartialResultType() {
+    return CatalogUtil.newSimpleDataType(Type.FLOAT8);
   }
 
   @Override

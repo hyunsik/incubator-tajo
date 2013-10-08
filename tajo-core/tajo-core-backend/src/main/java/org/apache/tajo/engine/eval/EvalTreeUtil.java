@@ -25,7 +25,6 @@ import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.common.TajoDataTypes.DataType;
 import org.apache.tajo.engine.planner.Target;
-import org.apache.tajo.engine.utils.SchemaUtil;
 import org.apache.tajo.exception.InternalException;
 
 import java.util.*;
@@ -131,13 +130,13 @@ public class EvalTreeUtil {
     for (Target target : targets) {
       schema.addColumn(
           target.hasAlias() ? target.getAlias() : target.getEvalTree().getName(),
-          getDomainByExpr(inputSchema, target.getEvalTree())[0]);
+          getDomainByExpr(inputSchema, target.getEvalTree()));
     }
     
     return schema;
   }
   
-  public static DataType[] getDomainByExpr(Schema inputSchema, EvalNode expr)
+  public static DataType getDomainByExpr(Schema inputSchema, EvalNode expr)
       throws InternalException {
     switch (expr.getType()) {
     case AND:      
@@ -158,7 +157,7 @@ public class EvalTreeUtil {
 
     case FIELD:
       FieldEval fieldEval = (FieldEval) expr;
-      return SchemaUtil.newNoNameSchema(inputSchema.getColumnByFQN(fieldEval.getName()).getDataType());
+      return inputSchema.getColumnByFQN(fieldEval.getName()).getDataType();
 
       
     default:
@@ -326,25 +325,25 @@ public class EvalTreeUtil {
     }
   }
 
-  public static List<AggFuncCallEval> findDistinctAggFunction(EvalNode expr) {
+  public static List<AggregationFunctionCallEval> findDistinctAggFunction(EvalNode expr) {
     AllAggFunctionFinder finder = new AllAggFunctionFinder();
     expr.postOrder(finder);
     return Lists.newArrayList(finder.getAggregationFunction());
   }
 
   public static class AllAggFunctionFinder implements EvalNodeVisitor {
-    private Set<AggFuncCallEval> aggFucntions = Sets.newHashSet();
-    private AggFuncCallEval field = null;
+    private Set<AggregationFunctionCallEval> aggFucntions = Sets.newHashSet();
+    private AggregationFunctionCallEval field = null;
 
     @Override
     public void visit(EvalNode node) {
       if (node.getType() == EvalType.AGG_FUNCTION) {
-        field = (AggFuncCallEval) node;
+        field = (AggregationFunctionCallEval) node;
         aggFucntions.add(field);
       }
     }
 
-    public Set<AggFuncCallEval> getAggregationFunction() {
+    public Set<AggregationFunctionCallEval> getAggregationFunction() {
       return this.aggFucntions;
     }
   }

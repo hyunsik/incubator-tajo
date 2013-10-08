@@ -4,6 +4,27 @@ Release 0.2.0 - unreleased
 
   NEW FEATURES
 
+    TAJO-179: Support MySQL CatalogStore. (jinho)
+
+    TAJO-147: Implement trim(text), ltrim(text), and rtrim(text) function.
+    (hyunsik)
+
+    TAJO-148: Implement UPPER(text), LOWER(text) function. (hyunsik)
+
+    TAJO-220: Implement catalog dump feature. (hyunsik)
+
+    TAJO-216: Improve FilterPushDownRule and Implement physical operators 
+    for outer join. (camelia_c via hyunsik)
+
+    TAJO-211: Implement regexp_replace function. (hyunsik)
+
+    TAJO-212: Implement type cast expresion. (hyunsik)
+
+    TAJO-206: Implement String concatenation operator (||). (hyunsik)
+
+    TAJO-213: NULL characters in meta of csv table should be supported.
+    (jinho)    
+
     TAJO-185: Implement split_part function. (hyunsik)
 
     TAJO-193: Add string pattern matching operators. (hyunsik)
@@ -28,6 +49,25 @@ Release 0.2.0 - unreleased
     TAJO-33: Implement a basic query progress indicator. (hyunsik)
 
   IMPROVEMENTS
+
+    TAJO-232: Rename join operators and add other join operators to
+    PhysicalPlanner. (hyunsik)
+
+    TAJO-229: Implement JoinGraph to represent a graph of relation joins.
+    (hyunsik)
+
+    TAJO-223: Maximize disk read bandwidth utilization of StorageManagerV2 by
+    moving Tuple creation role to next(). (Keuntae Park via hyunsik)
+
+    TAJO-199: All relations in catalog must have data volume size. (hyunsik)
+
+    TAJO-224: Rearrange DataType enumeration and Refactor type systems.
+    (hyunsik)
+
+    TAJO-214: System should inquire finished query history after execution 
+    in web. (SeongHwa Ahn via hyunsik)
+
+    TAJO-145: count(distinct column) should be supported. (hyunsik)
 
     TAJO-197: Implement Enforcer that forces physical planner to choose
     specified algorithms. (hyunsik)
@@ -152,6 +192,13 @@ Release 0.2.0 - unreleased
     TAJO-2: remove all @author tags and update license header. (hyunsik)
 
   BUG FIXES
+
+    TAJO-226: Can't use group by column alias. (hyunsik)
+
+    TAJO-203: Field delimiter does not work correctly. (jinho)
+
+    TAJO-205: Repartitioner occasionally chooses a partition number as one.
+    (hyunsik)
 
     TAJO-191: INSERT OVERWRITE INTO statement should follow the table meta in 
     catalog. (jinho)

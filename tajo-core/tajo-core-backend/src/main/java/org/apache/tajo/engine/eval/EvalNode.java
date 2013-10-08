@@ -19,11 +19,11 @@
 package org.apache.tajo.engine.eval;
 
 import com.google.gson.annotations.Expose;
-import org.apache.tajo.json.GsonObject;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.common.TajoDataTypes.DataType;
 import org.apache.tajo.datum.Datum;
 import org.apache.tajo.engine.json.CoreGsonHelper;
+import org.apache.tajo.json.GsonObject;
 import org.apache.tajo.storage.Tuple;
 
 public abstract class EvalNode implements Cloneable, GsonObject {
@@ -73,12 +73,12 @@ public abstract class EvalNode implements Cloneable, GsonObject {
     }
   }
 	
-	public abstract DataType [] getValueType();
+	public abstract DataType getValueType();
 	
 	public abstract String getName();
 	
 	public String toString() {
-		return "("+this.type+"("+leftExpr.toString()+" "+rightExpr.toString()+"))";
+		return "(" + this.type + "(" + leftExpr.toString() + " " + rightExpr.toString() + "))";
 	}
 
   @Override
@@ -90,12 +90,14 @@ public abstract class EvalNode implements Cloneable, GsonObject {
 
   public abstract Datum terminate(EvalContext ctx);
 
+  @Deprecated
 	public void preOrder(EvalNodeVisitor visitor) {
 	  visitor.visit(this);
 	  leftExpr.preOrder(visitor);
 	  rightExpr.preOrder(visitor);
 	}
-	
+
+  @Deprecated
 	public void postOrder(EvalNodeVisitor visitor) {
 	  leftExpr.postOrder(visitor);
 	  rightExpr.postOrder(visitor);	  	  

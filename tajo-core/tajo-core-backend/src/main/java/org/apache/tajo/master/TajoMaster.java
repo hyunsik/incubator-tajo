@@ -38,14 +38,13 @@ import org.apache.hadoop.yarn.service.Service;
 import org.apache.hadoop.yarn.util.RackResolver;
 import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.proto.CatalogProtos.FunctionType;
-import org.apache.tajo.common.TajoDataTypes;
 import org.apache.tajo.common.TajoDataTypes.Type;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.conf.TajoConf.ConfVars;
 import org.apache.tajo.engine.function.Country;
 import org.apache.tajo.engine.function.InCountry;
 import org.apache.tajo.engine.function.builtin.*;
-import org.apache.tajo.engine.function.string.SplitPart;
+import org.apache.tajo.engine.function.string.*;
 import org.apache.tajo.master.querymaster.QueryJobManager;
 import org.apache.tajo.master.rm.WorkerResourceManager;
 import org.apache.tajo.master.rm.YarnTajoResourceManager;
@@ -67,16 +66,21 @@ public class TajoMaster extends CompositeService {
   public static final int SHUTDOWN_HOOK_PRIORITY = 30;
 
   /** rw-r--r-- */
+  @SuppressWarnings("OctalInteger")
   final public static FsPermission TAJO_ROOT_DIR_PERMISSION = FsPermission.createImmutable((short) 0644);
   /** rw-r--r-- */
+  @SuppressWarnings("OctalInteger")
   final public static FsPermission SYSTEM_DIR_PERMISSION = FsPermission.createImmutable((short) 0644);
   /** rw-r--r-- */
   final public static FsPermission SYSTEM_RESOURCE_DIR_PERMISSION = FsPermission.createImmutable((short) 0644);
   /** rw-r--r-- */
+  @SuppressWarnings("OctalInteger")
   final public static FsPermission WAREHOUSE_DIR_PERMISSION = FsPermission.createImmutable((short) 0644);
   /** rw-r--r-- */
+  @SuppressWarnings("OctalInteger")
   final public static FsPermission STAGING_ROOTDIR_PERMISSION = FsPermission.createImmutable((short) 0644);
   /** rw-r--r-- */
+  @SuppressWarnings("OctalInteger")
   final public static FsPermission SYSTEM_CONF_FILE_PERMISSION = FsPermission.createImmutable((short) 0644);
 
 
@@ -214,98 +218,146 @@ public class TajoMaster extends CompositeService {
 
     // Sum
     sqlFuncs.add(new FunctionDesc("sum", SumInt.class, FunctionType.AGGREGATION,
-        CatalogUtil.newDataTypesWithoutLen(Type.INT4),
-        CatalogUtil.newDataTypesWithoutLen(Type.INT4)));
+        CatalogUtil.newSimpleDataType(Type.INT4),
+        CatalogUtil.newSimpleDataTypeArray(Type.INT4)));
     sqlFuncs.add(new FunctionDesc("sum", SumLong.class, FunctionType.AGGREGATION,
-        CatalogUtil.newDataTypesWithoutLen(Type.INT8),
-        CatalogUtil.newDataTypesWithoutLen(Type.INT8)));
+        CatalogUtil.newSimpleDataType(Type.INT8),
+        CatalogUtil.newSimpleDataTypeArray(Type.INT8)));
     sqlFuncs.add(new FunctionDesc("sum", SumFloat.class, FunctionType.AGGREGATION,
-        CatalogUtil.newDataTypesWithoutLen(Type.FLOAT4),
-        CatalogUtil.newDataTypesWithoutLen(Type.FLOAT4)));
+        CatalogUtil.newSimpleDataType(Type.FLOAT4),
+        CatalogUtil.newSimpleDataTypeArray(Type.FLOAT4)));
     sqlFuncs.add(new FunctionDesc("sum", SumDouble.class, FunctionType.AGGREGATION,
-        CatalogUtil.newDataTypesWithoutLen(Type.FLOAT8),
-        CatalogUtil.newDataTypesWithoutLen(Type.FLOAT8)));
+        CatalogUtil.newSimpleDataType(Type.FLOAT8),
+        CatalogUtil.newSimpleDataTypeArray(Type.FLOAT8)));
 
     // Max
     sqlFuncs.add(new FunctionDesc("max", MaxInt.class, FunctionType.AGGREGATION,
-        CatalogUtil.newDataTypesWithoutLen(Type.INT4),
-        CatalogUtil.newDataTypesWithoutLen(Type.INT4)));
+        CatalogUtil.newSimpleDataType(Type.INT4),
+        CatalogUtil.newSimpleDataTypeArray(Type.INT4)));
     sqlFuncs.add(new FunctionDesc("max", MaxLong.class, FunctionType.AGGREGATION,
-        CatalogUtil.newDataTypesWithoutLen(Type.INT8),
-        CatalogUtil.newDataTypesWithoutLen(Type.INT8)));
+        CatalogUtil.newSimpleDataType(Type.INT8),
+        CatalogUtil.newSimpleDataTypeArray(Type.INT8)));
     sqlFuncs.add(new FunctionDesc("max", MaxFloat.class, FunctionType.AGGREGATION,
-        CatalogUtil.newDataTypesWithoutLen(Type.FLOAT4),
-        CatalogUtil.newDataTypesWithoutLen(Type.FLOAT4)));
+        CatalogUtil.newSimpleDataType(Type.FLOAT4),
+        CatalogUtil.newSimpleDataTypeArray(Type.FLOAT4)));
     sqlFuncs.add(new FunctionDesc("max", MaxDouble.class, FunctionType.AGGREGATION,
-        CatalogUtil.newDataTypesWithoutLen(Type.FLOAT8),
-        CatalogUtil.newDataTypesWithoutLen(Type.FLOAT8)));
+        CatalogUtil.newSimpleDataType(Type.FLOAT8),
+        CatalogUtil.newSimpleDataTypeArray(Type.FLOAT8)));
 
     // Min
     sqlFuncs.add(new FunctionDesc("min", MinInt.class, FunctionType.AGGREGATION,
-        CatalogUtil.newDataTypesWithoutLen(Type.INT4),
-        CatalogUtil.newDataTypesWithoutLen(Type.INT4)));
+        CatalogUtil.newSimpleDataType(Type.INT4),
+        CatalogUtil.newSimpleDataTypeArray(Type.INT4)));
     sqlFuncs.add(new FunctionDesc("min", MinLong.class, FunctionType.AGGREGATION,
-        CatalogUtil.newDataTypesWithoutLen(Type.INT8),
-        CatalogUtil.newDataTypesWithoutLen(Type.INT8)));
+        CatalogUtil.newSimpleDataType(Type.INT8),
+        CatalogUtil.newSimpleDataTypeArray(Type.INT8)));
     sqlFuncs.add(new FunctionDesc("min", MinFloat.class, FunctionType.AGGREGATION,
-        CatalogUtil.newDataTypesWithoutLen(Type.FLOAT4),
-        CatalogUtil.newDataTypesWithoutLen(Type.FLOAT4 )));
+        CatalogUtil.newSimpleDataType(Type.FLOAT4),
+        CatalogUtil.newSimpleDataTypeArray(Type.FLOAT4)));
     sqlFuncs.add(new FunctionDesc("min", MinDouble.class, FunctionType.AGGREGATION,
-        CatalogUtil.newDataTypesWithoutLen(Type.FLOAT8),
-        CatalogUtil.newDataTypesWithoutLen(Type.FLOAT8)));
+        CatalogUtil.newSimpleDataType(Type.FLOAT8),
+        CatalogUtil.newSimpleDataTypeArray(Type.FLOAT8)));
     sqlFuncs.add(new FunctionDesc("min", MinString.class, FunctionType.AGGREGATION,
-        CatalogUtil.newDataTypesWithoutLen(Type.TEXT),
-        CatalogUtil.newDataTypesWithoutLen(Type.TEXT)));
+        CatalogUtil.newSimpleDataType(Type.TEXT),
+        CatalogUtil.newSimpleDataTypeArray(Type.TEXT)));
 
     // AVG
     sqlFuncs.add(new FunctionDesc("avg", AvgInt.class, FunctionType.AGGREGATION,
-        CatalogUtil.newDataTypesWithoutLen(Type.FLOAT4),
-        CatalogUtil.newDataTypesWithoutLen(Type.INT4)));
+        CatalogUtil.newSimpleDataType(Type.FLOAT8),
+        CatalogUtil.newSimpleDataTypeArray(Type.INT4)));
     sqlFuncs.add(new FunctionDesc("avg", AvgLong.class, FunctionType.AGGREGATION,
-        CatalogUtil.newDataTypesWithoutLen(Type.FLOAT8),
-        CatalogUtil.newDataTypesWithoutLen(Type.INT8)));
+        CatalogUtil.newSimpleDataType(Type.FLOAT8),
+        CatalogUtil.newSimpleDataTypeArray(Type.INT8)));
     sqlFuncs.add(new FunctionDesc("avg", AvgFloat.class, FunctionType.AGGREGATION,
-        CatalogUtil.newDataTypesWithoutLen(Type.FLOAT4),
-        CatalogUtil.newDataTypesWithoutLen(Type.FLOAT4)));
+        CatalogUtil.newSimpleDataType(Type.FLOAT8),
+        CatalogUtil.newSimpleDataTypeArray(Type.FLOAT4)));
     sqlFuncs.add(new FunctionDesc("avg", AvgDouble.class, FunctionType.AGGREGATION,
-        CatalogUtil.newDataTypesWithoutLen(Type.FLOAT8),
-        CatalogUtil.newDataTypesWithoutLen(Type.FLOAT8)));
+        CatalogUtil.newSimpleDataType(Type.FLOAT8),
+        CatalogUtil.newSimpleDataTypeArray(Type.FLOAT8)));
 
     // Count
     sqlFuncs.add(new FunctionDesc("count", CountValue.class, FunctionType.AGGREGATION,
-        CatalogUtil.newDataTypesWithoutLen(Type.INT8),
-        CatalogUtil.newDataTypesWithoutLen(Type.ANY)));
+        CatalogUtil.newSimpleDataType(Type.INT8),
+        CatalogUtil.newSimpleDataTypeArray(Type.ANY)));
     sqlFuncs.add(new FunctionDesc("count", CountRows.class, FunctionType.AGGREGATION,
-        CatalogUtil.newDataTypesWithoutLen(Type.INT8),
-        CatalogUtil.newDataTypesWithoutLen()));
+        CatalogUtil.newSimpleDataType(Type.INT8),
+        CatalogUtil.newSimpleDataTypeArray()));
+    sqlFuncs.add(new FunctionDesc("count", CountValueDistinct.class, FunctionType.DISTINCT_AGGREGATION,
+        CatalogUtil.newSimpleDataType(Type.INT8),
+        CatalogUtil.newSimpleDataTypeArray(Type.ANY)));
 
     // GeoIP
     sqlFuncs.add(new FunctionDesc("in_country", InCountry.class, FunctionType.GENERAL,
-        CatalogUtil.newDataTypesWithoutLen(Type.BOOLEAN),
-        CatalogUtil.newDataTypesWithoutLen(Type.TEXT, Type.TEXT)));
+        CatalogUtil.newSimpleDataType(Type.BOOLEAN),
+        CatalogUtil.newSimpleDataTypeArray(Type.TEXT, Type.TEXT)));
     sqlFuncs.add(new FunctionDesc("country", Country.class, FunctionType.GENERAL,
-        CatalogUtil.newDataTypesWithoutLen(Type.TEXT),
-        CatalogUtil.newDataTypesWithoutLen(Type.TEXT)));
+        CatalogUtil.newSimpleDataType(Type.TEXT),
+        CatalogUtil.newSimpleDataTypeArray(Type.TEXT)));
 
     // Date
     sqlFuncs.add(new FunctionDesc("date", Date.class, FunctionType.GENERAL,
-        CatalogUtil.newDataTypesWithoutLen(Type.INT8),
-        CatalogUtil.newDataTypesWithoutLen(Type.TEXT)));
+        CatalogUtil.newSimpleDataType(Type.INT8),
+        CatalogUtil.newSimpleDataTypeArray(Type.TEXT)));
 
     // Today
     sqlFuncs.add(new FunctionDesc("today", Date.class, FunctionType.GENERAL,
-        CatalogUtil.newDataTypesWithoutLen(Type.INT8),
-        CatalogUtil.newDataTypesWithoutLen()));
+        CatalogUtil.newSimpleDataType(Type.INT8),
+        CatalogUtil.newSimpleDataTypeArray()));
 
     sqlFuncs.add(
         new FunctionDesc("random", RandomInt.class, FunctionType.GENERAL,
-            CatalogUtil.newDataTypesWithoutLen(Type.INT4),
-            CatalogUtil.newDataTypesWithoutLen(Type.INT4)));
+            CatalogUtil.newSimpleDataType(Type.INT4),
+            CatalogUtil.newSimpleDataTypeArray(Type.INT4)));
+
+    sqlFuncs.add(
+        new FunctionDesc("upper", Upper.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.TEXT),
+            CatalogUtil.newSimpleDataTypeArray(Type.TEXT)));
+    sqlFuncs.add(
+        new FunctionDesc("lower", Lower.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.TEXT),
+            CatalogUtil.newSimpleDataTypeArray(Type.TEXT)));
 
     sqlFuncs.add(
         new FunctionDesc("split_part", SplitPart.class, FunctionType.GENERAL,
-            CatalogUtil.newDataTypesWithoutLen(Type.TEXT),
-            CatalogUtil.newDataTypesWithoutLen(Type.TEXT, Type.TEXT, Type.INT4)));
+            CatalogUtil.newSimpleDataType(Type.TEXT),
+            CatalogUtil.newSimpleDataTypeArray(Type.TEXT, Type.TEXT, Type.INT4)));
+    sqlFuncs.add(
+        new FunctionDesc("trim", BTrim.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.TEXT),
+            CatalogUtil.newSimpleDataTypeArray(Type.TEXT)));
+    sqlFuncs.add(
+        new FunctionDesc("trim", BTrim.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.TEXT),
+            CatalogUtil.newSimpleDataTypeArray(Type.TEXT, Type.TEXT)));
+    sqlFuncs.add(
+        new FunctionDesc("btrim", BTrim.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.TEXT),
+            CatalogUtil.newSimpleDataTypeArray(Type.TEXT)));
+    sqlFuncs.add(
+        new FunctionDesc("btrim", BTrim.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.TEXT),
+            CatalogUtil.newSimpleDataTypeArray(Type.TEXT, Type.TEXT)));
+    sqlFuncs.add(
+        new FunctionDesc("ltrim", LTrim.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.TEXT),
+            CatalogUtil.newSimpleDataTypeArray(Type.TEXT)));
+    sqlFuncs.add(
+        new FunctionDesc("ltrim", LTrim.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.TEXT),
+            CatalogUtil.newSimpleDataTypeArray(Type.TEXT, Type.TEXT)));
+    sqlFuncs.add(
+        new FunctionDesc("rtrim", RTrim.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.TEXT),
+            CatalogUtil.newSimpleDataTypeArray(Type.TEXT)));
+    sqlFuncs.add(
+        new FunctionDesc("rtrim", RTrim.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.TEXT),
+            CatalogUtil.newSimpleDataTypeArray(Type.TEXT, Type.TEXT)));
+    sqlFuncs.add(
+        new FunctionDesc("regexp_replace", RegexpReplace.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.TEXT),
+            CatalogUtil.newSimpleDataTypeArray(Type.TEXT, Type.TEXT, Type.TEXT)));
 
     return sqlFuncs;
   }

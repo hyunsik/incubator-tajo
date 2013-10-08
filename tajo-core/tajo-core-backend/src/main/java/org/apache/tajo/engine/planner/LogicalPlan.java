@@ -18,6 +18,8 @@
 
 package org.apache.tajo.engine.planner;
 
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import org.apache.tajo.algebra.*;
 import org.apache.tajo.annotation.NotThreadSafe;
 import org.apache.tajo.catalog.Column;
@@ -75,8 +77,8 @@ public class LogicalPlan {
     return newAndGetBlock(NONAME_BLOCK_PREFIX + (noNameBlockId++));
   }
 
-  public String newNonameColumnName() {
-    return "?_" + (noNameColumnId++);
+  public String newNonameColumnName(String prefix) {
+    return "?" + prefix + "_" + (noNameColumnId++);
   }
 
   /**
@@ -112,7 +114,7 @@ public class LogicalPlan {
   }
 
   public void connectBlocks(QueryBlock srcBlock, QueryBlock targetBlock, BlockType type) {
-    queryBlockGraph.connect(srcBlock.getName(), targetBlock.getName(), new BlockEdge(srcBlock, targetBlock, type));
+    queryBlockGraph.addEdge(srcBlock.getName(), targetBlock.getName(), new BlockEdge(srcBlock, targetBlock, type));
   }
 
   public QueryBlock getParentBlock(QueryBlock block) {
@@ -139,7 +141,7 @@ public class LogicalPlan {
    * It resolves a column.
    */
   public Column resolveColumn(QueryBlock block, LogicalNode currentNode, ColumnReferenceExpr columnRef)
-      throws VerifyException {
+      throws PlanningException {
 
     if (columnRef.hasQualifier()) { // if a column referenec is qualified
 
@@ -214,6 +216,16 @@ public class LogicalPlan {
 
       throw new VerifyException("ERROR: no such a column name "+ columnRef.getCanonicalName());
     }
+  }
+
+  /**
+   * replace the found column if the column is renamed to an alias name
+   */
+  public Column getColumnOrAliasedColumn(QueryBlock block, Column column) throws PlanningException {
+    if (block.targetListManager.isResolve(column)) {
+      column = block.targetListManager.getResolvedColumn(column);
+    }
+    return column;
   }
 
   private static Column ensureUniqueColumn(List<Column> candidates)
@@ -579,7 +591,7 @@ public class LogicalPlan {
     }
 
     public boolean isTargetResolved(int targetId) {
-      return targetListManager.isEvaluated(targetId);
+      return targetListManager.isResolved(targetId);
     }
 
     public void resolveAllTargetList() {
@@ -602,8 +614,10 @@ public class LogicalPlan {
       return targetListManager.size();
     }
 
-    public void fillTarget(int idx) throws VerifyException {
-      targetListManager.update(idx, planner.createTarget(LogicalPlan.this, this, getProjection().getTargets()[idx]));
+    public void fillTarget(int idx) throws PlanningException {
+      Target target = planner.createTarget(LogicalPlan.this, this, getProjection().getTargets()[idx]);
+      // below code reaches only when target is created.
+      targetListManager.fill(idx, target);
     }
 
     public boolean checkIfTargetCanBeEvaluated(int targetId, LogicalNode node) {
@@ -623,7 +637,7 @@ public class LogicalPlan {
       return targetListManager.getUpdatedSchema();
     }
 
-    public void fillTargets() {
+    public void fillTargets() throws PlanningException {
       for (int i = 0; i < getTargetListNum(); i++) {
         if (!isAlreadyTargetCreated(i)) {
           try {
@@ -712,20 +726,32 @@ public class LogicalPlan {
         } else if (node instanceof GroupbyNode) {
           // Set the current targets to the GroupByNode because the GroupByNode is the last projection operator.
           GroupbyNode groupbyNode = (GroupbyNode) node;
-          groupbyNode.setTargets(getCurrentTargets());
+          groupbyNode.setTargets(targetListManager.getUpdatedTarget(Sets.newHashSet(newEvaluatedTargetIds)));
+          //groupbyNode.setTargets(getCurrentTargets());
+          boolean distinct = false;
+          for (Target target : groupbyNode.getTargets()) {
+            for (AggregationFunctionCallEval aggrFunc : EvalTreeUtil.findDistinctAggFunction(target.getEvalTree())) {
+              if (aggrFunc.isDistinct()) {
+                distinct = true;
+                break;
+              }
+            }
+          }
+          groupbyNode.setDistinct(distinct);
           node.setOutSchema(updateSchema());
 
           // if a having condition is given,
           if (hasHaving()) {
             EvalNode havingCondition = planner.createEvalTree(LogicalPlan.this, this, getHaving().getQual());
-            List<AggFuncCallEval> aggrFunctions = EvalTreeUtil.findDistinctAggFunction(havingCondition);
+            List<AggregationFunctionCallEval> aggrFunctions = EvalTreeUtil.findDistinctAggFunction(havingCondition);
 
             if (aggrFunctions.size() == 0) {
               groupbyNode.setHavingCondition(havingCondition);
             } else {
               Target [] addedTargets = new Target[aggrFunctions.size()];
               for (int i = 0; i < aggrFunctions.size(); i++) {
-                Target aggrFunctionTarget = new Target(aggrFunctions.get(i), newNonameColumnName());
+                Target aggrFunctionTarget = new Target(aggrFunctions.get(i),
+                    newNonameColumnName(aggrFunctions.get(i).getName()));
                 addedTargets[i] = aggrFunctionTarget;
                 EvalTreeUtil.replace(havingCondition, aggrFunctions.get(i),
                     new FieldEval(aggrFunctionTarget.getColumnSchema()));

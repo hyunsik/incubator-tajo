@@ -32,16 +32,16 @@ public class BinaryOperator extends Expr {
     this.right = right;
   }
 
-  public Expr getLeft() {
-    return this.left;
+  public <T extends Expr> T getLeft() {
+    return (T) this.left;
   }
 
   public void setLeft(Expr left) {
     this.left = left;
   }
 
-  public Expr getRight() {
-    return this.right;
+  public <T extends Expr> T getRight() {
+    return (T) this.right;
   }
 
   public void setRight(Expr right) {

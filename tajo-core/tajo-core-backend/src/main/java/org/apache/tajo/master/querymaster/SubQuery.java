@@ -48,7 +48,7 @@ import org.apache.tajo.engine.planner.global.MasterPlan;
 import org.apache.tajo.engine.planner.logical.GroupbyNode;
 import org.apache.tajo.engine.planner.logical.NodeType;
 import org.apache.tajo.engine.planner.logical.ScanNode;
-import org.apache.tajo.ipc.TajoWorkerProtocol;
+import org.apache.tajo.engine.planner.logical.StoreTableNode;
 import org.apache.tajo.master.ExecutionBlock;
 import org.apache.tajo.master.TaskRunnerGroupEvent;
 import org.apache.tajo.master.TaskRunnerGroupEvent.EventType;
@@ -368,7 +368,15 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
     }
 
     DataChannel channel = masterPlan.getOutgoingChannels(getId()).get(0);
-    meta = CatalogUtil.newTableMeta(channel.getSchema(), CatalogProtos.StoreType.CSV, new Options());
+    // get default or store type
+    CatalogProtos.StoreType storeType = CatalogProtos.StoreType.CSV; // default setting
+
+    // if store plan (i.e., CREATE or INSERT OVERWRITE)
+    StoreTableNode storeTableNode = PlannerUtil.findTopNode(getBlock().getPlan(), NodeType.STORE);
+    if (storeTableNode != null) {
+      storeType = storeTableNode.getStorageType();
+    }
+    meta = CatalogUtil.newTableMeta(channel.getSchema(), storeType, new Options());
     meta.setStat(stat);
     statistics = stat;
     setFinishTime();
@@ -575,7 +583,7 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
       int mb = (int) Math.ceil((double)volume / 1048576);
       LOG.info("Table's volume is approximately " + mb + " MB");
       // determine the number of task per 64MB
-      int maxTaskNum = (int) Math.ceil((double)mb / 64);
+      int maxTaskNum = Math.max(1, (int) Math.ceil((double)mb / 64));
       LOG.info("The determined number of non-leaf tasks is " + maxTaskNum);
       return maxTaskNum;
     }

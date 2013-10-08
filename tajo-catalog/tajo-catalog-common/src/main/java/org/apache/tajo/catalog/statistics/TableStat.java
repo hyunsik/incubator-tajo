@@ -24,6 +24,7 @@ package org.apache.tajo.catalog.statistics;
 import com.google.common.base.Objects;
 import com.google.gson.Gson;
 import com.google.gson.annotations.Expose;
+import org.apache.tajo.common.TajoDataTypes;
 import org.apache.tajo.json.GsonObject;
 import org.apache.tajo.catalog.json.CatalogGsonHelper;
 import org.apache.tajo.catalog.proto.CatalogProtos.ColumnStatProto;
@@ -39,6 +40,7 @@ public class TableStat implements ProtoObject<TableStatProto>, Cloneable, GsonOb
 
   @Expose private Long numRows = null; // required
   @Expose private Long numBytes = null; // required
+  @Expose private Integer numFiles = null; // required
   @Expose private Integer numBlocks = null; // optional
   @Expose private Integer numPartitions = null; // optional
   @Expose private Long avgRows = null; // optional
@@ -47,6 +49,7 @@ public class TableStat implements ProtoObject<TableStatProto>, Cloneable, GsonOb
   public TableStat() {
     numRows = 0l;
     numBytes = 0l;
+    numFiles = 0;
     numBlocks = 0;
     numPartitions = 0;
     avgRows = 0l;
@@ -56,6 +59,7 @@ public class TableStat implements ProtoObject<TableStatProto>, Cloneable, GsonOb
   public TableStat(TableStatProto proto) {
     this.numRows = proto.getNumRows();
     this.numBytes = proto.getNumBytes();
+    //this.numFiles =
 
     if (proto.hasNumBlocks()) {
       this.numBlocks = proto.getNumBlocks();
@@ -69,6 +73,9 @@ public class TableStat implements ProtoObject<TableStatProto>, Cloneable, GsonOb
 
     this.columnStats = TUtil.newList();
     for (ColumnStatProto colProto : proto.getColStatList()) {
+      if (colProto.getColumn().getDataType().getType() == TajoDataTypes.Type.PROTOBUF) {
+        continue;
+      }
       columnStats.add(new ColumnStat(colProto));
     }
   }

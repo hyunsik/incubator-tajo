@@ -18,12 +18,9 @@
 
 package org.apache.tajo.engine.query;
 
-import org.apache.tajo.IntegrationTest;
 import org.apache.tajo.TpchTestBase;
-import org.apache.tajo.client.ResultSetUtil;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.junit.experimental.categories.Category;
 
 import java.io.IOException;
 import java.sql.ResultSet;
@@ -32,7 +29,6 @@ import java.util.Map;
 
 import static org.junit.Assert.*;
 
-@Category(IntegrationTest.class)
 public class TestTableSubQuery {
   private static TpchTestBase tpch;
   public TestTableSubQuery() throws IOException {

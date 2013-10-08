@@ -124,11 +124,12 @@ public class QueryInProgress extends CompositeService {
       }
     }
 
+    super.stop();
+
     if(queryMasterRpc != null) {
       //TODO release to connection pool
       queryMasterRpc.close();
     }
-    super.stop();
   }
 
   @Override

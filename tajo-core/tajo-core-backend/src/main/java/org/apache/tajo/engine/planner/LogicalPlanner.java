@@ -22,12 +22,13 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.tajo.algebra.*;
 import org.apache.tajo.algebra.CreateTable.ColumnDefinition;
 import org.apache.tajo.catalog.*;
-import org.apache.tajo.catalog.function.AggFunction;
-import org.apache.tajo.catalog.function.GeneralFunction;
 import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.common.TajoDataTypes;
 import org.apache.tajo.common.TajoDataTypes.DataType;
@@ -35,6 +36,8 @@ import org.apache.tajo.datum.Datum;
 import org.apache.tajo.datum.DatumFactory;
 import org.apache.tajo.datum.NullDatum;
 import org.apache.tajo.engine.eval.*;
+import org.apache.tajo.engine.function.AggFunction;
+import org.apache.tajo.engine.function.GeneralFunction;
 import org.apache.tajo.engine.planner.LogicalPlan.QueryBlock;
 import org.apache.tajo.engine.planner.logical.*;
 import org.apache.tajo.engine.query.exception.InvalidQueryException;
@@ -46,6 +49,7 @@ import java.util.List;
 import java.util.Stack;
 
 import static org.apache.tajo.algebra.Aggregation.GroupType;
+import static org.apache.tajo.catalog.proto.CatalogProtos.FunctionType;
 import static org.apache.tajo.engine.planner.LogicalPlan.BlockType;
 
 /**
@@ -113,7 +117,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   public LogicalNode postHook(PlanContext context, Stack<OpType> stack, Expr expr, LogicalNode current)
       throws PlanningException {
     // Post work
-    if (expr.getType() == OpType.RelationList && ((RelationList) expr).size() == 1) {
+    if ((expr.getType() == OpType.RelationList && ((RelationList) expr).size() == 1)
+        || expr.getType() == OpType.Having) {
       return current;
     }
 
@@ -140,7 +145,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     }
   }
 
-  public TableSubQueryNode visitTableSubQuery(PlanContext context, Stack<OpType> stack, TableSubQuery expr)
+  public TableSubQueryNode visitTableSubQuery(PlanContext context, Stack<OpType> stack, TablePrimarySubQuery expr)
       throws PlanningException {
     QueryBlock newBlock = context.plan.newAndGetBlock(expr.getName());
     PlanContext newContext = new PlanContext(context.plan, newBlock);
@@ -160,6 +165,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     // 3. build scan plan
     Relation relation = expr;
     TableDesc desc = catalog.getTableDesc(relation.getName());
+    updatePhysicalInfo(desc);
 
     ScanNode scanNode;
     if (relation.hasAlias()) {
@@ -169,6 +175,20 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     }
 
     return scanNode;
+  }
+
+  private void updatePhysicalInfo(TableDesc desc) {
+    if (desc.getPath() != null) {
+      try {
+        FileSystem fs = desc.getPath().getFileSystem(new Configuration());
+        FileStatus status = fs.getFileStatus(desc.getPath());
+        if (desc.getMeta().getStat() != null && (status.isDirectory() || status.isFile())) {
+          desc.getMeta().getStat().setNumBytes(fs.getContentSummary(desc.getPath()).getLength());
+        }
+      } catch (Throwable t) {
+        t.printStackTrace();
+      }
+    }
   }
 
   /*===============================================================================================
@@ -434,7 +454,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       for (int i = 0; i < groupElements.length; i++) {
         annotatedElements[i] = new GroupElement(
             groupElements[i].getType(),
-            annotateGroupingColumn(plan, block.getName(), groupElements[i].getColumns(), null));
+            annotateGroupingColumn(plan, block, groupElements[i].getColumns(), null));
       }
       GroupbyNode groupingNode = new GroupbyNode(plan.newPID(), annotatedElements[0].getColumns());
       if (aggregation.hasHavingCondition()) {
@@ -452,7 +472,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       return groupingNode;
 
     } else if (groupElements[0].getType() == GroupType.Cube) { // for cube by
-      List<Column[]> cuboids  = generateCuboids(annotateGroupingColumn(plan, block.getName(),
+      List<Column[]> cuboids  = generateCuboids(annotateGroupingColumn(plan, block,
           groupElements[0].getColumns(), null));
       UnionNode topUnion = createGroupByUnion(plan, block, child, cuboids, 0);
       block.resolveGroupingRequired();
@@ -518,12 +538,14 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   /**
    * It transforms a list of column references into a list of annotated columns with considering aliased expressions.
    */
-  private Column[] annotateGroupingColumn(LogicalPlan plan, String blockName,
+  private Column[] annotateGroupingColumn(LogicalPlan plan, QueryBlock block,
                                            ColumnReferenceExpr[] columnRefs, LogicalNode child)
-      throws VerifyException {
+      throws PlanningException {
+
     Column[] columns = new Column[columnRefs.length];
     for (int i = 0; i < columnRefs.length; i++) {
-      columns[i] = plan.resolveColumn(plan.getBlock(blockName), null, columnRefs[i]);
+      columns[i] = plan.resolveColumn(block, null, columnRefs[i]);
+      columns[i] = plan.getColumnOrAliasedColumn(block, columns[i]);
     }
 
     return columns;
@@ -585,8 +607,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     Sort.SortSpec[] sortSpecs = sort.getSortSpecs();
     for (int i = 0; i < sort.getSortSpecs().length; i++) {
       column = plan.resolveColumn(block, null, sortSpecs[i].getKey());
-      annotatedSortSpecs[i] = new SortSpec(column, sortSpecs[i].isAscending(),
-          sortSpecs[i].isNullFirst());
+      column = plan.getColumnOrAliasedColumn(block, column);
+      annotatedSortSpecs[i] = new SortSpec(column, sortSpecs[i].isAscending(), sortSpecs[i].isNullFirst());
     }
     SortNode sortNode = new SortNode(context.plan.newPID(), annotatedSortSpecs);
 
@@ -643,7 +665,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       evalOnly.setOutSchema(getProjectedSchema(plan, evalOnly.getExprs()));
       block.setProjectionNode(evalOnly);
       for (int i = 0; i < evalOnly.getTargets().length; i++) {
-        block.targetListManager.update(i, evalOnly.getTargets()[i]);
+        block.targetListManager.fill(i, evalOnly.getTargets()[i]);
       }
       return evalOnly;
     }
@@ -748,7 +770,6 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         storeNode.setStorageType(CatalogUtil.getStoreType(expr.getStorageType()));
       } else {
         // default type
-        // TODO - it should be configurable.
         storeNode.setStorageType(CatalogProtos.StoreType.CSV);
       }
 
@@ -806,35 +827,19 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     return schema;
   }
 
-  private Column convertColumn(ColumnDefinition columnDefinition) {
-    TajoDataTypes.Type type = TajoDataTypes.Type.valueOf(columnDefinition.getDataType());
-    Column column;
-    switch (type) {
-      case CHAR:
-      case VARCHAR:
-      case NCHAR:
-      case NVARCHAR:
-        column = new Column(columnDefinition.getColumnName(),
-            TajoDataTypes.Type.valueOf(columnDefinition.getDataType()),
-            columnDefinition.getLengthOrPrecision());
-        break;
-      case FLOAT4:
-      case FLOAT8:
-        // TODO: support precision
-        column = new Column(columnDefinition.getColumnName(),
-            TajoDataTypes.Type.valueOf(columnDefinition.getDataType()));
-        break;
-      case NUMERIC:
-      case DECIMAL:
-        // TODO: support precision and scale
-        column = new Column(columnDefinition.getColumnName(),
-            TajoDataTypes.Type.valueOf(columnDefinition.getDataType()));
-        break;
-      default:
-        column = new Column(columnDefinition.getColumnName(),
-            TajoDataTypes.Type.valueOf(columnDefinition.getDataType()));
+  private DataType convertDataType(org.apache.tajo.algebra.DataType dataType) {
+    TajoDataTypes.Type type = TajoDataTypes.Type.valueOf(dataType.getTypeName());
+
+    DataType.Builder builder = DataType.newBuilder();
+    builder.setType(type);
+    if (dataType.hasLengthOrPrecision()) {
+      builder.setLength(dataType.getLengthOrPrecision());
     }
-    return column;
+    return builder.build();
+  }
+
+  private Column convertColumn(ColumnDefinition columnDefinition) {
+    return new Column(columnDefinition.getColumnName(), convertDataType(columnDefinition));
   }
 
   protected LogicalNode visitInsert(PlanContext context, Stack<OpType> stack, Insert expr) throws PlanningException {
@@ -916,7 +921,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
    ===============================================================================================*/
 
   public EvalNode createEvalTree(LogicalPlan plan, QueryBlock block, final Expr expr)
-      throws VerifyException {
+      throws PlanningException {
 
     switch(expr.getType()) {
       // constants
@@ -939,6 +944,11 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
           default:
             throw new RuntimeException("Unsupported type: " + literal.getValueType());
         }
+
+      case Cast:
+        CastExpr cast = (CastExpr) expr;
+        return new CastEval(createEvalTree(plan, block, cast.getOperand()),
+            convertDataType(cast.getTarget()));
 
       case ValueList: {
         ValueListExpr valueList = (ValueListExpr) expr;
@@ -1002,6 +1012,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       case Multiply:
       case Divide:
       case Modular:
+      case Concatenate:
         BinaryOperator bin = (BinaryOperator) expr;
         return new BinaryEval(exprTypeToEvalType(expr.getType()),
             createEvalTree(plan, block, bin.getLeft()),
@@ -1011,43 +1022,44 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       case Column:
         return createFieldEval(plan, block, (ColumnReferenceExpr) expr);
 
-      case CountRowsFunction:
-        FunctionDesc countRows = catalog.getFunction("count", new DataType[] {});
+      case CountRowsFunction: {
+        FunctionDesc countRows = catalog.getFunction("count", FunctionType.AGGREGATION, new DataType[] {});
 
         try {
           block.setHasGrouping();
 
-          return new AggFuncCallEval(countRows, (AggFunction) countRows.newInstance(),
+          return new AggregationFunctionCallEval(countRows, (AggFunction) countRows.newInstance(),
               new EvalNode[] {});
         } catch (InternalException e) {
           throw new UndefinedFunctionException(CatalogUtil.
               getCanonicalName(countRows.getSignature(), new DataType[]{}));
         }
-
+      }
       case GeneralSetFunction: {
         GeneralSetFunctionExpr setFunction = (GeneralSetFunctionExpr) expr;
         Expr[] params = setFunction.getParams();
         EvalNode[] givenArgs = new EvalNode[params.length];
         DataType[] paramTypes = new DataType[params.length];
 
+        FunctionType functionType = setFunction.isDistinct() ?
+            FunctionType.DISTINCT_AGGREGATION : FunctionType.AGGREGATION;
         givenArgs[0] = createEvalTree(plan, block, params[0]);
         if (setFunction.getSignature().equalsIgnoreCase("count")) {
-          paramTypes[0] = CatalogUtil.newDataTypeWithoutLen(TajoDataTypes.Type.ANY);
+          paramTypes[0] = CatalogUtil.newSimpleDataType(TajoDataTypes.Type.ANY);
         } else {
-          paramTypes[0] = givenArgs[0].getValueType()[0];
+          paramTypes[0] = givenArgs[0].getValueType();
         }
 
-        if (!catalog.containFunction(setFunction.getSignature(), paramTypes)) {
-          throw new UndefinedFunctionException(CatalogUtil.
-              getCanonicalName(setFunction.getSignature(), paramTypes));
+        if (!catalog.containFunction(setFunction.getSignature(), functionType, paramTypes)) {
+          throw new UndefinedFunctionException(CatalogUtil. getCanonicalName(setFunction.getSignature(), paramTypes));
         }
 
-        FunctionDesc funcDesc = catalog.getFunction(setFunction.getSignature(), paramTypes);
+        FunctionDesc funcDesc = catalog.getFunction(setFunction.getSignature(), functionType, paramTypes);
         if (!block.hasGroupbyNode()) {
           block.setHasGrouping();
         }
         try {
-          return new AggFuncCallEval(funcDesc, (AggFunction) funcDesc.newInstance(), givenArgs);
+          return new AggregationFunctionCallEval(funcDesc, (AggFunction) funcDesc.newInstance(), givenArgs);
         } catch (InternalException e) {
           e.printStackTrace();
         }
@@ -1063,27 +1075,27 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
         for (int i = 0; i < params.length; i++) {
             givenArgs[i] = createEvalTree(plan, block, params[i]);
-            paramTypes[i] = givenArgs[i].getValueType()[0];
+            paramTypes[i] = givenArgs[i].getValueType();
         }
 
         if (!catalog.containFunction(function.getSignature(), paramTypes)) {
-            throw new UndefinedFunctionException(CatalogUtil.
-                getCanonicalName(function.getSignature(), paramTypes));
+            throw new UndefinedFunctionException(CatalogUtil.getCanonicalName(function.getSignature(), paramTypes));
         }
 
         FunctionDesc funcDesc = catalog.getFunction(function.getSignature(), paramTypes);
 
         try {
-          if (funcDesc.getFuncType() == CatalogProtos.FunctionType.GENERAL)
 
-            return new FuncCallEval(funcDesc,
-                (GeneralFunction) funcDesc.newInstance(), givenArgs);
-          else {
+          FunctionType functionType = funcDesc.getFuncType();
+          if (functionType == FunctionType.GENERAL || functionType == FunctionType.UDF) {
+            return new GeneralFunctionEval(funcDesc, (GeneralFunction) funcDesc.newInstance(), givenArgs);
+          } else if (functionType == FunctionType.AGGREGATION || functionType == FunctionType.UDA) {
             if (!block.hasGroupbyNode()) {
               block.setHasGrouping();
             }
-            return new AggFuncCallEval(funcDesc,
-                (AggFunction) funcDesc.newInstance(), givenArgs);
+            return new AggregationFunctionCallEval(funcDesc, (AggFunction) funcDesc.newInstance(), givenArgs);
+          } else if (functionType == FunctionType.DISTINCT_AGGREGATION || functionType == FunctionType.DISTINCT_UDA) {
+            throw new PlanningException("Unsupported function: " + funcDesc.toString());
           }
         } catch (InternalException e) {
           e.printStackTrace();
@@ -1105,7 +1117,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   }
 
   private FieldEval createFieldEval(LogicalPlan plan, QueryBlock block,
-                                    ColumnReferenceExpr columnRef) throws VerifyException {
+                                    ColumnReferenceExpr columnRef) throws PlanningException {
     Column column = plan.resolveColumn(block, null, columnRef);
     return new FieldEval(column);
   }
@@ -1125,6 +1137,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       case Multiply: return EvalType.MULTIPLY;
       case Divide: return EvalType.DIVIDE;
       case Modular: return EvalType.MODULAR;
+      case Concatenate: return EvalType.CONCATENATE;
       case Column: return EvalType.FIELD;
       case Function: return EvalType.FUNCTION;
       default: throw new RuntimeException("Unsupported type: " + type);
@@ -1132,7 +1145,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   }
 
   public CaseWhenEval createCaseWhenEval(LogicalPlan plan, QueryBlock block,
-                                              CaseWhenPredicate caseWhen) throws VerifyException {
+                                              CaseWhenPredicate caseWhen) throws PlanningException {
     CaseWhenEval caseEval = new CaseWhenEval();
     EvalNode condition;
     EvalNode result;
@@ -1151,7 +1164,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   }
 
   Target[] annotateTargets(LogicalPlan plan, QueryBlock block, org.apache.tajo.algebra.Target [] targets)
-      throws VerifyException {
+      throws PlanningException {
     Target annotatedTargets [] = new Target[targets.length];
 
     for (int i = 0; i < targets.length; i++) {
@@ -1161,7 +1174,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   }
 
   Target createTarget(LogicalPlan plan, QueryBlock block,
-                             org.apache.tajo.algebra.Target target) throws VerifyException {
+                             org.apache.tajo.algebra.Target target) throws PlanningException {
     if (target.hasAlias()) {
       return new Target(createEvalTree(plan, block, target.getExpr()),
           target.getAlias());
@@ -1176,14 +1189,13 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   static Schema getProjectedSchema(LogicalPlan plan, Target[] targets) {
     Schema projected = new Schema();
     for(Target t : targets) {
-      DataType type = t.getEvalTree().getValueType()[0];
+      DataType type = t.getEvalTree().getValueType();
       String name;
-      if (t.hasAlias()) {
+      if (t.hasAlias() || t.getEvalTree().getType() == EvalType.FIELD) {
+        name = t.getCanonicalName();
+      } else { // if an alias is not given or this target is an expression
+        t.setAlias(plan.newNonameColumnName(t.getEvalTree().getName()));
         name = t.getAlias();
-      } else if (t.getEvalTree().getName().equals("?")) {
-        name = plan.newNonameColumnName();
-      } else {
-        name = t.getEvalTree().getName();
       }
       projected.addColumn(name,type);
     }

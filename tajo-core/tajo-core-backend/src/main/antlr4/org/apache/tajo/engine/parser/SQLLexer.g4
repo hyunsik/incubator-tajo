@@ -121,9 +121,11 @@ ANY : A N Y;
 ASC : A S C;
 AVG : A V G;
 
+BOTH : B O T H;
 BY : B Y;
 
 CASE : C A S E;
+CAST : C A S T;
 CHARACTER : C H A R A C T E R;
 COALESCE : C O A L E S C E;
 COUNT : C O U N T;
@@ -167,6 +169,7 @@ IS : I S;
 JOIN : J O I N;
 
 LAST : L A S T;
+LEADING : L E A D I N G;
 LEFT : L E F T;
 LIKE : L I K E;
 LIMIT : L I M I T;
@@ -200,6 +203,7 @@ SOME : S O M E;
 
 TABLE : T A B L E;
 THEN : T H E N;
+TRAILING : T R A I L I N G;
 TRUE : T R U E;
 
 UNION : U N I O N;
@@ -235,6 +239,7 @@ STDDEV_POP : S T D D E V UNDERLINE P O P;
 STDDEV_SAMP : S T D D E V UNDERLINE S A M P;
 SUM : S U M;
 
+TRIM : T R I M;
 TO : T O;
 
 Nonreserved_keywords
@@ -245,6 +250,7 @@ Nonreserved_keywords
   | STDDEV_POP
   | STDDEV_SAMP
   | SUM
+  | TRIM
   | TO
   ;
 
@@ -305,10 +311,17 @@ Not_Similar_To : '!~';
 Similar_To_Case_Insensitive : '~*';
 Not_Similar_To_Case_Insensitive : '!~*';
 
+// Cast Operator
+CAST_EXPRESSION
+  : COLON COLON
+  ;
+
 ASSIGN  : ':=';
 EQUAL  : '=';
+COLON :  ':';
 SEMI_COLON :  ';';
 COMMA : ',';
+CONCATENATION_OPERATOR : VERTICAL_BAR VERTICAL_BAR;
 NOT_EQUAL  : '<>' | '!=' | '~='| '^=' ;
 LTH : '<' ;
 LEQ : '<=';
@@ -323,6 +336,7 @@ DIVIDE  : '/';
 MODULAR : '%';
 DOT : '.';
 UNDERLINE : '_';
+VERTICAL_BAR : '|';
 
 NUMBER : Digit+;
 
@@ -340,7 +354,7 @@ BlockComment
     ;
 
 LineComment
-    :   '//' ~[\r\n]* -> skip
+    :   '--' ~[\r\n]* -> skip
     ;
 
 /*
@@ -355,7 +369,7 @@ Identifier
   ;
 
 Regular_Identifier
-  : ('a'..'z'|'A'..'Z'|'_') ('a'..'z'|'A'..'Z'|Digit|'_'|':')*
+  : ('a'..'z'|'A'..'Z'|'_') ('a'..'z'|'A'..'Z'|Digit|'_')*
   ;
 
 /*

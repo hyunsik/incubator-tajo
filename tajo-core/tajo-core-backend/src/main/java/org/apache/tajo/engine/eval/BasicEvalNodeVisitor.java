@@ -105,16 +105,16 @@ public class BasicEvalNodeVisitor<CONTEXT, RESULT> implements EvalNodeVisitor2<C
       case SIMILAR_TO:
         result = visitSimilarTo(context, stack, (SimilarToPredicateEval) evalNode);
         break;
-      case Regex:
+      case REGEX:
         result = visitRegex(context, stack, (RegexPredicateEval) evalNode);
         break;
 
       // Functions
       case FUNCTION:
-        result = visitFuncCall(context, stack, (FuncCallEval) evalNode);
+        result = visitFuncCall(context, stack, (GeneralFunctionEval) evalNode);
         break;
       case AGG_FUNCTION:
-        result = visitAggrFuncCall(context, stack, (AggFuncCallEval) evalNode);
+        result = visitAggrFuncCall(context, stack, (AggregationFunctionCallEval) evalNode);
         break;
 
       default:
@@ -132,7 +132,7 @@ public class BasicEvalNodeVisitor<CONTEXT, RESULT> implements EvalNodeVisitor2<C
     return result;
   }
 
-  private RESULT visitDefaultFunctionEval(CONTEXT context, Stack<EvalNode> stack, FuncEval functionEval) {
+  private RESULT visitDefaultFunctionEval(CONTEXT context, Stack<EvalNode> stack, FunctionEval functionEval) {
     RESULT result = null;
     stack.push(functionEval);
     for (EvalNode arg : functionEval.getArgs()) {
@@ -287,12 +287,12 @@ public class BasicEvalNodeVisitor<CONTEXT, RESULT> implements EvalNodeVisitor2<C
   }
 
   @Override
-  public RESULT visitFuncCall(CONTEXT context, Stack<EvalNode> stack, FuncCallEval evalNode) {
+  public RESULT visitFuncCall(CONTEXT context, Stack<EvalNode> stack, GeneralFunctionEval evalNode) {
     return visitDefaultFunctionEval(context, stack, evalNode);
   }
 
   @Override
-  public RESULT visitAggrFuncCall(CONTEXT context, Stack<EvalNode> stack, AggFuncCallEval evalNode) {
+  public RESULT visitAggrFuncCall(CONTEXT context, Stack<EvalNode> stack, AggregationFunctionCallEval evalNode) {
     return visitDefaultFunctionEval(context, stack, evalNode);
   }
 }

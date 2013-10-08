@@ -20,8 +20,8 @@ package org.apache.tajo.engine.function.builtin;
 
 import org.apache.tajo.catalog.CatalogUtil;
 import org.apache.tajo.catalog.Column;
-import org.apache.tajo.catalog.function.AggFunction;
-import org.apache.tajo.catalog.function.FunctionContext;
+import org.apache.tajo.engine.function.AggFunction;
+import org.apache.tajo.engine.function.FunctionContext;
 import org.apache.tajo.common.TajoDataTypes.DataType;
 import org.apache.tajo.common.TajoDataTypes.Type;
 import org.apache.tajo.datum.Datum;
@@ -51,8 +51,8 @@ public class SumFloat extends AggFunction<Datum> {
   }
 
   @Override
-  public DataType [] getPartialResultType() {
-    return CatalogUtil.newDataTypesWithoutLen(Type.FLOAT4);
+  public DataType getPartialResultType() {
+    return CatalogUtil.newSimpleDataType(Type.FLOAT4);
   }
 
   @Override

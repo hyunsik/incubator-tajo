@@ -18,13 +18,16 @@
 
 package org.apache.tajo.storage;
 
+import com.google.protobuf.Message;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.common.TajoDataTypes;
 import org.apache.tajo.datum.*;
 import org.apache.tajo.datum.exception.InvalidCastException;
-import org.apache.tajo.storage.json.StorageGsonHelper;
+import org.apache.tajo.datum.protobuf.ProtobufJsonFormat;
+import org.apache.tajo.util.Bytes;
 
+import java.io.IOException;
 import java.net.InetAddress;
 import java.util.Arrays;
 
@@ -33,12 +36,18 @@ public class LazyTuple implements Tuple {
   private Datum[] values;
   private byte[][] textBytes;
   private Schema schema;
+  private byte[] nullBytes;
 
   public LazyTuple(Schema schema, byte[][] textBytes, long offset) {
+    this(schema, textBytes, offset, NullDatum.get().asTextBytes());
+  }
+
+  public LazyTuple(Schema schema, byte[][] textBytes, long offset, byte[] nullBytes) {
     this.schema = schema;
     this.textBytes = textBytes;
     this.values = new Datum[schema.getColumnNum()];
     this.offset = offset;
+    this.nullBytes = nullBytes;
   }
 
   public LazyTuple(LazyTuple tuple) {
@@ -47,6 +56,7 @@ public class LazyTuple implements Tuple {
     this.offset = tuple.offset;
     this.schema = tuple.schema;
     this.textBytes = tuple.textBytes.clone();
+    this.nullBytes = tuple.nullBytes;
   }
 
   @Override
@@ -113,7 +123,7 @@ public class LazyTuple implements Tuple {
     else if (textBytes.length <= fieldId) {
       values[fieldId] = NullDatum.get();  // split error. (col : 3, separator: ',', row text: "a,")
     } else if (textBytes[fieldId] != null) {
-      values[fieldId] = createByTextBytes(schema.getColumn(fieldId).getDataType().getType(), textBytes[fieldId]);
+      values[fieldId] = createByTextBytes(schema.getColumn(fieldId).getDataType(), textBytes[fieldId]);
       textBytes[fieldId] = null;
     } else {
       //non-projection
@@ -276,32 +286,62 @@ public class LazyTuple implements Tuple {
     return false;
   }
 
-  private static Datum createByTextBytes(TajoDataTypes.Type type, byte[] val) {
-    switch (type) {
+
+  public  boolean isNull(byte[] val){
+    return val == null || val.length == 0 || ((val.length == nullBytes.length) && Bytes.equals(val, nullBytes));
+  }
+
+  public  boolean isNullText(byte[] val){
+    return val == null || (val.length > 0 && val.length == nullBytes.length && Bytes.equals(val, nullBytes));
+  }
+
+  public boolean isNotNull(byte[] val){
+    return !isNull(val);
+  }
+
+  public boolean isNotNullText(byte[] val){
+    return !isNullText((val));
+  }
+
+  private  Datum createByTextBytes(TajoDataTypes.DataType type, byte [] val) {
+    switch (type.getType()) {
       case BOOLEAN:
-        return NullDatum.isNotNull(val) ? DatumFactory.createBool(new String(val)) : NullDatum.get();
+        return isNotNull(val) ? DatumFactory.createBool(new String(val)) : NullDatum.get();
       case INT2:
-        return NullDatum.isNotNull(val) ? DatumFactory.createInt2(new String(val)) : NullDatum.get();
+        return isNotNull(val) ? DatumFactory.createInt2(new String(val)) : NullDatum.get();
       case INT4:
-        return NullDatum.isNotNull(val) ? DatumFactory.createInt4(new String(val)) : NullDatum.get();
+        return isNotNull(val) ? DatumFactory.createInt4(new String(val)) : NullDatum.get();
       case INT8:
-        return NullDatum.isNotNull(val) ? DatumFactory.createInt8(new String(val)) : NullDatum.get();
+        return isNotNull(val) ? DatumFactory.createInt8(new String(val)) : NullDatum.get();
       case FLOAT4:
-        return NullDatum.isNotNull(val) ? DatumFactory.createFloat4(new String(val)) : NullDatum.get();
+        return isNotNull(val) ? DatumFactory.createFloat4(new String(val)) : NullDatum.get();
       case FLOAT8:
-        return NullDatum.isNotNull(val) ? DatumFactory.createFloat8(new String(val)) : NullDatum.get();
+        return isNotNull(val) ? DatumFactory.createFloat8(new String(val)) : NullDatum.get();
       case CHAR:
-        return DatumFactory.createChar(new String(val).trim());
+        return isNotNullText(val) ? DatumFactory.createChar(new String(val).trim()) : NullDatum.get();
       case TEXT:
-        return DatumFactory.createText(val);
+        return isNotNullText(val) ? DatumFactory.createText(val) : NullDatum.get();
       case BIT:
         return DatumFactory.createBit(Byte.parseByte(new String(val)));
       case BLOB:
         return DatumFactory.createBlob(Base64.decodeBase64(val));
       case INET4:
-        return NullDatum.isNotNull(val) ? DatumFactory.createInet4(new String(val)) : NullDatum.get();
-      case ARRAY:
-        return NullDatum.isNotNull(val) ? StorageGsonHelper.getInstance().fromJson(new String(val), Datum.class) : NullDatum.get();
+        return isNotNull(val) ? DatumFactory.createInet4(new String(val)) : NullDatum.get();
+      case PROTOBUF: {
+        if (isNotNull(val)) {
+          ProtobufDatumFactory factory = ProtobufDatumFactory.get(type);
+          Message.Builder builder = factory.newBuilder();
+          try {
+            ProtobufJsonFormat.getInstance().merge(val, builder);
+            return factory.createDatum(builder.build());
+          } catch (IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+          }
+        } else {
+          return NullDatum.get();
+        }
+      }
       case NULL:
         return NullDatum.get();
       default:
