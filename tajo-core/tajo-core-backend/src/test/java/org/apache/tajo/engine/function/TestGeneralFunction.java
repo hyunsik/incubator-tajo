@@ -18,13 +18,13 @@
 
 package org.apache.tajo.engine.function;
 
-import org.junit.Test;
 import org.apache.tajo.datum.Datum;
 import org.apache.tajo.datum.Int8Datum;
 import org.apache.tajo.datum.TextDatum;
-import org.apache.tajo.engine.function.builtin.Date;
+import org.apache.tajo.engine.function.datetime.Date;
 import org.apache.tajo.storage.Tuple;
 import org.apache.tajo.storage.VTuple;
+import org.junit.Test;
 
 import java.util.Calendar;
 
@@ -36,7 +36,7 @@ public class TestGeneralFunction {
   public void testDate() {
     Date date = new Date();
     Tuple tuple = new VTuple(new Datum[] {new TextDatum("25/12/2012 00:00:00")});
-    Int8Datum unixtime = (Int8Datum) date.eval(tuple);
+    Int8Datum unixtime = date.eval(tuple);
     Calendar c = Calendar.getInstance();
     c.setTimeInMillis(unixtime.asInt8());
     assertEquals(2012, c.get(Calendar.YEAR));

@@ -44,6 +44,9 @@ import org.apache.tajo.conf.TajoConf.ConfVars;
 import org.apache.tajo.engine.function.Country;
 import org.apache.tajo.engine.function.InCountry;
 import org.apache.tajo.engine.function.builtin.*;
+import org.apache.tajo.engine.function.datetime.Date;
+import org.apache.tajo.engine.function.datetime.ToTimestamp;
+import org.apache.tajo.engine.function.datetime.UnixTimestamp;
 import org.apache.tajo.engine.function.string.*;
 import org.apache.tajo.master.querymaster.QueryJobManager;
 import org.apache.tajo.master.rm.WorkerResourceManager;
@@ -299,10 +302,17 @@ public class TajoMaster extends CompositeService {
         CatalogUtil.newSimpleDataType(Type.INT8),
         CatalogUtil.newSimpleDataTypeArray(Type.TEXT)));
 
-    // Today
-    sqlFuncs.add(new FunctionDesc("today", Date.class, FunctionType.GENERAL,
+    // UnixTimestamp
+    sqlFuncs.add(new FunctionDesc("unix_timestamp", UnixTimestamp.class, FunctionType.GENERAL,
         CatalogUtil.newSimpleDataType(Type.INT8),
         CatalogUtil.newSimpleDataTypeArray()));
+
+    sqlFuncs.add(new FunctionDesc("to_timestamp", ToTimestamp.class, FunctionType.GENERAL,
+        CatalogUtil.newSimpleDataType(Type.TEXT),
+        CatalogUtil.newSimpleDataTypeArray(Type.INT8)));
+    sqlFuncs.add(new FunctionDesc("to_timestamp", ToTimestamp.class, FunctionType.GENERAL,
+        CatalogUtil.newSimpleDataType(Type.TEXT),
+        CatalogUtil.newSimpleDataTypeArray(Type.INT8, Type.TEXT)));
 
     sqlFuncs.add(
         new FunctionDesc("random", RandomInt.class, FunctionType.GENERAL,

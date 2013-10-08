@@ -16,22 +16,37 @@
  * limitations under the License.
  */
 
-package org.apache.tajo.engine.function.builtin;
+package org.apache.tajo.engine.function.datetime;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.tajo.catalog.Column;
-import org.apache.tajo.datum.Datum;
 import org.apache.tajo.datum.DatumFactory;
+import org.apache.tajo.datum.Int8Datum;
 import org.apache.tajo.engine.function.GeneralFunction;
 import org.apache.tajo.storage.Tuple;
 
-public class Today extends GeneralFunction {
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 
-  public Today() {
-    super(new Column[] {});
+import static org.apache.tajo.common.TajoDataTypes.Type.TEXT;
+
+public class Date extends GeneralFunction {
+  private final Log LOG = LogFactory.getLog(Date.class);
+  private final static String dateFormat = "dd/MM/yyyy HH:mm:ss";
+
+  public Date() {
+    super(new Column[] {new Column("val", TEXT)});
   }
 
   @Override
-  public Datum eval(Tuple params) {
-    return DatumFactory.createInt8(System.currentTimeMillis());
+  public Int8Datum eval(Tuple params) {
+    try {
+      return DatumFactory.createInt8(new SimpleDateFormat(dateFormat)
+          .parse(params.get(0).asChars()).getTime());
+    } catch (ParseException e) {
+      LOG.error(e);
+      return null;
+    }
   }
 }

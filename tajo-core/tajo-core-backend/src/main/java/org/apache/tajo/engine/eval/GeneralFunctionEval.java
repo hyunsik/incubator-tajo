@@ -22,8 +22,8 @@ import com.google.common.base.Objects;
 import com.google.gson.annotations.Expose;
 import org.apache.tajo.catalog.FunctionDesc;
 import org.apache.tajo.catalog.Schema;
-import org.apache.tajo.engine.function.GeneralFunction;
 import org.apache.tajo.datum.Datum;
+import org.apache.tajo.engine.function.GeneralFunction;
 import org.apache.tajo.storage.Tuple;
 import org.apache.tajo.storage.VTuple;
 import org.apache.tajo.util.TUtil;
@@ -58,7 +58,7 @@ public class GeneralFunctionEval extends FunctionEval {
 
     if(argEvals != null) {
       params.clear();
-      for(int i=0;i < argEvals.length; i++) {
+      for(int i = 0 ; i < argEvals.length; i++) {
         argEvals[i].eval(localCtx.argCtxs[i], schema, tuple);
         params.put(i, argEvals[i].terminate(localCtx.argCtxs[i]));
       }

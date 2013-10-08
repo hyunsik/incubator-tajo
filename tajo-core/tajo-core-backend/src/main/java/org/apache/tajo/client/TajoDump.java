@@ -21,14 +21,11 @@ package org.apache.tajo.client;
 import com.google.common.collect.Lists;
 import com.google.protobuf.ServiceException;
 import org.apache.commons.cli.*;
-import org.apache.commons.cli.Options;
 import org.apache.tajo.catalog.DDLBuilder;
 import org.apache.tajo.catalog.TableDesc;
 import org.apache.tajo.conf.TajoConf;
-import org.apache.tajo.engine.function.builtin.Date;
 
 import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.Writer;
 import java.text.DateFormat;

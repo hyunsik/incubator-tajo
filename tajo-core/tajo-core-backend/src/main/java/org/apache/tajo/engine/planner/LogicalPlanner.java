@@ -1070,12 +1070,14 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         FunctionExpr function = (FunctionExpr) expr;
         // Given parameters
         Expr[] params = function.getParams();
-        EvalNode[] givenArgs = new EvalNode[params.length];
-        DataType[] paramTypes = new DataType[params.length];
+        EvalNode[] givenArgs = new EvalNode[params == null ? 0 : params.length];
+        DataType[] paramTypes = new DataType[params == null ? 0 : params.length];
 
-        for (int i = 0; i < params.length; i++) {
+        if (params != null) {
+          for (int i = 0; i < params.length; i++) {
             givenArgs[i] = createEvalTree(plan, block, params[i]);
             paramTypes[i] = givenArgs[i].getValueType();
+          }
         }
 
         if (!catalog.containFunction(function.getSignature(), paramTypes)) {
