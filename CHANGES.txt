@@ -4,6 +4,15 @@ Release 0.2.0 - unreleased
 
   NEW FEATURES
 
+    TAJO-99: Design the interface of join enumeration algorithm. (hyunsik)
+
+    TAJO-179: Support MySQL CatalogStore. (jinho)
+
+    TAJO-147: Implement trim(text), ltrim(text), and rtrim(text) function.
+    (hyunsik)
+
+    TAJO-148: Implement UPPER(text), LOWER(text) function. (hyunsik)
+
     TAJO-220: Implement catalog dump feature. (hyunsik)
 
     TAJO-216: Improve FilterPushDownRule and Implement physical operators 
@@ -42,6 +51,11 @@ Release 0.2.0 - unreleased
     TAJO-33: Implement a basic query progress indicator. (hyunsik)
 
   IMPROVEMENTS
+
+    TAJO-239: Improving web UI. (Keuntae Park via hyunsik)
+
+    TAJO-232: Rename join operators and add other join operators to
+    PhysicalPlanner. (hyunsik)
 
     TAJO-229: Implement JoinGraph to represent a graph of relation joins.
     (hyunsik)
@@ -182,6 +196,24 @@ Release 0.2.0 - unreleased
     TAJO-2: remove all @author tags and update license header. (hyunsik)
 
   BUG FIXES
+
+    TAJO-250: QueryMaster must send the query finish heartbeat. (hyunsik)
+
+    TAJO-245: org.apache.tajo.algebra.FunctionExpr cannot be cast to 
+    org.apache.tajo.algebra.ColumnReferenceExpr. (hyunsik)
+
+    TAJO-243: The 'tajo_dump' does not include options of table. (jinho)
+
+    TAJO-244: assignToNonLeafTasks causes NPE occurs occasionally. (hyunsik)
+
+    TAJO-242: Enable omitted broadcast join feature after TAJO-184. (hyunsik)
+
+    TAJO-240: Reformat HiveConverter source code to match adopted conventions 
+    (jaehwa)   
+
+    TAJO-241: Does not reconnect the meta store. (jinho)
+
+    TAJO-226: Can't use group by column alias. (hyunsik)
 
     TAJO-203: Field delimiter does not work correctly. (jinho)
 

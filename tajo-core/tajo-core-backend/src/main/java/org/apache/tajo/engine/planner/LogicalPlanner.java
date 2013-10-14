@@ -23,6 +23,7 @@ import com.google.common.collect.Lists;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -45,7 +46,6 @@ import org.apache.tajo.engine.query.exception.UndefinedFunctionException;
 import org.apache.tajo.engine.utils.SchemaUtil;
 import org.apache.tajo.exception.InternalException;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Stack;
 
@@ -118,7 +118,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   public LogicalNode postHook(PlanContext context, Stack<OpType> stack, Expr expr, LogicalNode current)
       throws PlanningException {
     // Post work
-    if (expr.getType() == OpType.RelationList && ((RelationList) expr).size() == 1) {
+    if ((expr.getType() == OpType.RelationList && ((RelationList) expr).size() == 1)
+        || expr.getType() == OpType.Having) {
       return current;
     }
 
@@ -145,7 +146,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     }
   }
 
-  public TableSubQueryNode visitTableSubQuery(PlanContext context, Stack<OpType> stack, TableSubQuery expr)
+  public TableSubQueryNode visitTableSubQuery(PlanContext context, Stack<OpType> stack, TablePrimarySubQuery expr)
       throws PlanningException {
     QueryBlock newBlock = context.plan.newAndGetBlock(expr.getName());
     PlanContext newContext = new PlanContext(context.plan, newBlock);
@@ -183,10 +184,14 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         FileSystem fs = desc.getPath().getFileSystem(new Configuration());
         FileStatus status = fs.getFileStatus(desc.getPath());
         if (desc.getMeta().getStat() != null && (status.isDirectory() || status.isFile())) {
-          desc.getMeta().getStat().setNumBytes(fs.getContentSummary(desc.getPath()).getLength());
+          ContentSummary summary = fs.getContentSummary(desc.getPath());
+          if (summary != null) {
+            long volume = summary.getLength();
+            desc.getMeta().getStat().setNumBytes(volume);
+          }
         }
       } catch (Throwable t) {
-        t.printStackTrace();
+        LOG.warn(t);
       }
     }
   }
@@ -454,7 +459,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       for (int i = 0; i < groupElements.length; i++) {
         annotatedElements[i] = new GroupElement(
             groupElements[i].getType(),
-            annotateGroupingColumn(plan, block.getName(), groupElements[i].getColumns(), null));
+            annotateGroupingColumn(plan, block, groupElements[i].getColumns(), null));
       }
       GroupbyNode groupingNode = new GroupbyNode(plan.newPID(), annotatedElements[0].getColumns());
       if (aggregation.hasHavingCondition()) {
@@ -472,7 +477,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       return groupingNode;
 
     } else if (groupElements[0].getType() == GroupType.Cube) { // for cube by
-      List<Column[]> cuboids  = generateCuboids(annotateGroupingColumn(plan, block.getName(),
+      List<Column[]> cuboids  = generateCuboids(annotateGroupingColumn(plan, block,
           groupElements[0].getColumns(), null));
       UnionNode topUnion = createGroupByUnion(plan, block, child, cuboids, 0);
       block.resolveGroupingRequired();
@@ -538,12 +543,14 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   /**
    * It transforms a list of column references into a list of annotated columns with considering aliased expressions.
    */
-  private Column[] annotateGroupingColumn(LogicalPlan plan, String blockName,
+  private Column[] annotateGroupingColumn(LogicalPlan plan, QueryBlock block,
                                            ColumnReferenceExpr[] columnRefs, LogicalNode child)
-      throws VerifyException {
+      throws PlanningException {
+
     Column[] columns = new Column[columnRefs.length];
     for (int i = 0; i < columnRefs.length; i++) {
-      columns[i] = plan.resolveColumn(plan.getBlock(blockName), null, columnRefs[i]);
+      columns[i] = plan.resolveColumn(block, null, columnRefs[i]);
+      columns[i] = plan.getColumnOrAliasedColumn(block, columns[i]);
     }
 
     return columns;
@@ -605,8 +612,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     Sort.SortSpec[] sortSpecs = sort.getSortSpecs();
     for (int i = 0; i < sort.getSortSpecs().length; i++) {
       column = plan.resolveColumn(block, null, sortSpecs[i].getKey());
-      annotatedSortSpecs[i] = new SortSpec(column, sortSpecs[i].isAscending(),
-          sortSpecs[i].isNullFirst());
+      column = plan.getColumnOrAliasedColumn(block, column);
+      annotatedSortSpecs[i] = new SortSpec(column, sortSpecs[i].isAscending(), sortSpecs[i].isNullFirst());
     }
     SortNode sortNode = new SortNode(context.plan.newPID(), annotatedSortSpecs);
 
@@ -663,7 +670,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       evalOnly.setOutSchema(getProjectedSchema(plan, evalOnly.getExprs()));
       block.setProjectionNode(evalOnly);
       for (int i = 0; i < evalOnly.getTargets().length; i++) {
-        block.targetListManager.update(i, evalOnly.getTargets()[i]);
+        block.targetListManager.fill(i, evalOnly.getTargets()[i]);
       }
       return evalOnly;
     }
@@ -1107,7 +1114,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       case IsNullPredicate:
         IsNullPredicate nullPredicate = (IsNullPredicate) expr;
         return new IsNullEval(nullPredicate.isNot(),
-            createFieldEval(plan, block, nullPredicate.getColumnRef()));
+            createEvalTree(plan, block, nullPredicate.getPredicand()));
 
       default:
     }
@@ -1115,7 +1122,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   }
 
   private FieldEval createFieldEval(LogicalPlan plan, QueryBlock block,
-                                    ColumnReferenceExpr columnRef) throws VerifyException {
+                                    ColumnReferenceExpr columnRef) throws PlanningException {
     Column column = plan.resolveColumn(block, null, columnRef);
     return new FieldEval(column);
   }

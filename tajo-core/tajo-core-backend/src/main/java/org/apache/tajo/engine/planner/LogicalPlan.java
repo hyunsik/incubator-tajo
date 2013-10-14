@@ -18,11 +18,14 @@
 
 package org.apache.tajo.engine.planner;
 
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import org.apache.tajo.algebra.*;
 import org.apache.tajo.annotation.NotThreadSafe;
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.engine.eval.*;
+import org.apache.tajo.engine.planner.graph.DirectedGraphCursor;
 import org.apache.tajo.engine.planner.graph.SimpleDirectedGraph;
 import org.apache.tajo.engine.planner.logical.*;
 import org.apache.tajo.util.TUtil;
@@ -50,6 +53,9 @@ public class LogicalPlan {
   private Map<Integer, LogicalNode> nodeMap = new HashMap<Integer, LogicalNode>();
   private Map<Integer, QueryBlock> queryBlockByPID = new HashMap<Integer, QueryBlock>();
   private SimpleDirectedGraph<String, BlockEdge> queryBlockGraph = new SimpleDirectedGraph<String, BlockEdge>();
+
+  /** planning and optimization log */
+  private List<String> planingHistory = Lists.newArrayList();
 
   public LogicalPlan(LogicalPlanner planner) {
     this.planner = planner;
@@ -139,7 +145,7 @@ public class LogicalPlan {
    * It resolves a column.
    */
   public Column resolveColumn(QueryBlock block, LogicalNode currentNode, ColumnReferenceExpr columnRef)
-      throws VerifyException {
+      throws PlanningException {
 
     if (columnRef.hasQualifier()) { // if a column referenec is qualified
 
@@ -216,6 +222,16 @@ public class LogicalPlan {
     }
   }
 
+  /**
+   * replace the found column if the column is renamed to an alias name
+   */
+  public Column getColumnOrAliasedColumn(QueryBlock block, Column column) throws PlanningException {
+    if (block.targetListManager.isResolve(column)) {
+      column = block.targetListManager.getResolvedColumn(column);
+    }
+    return column;
+  }
+
   private static Column ensureUniqueColumn(List<Column> candidates)
       throws VerifyException {
     if (candidates.size() == 1) {
@@ -240,12 +256,24 @@ public class LogicalPlan {
   public String getQueryGraphAsString() {
     StringBuilder sb = new StringBuilder();
 
-    sb.append("-----------------------------\n");
+    sb.append("\n-----------------------------\n");
     sb.append("Query Block Graph\n");
     sb.append("-----------------------------\n");
     sb.append(queryBlockGraph.toStringGraph(getRootBlock().getName()));
     sb.append("-----------------------------\n");
-
+    sb.append("Optimization Log:\n");
+    DirectedGraphCursor<String, BlockEdge> cursor =
+        new DirectedGraphCursor<String, BlockEdge>(queryBlockGraph, getRootBlock().getName());
+    while(cursor.hasNext()) {
+      QueryBlock block = getBlock(cursor.nextBlock());
+      if (block.getPlaningHistory().size() > 0) {
+        sb.append("\n[").append(block.getName()).append("]\n");
+        for (String log : block.getPlaningHistory()) {
+          sb.append("> ").append(log).append("\n");
+        }
+      }
+    }
+    sb.append("-----------------------------\n");
     sb.append("\n");
 
     sb.append(getLogicalPlanAsString());
@@ -268,6 +296,14 @@ public class LogicalPlan {
     }
 
     return explains.toString();
+  }
+
+  public void addHistory(String string) {
+    planingHistory.add(string);
+  }
+
+  public List<String> getHistory() {
+    return planingHistory;
   }
 
   @Override
@@ -326,12 +362,16 @@ public class LogicalPlan {
     private boolean hasGrouping;
     private Projectable projectionNode;
     private GroupbyNode groupingNode;
+    private JoinNode joinNode;
     private SelectionNode selectionNode;
     private StoreTableNode storeTableNode;
     private InsertNode insertNode;
     private Schema schema;
 
     TargetListManager targetListManager;
+
+    /** It contains a planning log for this block */
+    private List<String> planingHistory = Lists.newArrayList();
 
     public QueryBlock(String blockName) {
       this.blockName = blockName;
@@ -358,8 +398,8 @@ public class LogicalPlan {
       queryBlockByPID.put(blockRoot.getPID(), this);
     }
 
-    public <T extends LogicalNode> T getRoot() {
-      return (T) rootNode;
+    public <NODE extends LogicalNode> NODE getRoot() {
+      return (NODE) rootNode;
     }
 
     public NodeType getRootType() {
@@ -394,7 +434,7 @@ public class LogicalPlan {
       return this.relations.size() > 0;
     }
 
-    public void setLatestNode(LogicalNode node) {
+    public void updateLatestNode(LogicalNode node) {
       this.latestNode = node;
     }
 
@@ -475,6 +515,25 @@ public class LogicalPlan {
       return this.groupingNode;
     }
 
+    public boolean hasJoinNode() {
+      return joinNode != null;
+    }
+
+    /**
+     * @return the topmost JoinNode instance
+     */
+    public JoinNode getJoinNode() {
+      return joinNode;
+    }
+
+    public void setJoinNode(JoinNode node) {
+      if (joinNode == null || latestNode == node) {
+        this.joinNode = node;
+      } else {
+        PlannerUtil.replaceNode(LogicalPlan.this, latestNode, this.joinNode, node);
+      }
+    }
+
     public boolean hasSelectionNode() {
       return this.selectionNode != null;
     }
@@ -511,12 +570,21 @@ public class LogicalPlan {
       this.insertNode = insertNode;
     }
 
+    public List<String> getPlaningHistory() {
+      return planingHistory;
+    }
+
+    public void addHistory(String history) {
+      this.planingHistory.add(history);
+    }
+
     public boolean postVisit(LogicalNode node, Stack<OpType> path) {
       if (nodeMap.containsKey(node.getPID())) {
         return false;
       }
 
       nodeMap.put(node.getPID(), node);
+      updateLatestNode(node);
 
       // if an added operator is a relation, add it to relation set.
       switch (node.getType()) {
@@ -534,6 +602,10 @@ public class LogicalPlan {
           setGroupbyNode((GroupbyNode) node);
           break;
 
+        case JOIN:
+          setJoinNode((JoinNode) node);
+          break;
+
         case SELECTION:
           setSelectionNode((SelectionNode) node);
           break;
@@ -547,8 +619,6 @@ public class LogicalPlan {
           addRelation(tableSubQueryNode);
           break;
       }
-
-      setLatestNode(node);
 
       // if this node is the topmost
       if (path.size() == 0) {
@@ -579,7 +649,7 @@ public class LogicalPlan {
     }
 
     public boolean isTargetResolved(int targetId) {
-      return targetListManager.isEvaluated(targetId);
+      return targetListManager.isResolved(targetId);
     }
 
     public void resolveAllTargetList() {
@@ -603,7 +673,9 @@ public class LogicalPlan {
     }
 
     public void fillTarget(int idx) throws PlanningException {
-      targetListManager.update(idx, planner.createTarget(LogicalPlan.this, this, getProjection().getTargets()[idx]));
+      Target target = planner.createTarget(LogicalPlan.this, this, getProjection().getTargets()[idx]);
+      // below code reaches only when target is created.
+      targetListManager.fill(idx, target);
     }
 
     public boolean checkIfTargetCanBeEvaluated(int targetId, LogicalNode node) {
@@ -712,7 +784,8 @@ public class LogicalPlan {
         } else if (node instanceof GroupbyNode) {
           // Set the current targets to the GroupByNode because the GroupByNode is the last projection operator.
           GroupbyNode groupbyNode = (GroupbyNode) node;
-          groupbyNode.setTargets(getCurrentTargets());
+          groupbyNode.setTargets(targetListManager.getUpdatedTarget(Sets.newHashSet(newEvaluatedTargetIds)));
+          //groupbyNode.setTargets(getCurrentTargets());
           boolean distinct = false;
           for (Target target : groupbyNode.getTargets()) {
             for (AggregationFunctionCallEval aggrFunc : EvalTreeUtil.findDistinctAggFunction(target.getEvalTree())) {

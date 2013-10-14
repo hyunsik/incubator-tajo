@@ -57,9 +57,6 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
   protected final TajoConf conf;
   protected final AbstractStorageManager sm;
 
-  final long threshold = 1048576 * 128; // 64MB
-
-
   public PhysicalPlannerImpl(final TajoConf conf, final AbstractStorageManager sm) {
     this.conf = conf;
     this.sm = sm;
@@ -212,178 +209,19 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
         return createFullOuterJoinPlan(context, joinNode, leftExec, rightExec);
 
       case LEFT_SEMI:
+        return createLeftSemiJoinPlan(context, joinNode, leftExec, rightExec);
+
       case RIGHT_SEMI:
+        return createRightSemiJoinPlan(context, joinNode, leftExec, rightExec);
 
       case LEFT_ANTI:
+        return createLeftAntiJoinPlan(context, joinNode, leftExec, rightExec);
+
       case RIGHT_ANTI:
+        return createRightAntiJoinPlan(context, joinNode, leftExec, rightExec);
 
       default:
         throw new PhysicalPlanningException("Cannot support join type: " + joinNode.getJoinType().name());
-    }
-  }
-
-  private PhysicalExec createLeftOuterJoinPlan(TaskAttemptContext context, JoinNode plan,
-                                           PhysicalExec leftExec, PhysicalExec rightExec) throws IOException {
-    Enforcer enforcer = context.getEnforcer();
-    EnforceProperty property = getAlgorithmEnforceProperty(enforcer, plan);
-    if (property != null) {
-      JoinAlgorithm algorithm = property.getJoin().getAlgorithm();
-      switch (algorithm) {
-        case IN_MEMORY_HASH_JOIN:
-          LOG.info("Left Outer Join (" + plan.getPID() +") chooses [Hash Join].");
-          return new LeftOuterHashJoinExec(context, plan, leftExec, rightExec);
-        case NESTED_LOOP_JOIN:
-          //the right operand is too large, so we opt for NL implementation of left outer join
-          LOG.info("Left Outer Join (" + plan.getPID() +") chooses [Nested Loop Join].");
-          return new LeftOuterNLJoinExec(context, plan, leftExec, rightExec);
-        default:
-          LOG.error("Invalid Left Outer Join Algorithm Enforcer: " + algorithm.name());
-          LOG.error("Choose a fallback inner join algorithm: " + JoinAlgorithm.IN_MEMORY_HASH_JOIN.name());
-          return new LeftOuterHashJoinExec(context, plan, leftExec, rightExec);
-      }
-    } else {
-      return createBestLeftOuterJoinPlan(context, plan, leftExec, rightExec);
-    }
-  }
-
-  private PhysicalExec createBestLeftOuterJoinPlan(TaskAttemptContext context, JoinNode plan,
-                                                   PhysicalExec leftExec, PhysicalExec rightExec) throws IOException {
-    String [] rightLineage = PlannerUtil.getLineage(plan.getRightChild());
-    long rightTableVolume = estimateSizeRecursive(context, rightLineage);
-
-    if (rightTableVolume < threshold) {
-      // we can implement left outer join using hash join, using the right operand as the build relation
-      LOG.info("Left Outer Join (" + plan.getPID() +") chooses [Hash Join].");
-      return new LeftOuterHashJoinExec(context, plan, leftExec, rightExec);
-    }
-    else {
-      //the right operand is too large, so we opt for NL implementation of left outer join
-      LOG.info("Left Outer Join (" + plan.getPID() +") chooses [Nested Loop Join].");
-      return new LeftOuterNLJoinExec(context, plan, leftExec, rightExec);
-    }
-  }
-
-  private PhysicalExec createBestRightJoinPlan(TaskAttemptContext context, JoinNode plan,
-                                               PhysicalExec leftExec, PhysicalExec rightExec) throws IOException {
-    //if the left operand is small enough => implement it as a left outer hash join with exchanged operators (note:
-    // blocking, but merge join is blocking as well)
-    String [] outerLineage4 = PlannerUtil.getLineage(plan.getLeftChild());
-    long outerSize4 = estimateSizeRecursive(context, outerLineage4);
-    if (outerSize4 < threshold){
-      LOG.info("Right Outer Join (" + plan.getPID() +") chooses [Hash Join].");
-      return new LeftOuterHashJoinExec(context, plan, rightExec, leftExec);
-    } else {
-      return createRightOuterMergeJoinPlan(context, plan, leftExec, rightExec);
-    }
-  }
-
-  private PhysicalExec createRightOuterMergeJoinPlan(TaskAttemptContext context, JoinNode plan,
-                                                     PhysicalExec leftExec, PhysicalExec rightExec) throws IOException {
-    //the left operand is too large, so opt for merge join implementation
-    LOG.info("Right Outer Join (" + plan.getPID() +") chooses [Merge Join].");
-    SortSpec[][] sortSpecs2 = PlannerUtil.getSortKeysFromJoinQual(
-        plan.getJoinQual(), leftExec.getSchema(), rightExec.getSchema());
-    ExternalSortExec outerSort2 = new ExternalSortExec(context, sm,
-        new SortNode(UNGENERATED_PID,sortSpecs2[0], leftExec.getSchema(), leftExec.getSchema()), leftExec);
-    ExternalSortExec innerSort2 = new ExternalSortExec(context, sm,
-        new SortNode(UNGENERATED_PID,sortSpecs2[1], rightExec.getSchema(), rightExec.getSchema()), rightExec);
-    return new RightOuterMergeJoinExec(context, plan, outerSort2, innerSort2, sortSpecs2[0], sortSpecs2[1]);
-  }
-
-  private PhysicalExec createRightOuterJoinPlan(TaskAttemptContext context, JoinNode plan,
-                                               PhysicalExec leftExec, PhysicalExec rightExec) throws IOException {
-    Enforcer enforcer = context.getEnforcer();
-    EnforceProperty property = getAlgorithmEnforceProperty(enforcer, plan);
-    if (property != null) {
-      JoinAlgorithm algorithm = property.getJoin().getAlgorithm();
-      switch (algorithm) {
-        case IN_MEMORY_HASH_JOIN:
-          LOG.info("Right Outer Join (" + plan.getPID() +") chooses [Hash Join].");
-          return new LeftOuterHashJoinExec(context, plan, rightExec, leftExec);
-        case MERGE_JOIN:
-          return createRightOuterMergeJoinPlan(context, plan, leftExec, rightExec);
-        default:
-          LOG.error("Invalid Right Outer Join Algorithm Enforcer: " + algorithm.name());
-          LOG.error("Choose a fallback merge join algorithm: " + JoinAlgorithm.MERGE_JOIN.name());
-          return createRightOuterMergeJoinPlan(context, plan, leftExec, rightExec);
-      }
-    } else {
-      return createBestRightJoinPlan(context, plan, leftExec, rightExec);
-    }
-  }
-
-  private PhysicalExec createFullOuterJoinPlan(TaskAttemptContext context, JoinNode plan,
-                                              PhysicalExec leftExec, PhysicalExec rightExec) throws IOException {
-    Enforcer enforcer = context.getEnforcer();
-    EnforceProperty property = getAlgorithmEnforceProperty(enforcer, plan);
-    if (property != null) {
-      JoinAlgorithm algorithm = property.getJoin().getAlgorithm();
-      switch (algorithm) {
-        case IN_MEMORY_HASH_JOIN:
-          return createFullOuterHashJoinPlan(context, plan, leftExec, rightExec);
-
-        case MERGE_JOIN:
-          return createFullOuterMergeJoinPlan(context, plan, leftExec, rightExec);
-
-        default:
-          LOG.error("Invalid Full Outer Join Algorithm Enforcer: " + algorithm.name());
-          LOG.error("Choose a fallback merge join algorithm: " + JoinAlgorithm.MERGE_JOIN.name());
-          return createFullOuterMergeJoinPlan(context, plan, leftExec, rightExec);
-      }
-    } else {
-      return createBestFullOuterJoinPlan(context, plan, leftExec, rightExec);
-    }
-  }
-
-  private FullOuterHashJoinExec createFullOuterHashJoinPlan(TaskAttemptContext context, JoinNode plan,
-                                                            PhysicalExec leftExec, PhysicalExec rightExec)
-      throws IOException {
-    String [] leftLineage = PlannerUtil.getLineage(plan.getLeftChild());
-    String [] rightLineage = PlannerUtil.getLineage(plan.getRightChild());
-    long outerSize2 = estimateSizeRecursive(context, leftLineage);
-    long innerSize2 = estimateSizeRecursive(context, rightLineage);
-
-    PhysicalExec selectedRight;
-    PhysicalExec selectedLeft;
-
-    // HashJoinExec loads the smaller relation to memory.
-    if (outerSize2 <= innerSize2) {
-      selectedLeft = leftExec;
-      selectedRight = rightExec;
-    } else {
-      selectedLeft = rightExec;
-      selectedRight = leftExec;
-    }
-    LOG.info("Full Outer Join (" + plan.getPID() +") chooses [Hash Join]");
-    return new FullOuterHashJoinExec(context, plan, selectedRight, selectedLeft);
-  }
-
-  private FullOuterMergeJoinExec createFullOuterMergeJoinPlan(TaskAttemptContext context, JoinNode plan,
-                                                              PhysicalExec leftExec, PhysicalExec rightExec)
-      throws IOException {
-    // if size too large, full outer merge join implementation
-    LOG.info("Full Outer Join (" + plan.getPID() +") chooses [Merge Join]");
-    SortSpec[][] sortSpecs3 = PlannerUtil.getSortKeysFromJoinQual(plan.getJoinQual(),
-        leftExec.getSchema(), rightExec.getSchema());
-    ExternalSortExec outerSort3 = new ExternalSortExec(context, sm,
-        new SortNode(UNGENERATED_PID,sortSpecs3[0], leftExec.getSchema(), leftExec.getSchema()), leftExec);
-    ExternalSortExec innerSort3 = new ExternalSortExec(context, sm,
-        new SortNode(UNGENERATED_PID,sortSpecs3[1], rightExec.getSchema(), rightExec.getSchema()), rightExec);
-
-    return new FullOuterMergeJoinExec(context, plan, outerSort3, innerSort3, sortSpecs3[0], sortSpecs3[1]);
-  }
-
-  private PhysicalExec createBestFullOuterJoinPlan(TaskAttemptContext context, JoinNode plan,
-                                                   PhysicalExec leftExec, PhysicalExec rightExec) throws IOException {
-    String [] leftLineage = PlannerUtil.getLineage(plan.getLeftChild());
-    String [] rightLineage = PlannerUtil.getLineage(plan.getRightChild());
-    long outerSize2 = estimateSizeRecursive(context, leftLineage);
-    long innerSize2 = estimateSizeRecursive(context, rightLineage);
-    final long threshold = 1048576 * 128;
-    if (outerSize2 < threshold || innerSize2 < threshold) {
-      return createFullOuterHashJoinPlan(context, plan, leftExec, rightExec);
-    } else {
-      return createFullOuterMergeJoinPlan(context, plan, leftExec, rightExec);
     }
   }
 
@@ -433,31 +271,30 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
           return new HashJoinExec(context, plan, leftExec, rightExec);
         case MERGE_JOIN:
           LOG.info("Join (" + plan.getPID() +") chooses [Sort Merge Join]");
-          return createMergeJoin(context, plan, leftExec, rightExec);
+          return createMergeInnerJoin(context, plan, leftExec, rightExec);
         case HYBRID_HASH_JOIN:
 
+          String[] leftLineage = PlannerUtil.getLineage(plan.getLeftChild());
+          String[] rightLineage = PlannerUtil.getLineage(plan.getRightChild());
+          long leftSize = estimateSizeRecursive(context, leftLineage);
+          long rightSize = estimateSizeRecursive(context, rightLineage);
 
-        String[] leftLineage = PlannerUtil.getLineage(plan.getLeftChild());
-        String[] rightLineage = PlannerUtil.getLineage(plan.getRightChild());
-        long leftSize = estimateSizeRecursive(context, leftLineage);
-        long rightSize = estimateSizeRecursive(context, rightLineage);
-
-        PhysicalExec selectedOuter;
-        PhysicalExec selectedInner;
-        if (leftSize <= rightSize) {
-          selectedInner = leftExec;
-          selectedOuter = rightExec;
-        } else {
-          selectedInner = rightExec;
-          selectedOuter = leftExec;
-        }
+          PhysicalExec selectedOuter;
+          PhysicalExec selectedInner;
+          if (leftSize <= rightSize) {
+            selectedInner = leftExec;
+            selectedOuter = rightExec;
+          } else {
+            selectedInner = rightExec;
+            selectedOuter = leftExec;
+          }
           LOG.info("Join (" + plan.getPID() + ") chooses [Hybrid Hash Join]");
-        return new HybridHashJoinExec(context, plan, selectedOuter, selectedInner);
+          return new HybridHashJoinExec(context, plan, selectedOuter, selectedInner);
 
         default:
           LOG.error("Invalid Inner Join Algorithm Enforcer: " + algorithm.name());
           LOG.error("Choose a fallback inner join algorithm: " + JoinAlgorithm.MERGE_JOIN.name());
-          return createMergeJoin(context, plan, leftExec, rightExec);
+          return createMergeInnerJoin(context, plan, leftExec, rightExec);
       }
 
 
@@ -473,7 +310,7 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
     long leftSize = estimateSizeRecursive(context, leftLineage);
     long rightSize = estimateSizeRecursive(context, rightLineage);
 
-    final long threshold = conf.getLongVar(TajoConf.ConfVars.INMEMORY_HASH_JOIN_THRESHOLD);
+    final long threshold = conf.getLongVar(TajoConf.ConfVars.INMEMORY_INNER_HASH_JOIN_THRESHOLD);
 
     boolean hashJoin = false;
     if (leftSize < threshold || rightSize < threshold) {
@@ -496,12 +333,12 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
       LOG.info("Join (" + plan.getPID() +") chooses [InMemory Hash Join]");
       return new HashJoinExec(context, plan, selectedOuter, selectedInner);
     } else {
-      return createMergeJoin(context, plan, leftExec, rightExec);
+      return createMergeInnerJoin(context, plan, leftExec, rightExec);
     }
   }
 
-  private MergeJoinExec createMergeJoin(TaskAttemptContext context, JoinNode plan,
-                                        PhysicalExec leftExec, PhysicalExec rightExec) throws IOException {
+  private MergeJoinExec createMergeInnerJoin(TaskAttemptContext context, JoinNode plan,
+                                             PhysicalExec leftExec, PhysicalExec rightExec) throws IOException {
     SortSpec[][] sortSpecs = PlannerUtil.getSortKeysFromJoinQual(
         plan.getJoinQual(), leftExec.getSchema(), rightExec.getSchema());
     ExternalSortExec outerSort = new ExternalSortExec(context, sm,
@@ -513,6 +350,271 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
 
     LOG.info("Join (" + plan.getPID() +") chooses [Merge Join]");
     return new MergeJoinExec(context, plan, outerSort, innerSort, sortSpecs[0], sortSpecs[1]);
+  }
+
+  private PhysicalExec createLeftOuterJoinPlan(TaskAttemptContext context, JoinNode plan,
+                                               PhysicalExec leftExec, PhysicalExec rightExec) throws IOException {
+    Enforcer enforcer = context.getEnforcer();
+    EnforceProperty property = getAlgorithmEnforceProperty(enforcer, plan);
+    if (property != null) {
+      JoinAlgorithm algorithm = property.getJoin().getAlgorithm();
+      switch (algorithm) {
+        case IN_MEMORY_HASH_JOIN:
+          LOG.info("Left Outer Join (" + plan.getPID() +") chooses [Hash Join].");
+          return new HashLeftOuterJoinExec(context, plan, leftExec, rightExec);
+        case NESTED_LOOP_JOIN:
+          //the right operand is too large, so we opt for NL implementation of left outer join
+          LOG.info("Left Outer Join (" + plan.getPID() +") chooses [Nested Loop Join].");
+          return new NLLeftOuterJoinExec(context, plan, leftExec, rightExec);
+        default:
+          LOG.error("Invalid Left Outer Join Algorithm Enforcer: " + algorithm.name());
+          LOG.error("Choose a fallback inner join algorithm: " + JoinAlgorithm.IN_MEMORY_HASH_JOIN.name());
+          return new HashLeftOuterJoinExec(context, plan, leftExec, rightExec);
+      }
+    } else {
+      return createBestLeftOuterJoinPlan(context, plan, leftExec, rightExec);
+    }
+  }
+
+  private PhysicalExec createBestLeftOuterJoinPlan(TaskAttemptContext context, JoinNode plan,
+                                                   PhysicalExec leftExec, PhysicalExec rightExec) throws IOException {
+    String [] rightLineage = PlannerUtil.getLineage(plan.getRightChild());
+    long rightTableVolume = estimateSizeRecursive(context, rightLineage);
+
+    if (rightTableVolume < conf.getLongVar(TajoConf.ConfVars.INMEMORY_OUTER_HASH_AGGREGATION_THRESHOLD)) {
+      // we can implement left outer join using hash join, using the right operand as the build relation
+      LOG.info("Left Outer Join (" + plan.getPID() +") chooses [Hash Join].");
+      return new HashLeftOuterJoinExec(context, plan, leftExec, rightExec);
+    }
+    else {
+      //the right operand is too large, so we opt for NL implementation of left outer join
+      LOG.info("Left Outer Join (" + plan.getPID() +") chooses [Nested Loop Join].");
+      return new NLLeftOuterJoinExec(context, plan, leftExec, rightExec);
+    }
+  }
+
+  private PhysicalExec createBestRightJoinPlan(TaskAttemptContext context, JoinNode plan,
+                                               PhysicalExec leftExec, PhysicalExec rightExec) throws IOException {
+    //if the left operand is small enough => implement it as a left outer hash join with exchanged operators (note:
+    // blocking, but merge join is blocking as well)
+    String [] outerLineage4 = PlannerUtil.getLineage(plan.getLeftChild());
+    long outerSize = estimateSizeRecursive(context, outerLineage4);
+    if (outerSize < conf.getLongVar(TajoConf.ConfVars.INMEMORY_OUTER_HASH_AGGREGATION_THRESHOLD)){
+      LOG.info("Right Outer Join (" + plan.getPID() +") chooses [Hash Join].");
+      return new HashLeftOuterJoinExec(context, plan, rightExec, leftExec);
+    } else {
+      return createRightOuterMergeJoinPlan(context, plan, leftExec, rightExec);
+    }
+  }
+
+  private PhysicalExec createRightOuterMergeJoinPlan(TaskAttemptContext context, JoinNode plan,
+                                                     PhysicalExec leftExec, PhysicalExec rightExec) throws IOException {
+    //the left operand is too large, so opt for merge join implementation
+    LOG.info("Right Outer Join (" + plan.getPID() +") chooses [Merge Join].");
+    SortSpec[][] sortSpecs2 = PlannerUtil.getSortKeysFromJoinQual(
+        plan.getJoinQual(), leftExec.getSchema(), rightExec.getSchema());
+    ExternalSortExec outerSort2 = new ExternalSortExec(context, sm,
+        new SortNode(UNGENERATED_PID,sortSpecs2[0], leftExec.getSchema(), leftExec.getSchema()), leftExec);
+    ExternalSortExec innerSort2 = new ExternalSortExec(context, sm,
+        new SortNode(UNGENERATED_PID,sortSpecs2[1], rightExec.getSchema(), rightExec.getSchema()), rightExec);
+    return new RightOuterMergeJoinExec(context, plan, outerSort2, innerSort2, sortSpecs2[0], sortSpecs2[1]);
+  }
+
+  private PhysicalExec createRightOuterJoinPlan(TaskAttemptContext context, JoinNode plan,
+                                                PhysicalExec leftExec, PhysicalExec rightExec) throws IOException {
+    Enforcer enforcer = context.getEnforcer();
+    EnforceProperty property = getAlgorithmEnforceProperty(enforcer, plan);
+    if (property != null) {
+      JoinAlgorithm algorithm = property.getJoin().getAlgorithm();
+      switch (algorithm) {
+        case IN_MEMORY_HASH_JOIN:
+          LOG.info("Right Outer Join (" + plan.getPID() +") chooses [Hash Join].");
+          return new HashLeftOuterJoinExec(context, plan, rightExec, leftExec);
+        case MERGE_JOIN:
+          return createRightOuterMergeJoinPlan(context, plan, leftExec, rightExec);
+        default:
+          LOG.error("Invalid Right Outer Join Algorithm Enforcer: " + algorithm.name());
+          LOG.error("Choose a fallback merge join algorithm: " + JoinAlgorithm.MERGE_JOIN.name());
+          return createRightOuterMergeJoinPlan(context, plan, leftExec, rightExec);
+      }
+    } else {
+      return createBestRightJoinPlan(context, plan, leftExec, rightExec);
+    }
+  }
+
+  private PhysicalExec createFullOuterJoinPlan(TaskAttemptContext context, JoinNode plan,
+                                               PhysicalExec leftExec, PhysicalExec rightExec) throws IOException {
+    Enforcer enforcer = context.getEnforcer();
+    EnforceProperty property = getAlgorithmEnforceProperty(enforcer, plan);
+    if (property != null) {
+      JoinAlgorithm algorithm = property.getJoin().getAlgorithm();
+      switch (algorithm) {
+        case IN_MEMORY_HASH_JOIN:
+          return createFullOuterHashJoinPlan(context, plan, leftExec, rightExec);
+
+        case MERGE_JOIN:
+          return createFullOuterMergeJoinPlan(context, plan, leftExec, rightExec);
+
+        default:
+          LOG.error("Invalid Full Outer Join Algorithm Enforcer: " + algorithm.name());
+          LOG.error("Choose a fallback merge join algorithm: " + JoinAlgorithm.MERGE_JOIN.name());
+          return createFullOuterMergeJoinPlan(context, plan, leftExec, rightExec);
+      }
+    } else {
+      return createBestFullOuterJoinPlan(context, plan, leftExec, rightExec);
+    }
+  }
+
+  private HashFullOuterJoinExec createFullOuterHashJoinPlan(TaskAttemptContext context, JoinNode plan,
+                                                            PhysicalExec leftExec, PhysicalExec rightExec)
+      throws IOException {
+    String [] leftLineage = PlannerUtil.getLineage(plan.getLeftChild());
+    String [] rightLineage = PlannerUtil.getLineage(plan.getRightChild());
+    long outerSize2 = estimateSizeRecursive(context, leftLineage);
+    long innerSize2 = estimateSizeRecursive(context, rightLineage);
+
+    PhysicalExec selectedRight;
+    PhysicalExec selectedLeft;
+
+    // HashJoinExec loads the smaller relation to memory.
+    if (outerSize2 <= innerSize2) {
+      selectedLeft = leftExec;
+      selectedRight = rightExec;
+    } else {
+      selectedLeft = rightExec;
+      selectedRight = leftExec;
+    }
+    LOG.info("Full Outer Join (" + plan.getPID() +") chooses [Hash Join]");
+    return new HashFullOuterJoinExec(context, plan, selectedRight, selectedLeft);
+  }
+
+  private MergeFullOuterJoinExec createFullOuterMergeJoinPlan(TaskAttemptContext context, JoinNode plan,
+                                                              PhysicalExec leftExec, PhysicalExec rightExec)
+      throws IOException {
+    // if size too large, full outer merge join implementation
+    LOG.info("Full Outer Join (" + plan.getPID() +") chooses [Merge Join]");
+    SortSpec[][] sortSpecs3 = PlannerUtil.getSortKeysFromJoinQual(plan.getJoinQual(),
+        leftExec.getSchema(), rightExec.getSchema());
+    ExternalSortExec outerSort3 = new ExternalSortExec(context, sm,
+        new SortNode(UNGENERATED_PID,sortSpecs3[0], leftExec.getSchema(), leftExec.getSchema()), leftExec);
+    ExternalSortExec innerSort3 = new ExternalSortExec(context, sm,
+        new SortNode(UNGENERATED_PID,sortSpecs3[1], rightExec.getSchema(), rightExec.getSchema()), rightExec);
+
+    return new MergeFullOuterJoinExec(context, plan, outerSort3, innerSort3, sortSpecs3[0], sortSpecs3[1]);
+  }
+
+  private PhysicalExec createBestFullOuterJoinPlan(TaskAttemptContext context, JoinNode plan,
+                                                   PhysicalExec leftExec, PhysicalExec rightExec) throws IOException {
+    String [] leftLineage = PlannerUtil.getLineage(plan.getLeftChild());
+    String [] rightLineage = PlannerUtil.getLineage(plan.getRightChild());
+    long outerSize2 = estimateSizeRecursive(context, leftLineage);
+    long innerSize2 = estimateSizeRecursive(context, rightLineage);
+    final long threshold = 1048576 * 128;
+    if (outerSize2 < threshold || innerSize2 < threshold) {
+      return createFullOuterHashJoinPlan(context, plan, leftExec, rightExec);
+    } else {
+      return createFullOuterMergeJoinPlan(context, plan, leftExec, rightExec);
+    }
+  }
+
+  /**
+   *  Left semi join means that the left side is the IN side table, and the right side is the FROM side table.
+   */
+  private PhysicalExec createLeftSemiJoinPlan(TaskAttemptContext context, JoinNode plan,
+                                              PhysicalExec leftExec, PhysicalExec rightExec) throws IOException {
+    Enforcer enforcer = context.getEnforcer();
+    EnforceProperty property = getAlgorithmEnforceProperty(enforcer, plan);
+    if (property != null) {
+      JoinAlgorithm algorithm = property.getJoin().getAlgorithm();
+      switch (algorithm) {
+        case IN_MEMORY_HASH_JOIN:
+          LOG.info("Left Semi Join (" + plan.getPID() +") chooses [In Memory Hash Join].");
+          return new HashLeftSemiJoinExec(context, plan, leftExec, rightExec);
+
+        default:
+          LOG.error("Invalid Left Semi Join Algorithm Enforcer: " + algorithm.name());
+          LOG.error("Choose a fallback inner join algorithm: " + JoinAlgorithm.IN_MEMORY_HASH_JOIN.name());
+          return new HashLeftOuterJoinExec(context, plan, leftExec, rightExec);
+      }
+    } else {
+      LOG.info("Left Semi Join (" + plan.getPID() +") chooses [In Memory Hash Join].");
+      return new HashLeftSemiJoinExec(context, plan, leftExec, rightExec);
+    }
+  }
+
+  /**
+   *  Left semi join means that the left side is the FROM side table, and the right side is the IN side table.
+   */
+  private PhysicalExec createRightSemiJoinPlan(TaskAttemptContext context, JoinNode plan,
+                                               PhysicalExec leftExec, PhysicalExec rightExec) throws IOException {
+    Enforcer enforcer = context.getEnforcer();
+    EnforceProperty property = getAlgorithmEnforceProperty(enforcer, plan);
+    if (property != null) {
+      JoinAlgorithm algorithm = property.getJoin().getAlgorithm();
+      switch (algorithm) {
+        case IN_MEMORY_HASH_JOIN:
+          LOG.info("Left Semi Join (" + plan.getPID() +") chooses [In Memory Hash Join].");
+          return new HashLeftSemiJoinExec(context, plan, rightExec, leftExec);
+
+        default:
+          LOG.error("Invalid Left Semi Join Algorithm Enforcer: " + algorithm.name());
+          LOG.error("Choose a fallback inner join algorithm: " + JoinAlgorithm.IN_MEMORY_HASH_JOIN.name());
+          return new HashLeftOuterJoinExec(context, plan, rightExec, leftExec);
+      }
+    } else {
+      LOG.info("Left Semi Join (" + plan.getPID() +") chooses [In Memory Hash Join].");
+      return new HashLeftSemiJoinExec(context, plan, rightExec, leftExec);
+    }
+  }
+
+  /**
+   *  Left semi join means that the left side is the FROM side table, and the right side is the IN side table.
+   */
+  private PhysicalExec createLeftAntiJoinPlan(TaskAttemptContext context, JoinNode plan,
+                                              PhysicalExec leftExec, PhysicalExec rightExec) throws IOException {
+    Enforcer enforcer = context.getEnforcer();
+    EnforceProperty property = getAlgorithmEnforceProperty(enforcer, plan);
+    if (property != null) {
+      JoinAlgorithm algorithm = property.getJoin().getAlgorithm();
+      switch (algorithm) {
+        case IN_MEMORY_HASH_JOIN:
+          LOG.info("Left Semi Join (" + plan.getPID() +") chooses [In Memory Hash Join].");
+          return new HashLeftAntiJoinExec(context, plan, leftExec, rightExec);
+
+        default:
+          LOG.error("Invalid Left Semi Join Algorithm Enforcer: " + algorithm.name());
+          LOG.error("Choose a fallback inner join algorithm: " + JoinAlgorithm.IN_MEMORY_HASH_JOIN.name());
+          return new HashLeftAntiJoinExec(context, plan, leftExec, rightExec);
+      }
+    } else {
+      LOG.info("Left Semi Join (" + plan.getPID() +") chooses [In Memory Hash Join].");
+      return new HashLeftAntiJoinExec(context, plan, leftExec, rightExec);
+    }
+  }
+
+  /**
+   *  Left semi join means that the left side is the FROM side table, and the right side is the IN side table.
+   */
+  private PhysicalExec createRightAntiJoinPlan(TaskAttemptContext context, JoinNode plan,
+                                               PhysicalExec leftExec, PhysicalExec rightExec) throws IOException {
+    Enforcer enforcer = context.getEnforcer();
+    EnforceProperty property = getAlgorithmEnforceProperty(enforcer, plan);
+    if (property != null) {
+      JoinAlgorithm algorithm = property.getJoin().getAlgorithm();
+      switch (algorithm) {
+        case IN_MEMORY_HASH_JOIN:
+          LOG.info("Left Semi Join (" + plan.getPID() +") chooses [In Memory Hash Join].");
+          return new HashLeftSemiJoinExec(context, plan, rightExec, leftExec);
+
+        default:
+          LOG.error("Invalid Left Semi Join Algorithm Enforcer: " + algorithm.name());
+          LOG.error("Choose a fallback inner join algorithm: " + JoinAlgorithm.IN_MEMORY_HASH_JOIN.name());
+          return new HashLeftOuterJoinExec(context, plan, rightExec, leftExec);
+      }
+    } else {
+      LOG.info("Left Semi Join (" + plan.getPID() +") chooses [In Memory Hash Join].");
+      return new HashLeftSemiJoinExec(context, plan, rightExec, leftExec);
+    }
   }
 
   public PhysicalExec createStorePlan(TaskAttemptContext ctx,

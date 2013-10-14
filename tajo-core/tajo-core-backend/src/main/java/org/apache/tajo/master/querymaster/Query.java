@@ -352,13 +352,14 @@ public class Query implements EventHandler<QueryEvent> {
               catalog.addTable(finalTableDesc);
             }
             query.setResultDesc(finalTableDesc);
+            query.finished(QueryState.QUERY_SUCCEEDED);
             query.eventHandler.handle(new QueryFinishEvent(query.getId()));
           }
           histogramBytes = Long.MAX_VALUE;
           histogram = null;
           histogramCount = 0;
 
-          return query.finished(QueryState.QUERY_SUCCEEDED);
+          return QueryState.QUERY_SUCCEEDED;
         }
       } else {
         histogramBytes = Long.MAX_VALUE;
