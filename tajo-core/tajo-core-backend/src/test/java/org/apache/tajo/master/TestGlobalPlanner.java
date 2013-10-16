@@ -75,7 +75,7 @@ public class TestGlobalPlanner {
       stat.setNumBytes(volumes[i]);
       m.setStat(stat);
 
-      TableDesc d = CatalogUtil.newTableDesc(tables[i], m, new Path("file:///"));
+      TableDesc d = CatalogUtil.newTableDesc(tables[i], m, new Path("/"));
       catalog.addTable(d);
     }
 
@@ -118,7 +118,7 @@ public class TestGlobalPlanner {
 
   @Test
   public void testMultipleJoin() throws Exception {
-    buildPlan(FileUtil.readTextFile(new File("src/test/queries/tpch_q2_simplified.tql")));
+    buildPlan(FileUtil.readTextFile(new File("src/test/queries/tpch_q2_simplified.sql")));
   }
 
   @Test
@@ -192,12 +192,7 @@ public class TestGlobalPlanner {
   }
 
   @Test
-  public void testInsertOverwriteWithUnion1() throws Exception {
-    buildPlan(FileUtil.readTextFile(new File("src/test/queries/complex_union_3.sql")));
-  }
-
-  @Test
   public void testTPCH_Q5() throws Exception {
-    buildPlan(FileUtil.readTextFile(new File("benchmark/tpch/q5.tql")));
+    buildPlan(FileUtil.readTextFile(new File("benchmark/tpch/q5.sql")));
   }
 }

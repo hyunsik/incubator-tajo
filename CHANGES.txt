@@ -4,6 +4,8 @@ Release 0.2.0 - unreleased
 
   NEW FEATURES
 
+    TAJO-99: Design the interface of join enumeration algorithm. (hyunsik)
+
     TAJO-179: Support MySQL CatalogStore. (jinho)
 
     TAJO-147: Implement trim(text), ltrim(text), and rtrim(text) function.
@@ -49,6 +51,8 @@ Release 0.2.0 - unreleased
     TAJO-33: Implement a basic query progress indicator. (hyunsik)
 
   IMPROVEMENTS
+
+    TAJO-253: Clean up tajo-default.xml in test resource. (hyunsik)
 
     TAJO-239: Improving web UI. (Keuntae Park via hyunsik)
 
@@ -195,7 +199,25 @@ Release 0.2.0 - unreleased
 
   BUG FIXES
 
-    TAJO-240: Reformat HiveConverter source code to match adopted conventions (jaehwa)   
+    TAJO-169: the default TAJO_WORKER_STANDBY_MODE in tajo-env.sh is wrong. 
+    (hyunsik)
+
+    TAJO-231: In StorageManger v2, TestCSVCompression incurs unexpected end of 
+    stream occasionally. (hyunsik)
+
+    TAJO-250: QueryMaster must send the query finish heartbeat. (hyunsik)
+
+    TAJO-245: org.apache.tajo.algebra.FunctionExpr cannot be cast to 
+    org.apache.tajo.algebra.ColumnReferenceExpr. (hyunsik)
+
+    TAJO-243: The 'tajo_dump' does not include options of table. (jinho)
+
+    TAJO-244: assignToNonLeafTasks causes NPE occurs occasionally. (hyunsik)
+
+    TAJO-242: Enable omitted broadcast join feature after TAJO-184. (hyunsik)
+
+    TAJO-240: Reformat HiveConverter source code to match adopted conventions 
+    (jaehwa)   
 
     TAJO-241: Does not reconnect the meta store. (jinho)
 
@@ -296,3 +318,9 @@ Release 0.2.0 - unreleased
     TAJO-6: Rename tajo.engine.function.builtin.NewSumInt to SumInt. (rsumbaly)
 
     TAJO-21: CREATE EXTERNAL TABLE should support a file path. (JaeHwa Jung)
+
+  TASKS
+
+    TAJO-252: Add DISCLAIMER file. (hyunsik)
+
+    TAJO-251: Rename the legacy name *.tql to *.sql. (hyunsik)

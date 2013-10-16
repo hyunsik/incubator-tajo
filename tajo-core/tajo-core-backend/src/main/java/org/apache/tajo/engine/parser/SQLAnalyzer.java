@@ -691,7 +691,7 @@ public class SQLAnalyzer extends SQLParserBaseVisitor<Expr> {
 
   @Override
   public IsNullPredicate visitNull_predicate(SQLParser.Null_predicateContext ctx) {
-    ColumnReferenceExpr predicand = (ColumnReferenceExpr) visit(ctx.numeric_value_expression());
+    Expr predicand = visit(ctx.numeric_value_expression());
     return new IsNullPredicate(ctx.NOT() != null, predicand);
   }
 
@@ -1075,9 +1075,7 @@ public class SQLAnalyzer extends SQLParserBaseVisitor<Expr> {
     for (Map.Entry<String, String> entry : map.entrySet()) {
       if (entry.getKey().equals(CSVFile.DELIMITER)) {
         params.put(entry.getKey(), escapeDelimiter(entry.getValue()));
-      } else if (entry.getKey().equals(CSVFile.NULL)) {
-        params.put(entry.getKey(), StringEscapeUtils.unescapeJava(entry.getValue()));
-      } else {
+      }  else {
         params.put(entry.getKey(), entry.getValue());
       }
     }
