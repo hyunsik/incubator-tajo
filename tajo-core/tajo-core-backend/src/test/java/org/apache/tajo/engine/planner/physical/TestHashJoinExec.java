@@ -21,7 +21,8 @@ package org.apache.tajo.engine.planner.physical;
 import org.apache.hadoop.fs.Path;
 import org.apache.tajo.LocalTajoTestingUtility;
 import org.apache.tajo.TajoTestingCluster;
-import org.apache.tajo.TaskAttemptContext;
+import org.apache.tajo.storage.fragment.FileFragment;
+import org.apache.tajo.worker.TaskAttemptContext;
 import org.apache.tajo.algebra.Expr;
 import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.proto.CatalogProtos.StoreType;
@@ -76,12 +77,12 @@ public class TestHashJoinExec {
     employeeSchema.addColumn("memId", Type.INT4);
     employeeSchema.addColumn("deptName", Type.TEXT);
 
-    TableMeta employeeMeta = CatalogUtil.newTableMeta(employeeSchema,
-        StoreType.CSV);
+    TableMeta employeeMeta = CatalogUtil.newTableMeta(StoreType.CSV);
     Path employeePath = new Path(testDir, "employee.csv");
-    Appender appender = StorageManagerFactory.getStorageManager(conf).getAppender(employeeMeta, employeePath);
+    Appender appender = StorageManagerFactory.getStorageManager(conf).getAppender(employeeMeta, employeeSchema,
+        employeePath);
     appender.init();
-    Tuple tuple = new VTuple(employeeMeta.getSchema().getColumnNum());
+    Tuple tuple = new VTuple(employeeSchema.getColumnNum());
     for (int i = 0; i < 10; i++) {
       tuple.put(new Datum[] { DatumFactory.createInt4(i),
           DatumFactory.createInt4(i), DatumFactory.createInt4(10 + i),
@@ -91,7 +92,7 @@ public class TestHashJoinExec {
 
     appender.flush();
     appender.close();
-    employee = CatalogUtil.newTableDesc("employee", employeeMeta, employeePath);
+    employee = CatalogUtil.newTableDesc("employee", employeeSchema, employeeMeta, employeePath);
     catalog.addTable(employee);
 
     Schema peopleSchema = new Schema();
@@ -99,11 +100,11 @@ public class TestHashJoinExec {
     peopleSchema.addColumn("fk_memId", Type.INT4);
     peopleSchema.addColumn("name", Type.TEXT);
     peopleSchema.addColumn("age", Type.INT4);
-    TableMeta peopleMeta = CatalogUtil.newTableMeta(peopleSchema, StoreType.CSV);
+    TableMeta peopleMeta = CatalogUtil.newTableMeta(StoreType.CSV);
     Path peoplePath = new Path(testDir, "people.csv");
-    appender = StorageManagerFactory.getStorageManager(conf).getAppender(peopleMeta, peoplePath);
+    appender = StorageManagerFactory.getStorageManager(conf).getAppender(peopleMeta, peopleSchema, peoplePath);
     appender.init();
-    tuple = new VTuple(peopleMeta.getSchema().getColumnNum());
+    tuple = new VTuple(peopleSchema.getColumnNum());
     for (int i = 1; i < 10; i += 2) {
       tuple.put(new Datum[] { DatumFactory.createInt4(i),
           DatumFactory.createInt4(10 + i),
@@ -115,7 +116,7 @@ public class TestHashJoinExec {
     appender.flush();
     appender.close();
 
-    people = CatalogUtil.newTableDesc("people", peopleMeta, peoplePath);
+    people = CatalogUtil.newTableDesc("people", peopleSchema, peopleMeta, peoplePath);
     catalog.addTable(people);
     analyzer = new SQLAnalyzer();
     planner = new LogicalPlanner(catalog);
@@ -140,9 +141,9 @@ public class TestHashJoinExec {
     Enforcer enforcer = new Enforcer();
     enforcer.enforceJoinAlgorithm(joinNode.getPID(), JoinAlgorithm.IN_MEMORY_HASH_JOIN);
 
-    Fragment[] empFrags = StorageManager.splitNG(conf, "e", employee.getMeta(), employee.getPath(), Integer.MAX_VALUE);
-    Fragment[] peopleFrags = StorageManager.splitNG(conf, "p", people.getMeta(), people.getPath(), Integer.MAX_VALUE);
-    Fragment[] merged = TUtil.concat(empFrags, peopleFrags);
+    FileFragment[] empFrags = StorageManager.splitNG(conf, "e", employee.getMeta(), employee.getPath(), Integer.MAX_VALUE);
+    FileFragment[] peopleFrags = StorageManager.splitNG(conf, "p", people.getMeta(), people.getPath(), Integer.MAX_VALUE);
+    FileFragment[] merged = TUtil.concat(empFrags, peopleFrags);
 
     Path workDir = CommonTestingUtil.getTestDir("target/test-data/testHashInnerJoin");
     TaskAttemptContext ctx = new TaskAttemptContext(conf,

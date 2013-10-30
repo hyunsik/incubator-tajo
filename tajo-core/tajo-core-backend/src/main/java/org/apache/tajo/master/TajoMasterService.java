@@ -29,7 +29,7 @@ import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.ipc.TajoMasterProtocol;
 import org.apache.tajo.master.querymaster.QueryJobManager;
 import org.apache.tajo.master.rm.WorkerResource;
-import org.apache.tajo.rpc.ProtoAsyncRpcServer;
+import org.apache.tajo.rpc.AsyncRpcServer;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.BoolProto;
 import org.apache.tajo.util.NetUtils;
@@ -43,7 +43,7 @@ public class TajoMasterService extends AbstractService {
   private final TajoMaster.MasterContext context;
   private final TajoConf conf;
   private final TajoMasterServiceHandler masterHandler;
-  private ProtoAsyncRpcServer server;
+  private AsyncRpcServer server;
   private InetSocketAddress bindAddress;
 
   private final BoolProto BOOL_TRUE = BoolProto.newBuilder().setValue(true).build();
@@ -58,16 +58,16 @@ public class TajoMasterService extends AbstractService {
 
   @Override
   public void start() {
-    String confMasterServiceAddr = conf.getVar(TajoConf.ConfVars.TAJO_MASTER_SERVICE_ADDRESS);
+    String confMasterServiceAddr = conf.getVar(TajoConf.ConfVars.TAJO_MASTER_UMBILICAL_RPC_ADDRESS);
     InetSocketAddress initIsa = NetUtils.createSocketAddr(confMasterServiceAddr);
     try {
-      server = new ProtoAsyncRpcServer(TajoMasterProtocol.class, masterHandler, initIsa);
+      server = new AsyncRpcServer(TajoMasterProtocol.class, masterHandler, initIsa);
     } catch (Exception e) {
       LOG.error(e);
     }
     server.start();
     bindAddress = NetUtils.getConnectAddress(server.getListenAddress());
-    this.conf.setVar(TajoConf.ConfVars.TAJO_MASTER_SERVICE_ADDRESS,
+    this.conf.setVar(TajoConf.ConfVars.TAJO_MASTER_UMBILICAL_RPC_ADDRESS,
         NetUtils.normalizeInetSocketAddress(bindAddress));
     LOG.info("Instantiated TajoMasterService at " + this.bindAddress);
     super.start();
@@ -93,7 +93,8 @@ public class TajoMasterService extends AbstractService {
         RpcController controller,
         TajoMasterProtocol.TajoHeartbeat request, RpcCallback<TajoMasterProtocol.TajoHeartbeatResponse> done) {
       if(LOG.isDebugEnabled()) {
-        LOG.debug("Received QueryHeartbeat:" + request.getTajoWorkerHost() + ":" + request.getTajoWorkerPort());
+        LOG.debug("Received QueryHeartbeat:" + request.getTajoWorkerHost() + ":" +
+            request.getTajoQueryMasterPort() + ":" + request.getPeerRpcPort());
       }
 
       TajoMasterProtocol.TajoHeartbeatResponse.ResponseCommand command = null;
@@ -137,9 +138,10 @@ public class TajoMasterService extends AbstractService {
       List<TajoMasterProtocol.WorkerResourceProto> workerResources = request.getWorkerResourcesList();
       for(TajoMasterProtocol.WorkerResourceProto eachWorkerResource: workerResources) {
         WorkerResource workerResource = new WorkerResource();
-        String[] tokens = eachWorkerResource.getWorkerHostAndPort().split(":");
-        workerResource.setAllocatedHost(tokens[0]);
-        workerResource.setManagerPort(Integer.parseInt(tokens[1]));
+        workerResource.setAllocatedHost(eachWorkerResource.getHost());
+
+        workerResource.setPeerRpcPort(eachWorkerResource.getPeerRpcPort());
+        workerResource.setQueryMasterPort(eachWorkerResource.getQueryMasterPort());
         workerResource.setMemoryMBSlots(eachWorkerResource.getMemoryMBSlots());
         workerResource.setDiskSlots(eachWorkerResource.getDiskSlots());
 

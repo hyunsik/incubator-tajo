@@ -20,7 +20,6 @@ package org.apache.tajo.engine.planner;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import org.apache.hadoop.fs.Path;
 import org.apache.tajo.TajoTestingCluster;
 import org.apache.tajo.algebra.Expr;
 import org.apache.tajo.algebra.JoinType;
@@ -35,6 +34,7 @@ import org.apache.tajo.engine.json.CoreGsonHelper;
 import org.apache.tajo.engine.parser.SQLAnalyzer;
 import org.apache.tajo.engine.planner.logical.*;
 import org.apache.tajo.master.TajoMaster;
+import org.apache.tajo.util.CommonTestingUtil;
 import org.apache.tajo.util.FileUtil;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -75,14 +75,14 @@ public class TestLogicalPlanner {
     schema3.addColumn("deptname", Type.TEXT);
     schema3.addColumn("score", Type.INT4);
 
-    TableMeta meta = CatalogUtil.newTableMeta(schema, StoreType.CSV);
-    TableDesc people = new TableDescImpl("employee", meta, new Path("/"));
+    TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV);
+    TableDesc people = new TableDesc("employee", schema, meta, CommonTestingUtil.getTestDir());
     catalog.addTable(people);
 
-    TableDesc student = new TableDescImpl("dept", schema2, StoreType.CSV, new Options(), new Path("/"));
+    TableDesc student = new TableDesc("dept", schema2, StoreType.CSV, new Options(), CommonTestingUtil.getTestDir());
     catalog.addTable(student);
 
-    TableDesc score = new TableDescImpl("score", schema3, StoreType.CSV, new Options(), new Path("/"));
+    TableDesc score = new TableDesc("score", schema3, StoreType.CSV, new Options(), CommonTestingUtil.getTestDir());
     catalog.addTable(score);
 
     FunctionDesc funcDesc = new FunctionDesc("sumtest", SumInt.class, FunctionType.AGGREGATION,
@@ -98,8 +98,8 @@ public class TestLogicalPlanner {
     tpch.loadSchemas();
     tpch.loadOutSchema();
     for (String table : tpchTables) {
-      TableMeta m = CatalogUtil.newTableMeta(tpch.getSchema(table), StoreType.CSV);
-      TableDesc d = CatalogUtil.newTableDesc(table, m, new Path("/"));
+      TableMeta m = CatalogUtil.newTableMeta(StoreType.CSV);
+      TableDesc d = CatalogUtil.newTableDesc(table, tpch.getSchema(table), m, CommonTestingUtil.getTestDir());
       catalog.addTable(d);
     }
 
@@ -832,7 +832,7 @@ public class TestLogicalPlanner {
   public void testJsonSerDerObject(LogicalNode rootNode) {
     String json = rootNode.toJson();
     LogicalNode fromJson = CoreGsonHelper.fromJson(json, LogicalNode.class);
-    assertEquals("JSON (de) serialization equivalence check", rootNode, fromJson);
+    assertTrue("JSON (de) serialization equivalence check", rootNode.deepEquals(fromJson));
   }
 
   // Table descriptions

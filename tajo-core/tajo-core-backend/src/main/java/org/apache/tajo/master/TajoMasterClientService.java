@@ -31,10 +31,7 @@ import org.apache.tajo.QueryIdFactory;
 import org.apache.tajo.TajoIdProtos;
 import org.apache.tajo.TajoProtos;
 import org.apache.tajo.catalog.*;
-import org.apache.tajo.catalog.exception.AlreadyExistsTableException;
 import org.apache.tajo.catalog.exception.NoSuchTableException;
-import org.apache.tajo.catalog.proto.CatalogProtos.TableDescProto;
-import org.apache.tajo.catalog.statistics.TableStat;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.conf.TajoConf.ConfVars;
 import org.apache.tajo.ipc.ClientProtos;
@@ -45,8 +42,7 @@ import org.apache.tajo.master.TajoMaster.MasterContext;
 import org.apache.tajo.master.querymaster.QueryInProgress;
 import org.apache.tajo.master.querymaster.QueryInfo;
 import org.apache.tajo.master.querymaster.QueryJobManager;
-import org.apache.tajo.rpc.ProtoBlockingRpcServer;
-import org.apache.tajo.rpc.RemoteException;
+import org.apache.tajo.rpc.BlockingRpcServer;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.BoolProto;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.StringProto;
 import org.apache.tajo.util.NetUtils;
@@ -61,7 +57,7 @@ public class TajoMasterClientService extends AbstractService {
   private final TajoConf conf;
   private final CatalogService catalog;
   private final TajoMasterClientProtocolServiceHandler clientHandler;
-  private ProtoBlockingRpcServer server;
+  private BlockingRpcServer server;
   private InetSocketAddress bindAddress;
 
   private final BoolProto BOOL_TRUE =
@@ -81,16 +77,16 @@ public class TajoMasterClientService extends AbstractService {
   public void start() {
 
     // start the rpc server
-    String confClientServiceAddr = conf.getVar(ConfVars.CLIENT_SERVICE_ADDRESS);
+    String confClientServiceAddr = conf.getVar(ConfVars.TAJO_MASTER_CLIENT_RPC_ADDRESS);
     InetSocketAddress initIsa = NetUtils.createSocketAddr(confClientServiceAddr);
     try {
-      server = new ProtoBlockingRpcServer(TajoMasterClientProtocol.class, clientHandler, initIsa);
+      server = new BlockingRpcServer(TajoMasterClientProtocol.class, clientHandler, initIsa);
     } catch (Exception e) {
       LOG.error(e);
     }
     server.start();
     bindAddress = NetUtils.getConnectAddress(server.getListenAddress());
-    this.conf.setVar(ConfVars.CLIENT_SERVICE_ADDRESS, NetUtils.normalizeInetSocketAddress(bindAddress));
+    this.conf.setVar(ConfVars.TAJO_MASTER_CLIENT_RPC_ADDRESS, NetUtils.normalizeInetSocketAddress(bindAddress));
     LOG.info("Instantiated TajoMasterClientService at " + this.bindAddress);
     super.start();
   }
@@ -287,26 +283,49 @@ public class TajoMasterClientService extends AbstractService {
       String name = request.getTableName();
       if (catalog.existsTable(name)) {
         return TableResponse.newBuilder()
-            .setTableDesc((TableDescProto) catalog.getTableDesc(name).getProto())
+            .setResultCode(ResultCode.OK)
+            .setTableDesc(catalog.getTableDesc(name).getProto())
             .build();
       } else {
-        return null;
+        return TableResponse.newBuilder()
+            .setResultCode(ResultCode.ERROR)
+            .setErrorMessage("ERROR: no such a table: " + request.getTableName())
+            .build();
       }
     }
 
     @Override
-    public TableResponse createTable(RpcController controller, CreateTableRequest request)
+    public TableResponse createExternalTable(RpcController controller, CreateTableRequest request)
         throws ServiceException {
-      Path path = new Path(request.getPath());
-      TableMeta meta = new TableMetaImpl(request.getMeta());
-      TableDesc desc;
       try {
-        desc = context.getGlobalEngine().createTable(request.getName(), meta, path);
-      } catch (Exception e) {
-        return TableResponse.newBuilder().setErrorMessage(e.getMessage()).build();
-      }
+        Path path = new Path(request.getPath());
+        FileSystem fs = path.getFileSystem(conf);
 
-      return TableResponse.newBuilder().setTableDesc((TableDescProto) desc.getProto()).build();
+        if (!fs.exists(path)) {
+          throw new IOException("No such a directory: " + path);
+        }
+
+        Schema schema = new Schema(request.getSchema());
+        TableMeta meta = new TableMeta(request.getMeta());
+
+        TableDesc desc;
+        try {
+          desc = context.getGlobalEngine().createTableOnDirectory(request.getName(), schema, meta, path,
+              false);
+        } catch (Exception e) {
+          return TableResponse.newBuilder()
+              .setResultCode(ResultCode.ERROR)
+              .setErrorMessage(e.getMessage()).build();
+        }
+
+        return TableResponse.newBuilder()
+            .setResultCode(ResultCode.OK)
+            .setTableDesc(desc.getProto()).build();
+      } catch (IOException ioe) {
+        return TableResponse.newBuilder()
+            .setResultCode(ResultCode.ERROR)
+            .setErrorMessage(ioe.getMessage()).build();
+      }
     }
 
     @Override
@@ -315,53 +334,6 @@ public class TajoMasterClientService extends AbstractService {
         throws ServiceException {
       context.getGlobalEngine().dropTable(tableNameProto.getValue());
       return BOOL_TRUE;
-    }
-
-    @Override
-    public TableResponse attachTable(RpcController controller,
-                                     AttachTableRequest request)
-        throws ServiceException {
-
-      TableDesc desc;
-      if (catalog.existsTable(request.getName())) {
-        throw new AlreadyExistsTableException(request.getName());
-      }
-
-      Path tablePath = new Path(request.getPath());
-
-      LOG.info(tablePath.toUri());
-
-      TableMeta meta;
-      try {
-        meta = TableUtil.getTableMeta(conf, tablePath);
-      } catch (IOException e) {
-        throw new RemoteException(e);
-      }
-
-      if (meta.getStat() == null) {
-        long totalSize;
-        try {
-          FileSystem fs = tablePath.getFileSystem(conf);
-          totalSize = fs.getContentSummary(tablePath).getSpaceConsumed();
-        } catch (IOException e) {
-          LOG.error("Cannot get the volume of the table", e);
-          return null;
-        }
-
-        meta = new TableMetaImpl(meta.getProto());
-        TableStat stat = new TableStat();
-        stat.setNumBytes(totalSize);
-        meta.setStat(stat);
-      }
-
-      desc = new TableDescImpl(request.getName(), meta, tablePath);
-      catalog.addTable(desc);
-      LOG.info("Table " + desc.getName() + " is attached ("
-          + meta.getStat().getNumBytes() + ")");
-
-      return TableResponse.newBuilder().
-          setTableDesc((TableDescProto) desc.getProto())
-          .build();
     }
 
     @Override

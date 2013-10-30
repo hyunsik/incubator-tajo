@@ -26,12 +26,14 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.tajo.catalog.Column;
+import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.catalog.TableMeta;
-import org.apache.tajo.catalog.statistics.TableStat;
+import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.conf.TajoConf.ConfVars;
 import org.apache.tajo.datum.Datum;
 import org.apache.tajo.datum.DatumFactory;
 import org.apache.tajo.storage.exception.AlreadyExistsStorageException;
+import org.apache.tajo.storage.fragment.FileFragment;
 import org.apache.tajo.util.BitArray;
 
 import java.io.FileNotFoundException;
@@ -65,9 +67,9 @@ public class RowFile {
     private int numBitsOfNullFlags;
     private long bufferStartPos;
 
-    public RowFileScanner(Configuration conf, final TableMeta meta,
-                          final Fragment fragment) throws IOException {
-      super(conf, meta, fragment);
+    public RowFileScanner(Configuration conf, final Schema schema, final TableMeta meta, final FileFragment fragment)
+        throws IOException {
+      super(conf, schema, meta, fragment);
 
       SYNC_INTERVAL =
           conf.getInt(ConfVars.RAWFILE_SYNC_INTERVAL.varname,
@@ -75,8 +77,8 @@ public class RowFile {
       numBitsOfNullFlags = (int) Math.ceil(((double)schema.getColumnNum()));
       nullFlags = new BitArray(numBitsOfNullFlags);
       tupleHeaderSize = nullFlags.bytesLength() + (2 * Short.SIZE/8);
-      this.start = fragment.getStartOffset();
-      this.end = this.start + fragment.getLength();
+      this.start = fragment.getStartKey();
+      this.end = this.start + fragment.getEndKey();
     }
 
     public void init() throws IOException {
@@ -323,9 +325,9 @@ public class RowFile {
     // statistics
     private TableStatistics stats;
 
-    public RowFileAppender(Configuration conf, final TableMeta meta, final Path path)
+    public RowFileAppender(Configuration conf, final Schema schema, final TableMeta meta, final Path path)
         throws IOException {
-      super(conf, meta, path);
+      super(conf, schema, meta, path);
     }
 
     public void init() throws IOException {
@@ -495,7 +497,7 @@ public class RowFile {
     }
 
     @Override
-    public TableStat getStats() {
+    public TableStats getStats() {
       if (enabledStats) {
         return stats.getTableStat();
       } else {

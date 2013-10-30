@@ -30,13 +30,13 @@ import org.apache.tajo.QueryId;
 import org.apache.tajo.QueryUnitAttemptId;
 import org.apache.tajo.TajoIdProtos;
 import org.apache.tajo.conf.TajoConf;
+import org.apache.tajo.engine.query.QueryContext;
 import org.apache.tajo.ipc.TajoWorkerProtocol;
-import org.apache.tajo.master.QueryContext;
 import org.apache.tajo.master.TaskSchedulerImpl;
 import org.apache.tajo.master.event.*;
 import org.apache.tajo.master.querymaster.QueryMaster;
 import org.apache.tajo.master.querymaster.QueryMasterTask;
-import org.apache.tajo.rpc.ProtoAsyncRpcServer;
+import org.apache.tajo.rpc.AsyncRpcServer;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos;
 import org.apache.tajo.util.NetUtils;
 
@@ -46,12 +46,10 @@ public class TajoWorkerManagerService extends CompositeService
     implements TajoWorkerProtocol.TajoWorkerProtocolService.Interface {
   private static final Log LOG = LogFactory.getLog(TajoWorkerManagerService.class.getName());
 
-  private ProtoAsyncRpcServer rpcServer;
+  private AsyncRpcServer rpcServer;
   private InetSocketAddress bindAddr;
   private String addr;
   private int port;
-
-  private QueryMaster queryMaster;
 
   private TajoWorker.WorkerContext workerContext;
 
@@ -61,12 +59,9 @@ public class TajoWorkerManagerService extends CompositeService
     this.port = port;
   }
 
-  public QueryMaster getQueryMaster() {
-    return queryMaster;
-  }
-
   @Override
   public void init(Configuration conf) {
+    TajoConf tajoConf = (TajoConf) conf;
     try {
       // Setup RPC server
       InetSocketAddress initIsa =
@@ -75,25 +70,20 @@ public class TajoWorkerManagerService extends CompositeService
         throw new IllegalArgumentException("Failed resolve of " + initIsa);
       }
 
-      this.rpcServer = new ProtoAsyncRpcServer(TajoWorkerProtocol.class, this, initIsa);
+      this.rpcServer = new AsyncRpcServer(TajoWorkerProtocol.class, this, initIsa);
       this.rpcServer.start();
 
       this.bindAddr = NetUtils.getConnectAddress(rpcServer.getListenAddress());
       this.addr = bindAddr.getHostName() + ":" + bindAddr.getPort();
 
       this.port = bindAddr.getPort();
-
-      queryMaster = new QueryMaster(workerContext);
-      addService(queryMaster);
-
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
     // Get the master address
     LOG.info("TajoWorkerManagerService is bind to " + addr);
-    ((TajoConf)conf).setVar(TajoConf.ConfVars.TASKRUNNER_LISTENER_ADDRESS, addr);
-
-    super.init(conf);
+    tajoConf.setVar(TajoConf.ConfVars.WORKER_PEER_RPC_ADDRESS, NetUtils.normalizeInetSocketAddress(bindAddr));
+    super.init(tajoConf);
   }
 
   @Override
@@ -119,96 +109,10 @@ public class TajoWorkerManagerService extends CompositeService
   }
 
   @Override
-  public void getTask(RpcController controller, TajoWorkerProtocol.GetTaskRequestProto request,
-                      RpcCallback<TajoWorkerProtocol.QueryUnitRequestProto> done) {
-    try {
-      ExecutionBlockId ebId = new ExecutionBlockId(request.getExecutionBlockId());
-      QueryMasterTask queryMasterTask = workerContext.getQueryMaster().getQueryMasterTask(ebId.getQueryId());
-      ContainerId cid =
-          queryMasterTask.getQueryTaskContext().getResourceAllocator().makeContainerId(request.getContainerId());
-
-      if(queryMasterTask == null || queryMasterTask.isStopped()) {
-        LOG.debug("getTask:" + cid + ", ebId:" + ebId + ", but query is finished.");
-        done.run(TaskSchedulerImpl.stopTaskRunnerReq);
-      } else {
-        LOG.debug("getTask:" + cid + ", ebId:" + ebId);
-        queryMasterTask.handleTaskRequestEvent(new TaskRequestEvent(cid, ebId, done));
-      }
-    } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
-    }
-  }
-
-  @Override
-  public void statusUpdate(RpcController controller, TajoWorkerProtocol.TaskStatusProto request,
-                           RpcCallback<PrimitiveProtos.BoolProto> done) {
-    try {
-      QueryMasterTask queryMasterTask = queryMaster.getQueryMasterTask(
-          new QueryId(request.getId().getQueryUnitId().getExecutionBlockId().getQueryId()));
-      queryMasterTask.getEventHandler().handle(
-          new TaskAttemptStatusUpdateEvent(new QueryUnitAttemptId(request.getId()), request));
-      done.run(TajoWorker.TRUE_PROTO);
-    } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
-      done.run(TajoWorker.FALSE_PROTO);
-    }
-  }
-
-  @Override
   public void ping(RpcController controller,
                    TajoIdProtos.QueryUnitAttemptIdProto attemptId,
                    RpcCallback<PrimitiveProtos.BoolProto> done) {
-    // TODO - to be completed
-//      QueryUnitAttemptId attemptId = new QueryUnitAttemptId(attemptIdProto);
-//    context.getQuery(attemptId.getQueryId()).getSubQuery(attemptId.getExecutionBlockId()).
-//        getQueryUnit(attemptId.getQueryUnitId()).getAttempt(attemptId).
-//        resetExpireTime();
     done.run(TajoWorker.TRUE_PROTO);
-  }
-
-  @Override
-  public void fatalError(RpcController controller, TajoWorkerProtocol.TaskFatalErrorReport report,
-                         RpcCallback<PrimitiveProtos.BoolProto> done) {
-    try {
-      QueryMasterTask queryMasterTask = queryMaster.getQueryMasterTask(
-          new QueryId(report.getId().getQueryUnitId().getExecutionBlockId().getQueryId()));
-      queryMasterTask.getEventHandler().handle(new TaskFatalErrorEvent(report));
-      done.run(TajoWorker.TRUE_PROTO);
-    } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
-      done.run(TajoWorker.FALSE_PROTO);
-    }
-  }
-
-  @Override
-  public void done(RpcController controller, TajoWorkerProtocol.TaskCompletionReport report,
-                   RpcCallback<PrimitiveProtos.BoolProto> done) {
-    try {
-      QueryMasterTask queryMasterTask = queryMaster.getQueryMasterTask(
-          new QueryId(report.getId().getQueryUnitId().getExecutionBlockId().getQueryId()));
-      queryMasterTask.getEventHandler().handle(new TaskCompletionEvent(report));
-      done.run(TajoWorker.TRUE_PROTO);
-    } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
-      done.run(TajoWorker.FALSE_PROTO);
-    }
-  }
-
-  @Override
-  public void executeQuery(RpcController controller,
-                           TajoWorkerProtocol.QueryExecutionRequestProto request,
-                           RpcCallback<PrimitiveProtos.BoolProto> done) {
-    try {
-      QueryId queryId = new QueryId(request.getQueryId());
-      LOG.info("Receive executeQuery request:" + queryId);
-      queryMaster.handle(new QueryStartEvent(queryId,
-          new QueryContext(request.getQueryContext()), request.getSql().getValue(),
-          request.getLogicalPlanJson().getValue()));
-      done.run(TajoWorker.TRUE_PROTO);
-    } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
-      done.run(TajoWorker.FALSE_PROTO);
-    }
   }
 
   @Override

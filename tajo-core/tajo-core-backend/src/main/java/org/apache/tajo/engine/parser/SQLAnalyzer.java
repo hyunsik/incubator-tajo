@@ -28,8 +28,6 @@ import org.apache.tajo.algebra.*;
 import org.apache.tajo.algebra.Aggregation.GroupType;
 import org.apache.tajo.algebra.LiteralValue.LiteralType;
 import org.apache.tajo.engine.parser.SQLParser.*;
-import org.apache.tajo.engine.query.exception.SQLParseError;
-import org.apache.tajo.engine.query.exception.SQLSyntaxError;
 import org.apache.tajo.storage.CSVFile;
 
 import java.util.HashMap;
@@ -413,6 +411,15 @@ public class SQLAnalyzer extends SQLParserBaseVisitor<Expr> {
   }
 
   @Override
+  public BetweenPredicate visitBetween_predicate(SQLParser.Between_predicateContext ctx) {
+    Expr predicand = visitRow_value_predicand(ctx.predicand);
+    Expr begin = visitRow_value_predicand(ctx.between_predicate_part_2().begin);
+    Expr end = visitRow_value_predicand(ctx.between_predicate_part_2().end);
+    return new BetweenPredicate(checkIfExist(ctx.between_predicate_part_2().NOT()),
+        checkIfExist(ctx.between_predicate_part_2().SYMMETRIC()), predicand, begin, end);
+  }
+
+  @Override
   public CaseWhenPredicate visitSimple_case(SQLParser.Simple_caseContext ctx) {
     Expr leftTerm = visitBoolean_value_expression(ctx.boolean_value_expression());
     CaseWhenPredicate caseWhen = new CaseWhenPredicate();
@@ -507,7 +514,24 @@ public class SQLAnalyzer extends SQLParserBaseVisitor<Expr> {
 
   @Override
   public Expr visitBoolean_test(SQLParser.Boolean_testContext ctx) {
-    return visitBoolean_primary(ctx.boolean_primary());
+    if (checkIfExist(ctx.is_clause())) {
+      Is_clauseContext isClauseContext = ctx.is_clause();
+      if (checkIfExist(isClauseContext.NOT())) {
+        if (checkIfExist(ctx.is_clause().truth_value().TRUE())) {
+          return new NotExpr(visitBoolean_primary(ctx.boolean_primary()));
+        } else {
+          return visitBoolean_primary(ctx.boolean_primary());
+        }
+      } else {
+        if (checkIfExist(ctx.is_clause().truth_value().TRUE())) {
+          return visitBoolean_primary(ctx.boolean_primary());
+        } else {
+          return new NotExpr(visitBoolean_primary(ctx.boolean_primary()));
+        }
+      }
+    } else {
+      return visitBoolean_primary(ctx.boolean_primary());
+    }
   }
 
   @Override

@@ -18,21 +18,23 @@
 
 package org.apache.tajo.master;
 
-import org.apache.hadoop.fs.Path;
 import org.apache.tajo.LocalTajoTestingUtility;
 import org.apache.tajo.TajoTestingCluster;
 import org.apache.tajo.algebra.Expr;
 import org.apache.tajo.benchmark.TPCH;
 import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.proto.CatalogProtos;
-import org.apache.tajo.catalog.statistics.TableStat;
+import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.engine.parser.SQLAnalyzer;
 import org.apache.tajo.engine.planner.LogicalOptimizer;
 import org.apache.tajo.engine.planner.LogicalPlan;
 import org.apache.tajo.engine.planner.LogicalPlanner;
 import org.apache.tajo.engine.planner.PlanningException;
+import org.apache.tajo.engine.planner.global.GlobalPlanner;
 import org.apache.tajo.engine.planner.global.MasterPlan;
+import org.apache.tajo.engine.query.QueryContext;
 import org.apache.tajo.storage.StorageManagerFactory;
+import org.apache.tajo.util.CommonTestingUtil;
 import org.apache.tajo.util.FileUtil;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -70,12 +72,11 @@ public class TestGlobalPlanner {
     tpch.loadSchemas();
     tpch.loadOutSchema();
     for (int i = 0; i < tables.length; i++) {
-      TableMeta m = CatalogUtil.newTableMeta(tpch.getSchema(tables[i]), CatalogProtos.StoreType.CSV);
-      TableStat stat = new TableStat();
-      stat.setNumBytes(volumes[i]);
-      m.setStat(stat);
-
-      TableDesc d = CatalogUtil.newTableDesc(tables[i], m, new Path("/"));
+      TableMeta m = CatalogUtil.newTableMeta(CatalogProtos.StoreType.CSV);
+      TableStats stats = new TableStats();
+      stats.setNumBytes(volumes[i]);
+      TableDesc d = CatalogUtil.newTableDesc(tables[i], tpch.getSchema(tables[i]), m, CommonTestingUtil.getTestDir());
+      d.setStats(stats);
       catalog.addTable(d);
     }
 

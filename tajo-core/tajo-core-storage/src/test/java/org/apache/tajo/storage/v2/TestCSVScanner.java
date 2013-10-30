@@ -29,6 +29,7 @@ import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.datum.Datum;
 import org.apache.tajo.datum.DatumFactory;
 import org.apache.tajo.storage.*;
+import org.apache.tajo.storage.fragment.FileFragment;
 import org.apache.tajo.util.CommonTestingUtil;
 import org.junit.After;
 import org.junit.Before;
@@ -36,6 +37,7 @@ import org.junit.Test;
 
 import java.io.IOException;
 
+import static org.apache.tajo.conf.TajoConf.ConfVars;
 import static org.junit.Assert.assertEquals;
 
 public class TestCSVScanner {
@@ -48,7 +50,7 @@ public class TestCSVScanner {
   @Before
   public void setUp() throws Exception {
     conf = new TajoConf();
-    conf.set("tajo.storage.manager.v2", "true");
+    conf.setBoolVar(ConfVars.STORAGE_MANAGER_VERSION_2, true);
     testDir = CommonTestingUtil.getTestDir(TEST_PATH);
     fs = testDir.getFileSystem(conf);
     sm = StorageManagerFactory.getStorageManager(conf, testDir);
@@ -65,7 +67,7 @@ public class TestCSVScanner {
     schema.addColumn("age", TajoDataTypes.Type.INT4);
     schema.addColumn("name", TajoDataTypes.Type.TEXT);
 
-    TableMeta meta = CatalogUtil.newTableMeta(schema, CatalogProtos.StoreType.CSV);
+    TableMeta meta = CatalogUtil.newTableMeta(CatalogProtos.StoreType.CSV);
 
     Tuple[] tuples = new Tuple[4];
     for(int i=0; i < tuples.length; i++) {
@@ -78,14 +80,14 @@ public class TestCSVScanner {
 
     Path path = StorageUtil.concatPath(testDir, "testGetScannerAndAppender", "table.csv");
     fs.mkdirs(path.getParent());
-    Appender appender = StorageManagerFactory.getStorageManager(conf).getAppender(meta, path);
+    Appender appender = StorageManagerFactory.getStorageManager(conf).getAppender(meta, schema, path);
     appender.init();
     for(Tuple t : tuples) {
       appender.addTuple(t);
     }
     appender.close();
 
-    Scanner scanner = StorageManagerFactory.getStorageManager(conf).getScanner(meta, path);
+    Scanner scanner = StorageManagerFactory.getStorageManager(conf).getFileScanner(meta, schema, path);
     scanner.init();
     int i=0;
     Tuple tuple = null;
@@ -102,12 +104,12 @@ public class TestCSVScanner {
     schema.addColumn("age", TajoDataTypes.Type.INT4);
     schema.addColumn("name", TajoDataTypes.Type.TEXT);
 
-    TableMeta meta = CatalogUtil.newTableMeta(schema, CatalogProtos.StoreType.CSV);
+    TableMeta meta = CatalogUtil.newTableMeta(CatalogProtos.StoreType.CSV);
 
 
     Path path = StorageUtil.concatPath(testDir, "testPartitionFile", "table.csv");
     fs.mkdirs(path.getParent());
-    Appender appender = StorageManagerFactory.getStorageManager(conf).getAppender(meta, path);
+    Appender appender = StorageManagerFactory.getStorageManager(conf).getAppender(meta, schema, path);
     appender.init();
 
     String keyValue = "";
@@ -143,8 +145,8 @@ public class TestCSVScanner {
       long startOffset = (64 * 1024 * 1024) * scanCount;
       long length = Math.min(64 * 1024 * 1024, fileLength - startOffset);
 
-      Fragment fragment = new Fragment("Test", path, meta, startOffset, length, null, null);
-      Scanner scanner = StorageManagerFactory.getStorageManager(conf).getScanner(meta, fragment, schema);
+      FileFragment fragment = new FileFragment("Test", path, startOffset, length, null, null);
+      Scanner scanner = StorageManagerFactory.getStorageManager(conf).getScanner(meta, schema, fragment, schema);
       scanner.init();
       Tuple tuple = null;
       while( (tuple = scanner.next()) != null) {

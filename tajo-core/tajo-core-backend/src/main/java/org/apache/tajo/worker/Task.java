@@ -19,53 +19,46 @@
 package org.apache.tajo.worker;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocalDirAllocator;
-import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.util.ConverterUtils;
-import org.apache.tajo.DataChannel;
 import org.apache.tajo.QueryUnitAttemptId;
 import org.apache.tajo.TajoConstants;
 import org.apache.tajo.TajoProtos.TaskAttemptState;
-import org.apache.tajo.TaskAttemptContext;
 import org.apache.tajo.catalog.Schema;
+import org.apache.tajo.catalog.TableDesc;
 import org.apache.tajo.catalog.TableMeta;
-import org.apache.tajo.catalog.statistics.TableStat;
+import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.conf.TajoConf;
-import org.apache.tajo.engine.exception.UnfinishedTaskException;
 import org.apache.tajo.engine.json.CoreGsonHelper;
 import org.apache.tajo.engine.planner.PlannerUtil;
-import org.apache.tajo.engine.planner.logical.LogicalNode;
-import org.apache.tajo.engine.planner.logical.SortNode;
-import org.apache.tajo.engine.planner.logical.StoreTableNode;
+import org.apache.tajo.engine.planner.logical.*;
 import org.apache.tajo.engine.planner.physical.PhysicalExec;
+import org.apache.tajo.engine.query.QueryContext;
+import org.apache.tajo.engine.query.QueryUnitRequest;
+import org.apache.tajo.ipc.QueryMasterProtocol.QueryMasterProtocolService;
 import org.apache.tajo.ipc.TajoWorkerProtocol.*;
-import org.apache.tajo.ipc.TajoWorkerProtocol.TajoWorkerProtocolService.Interface;
-import org.apache.tajo.ipc.protocolrecords.QueryUnitRequest;
-import org.apache.tajo.master.QueryContext;
 import org.apache.tajo.rpc.NullCallback;
-import org.apache.tajo.storage.Fragment;
 import org.apache.tajo.storage.StorageUtil;
 import org.apache.tajo.storage.TupleComparator;
+import org.apache.tajo.storage.fragment.FileFragment;
 import org.apache.tajo.util.ApplicationIdUtils;
 
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.text.NumberFormat;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import static org.apache.tajo.catalog.proto.CatalogProtos.FragmentProto;
 
 public class Task {
   private static final Log LOG = LogFactory.getLog(Task.class);
@@ -74,7 +67,7 @@ public class Task {
   private final QueryContext queryContext;
   private final FileSystem localFS;
   private final TaskRunner.TaskRunnerContext taskRunnerContext;
-  private final Interface masterProxy;
+  private final QueryMasterProtocolService.Interface masterProxy;
   private final LocalDirAllocator lDirAllocator;
   private final QueryUnitAttemptId taskId;
 
@@ -83,6 +76,7 @@ public class Task {
   private final TaskAttemptContext context;
   private List<Fetcher> fetcherRunners;
   private final LogicalNode plan;
+  private final Map<String, TableDesc> descs = Maps.newHashMap();
   private PhysicalExec executor;
   private boolean interQuery;
   private boolean killed = false;
@@ -131,7 +125,8 @@ public class Task {
       };
 
   public Task(QueryUnitAttemptId taskId,
-              final TaskRunner.TaskRunnerContext worker, final Interface masterProxy,
+              final TaskRunner.TaskRunnerContext worker,
+              final QueryMasterProtocolService.Interface masterProxy,
               final QueryUnitRequest request) throws IOException {
     this.request = request;
     this.reporter = new Reporter(masterProxy);
@@ -148,19 +143,24 @@ public class Task {
         taskId.getQueryUnitId().getId() + "_" + taskId.getId());
 
     this.context = new TaskAttemptContext(systemConf, taskId,
-        request.getFragments().toArray(new Fragment[request.getFragments().size()]),
-        taskDir);
+        request.getFragments().toArray(new FragmentProto[request.getFragments().size()]), taskDir);
     this.context.setDataChannel(request.getDataChannel());
     this.context.setEnforcer(request.getEnforcer());
 
     plan = CoreGsonHelper.fromJson(request.getSerializedData(), LogicalNode.class);
+    LogicalNode [] scanNode = PlannerUtil.findAllNodes(plan, NodeType.SCAN);
+    for (LogicalNode node : scanNode) {
+      ScanNode scan = (ScanNode)node;
+      descs.put(scan.getCanonicalName(), scan.getTableDesc());
+    }
+
     interQuery = request.getProto().getInterQuery();
     if (interQuery) {
       context.setInterQuery();
       StoreTableNode store = (StoreTableNode) plan;
       this.partitionType = store.getPartitionType();
       if (partitionType == PartitionType.RANGE_PARTITION) {
-        SortNode sortNode = (SortNode) store.getChild();
+        SortNode sortNode = store.getChild();
         this.finalSchema = PlannerUtil.sortSpecsToSchema(sortNode.getSortKeys());
         this.sortComp = new TupleComparator(finalSchema, sortNode.getSortKeys());
       }
@@ -182,10 +182,6 @@ public class Task {
         + (interQuery ? ", Use " + this.partitionType  + " partitioning":""));
 
     LOG.info("* Fragments (num: " + request.getFragments().size() + ")");
-    for (Fragment f: request.getFragments()) {
-      LOG.info("Table Id:" + f.getName() + ", path:" + f.getPath() + "(" + f.getMeta().getStoreType() + "), " +
-          "(start:" + f.getStartOffset() + ", length: " + f.getLength() + ")");
-    }
     LOG.info("* Fetches (total:" + request.getFetches().size() + ") :");
     for (Fetch f : request.getFetches()) {
       LOG.info("Table Id: " + f.getName() + ", url: " + f.getUrls());
@@ -237,25 +233,6 @@ public class Task {
 
   public void localize(QueryUnitRequest request) throws IOException {
     fetcherRunners = getFetchRunners(context, request.getFetches());
-
-    List<Fragment> cached = Lists.newArrayList();
-    for (Fragment frag : request.getFragments()) {
-      if (frag.isDistCached()) {
-        cached.add(frag);
-      }
-    }
-
-    if (cached.size() > 0) {
-      Path inFile;
-
-      int i = fetcherRunners.size();
-      for (Fragment cache : cached) {
-        inFile = new Path(inputTableBaseDir, "in_" + i);
-        taskRunnerContext.getDefaultFS().copyToLocalFile(cache.getPath(), inFile);
-        cache.setPath(inFile);
-        i++;
-      }
-    }
   }
 
   public QueryUnitAttemptId getId() {
@@ -300,12 +277,11 @@ public class Task {
 
   public void cleanUp() {
     // remove itself from worker
-    // 끝난건지 확인
+
     if (context.getState() == TaskAttemptState.TA_SUCCEEDED) {
       try {
         // context.getWorkDir() 지우기
         localFS.delete(context.getWorkDir(), true);
-        // tasks에서 자기 지우기
         synchronized (taskRunnerContext.getTasks()) {
           taskRunnerContext.getTasks().remove(this.getId());
         }
@@ -313,8 +289,7 @@ public class Task {
         e.printStackTrace();
       }
     } else {
-      LOG.error(new UnfinishedTaskException("QueryUnitAttemptId: "
-          + context.getTaskId() + " status: " + context.getState()));
+      LOG.error("QueryUnitAttemptId: " + context.getTaskId() + " status: " + context.getState());
     }
   }
 
@@ -334,7 +309,7 @@ public class Task {
     if (context.hasResultStats()) {
       builder.setResultStats(context.getResultStats().getProto());
     } else {
-      builder.setResultStats(new TableStat().getProto());
+      builder.setResultStats(new TableStats().getProto());
     }
 
     Iterator<Entry<Integer,String>> it = context.getRepartitions();
@@ -356,9 +331,8 @@ public class Task {
     Collection<String> inputs = Lists.newArrayList(context.getInputTables());
     for (String inputTable: inputs) {
       File tableDir = new File(context.getFetchIn(), inputTable);
-      Fragment [] frags = localizeFetchedData(tableDir, inputTable,
-          context.getTable(inputTable).getMeta());
-      context.changeFragment(inputTable, frags);
+      FileFragment[] frags = localizeFetchedData(tableDir, inputTable, descs.get(inputTable).getMeta());
+      context.updateAssignedFragments(inputTable, frags);
     }
   }
 
@@ -452,26 +426,26 @@ public class Task {
     return false;
   }
 
-  private Fragment[] localizeFetchedData(File file, String name, TableMeta meta)
+  private FileFragment[] localizeFetchedData(File file, String name, TableMeta meta)
       throws IOException {
     Configuration c = new Configuration(systemConf);
-    c.set("fs.default.name", "file:///");
+    c.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, "file:///");
     FileSystem fs = FileSystem.get(c);
     Path tablePath = new Path(file.getAbsolutePath());
 
-    List<Fragment> listTablets = new ArrayList<Fragment>();
-    Fragment tablet;
+    List<FileFragment> listTablets = new ArrayList<FileFragment>();
+    FileFragment tablet;
 
     FileStatus[] fileLists = fs.listStatus(tablePath);
     for (FileStatus f : fileLists) {
       if (f.getLen() == 0) {
         continue;
       }
-      tablet = new Fragment(name, f.getPath(), meta, 0l, f.getLen());
+      tablet = new FileFragment(name, f.getPath(), 0l, f.getLen());
       listTablets.add(tablet);
     }
 
-    Fragment[] tablets = new Fragment[listTablets.size()];
+    FileFragment[] tablets = new FileFragment[listTablets.size()];
     listTablets.toArray(tablets);
 
     return tablets;
@@ -552,12 +526,12 @@ public class Task {
   }
 
   protected class Reporter implements Runnable {
-    private Interface masterStub;
+    private QueryMasterProtocolService.Interface masterStub;
     private Thread pingThread;
     private Object lock = new Object();
     private static final int PROGRESS_INTERVAL = 3000;
 
-    public Reporter(Interface masterStub) {
+    public Reporter(QueryMasterProtocolService.Interface masterStub) {
       this.masterStub = masterStub;
     }
 

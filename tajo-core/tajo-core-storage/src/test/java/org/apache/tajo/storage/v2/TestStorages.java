@@ -26,13 +26,14 @@ import org.apache.tajo.catalog.Options;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.catalog.TableMeta;
 import org.apache.tajo.catalog.proto.CatalogProtos.StoreType;
-import org.apache.tajo.catalog.statistics.TableStat;
+import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.common.TajoDataTypes.Type;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.datum.Datum;
 import org.apache.tajo.datum.DatumFactory;
 import org.apache.tajo.datum.NullDatum;
 import org.apache.tajo.storage.*;
+import org.apache.tajo.storage.fragment.FileFragment;
 import org.apache.tajo.storage.rcfile.RCFile;
 import org.apache.tajo.util.CommonTestingUtil;
 import org.junit.Test;
@@ -43,6 +44,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 
+import static org.apache.tajo.conf.TajoConf.ConfVars;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -63,7 +65,7 @@ public class TestStorages {
     this.statsable = statsable;
 
     conf = new TajoConf();
-    conf.set("tajo.storage.manager.v2", "true");
+    conf.setBoolVar(ConfVars.STORAGE_MANAGER_VERSION_2, true);
 
     if (storeType == StoreType.RCFILE) {
       conf.setInt(RCFile.RECORD_INTERVAL_CONF_STR, 100);
@@ -91,9 +93,9 @@ public class TestStorages {
       schema.addColumn("id", Type.INT4);
       schema.addColumn("age", Type.INT8);
 
-      TableMeta meta = CatalogUtil.newTableMeta(schema, storeType);
+      TableMeta meta = CatalogUtil.newTableMeta(storeType);
       Path tablePath = new Path(testDir, "Splitable.data");
-      Appender appender = StorageManagerFactory.getStorageManager(conf).getAppender(meta, tablePath);
+      Appender appender = StorageManagerFactory.getStorageManager(conf).getAppender(meta, schema, tablePath);
       appender.enableStats();
       appender.init();
       int tupleNum = 10000;
@@ -106,18 +108,18 @@ public class TestStorages {
         appender.addTuple(vTuple);
       }
       appender.close();
-      TableStat stat = appender.getStats();
+      TableStats stat = appender.getStats();
       assertEquals(tupleNum, stat.getNumRows().longValue());
 
       FileStatus status = fs.getFileStatus(tablePath);
       long fileLen = status.getLen();
       long randomNum = (long) (Math.random() * fileLen) + 1;
 
-      Fragment[] tablets = new Fragment[2];
-      tablets[0] = new Fragment("Splitable", tablePath, meta, 0, randomNum);
-      tablets[1] = new Fragment("Splitable", tablePath, meta, randomNum, (fileLen - randomNum));
+      FileFragment[] tablets = new FileFragment[2];
+      tablets[0] = new FileFragment("Splitable", tablePath, 0, randomNum);
+      tablets[1] = new FileFragment("Splitable", tablePath, randomNum, (fileLen - randomNum));
 
-      Scanner scanner = StorageManagerFactory.getStorageManager(conf).getScanner(meta, tablets[0], schema);
+      Scanner scanner = StorageManagerFactory.getStorageManager(conf).getScanner(meta, schema, tablets[0], schema);
       scanner.init();
       int tupleCnt = 0;
       while (scanner.next() != null) {
@@ -125,7 +127,7 @@ public class TestStorages {
       }
       scanner.close();
 
-      scanner = StorageManagerFactory.getStorageManager(conf).getScanner(meta, tablets[1], schema);
+      scanner = StorageManagerFactory.getStorageManager(conf).getScanner(meta, schema, tablets[1], schema);
       scanner.init();
       while (scanner.next() != null) {
         tupleCnt++;
@@ -143,10 +145,10 @@ public class TestStorages {
     schema.addColumn("age", Type.INT8);
     schema.addColumn("score", Type.FLOAT4);
 
-    TableMeta meta = CatalogUtil.newTableMeta(schema, storeType);
+    TableMeta meta = CatalogUtil.newTableMeta(storeType);
 
     Path tablePath = new Path(testDir, "testProjection.data");
-    Appender appender = StorageManagerFactory.getStorageManager(conf).getAppender(meta, tablePath);
+    Appender appender = StorageManagerFactory.getStorageManager(conf).getAppender(meta, schema, tablePath);
     appender.init();
     int tupleNum = 10000;
     VTuple vTuple;
@@ -161,12 +163,12 @@ public class TestStorages {
     appender.close();
 
     FileStatus status = fs.getFileStatus(tablePath);
-    Fragment fragment = new Fragment("testReadAndWrite", tablePath, meta, 0, status.getLen());
+    FileFragment fragment = new FileFragment("testReadAndWrite", tablePath, 0, status.getLen());
 
     Schema target = new Schema();
     target.addColumn("age", Type.INT8);
     target.addColumn("score", Type.FLOAT4);
-    Scanner scanner = StorageManagerFactory.getStorageManager(conf).getScanner(meta, fragment, target);
+    Scanner scanner = StorageManagerFactory.getStorageManager(conf).getScanner(meta, schema, fragment, target);
     scanner.init();
     int tupleCnt = 0;
     Tuple tuple;
@@ -200,10 +202,10 @@ public class TestStorages {
     schema.addColumn("col12", Type.NULL);
 
     Options options = new Options();
-    TableMeta meta = CatalogUtil.newTableMeta(schema, storeType, options);
+    TableMeta meta = CatalogUtil.newTableMeta(storeType, options);
 
     Path tablePath = new Path(testDir, "testVariousTypes.data");
-    Appender appender = StorageManagerFactory.getStorageManager(conf).getAppender(meta, tablePath);
+    Appender appender = StorageManagerFactory.getStorageManager(conf).getAppender(meta, schema, tablePath);
     appender.init();
 
     Tuple tuple = new VTuple(12);
@@ -226,8 +228,8 @@ public class TestStorages {
     appender.close();
 
     FileStatus status = fs.getFileStatus(tablePath);
-    Fragment fragment = new Fragment("table", tablePath, meta, 0, status.getLen());
-    Scanner scanner =  StorageManagerFactory.getStorageManager(conf).getScanner(meta, fragment);
+    FileFragment fragment = new FileFragment("table", tablePath, 0, status.getLen());
+    Scanner scanner =  StorageManagerFactory.getStorageManager(conf).getScanner(meta, schema, fragment);
     scanner.init();
 
     Tuple retrieved;

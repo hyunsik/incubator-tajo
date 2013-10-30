@@ -25,12 +25,14 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.compress.DefaultCodec;
 import org.apache.tajo.catalog.Column;
+import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.catalog.TableMeta;
-import org.apache.tajo.catalog.statistics.TableStat;
+import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.datum.DatumFactory;
 import org.apache.tajo.datum.ProtobufDatumFactory;
 import org.apache.tajo.storage.*;
 import org.apache.tajo.storage.exception.AlreadyExistsStorageException;
+import org.apache.tajo.storage.fragment.FileFragment;
 import org.apache.tajo.util.Bytes;
 import org.apache.tajo.util.TUtil;
 
@@ -47,8 +49,8 @@ public class RCFileWrapper {
 
     private TableStatistics stats = null;
 
-    public RCFileAppender(Configuration conf, TableMeta meta, Path path) throws IOException {
-      super(conf, meta, path);
+    public RCFileAppender(Configuration conf, Schema schema, TableMeta meta, Path path) throws IOException {
+      super(conf, schema, meta, path);
     }
 
     public void init() throws IOException {
@@ -148,7 +150,7 @@ public class RCFileWrapper {
     }
 
     @Override
-    public TableStat getStats() {
+    public TableStats getStats() {
       if (enabledStats) {
         return stats.getTableStat();
       } else {
@@ -167,13 +169,13 @@ public class RCFileWrapper {
     private boolean more;
     long end;
 
-    public RCFileScanner(Configuration conf, final TableMeta meta,
-                          final Fragment fragment) throws IOException {
-      super(conf, meta, fragment);
+    public RCFileScanner(Configuration conf, final Schema schema, final TableMeta meta, final FileFragment fragment)
+        throws IOException {
+      super(conf, schema, meta, fragment);
       fs = fragment.getPath().getFileSystem(conf);
 
-      end = fragment.getStartOffset() + fragment.getLength();
-      more = fragment.getStartOffset() < end;
+      end = fragment.getStartKey() + fragment.getEndKey();
+      more = fragment.getStartKey() < end;
 
       rowId = new LongWritable();
       column = new BytesRefArrayWritable();
@@ -188,8 +190,8 @@ public class RCFileWrapper {
       prepareProjection(targets);
 
       reader = new RCFile.Reader(fs, fragment.getPath(), conf);
-      if (fragment.getStartOffset() > reader.getPosition()) {
-        reader.sync(fragment.getStartOffset()); // sync to start
+      if (fragment.getStartKey() > reader.getPosition()) {
+        reader.sync(fragment.getStartKey()); // sync to start
       }
 
       super.init();

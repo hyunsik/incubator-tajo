@@ -4,6 +4,13 @@ Release 0.2.0 - unreleased
 
   NEW FEATURES
 
+    TAJO-267: Implement equals() and deepEquals() functions at LogicalNode. 
+    (jihoon)
+
+    TAJO-260: Add between predicate. (hyunsik)
+
+    TAJO-208: Implement char_length(string) function. (hyunsik)
+
     TAJO-99: Design the interface of join enumeration algorithm. (hyunsik)
 
     TAJO-179: Support MySQL CatalogStore. (jinho)
@@ -51,6 +58,28 @@ Release 0.2.0 - unreleased
     TAJO-33: Implement a basic query progress indicator. (hyunsik)
 
   IMPROVEMENTS
+
+    TAJO-287: Improve Fragment to be more generic. (hyunsik)
+
+    TAJO-274: Maintaining connectivity to Tajo master regardless of the restart
+    of the Tajo master. (Keuntae Park via hyunsik)
+
+    TAJO-287: Refactor TableDesc, TableMeta, and Fragment. (hyunsik)
+
+    TAJO-275: Separating QueryMaster and TaskRunner roles in worker. 
+    (Keuntae Park via jihoon)
+
+    TAJO-270: Boolean datum compatible to apache hive. (jinho)
+
+    TAJO-261: Rearrange default port numbers and config names. (hyunsik)
+
+    TAJO-236: Implement LogicalPlanVerifier to check if a logical plan is 
+    valid. (hyunsik)
+
+    TAJO-254: Refactor package names and class names to have proper names.
+    (add a missed changelog)
+
+    TAJO-255: Cleanup exceptions of engine. (hyunsik)
 
     TAJO-253: Clean up tajo-default.xml in test resource. (hyunsik)
 
@@ -199,6 +228,23 @@ Release 0.2.0 - unreleased
 
   BUG FIXES
 
+    TAJO-293: querymasters directory not found in single node setup. (hyunsik)
+
+    TAJO-281: 'mvn package -Pdist' generates duplicate Tajo jar files.
+    (hyunsik)
+
+    TAJO-277: Infinite loop occurs when a table is empty. (jinho)
+
+    TAJO-273: NotEval incurs NPE with boolean column. (hyunsik)
+
+    TAJO-272: boolean test does not work correctly. (hyunsik)
+
+    TAJO-264: Remove hard-coded 'standby' mode. (jinho)
+
+    TAJO-262: Integration test hang on jenkins. (jinho)
+
+    TAJO-257: Unit tests occassionally fail. (hyunsik)
+
     TAJO-169: the default TAJO_WORKER_STANDBY_MODE in tajo-env.sh is wrong. 
     (hyunsik)
 
@@ -320,6 +366,14 @@ Release 0.2.0 - unreleased
     TAJO-21: CREATE EXTERNAL TABLE should support a file path. (JaeHwa Jung)
 
   TASKS
+
+    TAJO-288: Correct NOTICE file and LICENSE.txt. (hyunsik)
+
+    TAJO-271: Add MIT license to NOTICE.txt and LICENSE.txt for jquery and 
+    jsPlumb. (hyunsik)
+
+    TAJO-265: Update installation guide and other documentation for 0.2
+    release. (hyunsik)
 
     TAJO-252: Add DISCLAIMER file. (hyunsik)
 

@@ -22,13 +22,14 @@ package org.apache.tajo.engine.function;
 import org.apache.tajo.engine.eval.ExprTestBase;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
 public class TestDateTime extends ExprTestBase {
 
   @Test
-  public void testUnixTimestamp() {
+  public void testUnixTimestamp() throws IOException {
     SimpleDateFormat format = new SimpleDateFormat("yyyyMMddHH");
     String expected = format.format(new Date(System.currentTimeMillis()));
     testSimpleEval("select to_timestamp(unix_timestamp(), 'yyyyMMddHH');", new String[]{expected});

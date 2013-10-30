@@ -27,11 +27,12 @@ import org.apache.tajo.catalog.CatalogUtil;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.catalog.TableMeta;
 import org.apache.tajo.catalog.proto.CatalogProtos;
-import org.apache.tajo.catalog.statistics.TableStat;
+import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.common.TajoDataTypes;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.datum.DatumFactory;
 import org.apache.tajo.storage.*;
+import org.apache.tajo.storage.fragment.FileFragment;
 import org.apache.tajo.util.CommonTestingUtil;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -55,7 +56,7 @@ public class TestCSVCompression {
   public TestCSVCompression(CatalogProtos.StoreType type) throws IOException {
     this.storeType = type;
     conf = new TajoConf();
-    conf.set("tajo.storage.manager.v2", "true");
+    conf.setBoolVar(TajoConf.ConfVars.STORAGE_MANAGER_VERSION_2, true);
 
     testDir = CommonTestingUtil.getTestDir(TEST_PATH);
     fs = testDir.getFileSystem(conf);
@@ -104,11 +105,11 @@ public class TestCSVCompression {
     schema.addColumn("id", TajoDataTypes.Type.INT4);
     schema.addColumn("age", TajoDataTypes.Type.INT8);
 
-    TableMeta meta = CatalogUtil.newTableMeta(schema, CatalogProtos.StoreType.CSV);
+    TableMeta meta = CatalogUtil.newTableMeta(CatalogProtos.StoreType.CSV);
     meta.putOption("compression.codec", BZip2Codec.class.getCanonicalName());
 
     Path tablePath = new Path(testDir, "SplitCompression");
-    Appender appender = StorageManagerFactory.getStorageManager(conf).getAppender(meta, tablePath);
+    Appender appender = StorageManagerFactory.getStorageManager(conf).getAppender(meta, schema, tablePath);
     appender.enableStats();
 
     appender.init();
@@ -129,7 +130,7 @@ public class TestCSVCompression {
     }
     appender.close();
 
-    TableStat stat = appender.getStats();
+    TableStats stat = appender.getStats();
     assertEquals(tupleNum, stat.getNumRows().longValue());
     tablePath = tablePath.suffix(extention);
 
@@ -137,11 +138,11 @@ public class TestCSVCompression {
     long fileLen = status.getLen();
     long randomNum = (long) (Math.random() * fileLen) + 1;
 
-    Fragment[] tablets = new Fragment[2];
-    tablets[0] = new Fragment("SplitCompression", tablePath, meta, 0, randomNum);
-    tablets[1] = new Fragment("SplitCompression", tablePath, meta, randomNum, (fileLen - randomNum));
+    FileFragment[] tablets = new FileFragment[2];
+    tablets[0] = new FileFragment("SplitCompression", tablePath, 0, randomNum);
+    tablets[1] = new FileFragment("SplitCompression", tablePath, randomNum, (fileLen - randomNum));
 
-    Scanner scanner = StorageManagerFactory.getStorageManager(conf).getScanner(meta, tablets[0], schema);
+    Scanner scanner = StorageManagerFactory.getStorageManager(conf).getScanner(meta, schema, tablets[0], schema);
     scanner.init();
     int tupleCnt = 0;
     Tuple tuple;
@@ -150,7 +151,7 @@ public class TestCSVCompression {
     }
     scanner.close();
 
-    scanner = StorageManagerFactory.getStorageManager(conf).getScanner(meta, tablets[1], schema);
+    scanner = StorageManagerFactory.getStorageManager(conf).getScanner(meta, schema, tablets[1], schema);
     scanner.init();
     while ((tuple = scanner.next()) != null) {
       tupleCnt++;
@@ -160,17 +161,18 @@ public class TestCSVCompression {
     assertEquals(tupleNum, tupleCnt);
   }
 
-  private void storageCompressionTest(CatalogProtos.StoreType storeType, Class<? extends CompressionCodec> codec) throws IOException {
+  private void storageCompressionTest(CatalogProtos.StoreType storeType, Class<? extends CompressionCodec> codec)
+      throws IOException {
     Schema schema = new Schema();
     schema.addColumn("id", TajoDataTypes.Type.INT4);
     schema.addColumn("age", TajoDataTypes.Type.INT8);
 
-    TableMeta meta = CatalogUtil.newTableMeta(schema, storeType);
+    TableMeta meta = CatalogUtil.newTableMeta(storeType);
     meta.putOption("compression.codec", codec.getCanonicalName());
 
     String fileName = "Compression_" + codec.getSimpleName();
     Path tablePath = new Path(testDir, fileName);
-    Appender appender = StorageManagerFactory.getStorageManager(conf).getAppender(meta, tablePath);
+    Appender appender = StorageManagerFactory.getStorageManager(conf).getAppender(meta, schema, tablePath);
     appender.enableStats();
 
     appender.init();
@@ -191,15 +193,15 @@ public class TestCSVCompression {
     }
     appender.close();
 
-    TableStat stat = appender.getStats();
+    TableStats stat = appender.getStats();
     assertEquals(tupleNum, stat.getNumRows().longValue());
     tablePath = tablePath.suffix(extension);
     FileStatus status = fs.getFileStatus(tablePath);
     long fileLen = status.getLen();
-    Fragment[] tablets = new Fragment[1];
-    tablets[0] = new Fragment(fileName, tablePath, meta, 0, fileLen);
+    FileFragment[] tablets = new FileFragment[1];
+    tablets[0] = new FileFragment(fileName, tablePath, 0, fileLen);
 
-    Scanner scanner = StorageManagerFactory.getStorageManager(conf).getScanner(meta, tablets[0], schema);
+    Scanner scanner = StorageManagerFactory.getStorageManager(conf).getScanner(meta, schema, tablets[0], schema);
     scanner.init();
     int tupleCnt = 0;
     while (scanner.next() != null) {

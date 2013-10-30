@@ -19,16 +19,19 @@
 package org.apache.tajo.storage;
 
 import com.google.protobuf.CodedInputStream;
-import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.Message;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.catalog.TableMeta;
-import org.apache.tajo.catalog.statistics.TableStat;
+import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.common.TajoDataTypes.DataType;
-import org.apache.tajo.datum.*;
+import org.apache.tajo.datum.DatumFactory;
+import org.apache.tajo.datum.NullDatum;
+import org.apache.tajo.datum.ProtobufDatumFactory;
+import org.apache.tajo.storage.fragment.FileFragment;
 import org.apache.tajo.util.BitArray;
 
 import java.io.File;
@@ -56,15 +59,15 @@ public class RawFile {
     private boolean eof = false;
     private long fileSize;
 
-    public RawFileScanner(Configuration conf, TableMeta meta, Path path) throws IOException {
-      super(conf, meta, null);
+    public RawFileScanner(Configuration conf, Schema schema, TableMeta meta, Path path) throws IOException {
+      super(conf, schema, meta, null);
       this.path = path;
       init();
     }
 
     @SuppressWarnings("unused")
-    public RawFileScanner(Configuration conf, TableMeta meta, Fragment fragment) throws IOException {
-      this(conf, meta, fragment.getPath());
+    public RawFileScanner(Configuration conf, Schema schema, TableMeta meta, FileFragment fragment) throws IOException {
+      this(conf, schema, meta, fragment.getPath());
     }
 
     public void init() throws IOException {
@@ -191,21 +194,30 @@ public class RawFile {
             tuple.put(i, DatumFactory.createFloat8(buffer.getDouble()));
             break;
 
-          case TEXT : {
+          case TEXT :
             // TODO - shoud use CharsetEncoder / CharsetDecoder
-            byte [] rawBytes = getColumnBytes();
-            tuple.put(i, DatumFactory.createText(new String(rawBytes)));
+            //byte [] rawBytes = getColumnBytes();
+            int strSize2 = buffer.getInt();
+            byte [] strBytes2 = new byte[strSize2];
+            buffer.get(strBytes2);
+            tuple.put(i, DatumFactory.createText(new String(strBytes2)));
             break;
-          }
 
           case BLOB : {
-            byte [] rawBytes = getColumnBytes();
+            //byte [] rawBytes = getColumnBytes();
+            int byteSize = buffer.getInt();
+            byte [] rawBytes = new byte[byteSize];
+            buffer.get(rawBytes);
             tuple.put(i, DatumFactory.createBlob(rawBytes));
             break;
           }
 
           case PROTOBUF: {
-            byte [] rawBytes = getColumnBytes();
+            //byte [] rawBytes = getColumnBytes();
+            int byteSize = buffer.getInt();
+            byte [] rawBytes = new byte[byteSize];
+            buffer.get(rawBytes);
+
             ProtobufDatumFactory factory = ProtobufDatumFactory.get(columnTypes[i]);
             Message.Builder builder = factory.newBuilder();
             builder.mergeFrom(rawBytes);
@@ -298,8 +310,8 @@ public class RawFile {
 
     private TableStatistics stats;
 
-    public RawFileAppender(Configuration conf, TableMeta meta, Path path) throws IOException {
-      super(conf, meta, path);
+    public RawFileAppender(Configuration conf, Schema schema, TableMeta meta, Path path) throws IOException {
+      super(conf, schema, meta, path);
     }
 
     public void init() throws IOException {
@@ -427,19 +439,42 @@ public class RawFile {
             break;
 
           case TEXT:
-          case BLOB:
-          case PROTOBUF: {
-            byte [] lengthByte = new byte[4];
-            byte [] byteArray = t.get(i).asByteArray();
-            CodedOutputStream outputStream = CodedOutputStream.newInstance(lengthByte);
-            outputStream.writeUInt32NoTag(byteArray.length);
-            outputStream.flush();
-            int legnthByteLength = CodedOutputStream.computeInt32SizeNoTag(byteArray.length);
-            if (flushBufferAndReplace(recordOffset, byteArray.length + legnthByteLength)) {
+            byte [] strBytes2 = t.get(i).asByteArray();
+            if (flushBufferAndReplace(recordOffset, strBytes2.length + 4)) {
               recordOffset = 0;
             }
-            buffer.put(lengthByte, 0, legnthByteLength);
-            buffer.put(byteArray);
+            buffer.putInt(strBytes2.length);
+            buffer.put(strBytes2);
+            break;
+
+          case BLOB : {
+            byte [] rawBytes = t.get(i).asByteArray();
+            if (flushBufferAndReplace(recordOffset, rawBytes.length + 4)) {
+              recordOffset = 0;
+            }
+            buffer.putInt(rawBytes.length);
+            buffer.put(rawBytes);
+            break;
+          }
+
+          case PROTOBUF: {
+            // TODO - to be fixed
+//            byte [] lengthByte = new byte[4];
+//            byte [] byteArray = t.get(i).asByteArray();
+//            CodedOutputStream outputStream = CodedOutputStream.newInstance(lengthByte);
+//            outputStream.writeUInt32NoTag(byteArray.length);
+//            outputStream.flush();
+//            int legnthByteLength = CodedOutputStream.computeInt32SizeNoTag(byteArray.length);
+//            if (flushBufferAndReplace(recordOffset, byteArray.length + legnthByteLength)) {
+//              recordOffset = 0;
+//            }
+//            buffer.put(lengthByte, 0, legnthByteLength);
+            byte [] rawBytes = t.get(i).asByteArray();
+            if (flushBufferAndReplace(recordOffset, rawBytes.length + 4)) {
+              recordOffset = 0;
+            }
+            buffer.putInt(rawBytes.length);
+            buffer.put(rawBytes);
             break;
           }
 
@@ -479,7 +514,7 @@ public class RawFile {
     }
 
     @Override
-    public TableStat getStats() {
+    public TableStats getStats() {
       if (enabledStats) {
         return stats.getTableStat();
       } else {

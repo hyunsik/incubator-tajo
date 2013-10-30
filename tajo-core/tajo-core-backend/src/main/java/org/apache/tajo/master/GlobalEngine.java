@@ -33,25 +33,23 @@ import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.exception.AlreadyExistsTableException;
 import org.apache.tajo.catalog.exception.NoSuchTableException;
 import org.apache.tajo.catalog.proto.CatalogProtos;
-import org.apache.tajo.catalog.statistics.TableStat;
+import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.datum.NullDatum;
 import org.apache.tajo.engine.eval.ConstEval;
 import org.apache.tajo.engine.eval.FieldEval;
-import org.apache.tajo.engine.exception.EmptyClusterException;
 import org.apache.tajo.engine.exception.IllegalQueryStatusException;
-import org.apache.tajo.engine.exception.NoSuchQueryIdException;
-import org.apache.tajo.engine.exception.UnknownWorkerException;
+import org.apache.tajo.engine.exception.VerifyException;
 import org.apache.tajo.engine.parser.HiveConverter;
 import org.apache.tajo.engine.parser.SQLAnalyzer;
 import org.apache.tajo.engine.planner.*;
 import org.apache.tajo.engine.planner.logical.*;
+import org.apache.tajo.engine.query.QueryContext;
 import org.apache.tajo.ipc.ClientProtos;
 import org.apache.tajo.master.TajoMaster.MasterContext;
 import org.apache.tajo.master.querymaster.QueryInfo;
 import org.apache.tajo.master.querymaster.QueryJobManager;
 import org.apache.tajo.storage.AbstractStorageManager;
-import org.apache.tajo.storage.StorageUtil;
 
 import java.io.IOException;
 import java.sql.SQLException;
@@ -72,6 +70,7 @@ public class GlobalEngine extends AbstractService {
   private CatalogService catalog;
   private LogicalPlanner planner;
   private LogicalOptimizer optimizer;
+  private LogicalPlanVerifier verifier;
   private DistributedQueryHookManager hookManager;
 
   public GlobalEngine(final MasterContext context) {
@@ -87,6 +86,7 @@ public class GlobalEngine extends AbstractService {
       converter = new HiveConverter();
       planner = new LogicalPlanner(context.getCatalog());
       optimizer = new LogicalOptimizer();
+      verifier = new LogicalPlanVerifier(context.getConf(), context.getCatalog());
 
       hookManager = new DistributedQueryHookManager();
       hookManager.addHook(new CreateTableHook());
@@ -103,9 +103,7 @@ public class GlobalEngine extends AbstractService {
   }
 
   public GetQueryStatusResponse executeQuery(String sql)
-      throws InterruptedException, IOException,
-      NoSuchQueryIdException, IllegalQueryStatusException,
-      UnknownWorkerException, EmptyClusterException {
+      throws InterruptedException, IOException, IllegalQueryStatusException {
 
     LOG.info("SQL: " + sql);
     QueryContext queryContext = new QueryContext();
@@ -151,13 +149,20 @@ public class GlobalEngine extends AbstractService {
 
         queryInfo = queryJobManager.createNewQueryJob(queryContext, sql, rootNode);
 
-        responseBuilder.setQueryId(queryInfo.getQueryId().getProto());
-        responseBuilder.setResultCode(ClientProtos.ResultCode.OK);
-        responseBuilder.setState(queryInfo.getQueryState());
-        if(queryInfo.getQueryMasterHost() != null) {
-          responseBuilder.setQueryMasterHost(queryInfo.getQueryMasterHost());
+        if(queryInfo == null) {
+          responseBuilder.setQueryId(QueryIdFactory.NULL_QUERY_ID.getProto());
+          responseBuilder.setResultCode(ClientProtos.ResultCode.ERROR);
+          responseBuilder.setState(TajoProtos.QueryState.QUERY_ERROR);
+          responseBuilder.setErrorMessage("Fail starting QueryMaster.");
+        } else {
+          responseBuilder.setQueryId(queryInfo.getQueryId().getProto());
+          responseBuilder.setResultCode(ClientProtos.ResultCode.OK);
+          responseBuilder.setState(queryInfo.getQueryState());
+          if(queryInfo.getQueryMasterHost() != null) {
+            responseBuilder.setQueryMasterHost(queryInfo.getQueryMasterHost());
+          }
+          responseBuilder.setQueryMasterPort(queryInfo.getQueryMasterClientPort());
         }
-        responseBuilder.setQueryMasterPort(queryInfo.getQueryMasterClientPort());
       }
       GetQueryStatusResponse response = responseBuilder.build();
 
@@ -182,7 +187,7 @@ public class GlobalEngine extends AbstractService {
     // parse the query
     Expr expr = analyzer.parse(sql);
     LogicalPlan plan = createLogicalPlan(expr);
-    LogicalRootNode rootNode = (LogicalRootNode) plan.getRootBlock().getRoot();
+    LogicalRootNode rootNode = plan.getRootBlock().getRoot();
 
     if (!PlannerUtil.checkIfDDLPlan(rootNode)) {
       throw new SQLException("This is not update query:\n" + sql);
@@ -217,6 +222,17 @@ public class GlobalEngine extends AbstractService {
       LOG.debug("LogicalPlan:\n" + plan.getRootBlock().getRoot());
     }
 
+    VerificationState state = new VerificationState();
+    verifier.visit(state, plan, plan.getRootBlock());
+
+    if (!state.verified()) {
+      StringBuilder sb = new StringBuilder();
+      for (String error : state.getErrorMessages()) {
+        sb.append("ERROR: ").append(error).append("\n");
+      }
+      throw new VerifyException(sb.toString());
+    }
+
     return plan;
   }
 
@@ -224,29 +240,33 @@ public class GlobalEngine extends AbstractService {
     TableMeta meta;
 
     if (createTable.hasOptions()) {
-      meta = CatalogUtil.newTableMeta(createTable.getSchema(),
-          createTable.getStorageType(), createTable.getOptions());
+      meta = CatalogUtil.newTableMeta(createTable.getStorageType(), createTable.getOptions());
     } else {
-      meta = CatalogUtil.newTableMeta(createTable.getSchema(),
-          createTable.getStorageType());
+      meta = CatalogUtil.newTableMeta(createTable.getStorageType());
     }
 
     if(!createTable.isExternal()){
-      Path tablePath = new Path(sm.getTableBaseDir(), createTable.getTableName().toLowerCase());
+      Path tablePath = new Path(sm.getWarehouseDir(), createTable.getTableName().toLowerCase());
       createTable.setPath(tablePath);
     } else {
       Preconditions.checkState(createTable.hasPath(), "ERROR: LOCATION must be given.");
     }
 
-    return createTable(createTable.getTableName(), meta, createTable.getPath());
+    return createTableOnDirectory(createTable.getTableName(), createTable.getSchema(), meta,
+        createTable.getPath(), true);
   }
 
-  public TableDesc createTable(String tableName, TableMeta meta, Path path) throws IOException {
+  public TableDesc createTableOnDirectory(String tableName, Schema schema, TableMeta meta, Path path, boolean isCreated)
+      throws IOException {
     if (catalog.existsTable(tableName)) {
       throw new AlreadyExistsTableException(tableName);
     }
 
     FileSystem fs = path.getFileSystem(context.getConf());
+
+    if (isCreated) {
+      fs.mkdirs(path);
+    }
 
     if(fs.exists(path) && fs.isFile(path)) {
       throw new IOException("ERROR: LOCATION must be a directory.");
@@ -260,15 +280,13 @@ public class GlobalEngine extends AbstractService {
       LOG.error("Cannot calculate the size of the relation", e);
     }
 
-    TableStat stat = new TableStat();
-    stat.setNumBytes(totalSize);
-    meta.setStat(stat);
-
-    TableDesc desc = CatalogUtil.newTableDesc(tableName, meta, path);
-    StorageUtil.writeTableMeta(context.getConf(), path, meta);
+    TableStats stats = new TableStats();
+    stats.setNumBytes(totalSize);
+    TableDesc desc = CatalogUtil.newTableDesc(tableName, schema, meta, path);
+    desc.setStats(stats);
     catalog.addTable(desc);
 
-    LOG.info("Table " + desc.getName() + " is created (" + desc.getMeta().getStat().getNumBytes() + ")");
+    LOG.info("Table " + desc.getName() + " is created (" + desc.getStats().getNumBytes() + ")");
 
     return desc;
   }
@@ -340,7 +358,7 @@ public class GlobalEngine extends AbstractService {
       StoreTableNode storeTableNode = plan.getRootBlock().getStoreTableNode();
       String tableName = storeTableNode.getTableName();
       queryContext.setOutputTable(tableName);
-      queryContext.setOutputPath(new Path(TajoConf.getWarehousePath(context.getConf()), tableName));
+      queryContext.setOutputPath(new Path(TajoConf.getWarehouseDir(context.getConf()), tableName));
       queryContext.setCreateTable();
     }
   }
@@ -415,7 +433,7 @@ public class GlobalEngine extends AbstractService {
       if (insertNode.hasTargetTable()) { // if a target table is given, it computes the proper schema.
         storeNode.getOptions().putAll(insertNode.getTargetTable().getMeta().toMap());
 
-        Schema targetTableSchema = insertNode.getTargetTable().getMeta().getSchema();
+        Schema targetTableSchema = insertNode.getTargetTable().getSchema();
         Schema targetProjectedSchema = insertNode.getTargetSchema();
 
         int [] targetColumnIds = new int[targetProjectedSchema.getColumnNum()];

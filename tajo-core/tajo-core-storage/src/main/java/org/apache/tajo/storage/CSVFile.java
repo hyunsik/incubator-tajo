@@ -31,7 +31,7 @@ import org.apache.hadoop.io.compress.*;
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.catalog.TableMeta;
-import org.apache.tajo.catalog.statistics.TableStat;
+import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.common.TajoDataTypes;
 import org.apache.tajo.datum.CharDatum;
 import org.apache.tajo.datum.Datum;
@@ -41,17 +41,22 @@ import org.apache.tajo.datum.protobuf.ProtobufJsonFormat;
 import org.apache.tajo.exception.UnsupportedException;
 import org.apache.tajo.storage.compress.CodecPool;
 import org.apache.tajo.storage.exception.AlreadyExistsStorageException;
+import org.apache.tajo.storage.fragment.FileFragment;
 import org.apache.tajo.util.Bytes;
 
 import java.io.*;
 import java.util.Arrays;
 
 public class CSVFile {
+  public static byte[] trueBytes = "true".getBytes();
+  public static byte[] falseBytes = "false".getBytes();
+
   public static final String DELIMITER = "csvfile.delimiter";
   public static final String NULL = "csvfile.null";     //read only
   public static final String DELIMITER_DEFAULT = "|";
   public static final byte LF = '\n';
   public static int EOF = -1;
+
   private static final Log LOG = LogFactory.getLog(CSVFile.class);
 
   public static class CSVAppender extends FileAppender {
@@ -70,12 +75,11 @@ public class CSVFile {
     private byte[] nullChars;
     private ProtobufJsonFormat protobufJsonFormat = ProtobufJsonFormat.getInstance();
 
-    public CSVAppender(Configuration conf, final TableMeta meta,
-                       final Path path) throws IOException {
-      super(conf, meta, path);
+    public CSVAppender(Configuration conf, final Schema schema, final TableMeta meta, final Path path) throws IOException {
+      super(conf, schema, meta, path);
       this.fs = path.getFileSystem(conf);
       this.meta = meta;
-      this.schema = meta.getSchema();
+      this.schema = schema;
       this.delimiter = StringEscapeUtils.unescapeJava(this.meta.getOption(DELIMITER, DELIMITER_DEFAULT)).charAt(0);
 
       String nullCharacters = StringEscapeUtils.unescapeJava(this.meta.getOption(NULL));
@@ -135,26 +139,46 @@ public class CSVFile {
         LazyTuple  lTuple = (LazyTuple)tuple;
         for (int i = 0; i < colNum; i++) {
           TajoDataTypes.DataType dataType = schema.getColumn(i).getDataType();
-          datum = tuple.get(i);
 
           switch (dataType.getType()) {
-            case TEXT:
-              outputStream.write(datum.asTextBytes());
+            case TEXT: {
+              datum = tuple.get(i);
+              if (datum instanceof NullDatum) {
+                outputStream.write(nullChars);
+              } else {
+                outputStream.write(datum.asTextBytes());
+              }
               break;
-            case CHAR:
-              byte[] pad = new byte[dataType.getLength() - datum.size()];
-              outputStream.write(datum.asTextBytes());
-              outputStream.write(pad);
+            }
+            case CHAR: {
+              datum = tuple.get(i);
+              if (datum instanceof NullDatum) {
+                outputStream.write(nullChars);
+              } else {
+                byte[] pad = new byte[dataType.getLength() - datum.size()];
+                outputStream.write(datum.asTextBytes());
+                outputStream.write(pad);
+              }
               break;
+            }
+            case BOOLEAN: {
+              datum = tuple.get(i);
+              if (datum instanceof NullDatum) {
+                //null datum is zero length byte array
+              } else {
+                outputStream.write(datum.asBool() ? trueBytes : falseBytes);   //Compatibility with Apache Hive
+              }
+              break;
+            }
             case NULL:
-              outputStream.write(nullChars);
               break;
             case PROTOBUF:
+              datum = tuple.get(i);
               ProtobufDatum protobufDatum = (ProtobufDatum) datum;
               protobufJsonFormat.print(protobufDatum.get(), outputStream);
               break;
             default:
-              outputStream.write(lTuple.getTextBytes(i));
+              outputStream.write(lTuple.getTextBytes(i)); //better usage for insertion to table of lazy tuple
               break;
           }
 
@@ -179,7 +203,7 @@ public class CSVFile {
             col = schema.getColumn(i);
             switch (col.getDataType().getType()) {
               case BOOLEAN:
-                outputStream.write(tuple.getBoolean(i).asTextBytes());
+                outputStream.write(tuple.getBoolean(i).asBool() ? trueBytes : falseBytes);   //Compatibility with Apache Hive
                 break;
               case BIT:
                 outputStream.write(tuple.getByte(i).asTextBytes());
@@ -274,7 +298,7 @@ public class CSVFile {
     }
 
     @Override
-    public TableStat getStats() {
+    public TableStats getStats() {
       if (enabledStats) {
         return stats.getTableStat();
       } else {
@@ -292,9 +316,9 @@ public class CSVFile {
   }
 
   public static class CSVScanner extends FileScanner implements SeekableScanner {
-    public CSVScanner(Configuration conf, final TableMeta meta,
-                      final Fragment fragment) throws IOException {
-      super(conf, meta, fragment);
+    public CSVScanner(Configuration conf, final Schema schema, final TableMeta meta, final FileFragment fragment)
+        throws IOException {
+      super(conf, schema, meta, fragment);
       factory = new CompressionCodecFactory(conf);
       codec = factory.getCodec(fragment.getPath());
       if (isCompress() && !(codec instanceof SplittableCompressionCodec)) {
@@ -303,10 +327,10 @@ public class CSVFile {
 
       // Buffer size, Delimiter
       this.bufSize = DEFAULT_BUFFER_SIZE;
-      String delim  = fragment.getMeta().getOption(DELIMITER, DELIMITER_DEFAULT);
+      String delim  = meta.getOption(DELIMITER, DELIMITER_DEFAULT);
       this.delimiter = StringEscapeUtils.unescapeJava(delim).charAt(0);
 
-      String nullCharacters = StringEscapeUtils.unescapeJava(fragment.getMeta().getOption(NULL));
+      String nullCharacters = StringEscapeUtils.unescapeJava(meta.getOption(NULL));
       if (StringUtils.isEmpty(nullCharacters)) {
         nullChars = NullDatum.get().asTextBytes();
       } else {
@@ -340,11 +364,11 @@ public class CSVFile {
     @Override
     public void init() throws IOException {
 
-      // Fragment information
+      // FileFragment information
       fs = fragment.getPath().getFileSystem(conf);
       fis = fs.open(fragment.getPath());
-      startOffset = fragment.getStartOffset();
-      length = fragment.getLength();
+      startOffset = fragment.getStartKey();
+      length = fragment.getEndKey();
 
       if(startOffset > 0) startOffset--; // prev line feed
 

@@ -14,7 +14,6 @@
 
 package org.apache.tajo.master;
 
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.event.AsyncDispatcher;
 import org.apache.tajo.LocalTajoTestingUtility;
 import org.apache.tajo.TajoTestingCluster;
@@ -25,17 +24,20 @@ import org.apache.tajo.catalog.CatalogUtil;
 import org.apache.tajo.catalog.TableDesc;
 import org.apache.tajo.catalog.TableMeta;
 import org.apache.tajo.catalog.proto.CatalogProtos;
-import org.apache.tajo.catalog.statistics.TableStat;
+import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.engine.parser.SQLAnalyzer;
 import org.apache.tajo.engine.planner.LogicalOptimizer;
 import org.apache.tajo.engine.planner.LogicalPlan;
 import org.apache.tajo.engine.planner.LogicalPlanner;
+import org.apache.tajo.engine.planner.global.ExecutionBlockCursor;
+import org.apache.tajo.engine.planner.global.GlobalPlanner;
 import org.apache.tajo.engine.planner.global.MasterPlan;
-import org.apache.tajo.engine.planner.logical.LogicalNode;
-import org.apache.tajo.engine.planner.logical.LogicalRootNode;
+import org.apache.tajo.engine.query.QueryContext;
 import org.apache.tajo.storage.AbstractStorageManager;
 import org.apache.tajo.storage.StorageManagerFactory;
+import org.apache.tajo.util.CommonTestingUtil;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -49,6 +51,7 @@ public class TestExecutionBlockCursor {
   private static SQLAnalyzer analyzer;
   private static LogicalPlanner logicalPlanner;
   private static LogicalOptimizer optimizer;
+  private static AsyncDispatcher dispatcher;
 
   @BeforeClass
   public static void setUp() throws Exception {
@@ -61,9 +64,9 @@ public class TestExecutionBlockCursor {
     tpch.loadSchemas();
     tpch.loadOutSchema();
     for (String table : tpch.getTableNames()) {
-      TableMeta m = CatalogUtil.newTableMeta(tpch.getSchema(table), CatalogProtos.StoreType.CSV);
-      m.setStat(new TableStat());
-      TableDesc d = CatalogUtil.newTableDesc(table, m, new Path("/"));
+      TableMeta m = CatalogUtil.newTableMeta(CatalogProtos.StoreType.CSV);
+      TableDesc d = CatalogUtil.newTableDesc(table, tpch.getSchema(table), m, CommonTestingUtil.getTestDir());
+      d.setStats(new TableStats());
       catalog.addTable(d);
     }
 
@@ -72,14 +75,16 @@ public class TestExecutionBlockCursor {
     optimizer = new LogicalOptimizer();
 
     AbstractStorageManager sm  = StorageManagerFactory.getStorageManager(conf);
-    AsyncDispatcher dispatcher = new AsyncDispatcher();
+    dispatcher = new AsyncDispatcher();
     dispatcher.init(conf);
     dispatcher.start();
     planner = new GlobalPlanner(conf, sm);
   }
 
+  @AfterClass
   public static void tearDown() {
     util.shutdownCatalogCluster();
+    dispatcher.stop();
   }
 
   @Test

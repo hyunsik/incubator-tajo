@@ -37,12 +37,13 @@ import org.apache.tajo.datum.Datum;
 import org.apache.tajo.datum.DatumFactory;
 import org.apache.tajo.datum.NullDatum;
 import org.apache.tajo.engine.eval.*;
+import org.apache.tajo.engine.exception.InvalidQueryException;
+import org.apache.tajo.engine.exception.UndefinedFunctionException;
+import org.apache.tajo.engine.exception.VerifyException;
 import org.apache.tajo.engine.function.AggFunction;
 import org.apache.tajo.engine.function.GeneralFunction;
 import org.apache.tajo.engine.planner.LogicalPlan.QueryBlock;
 import org.apache.tajo.engine.planner.logical.*;
-import org.apache.tajo.engine.query.exception.InvalidQueryException;
-import org.apache.tajo.engine.query.exception.UndefinedFunctionException;
 import org.apache.tajo.engine.utils.SchemaUtil;
 import org.apache.tajo.exception.InternalException;
 
@@ -183,11 +184,11 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       try {
         FileSystem fs = desc.getPath().getFileSystem(new Configuration());
         FileStatus status = fs.getFileStatus(desc.getPath());
-        if (desc.getMeta().getStat() != null && (status.isDirectory() || status.isFile())) {
+        if (desc.getStats() != null && (status.isDirectory() || status.isFile())) {
           ContentSummary summary = fs.getContentSummary(desc.getPath());
           if (summary != null) {
             long volume = summary.getLength();
-            desc.getMeta().getStat().setNumBytes(volume);
+            desc.getStats().setNumBytes(volume);
           }
         }
       } catch (Throwable t) {
@@ -357,8 +358,6 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     TableSubQueryNode rightSubQuery = new TableSubQueryNode(plan.newPID(), rightContext.block.getName(), right);
     context.plan.connectBlocks(rightContext.block, context.block, BlockType.TableSubQuery);
 
-    verifySetStatement(setOperation.getType(), leftContext.block, rightContext.block);
-
     BinaryNode setOp;
     if (setOperation.getType() == OpType.Union) {
       setOp = new UnionNode(plan.newPID(), leftSubQuery, rightSubQuery);
@@ -385,26 +384,6 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     }
 
     return setOp;
-  }
-
-  private boolean verifySetStatement(OpType type, QueryBlock left, QueryBlock right)
-      throws VerifyException {
-
-    if (left.getCurrentTargets().length != right.getCurrentTargets().length) {
-      throw new VerifyException("ERROR: each " + type.name() + " query must have the same number of columns");
-    }
-
-    Target[] targets1 = left.getCurrentTargets();
-    Target[] targets2 = right.getCurrentTargets();
-
-    for (int i = 0; i < targets1.length; i++) {
-      if (!targets1[i].getDataType().equals(targets2[i].getDataType())) {
-        throw new VerifyException(type + " types " + targets1[i].getDataType().getType() + " and "
-            + targets2[i].getDataType().getType() + " cannot be matched");
-      }
-    }
-
-    return true;
   }
 
   @Override
@@ -869,13 +848,12 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
           targetSchema.addColumn(targetColumn);
         }
       } else {
-        Schema targetTableSchema = desc.getMeta().getSchema();
+        Schema targetTableSchema = desc.getSchema();
         for (int i = 0; i < subQuery.getOutSchema().getColumnNum(); i++) {
           targetSchema.addColumn(targetTableSchema.getColumn(i));
         }
       }
 
-      ensureDomains(targetSchema, subQuery.getOutSchema());
       insertNode = new InsertNode(context.plan.newPID(), desc, subQuery);
       insertNode.setTargetSchema(targetSchema);
       insertNode.setOutSchema(targetSchema);
@@ -937,7 +915,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         LiteralValue literal = (LiteralValue) expr;
         switch (literal.getValueType()) {
           case Boolean:
-            return new ConstEval(DatumFactory.createBool(literal.getValue()));
+            char val = literal.getValue().charAt(0);
+            return new ConstEval(DatumFactory.createBool(val == 't' || val == 'T'));
           case String:
             return new ConstEval(DatumFactory.createText(literal.getValue()));
           case Unsigned_Integer:
@@ -971,6 +950,13 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         NotExpr notExpr = (NotExpr) expr;
         return new NotEval(createEvalTree(plan, block, notExpr.getChild()));
 
+      case Between: {
+        BetweenPredicate between = (BetweenPredicate) expr;
+        BetweenPredicateEval betweenEval = new BetweenPredicateEval(between.isNot(), between.isSymmetric(),
+            createEvalTree(plan, block, between.predicand()), createEvalTree(plan, block, between.begin()),
+            createEvalTree(plan, block, between.end()));
+        return betweenEval;
+      }
       // pattern matching predicates
       case LikePredicate:
       case SimilarToPredicate:

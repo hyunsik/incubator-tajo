@@ -28,7 +28,7 @@ import org.apache.tajo.QueryId;
 import org.apache.tajo.QueryIdFactory;
 import org.apache.tajo.engine.planner.logical.LogicalRootNode;
 import org.apache.tajo.ipc.TajoMasterProtocol;
-import org.apache.tajo.master.QueryContext;
+import org.apache.tajo.engine.query.QueryContext;
 import org.apache.tajo.master.TajoMaster;
 import org.apache.tajo.master.rm.WorkerResource;
 
@@ -107,7 +107,9 @@ public class QueryJobManager extends CompositeService {
     queryInProgress.init(getConfig());
     queryInProgress.start();
 
-    queryInProgress.startQueryMaster();
+    if(!queryInProgress.startQueryMaster()) {
+      return null;
+    }
 
     return queryInProgress.getQueryInfo();
   }
@@ -171,13 +173,15 @@ public class QueryJobManager extends CompositeService {
     if(queryHeartbeat.getTajoWorkerHost() != null) {
       WorkerResource queryMasterResource = new WorkerResource();
       queryMasterResource.setAllocatedHost(queryHeartbeat.getTajoWorkerHost());
-      queryMasterResource.setManagerPort(queryHeartbeat.getTajoWorkerPort());
+      queryMasterResource.setPeerRpcPort(queryHeartbeat.getPeerRpcPort());
+      queryMasterResource.setQueryMasterPort(queryHeartbeat.getTajoQueryMasterPort());
       queryMasterResource.setClientPort(queryHeartbeat.getTajoWorkerClientPort());
       queryMasterResource.setPullServerPort(queryHeartbeat.getTajoWorkerPullServerPort());
       queryInfo.setQueryMasterResource(queryMasterResource);
     }
     queryInfo.setLastMessage(queryHeartbeat.getStatusMessage());
     queryInfo.setQueryState(queryHeartbeat.getState());
+    queryInfo.setProgress(queryHeartbeat.getQueryProgress());
 
     if (queryHeartbeat.hasQueryFinishTime()) {
       queryInfo.setFinishTime(queryHeartbeat.getQueryFinishTime());

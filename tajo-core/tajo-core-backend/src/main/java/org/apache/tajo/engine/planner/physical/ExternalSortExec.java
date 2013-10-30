@@ -20,13 +20,13 @@ package org.apache.tajo.engine.planner.physical;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.tajo.TaskAttemptContext;
 import org.apache.tajo.catalog.CatalogUtil;
 import org.apache.tajo.catalog.TableMeta;
 import org.apache.tajo.catalog.proto.CatalogProtos.StoreType;
 import org.apache.tajo.conf.TajoConf.ConfVars;
 import org.apache.tajo.engine.planner.logical.SortNode;
 import org.apache.tajo.storage.*;
+import org.apache.tajo.worker.TaskAttemptContext;
 
 import java.io.IOException;
 import java.util.*;
@@ -50,12 +50,12 @@ public class ExternalSortExec extends SortExec {
     super(context, plan.getInSchema(), plan.getOutSchema(), child, plan.getSortKeys());
     this.plan = plan;
 
-    this.MEM_TUPLE_NUM = context.getConf().getIntVar(ConfVars.EXTENAL_SORT_BUFFER_NUM);
+    this.MEM_TUPLE_NUM = context.getConf().getIntVar(ConfVars.EXECUTOR_SORT_EXTENAL_BUFFER_SIZE);
     this.tupleSlots = new ArrayList<Tuple>(MEM_TUPLE_NUM);
 
     this.sortTmpDir = new Path(context.getWorkDir(), UUID.randomUUID().toString());
     this.localFS = FileSystem.getLocal(context.getConf());
-    meta = CatalogUtil.newTableMeta(inSchema, StoreType.ROWFILE);
+    meta = CatalogUtil.newTableMeta(StoreType.ROWFILE);
   }
 
   public void init() throws IOException {
@@ -69,13 +69,13 @@ public class ExternalSortExec extends SortExec {
 
   private void sortAndStoreChunk(int chunkId, List<Tuple> tupleSlots)
       throws IOException {
-    TableMeta meta = CatalogUtil.newTableMeta(inSchema, StoreType.RAW);
+    TableMeta meta = CatalogUtil.newTableMeta(StoreType.RAW);
     Collections.sort(tupleSlots, getComparator());
     // TODO - RawFile requires the local file path.
     // So, I add the scheme 'file:/' to path. But, it should be improved.
     Path localPath = new Path(sortTmpDir + "/0_" + chunkId);
 
-    appender = new RawFile.RawFileAppender(context.getConf(), meta, localPath);
+    appender = new RawFile.RawFileAppender(context.getConf(), inSchema, meta, localPath);
     appender.init();
 
     for (Tuple t : tupleSlots) {
@@ -147,7 +147,7 @@ public class ExternalSortExec extends SortExec {
             Path leftChunk = getChunkPath(level, chunkId);
             Path rightChunk = getChunkPath(level, chunkId + 1);
 
-            appender = new RawFile.RawFileAppender(context.getConf(), meta, nextChunk);
+            appender = new RawFile.RawFileAppender(context.getConf(), inSchema, meta, nextChunk);
             appender.init();
             merge(appender, leftChunk, rightChunk);
 
@@ -167,7 +167,7 @@ public class ExternalSortExec extends SortExec {
       }
 
       Path result = getChunkPath(level, 0);
-      this.result = new RawFile.RawFileScanner(context.getConf(), meta, result);
+      this.result = new RawFile.RawFileScanner(context.getConf(), plan.getInSchema(), meta, result);
       sorted = true;
     }
 
@@ -176,10 +176,10 @@ public class ExternalSortExec extends SortExec {
 
   private void merge(RawFile.RawFileAppender appender, Path left, Path right)
       throws IOException {
-    RawFile.RawFileScanner leftScan = new RawFile.RawFileScanner(context.getConf(), meta, left);
+    RawFile.RawFileScanner leftScan = new RawFile.RawFileScanner(context.getConf(), plan.getInSchema(), meta, left);
 
     RawFile.RawFileScanner rightScan =
-        new RawFile.RawFileScanner(context.getConf(), meta, right);
+        new RawFile.RawFileScanner(context.getConf(), plan.getInSchema(), meta, right);
 
     Tuple leftTuple = leftScan.next();
     Tuple rightTuple = rightScan.next();

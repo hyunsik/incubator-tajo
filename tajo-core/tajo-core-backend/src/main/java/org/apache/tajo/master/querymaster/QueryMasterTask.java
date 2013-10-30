@@ -41,12 +41,15 @@ import org.apache.tajo.engine.planner.global.MasterPlan;
 import org.apache.tajo.engine.planner.logical.LogicalNode;
 import org.apache.tajo.engine.planner.logical.NodeType;
 import org.apache.tajo.engine.planner.logical.ScanNode;
+import org.apache.tajo.engine.query.QueryContext;
+import org.apache.tajo.ipc.TajoMasterProtocol;
 import org.apache.tajo.master.GlobalEngine;
-import org.apache.tajo.master.QueryContext;
 import org.apache.tajo.master.TajoAsyncDispatcher;
 import org.apache.tajo.master.event.*;
 import org.apache.tajo.master.rm.TajoWorkerResourceManager;
-import org.apache.tajo.rpc.NullCallback;
+import org.apache.tajo.rpc.CallFuture;
+import org.apache.tajo.rpc.NettyClientBase;
+import org.apache.tajo.rpc.RpcConnectionPool;
 import org.apache.tajo.storage.AbstractStorageManager;
 import org.apache.tajo.worker.AbstractResourceAllocator;
 import org.apache.tajo.worker.TajoResourceAllocator;
@@ -55,6 +58,7 @@ import org.apache.tajo.worker.YarnResourceAllocator;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -112,8 +116,7 @@ public class QueryMasterTask extends CompositeService {
 
     try {
       queryTaskContext = new QueryMasterTaskContext();
-      String resourceManagerClassName = conf.get("tajo.resource.manager",
-          TajoWorkerResourceManager.class.getCanonicalName());
+      String resourceManagerClassName = systemConf.getVar(TajoConf.ConfVars.RESOURCE_MANAGER_CLASS);
 
       if(resourceManagerClassName.indexOf(TajoWorkerResourceManager.class.getName()) >= 0) {
         resourceAllocator = new TajoResourceAllocator(queryTaskContext);
@@ -158,8 +161,28 @@ public class QueryMasterTask extends CompositeService {
 
     LOG.info("Stopping QueryMasterTask:" + queryId);
 
-    queryMasterContext.getWorkerContext().getTajoMasterRpcClient()
-        .stopQueryMaster(null, queryId.getProto(), NullCallback.get());
+    CallFuture future = new CallFuture();
+
+    RpcConnectionPool connPool = RpcConnectionPool.getPool(queryMasterContext.getConf());
+    NettyClientBase tmClient = null;
+    try {
+      tmClient = connPool.getConnection(queryMasterContext.getWorkerContext().getTajoMasterAddress(),
+          TajoMasterProtocol.class, true);
+      TajoMasterProtocol.TajoMasterProtocolService masterClientService = tmClient.getStub();
+      masterClientService.stopQueryMaster(null, queryId.getProto(), future);
+    } catch (Exception e) {
+      connPool.closeConnection(tmClient);
+      tmClient = null;
+      LOG.error(e.getMessage(), e);
+    } finally {
+      connPool.releaseConnection(tmClient);
+    }
+
+    try {
+      future.get(3, TimeUnit.SECONDS);
+    } catch (Throwable t) {
+      LOG.warn(t);
+    }
 
     super.stop();
 
@@ -300,7 +323,7 @@ public class QueryMasterTask extends CompositeService {
     ugi = UserGroupInformation.getLoginUser();
     realUser = ugi.getShortUserName();
     currentUser = UserGroupInformation.getCurrentUser().getShortUserName();
-    FileSystem defaultFS = FileSystem.get(systemConf);
+    FileSystem defaultFS = TajoConf.getWarehouseDir(systemConf).getFileSystem(systemConf);
 
     Path stagingDir = null;
     Path outputDir = null;
@@ -309,7 +332,7 @@ public class QueryMasterTask extends CompositeService {
       // Create Output Directory
       ////////////////////////////////////////////
 
-      stagingDir = new Path(TajoConf.getStagingRoot(systemConf), queryId.toString());
+      stagingDir = new Path(TajoConf.getStagingDir(systemConf), queryId.toString());
 
       if (defaultFS.exists(stagingDir)) {
         throw new IOException("The staging directory '" + stagingDir + "' already exists");

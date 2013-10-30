@@ -20,7 +20,9 @@ package org.apache.tajo.master.rm;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.tajo.worker.TajoWorker;
 
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -28,7 +30,8 @@ public class WorkerResource {
   private static final Log LOG = LogFactory.getLog(WorkerResource.class);
 
   private String allocatedHost;
-  private int managerPort;
+  private int peerRpcPort;
+  private int queryMasterPort;
   private int clientPort;
   private int pullServerPort;
   private int httpPort;
@@ -47,8 +50,6 @@ public class WorkerResource {
 
   private int numRunningTasks;
 
-  private boolean queryMasterAllocated;
-
   private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
   private final Lock rlock = lock.readLock();
   private final Lock wlock = lock.writeLock();
@@ -57,13 +58,14 @@ public class WorkerResource {
 
   private long lastHeartbeat;
 
-  public String getId() {
-    return allocatedHost + ":" + managerPort;
-  }
+  private boolean queryMasterMode;
 
-  public void copyId(WorkerResource workerResource) {
-    managerPort = workerResource.getManagerPort();
-    allocatedHost = workerResource.getAllocatedHost();
+  private boolean taskRunnerMode;
+
+  private AtomicInteger numQueryMasterTasks = new AtomicInteger(0);
+
+  public String getId() {
+    return allocatedHost + ":" + queryMasterPort + ":" + peerRpcPort;
   }
 
   public String getAllocatedHost() {
@@ -140,7 +142,7 @@ public class WorkerResource {
   }
 
   public String portsToStr() {
-    return managerPort + "," + clientPort + "," + pullServerPort;
+    return queryMasterPort + "," + peerRpcPort + "," + clientPort + "," + pullServerPort;
   }
 
   public void setLastHeartbeat(long heartbeatTime) {
@@ -194,19 +196,23 @@ public class WorkerResource {
     return lastHeartbeat;
   }
 
-  public boolean isQueryMasterAllocated() {
-    return queryMasterAllocated;
+  public boolean isQueryMasterMode() {
+    return queryMasterMode;
   }
 
-  public void setQueryMasterAllocated(boolean queryMasterAllocated) {
-    this.queryMasterAllocated = queryMasterAllocated;
+  public void setQueryMasterMode(boolean queryMasterMode) {
+    this.queryMasterMode = queryMasterMode;
+  }
+
+  public boolean isTaskRunnerMode() {
+    return taskRunnerMode;
+  }
+
+  public void setTaskRunnerMode(boolean taskRunnerMode) {
+    this.taskRunnerMode = taskRunnerMode;
   }
 
   public void releaseResource(WorkerResource workerResource) {
-    if(workerResource.isQueryMasterAllocated()) {
-        queryMasterAllocated = false;
-    }
-
     try {
       wlock.lock();
       usedMemoryMBSlots = usedMemoryMBSlots - workerResource.getMemoryMBSlots();
@@ -235,14 +241,22 @@ public class WorkerResource {
     return getUsedMemoryMBSlots()/512;
   }
 
-  public int getManagerPort() {
-    return managerPort;
+  public int getPeerRpcPort() {
+    return peerRpcPort;
   }
 
-  public void setManagerPort(int managerPort) {
-    this.managerPort = managerPort;
+  public void setPeerRpcPort(int peerRpcPort) {
+    this.peerRpcPort = peerRpcPort;
   }
 
+  public int getQueryMasterPort() {
+    return queryMasterPort;
+  }
+
+  public void setQueryMasterPort(int queryMasterPort) {
+    this.queryMasterPort = queryMasterPort;
+  }
+  
   public int getClientPort() {
     return clientPort;
   }
@@ -297,5 +311,21 @@ public class WorkerResource {
 
   public void setNumRunningTasks(int numRunningTasks) {
     this.numRunningTasks = numRunningTasks;
+  }
+
+  public int getNumQueryMasterTasks() {
+    return numQueryMasterTasks.get();
+  }
+
+  public void setNumQueryMasterTasks(int numQueryMasterTasks) {
+    this.numQueryMasterTasks.set(numQueryMasterTasks);
+  }
+
+  public void addNumQueryMasterTask() {
+    numQueryMasterTasks.getAndIncrement();
+  }
+
+  public void releaseQueryMasterTask() {
+    numQueryMasterTasks.getAndDecrement();
   }
 }

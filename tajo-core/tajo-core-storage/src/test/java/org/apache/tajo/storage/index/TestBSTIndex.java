@@ -27,6 +27,7 @@ import org.apache.tajo.common.TajoDataTypes.Type;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.datum.DatumFactory;
 import org.apache.tajo.storage.*;
+import org.apache.tajo.storage.fragment.FileFragment;
 import org.apache.tajo.storage.index.bst.BSTIndex;
 import org.apache.tajo.storage.index.bst.BSTIndex.BSTIndexReader;
 import org.apache.tajo.storage.index.bst.BSTIndex.BSTIndexWriter;
@@ -70,10 +71,10 @@ public class TestBSTIndex {
   
   @Test
   public void testFindValueInCSV() throws IOException {
-    meta = CatalogUtil.newTableMeta(schema, StoreType.CSV);
+    meta = CatalogUtil.newTableMeta(StoreType.CSV);
     
     Path tablePath = new Path(testDir, "FindValueInCSV.csv");
-    Appender appender  = StorageManagerFactory.getStorageManager(conf).getAppender(meta, tablePath);
+    Appender appender  = StorageManagerFactory.getStorageManager(conf).getAppender(meta, schema, tablePath);
     appender.init();
     Tuple tuple;
     for(int i = 0 ; i < TUPLE_NUM; i ++ ) {
@@ -89,7 +90,7 @@ public class TestBSTIndex {
 
     FileStatus status = fs.getFileStatus(tablePath);
     long fileLen = status.getLen();
-    Fragment tablet = new Fragment("table1_1", status.getPath(), meta, 0, fileLen);
+    FileFragment tablet = new FileFragment("table1_1", status.getPath(), 0, fileLen);
     
     SortSpec [] sortKeys = new SortSpec[2];
     sortKeys[0] = new SortSpec(schema.getColumnByFQN("long"), true, false);
@@ -108,7 +109,7 @@ public class TestBSTIndex {
     creater.setLoadNum(LOAD_NUM);
     creater.open();
 
-    SeekableScanner scanner = StorageManagerFactory.getSeekableScanner(conf, meta, tablet, meta.getSchema());
+    SeekableScanner scanner = StorageManagerFactory.getSeekableScanner(conf, meta, schema, tablet, schema);
     scanner.init();
 
     Tuple keyTuple;
@@ -131,7 +132,7 @@ public class TestBSTIndex {
     tuple = new VTuple(keySchema.getColumnNum());
     BSTIndexReader reader = bst.getIndexReader(new Path(testDir, "FindValueInCSV.idx"), keySchema, comp);
     reader.open();
-    scanner = StorageManagerFactory.getSeekableScanner(conf, meta, tablet, meta.getSchema());
+    scanner = StorageManagerFactory.getSeekableScanner(conf, meta, schema, tablet, schema);
     scanner.init();
 
     for(int i = 0 ; i < TUPLE_NUM -1 ; i ++) {
@@ -156,10 +157,11 @@ public class TestBSTIndex {
 
   @Test
   public void testBuildIndexWithAppender() throws IOException {
-    meta = CatalogUtil.newTableMeta(schema, StoreType.CSV);
+    meta = CatalogUtil.newTableMeta(StoreType.CSV);
 
     Path tablePath = new Path(testDir, "BuildIndexWithAppender.csv");
-    FileAppender appender  = (FileAppender) StorageManagerFactory.getStorageManager(conf).getAppender(meta, tablePath);
+    FileAppender appender  = (FileAppender) StorageManagerFactory.getStorageManager(conf).getAppender(meta, schema,
+        tablePath);
     appender.init();
 
     SortSpec [] sortKeys = new SortSpec[2];
@@ -201,13 +203,13 @@ public class TestBSTIndex {
 
     FileStatus status = fs.getFileStatus(tablePath);
     long fileLen = status.getLen();
-    Fragment tablet = new Fragment("table1_1", status.getPath(), meta, 0, fileLen);
+    FileFragment tablet = new FileFragment("table1_1", status.getPath(), 0, fileLen);
 
     tuple = new VTuple(keySchema.getColumnNum());
     BSTIndexReader reader = bst.getIndexReader(new Path(testDir, "BuildIndexWithAppender.idx"),
         keySchema, comp);
     reader.open();
-    SeekableScanner scanner = StorageManagerFactory.getSeekableScanner(conf, meta, tablet, meta.getSchema());
+    SeekableScanner scanner = StorageManagerFactory.getSeekableScanner(conf, meta, schema, tablet, schema);
     scanner.init();
 
     for(int i = 0 ; i < TUPLE_NUM -1 ; i ++) {
@@ -232,10 +234,10 @@ public class TestBSTIndex {
   
   @Test
   public void testFindOmittedValueInCSV() throws IOException {
-    meta = CatalogUtil.newTableMeta(schema, StoreType.CSV);
+    meta = CatalogUtil.newTableMeta(StoreType.CSV);
     
     Path tablePath = StorageUtil.concatPath(testDir, "FindOmittedValueInCSV.csv");
-    Appender appender = StorageManagerFactory.getStorageManager(conf).getAppender(meta, tablePath);
+    Appender appender = StorageManagerFactory.getStorageManager(conf).getAppender(meta, schema, tablePath);
     appender.init();
     Tuple tuple;
     for(int i = 0 ; i < TUPLE_NUM; i += 2 ) {
@@ -250,7 +252,7 @@ public class TestBSTIndex {
     appender.close();
 
     FileStatus status = fs.getFileStatus(tablePath);
-    Fragment tablet = new Fragment("table1_1", status.getPath(), meta, 0, status.getLen());
+    FileFragment tablet = new FileFragment("table1_1", status.getPath(), 0, status.getLen());
     
     SortSpec [] sortKeys = new SortSpec[2];
     sortKeys[0] = new SortSpec(schema.getColumnByFQN("long"), true, false);
@@ -268,7 +270,7 @@ public class TestBSTIndex {
     creater.setLoadNum(LOAD_NUM);
     creater.open();
 
-    SeekableScanner scanner  = StorageManagerFactory.getSeekableScanner(conf, meta, tablet, meta.getSchema());
+    SeekableScanner scanner  = StorageManagerFactory.getSeekableScanner(conf, meta, schema, tablet, schema);
     scanner.init();
 
     Tuple keyTuple;
@@ -300,10 +302,10 @@ public class TestBSTIndex {
   
   @Test
   public void testFindNextKeyValueInCSV() throws IOException {
-    meta = CatalogUtil.newTableMeta(schema, StoreType.CSV);
+    meta = CatalogUtil.newTableMeta(StoreType.CSV);
 
     Path tablePath = new Path(testDir, "FindNextKeyValueInCSV.csv");
-    Appender appender = StorageManagerFactory.getStorageManager(conf).getAppender(meta, tablePath);
+    Appender appender = StorageManagerFactory.getStorageManager(conf).getAppender(meta, schema, tablePath);
     appender.init();
     Tuple tuple;
     for(int i = 0 ; i < TUPLE_NUM; i ++ ) {
@@ -319,7 +321,7 @@ public class TestBSTIndex {
 
     FileStatus status = fs.getFileStatus(tablePath);
     long fileLen = status.getLen();
-    Fragment tablet = new Fragment("table1_1", status.getPath(), meta, 0, fileLen);
+    FileFragment tablet = new FileFragment("table1_1", status.getPath(), 0, fileLen);
     
     SortSpec [] sortKeys = new SortSpec[2];
     sortKeys[0] = new SortSpec(schema.getColumnByFQN("int"), true, false);
@@ -337,7 +339,7 @@ public class TestBSTIndex {
     creater.setLoadNum(LOAD_NUM);
     creater.open();
 
-    SeekableScanner scanner  = StorageManagerFactory.getSeekableScanner(conf, meta, tablet, meta.getSchema());
+    SeekableScanner scanner  = StorageManagerFactory.getSeekableScanner(conf, meta, schema, tablet, schema);
     scanner.init();
 
     Tuple keyTuple;
@@ -360,7 +362,7 @@ public class TestBSTIndex {
     BSTIndexReader reader = bst.getIndexReader(new Path(testDir, "FindNextKeyValueInCSV.idx"),
         keySchema, comp);
     reader.open();
-    scanner  = StorageManagerFactory.getSeekableScanner(conf, meta, tablet, meta.getSchema());
+    scanner  = StorageManagerFactory.getSeekableScanner(conf, meta, schema, tablet, schema);
     scanner.init();
 
     Tuple result;
@@ -388,10 +390,10 @@ public class TestBSTIndex {
   
   @Test
   public void testFindNextKeyOmittedValueInCSV() throws IOException {
-    meta = CatalogUtil.newTableMeta(schema, StoreType.CSV);
+    meta = CatalogUtil.newTableMeta(StoreType.CSV);
 
     Path tablePath = new Path(testDir, "FindNextKeyOmittedValueInCSV.csv");
-    Appender appender = StorageManagerFactory.getStorageManager(conf).getAppender(meta, tablePath);
+    Appender appender = StorageManagerFactory.getStorageManager(conf).getAppender(meta, schema, tablePath);
     appender.init();
     Tuple tuple;
     for(int i = 0 ; i < TUPLE_NUM; i+=2) {
@@ -407,7 +409,7 @@ public class TestBSTIndex {
 
     FileStatus status = fs.getFileStatus(tablePath);
     long fileLen = status.getLen();
-    Fragment tablet = new Fragment("table1_1", status.getPath(), meta, 0, fileLen);
+    FileFragment tablet = new FileFragment("table1_1", status.getPath(), 0, fileLen);
     
     SortSpec [] sortKeys = new SortSpec[2];
     sortKeys[0] = new SortSpec(schema.getColumnByFQN("int"), true, false);
@@ -425,7 +427,7 @@ public class TestBSTIndex {
     creater.setLoadNum(LOAD_NUM);
     creater.open();
 
-    SeekableScanner scanner  = StorageManagerFactory.getSeekableScanner(conf, meta, tablet, meta.getSchema());
+    SeekableScanner scanner  = StorageManagerFactory.getSeekableScanner(conf, meta, schema, tablet, schema);
     scanner.init();
 
     Tuple keyTuple;
@@ -448,7 +450,7 @@ public class TestBSTIndex {
     BSTIndexReader reader = bst.getIndexReader(new Path(testDir, "FindNextKeyOmittedValueInCSV.idx"),
         keySchema, comp);
     reader.open();
-    scanner  = StorageManagerFactory.getSeekableScanner(conf, meta, tablet, meta.getSchema());
+    scanner  = StorageManagerFactory.getSeekableScanner(conf, meta, schema, tablet, schema);
     scanner.init();
 
     Tuple result;
@@ -487,7 +489,7 @@ public class TestBSTIndex {
 
     FileStatus status = sm.listTableFiles("table1")[0];
     long fileLen = status.getLen();
-    Fragment tablet = new Fragment("table1_1", status.getPath(), meta, 0, fileLen, null);
+    FileFragment tablet = new FileFragment("table1_1", status.getPath(), meta, 0, fileLen, null);
     
     SortSpec [] sortKeys = new SortSpec[2];
     sortKeys[0] = new SortSpec(schema.getColumnByFQN("long"), false, false);
@@ -505,7 +507,7 @@ public class TestBSTIndex {
     creater.setLoadNum(LOAD_NUM);
     creater.open();
 
-    SeekableScanner scanner  = (SeekableScanner)(sm.getScanner(meta, new Fragment[]{tablet}));
+    SeekableScanner scanner  = (SeekableScanner)(sm.getFileScanner(meta, new FileFragment[]{tablet}));
     Tuple keyTuple;
     long offset;
     while (true) {
@@ -526,7 +528,7 @@ public class TestBSTIndex {
     tuple = new VTuple(keySchema.getColumnNum());
     BSTIndexReader reader = bst.getIndexReader(new Path(testDir, "FindValueInRawBSTIndex.idx"), keySchema, comp);
     reader.open();
-    scanner  = (SeekableScanner)(sm.getScanner(meta, new Fragment[]{tablet}));
+    scanner  = (SeekableScanner)(sm.getFileScanner(meta, new FileFragment[]{tablet}));
     for(int i = 0 ; i < TUPLE_NUM -1 ; i ++) {
       tuple.put(0, DatumFactory.createInt8(i));
       tuple.put(1, DatumFactory.createFloat8(i));
@@ -560,7 +562,7 @@ public class TestBSTIndex {
 
     FileStatus status = sm.listTableFiles("table1")[0];
     long fileLen = status.getLen();
-    Fragment tablet = new Fragment("table1_1", status.getPath(), meta, 0, fileLen, null);
+    FileFragment tablet = new FileFragment("table1_1", status.getPath(), meta, 0, fileLen, null);
     
     SortSpec [] sortKeys = new SortSpec[2];
     sortKeys[0] = new SortSpec(schema.getColumnByFQN("long"), false, false);
@@ -578,7 +580,7 @@ public class TestBSTIndex {
     creater.setLoadNum(LOAD_NUM);
     creater.open();
 
-    SeekableScanner scanner  = (SeekableScanner)(sm.getScanner(meta, new Fragment[]{tablet}));
+    SeekableScanner scanner  = (SeekableScanner)(sm.getFileScanner(meta, new FileFragment[]{tablet}));
     Tuple keyTuple;
     long offset;
     while (true) {
@@ -628,7 +630,7 @@ public class TestBSTIndex {
 
     FileStatus status = sm.listTableFiles("table1")[0];
     long fileLen = status.getLen();
-    Fragment tablet = new Fragment("table1_1", status.getPath(), meta, 0, fileLen, null);
+    FileFragment tablet = new FileFragment("table1_1", status.getPath(), meta, 0, fileLen, null);
     
     SortSpec [] sortKeys = new SortSpec[2];
     sortKeys[0] = new SortSpec(schema.getColumnByFQN("int"), true, false);
@@ -646,7 +648,7 @@ public class TestBSTIndex {
     creater.setLoadNum(LOAD_NUM);
     creater.open();
 
-    SeekableScanner scanner  = (SeekableScanner)(sm.getScanner(meta, new Fragment[]{tablet}));
+    SeekableScanner scanner  = (SeekableScanner)(sm.getFileScanner(meta, new FileFragment[]{tablet}));
     Tuple keyTuple;
     long offset;
     while (true) {
@@ -666,7 +668,7 @@ public class TestBSTIndex {
     
     BSTIndexReader reader = bst.getIndexReader(new Path(testDir, "FindOmittedValueInRaw.idx"), keySchema, comp);
     reader.open();
-    scanner  = (SeekableScanner)(sm.getScanner(meta, new Fragment[]{tablet}));
+    scanner  = (SeekableScanner)(sm.getFileScanner(meta, new FileFragment[]{tablet}));
     Tuple result;
     for(int i = 0 ; i < TUPLE_NUM -1 ; i ++) {
       keyTuple = new VTuple(2);
@@ -710,7 +712,7 @@ public class TestBSTIndex {
 
     FileStatus status = sm.listTableFiles("table1")[0];
     long fileLen = status.getLen();
-    Fragment tablet = new Fragment("table1_1", status.getPath(), meta, 0, fileLen, null);
+    FileFragment tablet = new FileFragment("table1_1", status.getPath(), meta, 0, fileLen, null);
     
     SortSpec [] sortKeys = new SortSpec[2];
     sortKeys[0] = new SortSpec(schema.getColumnByFQN("int"), true, false);
@@ -728,7 +730,7 @@ public class TestBSTIndex {
     creater.setLoadNum(LOAD_NUM);
     creater.open();
 
-    SeekableScanner scanner  = (SeekableScanner)(sm.getScanner(meta, new Fragment[]{tablet}));
+    SeekableScanner scanner  = (SeekableScanner)(sm.getFileScanner(meta, new FileFragment[]{tablet}));
     Tuple keyTuple;
     long offset;
     while (true) {
@@ -749,7 +751,7 @@ public class TestBSTIndex {
     BSTIndexReader reader = bst.getIndexReader(new Path(testDir, "FindNextKeyOmittedValueInRaw.idx"),
         keySchema, comp);
     reader.open();
-    scanner  = (SeekableScanner)(sm.getScanner(meta, new Fragment[]{tablet}));
+    scanner  = (SeekableScanner)(sm.getFileScanner(meta, new FileFragment[]{tablet}));
     Tuple result;
     for(int i = 1 ; i < TUPLE_NUM -1 ; i+=2) {
       keyTuple = new VTuple(2);
@@ -783,7 +785,7 @@ public class TestBSTIndex {
 
     FileStatus status = sm.listTableFiles("table1")[0];
     long fileLen = status.getLen();
-    Fragment tablet = new Fragment("table1_1", status.getPath(), meta, 0, fileLen, null);
+    FileFragment tablet = new FileFragment("table1_1", status.getPath(), meta, 0, fileLen, null);
     
     SortSpec [] sortKeys = new SortSpec[2];
     sortKeys[0] = new SortSpec(schema.getColumnByFQN("int"), true, false);
@@ -801,7 +803,7 @@ public class TestBSTIndex {
     creater.setLoadNum(LOAD_NUM);
     creater.open();
 
-    SeekableScanner scanner  = (SeekableScanner)(sm.getScanner(meta, new Fragment[]{tablet}));
+    SeekableScanner scanner  = (SeekableScanner)(sm.getFileScanner(meta, new FileFragment[]{tablet}));
     Tuple keyTuple;
     long offset;
     while (true) {
@@ -822,7 +824,7 @@ public class TestBSTIndex {
     BSTIndexReader reader = bst.getIndexReader(new Path(testDir, "FindNextKeyOmittedValueInRaw.idx"),
         keySchema, comp);
     reader.open();
-    scanner  = (SeekableScanner)(sm.getScanner(meta, new Fragment[]{tablet}));
+    scanner  = (SeekableScanner)(sm.getFileScanner(meta, new FileFragment[]{tablet}));
     Tuple result;
 
     keyTuple = new VTuple(2);
@@ -866,7 +868,7 @@ public class TestBSTIndex {
 
     FileStatus status = sm.listTableFiles("table1")[0];
     long fileLen = status.getLen();
-    Fragment tablet = new Fragment("table1_1", status.getPath(), meta, 0, fileLen, null);
+    FileFragment tablet = new FileFragment("table1_1", status.getPath(), meta, 0, fileLen, null);
 
     SortSpec [] sortKeys = new SortSpec[2];
     sortKeys[0] = new SortSpec(schema.getColumnByFQN("long"), true, false);
@@ -884,7 +886,7 @@ public class TestBSTIndex {
     creater.setLoadNum(LOAD_NUM);
     creater.open();
 
-    SeekableScanner scanner  = (SeekableScanner)(sm.getScanner(meta, new Fragment[]{tablet}));
+    SeekableScanner scanner  = (SeekableScanner)(sm.getFileScanner(meta, new FileFragment[]{tablet}));
     Tuple keyTuple;
     long offset;
     while (true) {
@@ -905,7 +907,7 @@ public class TestBSTIndex {
     tuple = new VTuple(keySchema.getColumnNum());
     BSTIndexReader reader = bst.getIndexReader(new Path(testDir, "Test.idx"), keySchema, comp);
     reader.open();
-    scanner  = (SeekableScanner)(sm.getScanner(meta, new Fragment[]{tablet}));
+    scanner  = (SeekableScanner)(sm.getFileScanner(meta, new FileFragment[]{tablet}));
     tuple.put(0, DatumFactory.createInt8(0));
     tuple.put(1, DatumFactory.createFloat8(0));
 
@@ -940,7 +942,7 @@ public class TestBSTIndex {
 
     FileStatus status = sm.listTableFiles("table1")[0];
     long fileLen = status.getLen();
-    Fragment tablet = new Fragment("table1_1", status.getPath(), meta, 0, fileLen, null);
+    FileFragment tablet = new FileFragment("table1_1", status.getPath(), meta, 0, fileLen, null);
 
     SortSpec [] sortKeys = new SortSpec[2];
     sortKeys[0] = new SortSpec(schema.getColumnByFQN("int"), true, false);
@@ -958,7 +960,7 @@ public class TestBSTIndex {
     creater.setLoadNum(LOAD_NUM);
     creater.open();
 
-    SeekableScanner scanner  = (SeekableScanner)(sm.getScanner(meta, new Fragment[]{tablet}));
+    SeekableScanner scanner  = (SeekableScanner)(sm.getFileScanner(meta, new FileFragment[]{tablet}));
     Tuple keyTuple;
     long offset;
     while (true) {
@@ -1040,7 +1042,7 @@ public class TestBSTIndex {
 
     FileStatus status = sm.listTableFiles("table1")[0];
     long fileLen = status.getLen();
-    Fragment tablet = new Fragment("table1_1", status.getPath(), meta, 0, fileLen, null);
+    FileFragment tablet = new FileFragment("table1_1", status.getPath(), meta, 0, fileLen, null);
 
     SortSpec [] sortKeys = new SortSpec[2];
     sortKeys[0] = new SortSpec(schema.getColumnByFQN("int"), true, false);
@@ -1058,7 +1060,7 @@ public class TestBSTIndex {
     creater.setLoadNum(LOAD_NUM);
     creater.open();
 
-    SeekableScanner scanner  = (SeekableScanner)(sm.getScanner(meta, new Fragment[]{tablet}));
+    SeekableScanner scanner  = (SeekableScanner)(sm.getFileScanner(meta, new FileFragment[]{tablet}));
     Tuple keyTuple;
     long offset;
     while (true) {
@@ -1116,7 +1118,7 @@ public class TestBSTIndex {
 
     FileStatus status = sm.listTableFiles("table1")[0];
     long fileLen = status.getLen();
-    Fragment tablet = new Fragment("table1_1", status.getPath(), meta, 0, fileLen, null);
+    FileFragment tablet = new FileFragment("table1_1", status.getPath(), meta, 0, fileLen, null);
 
     SortSpec [] sortKeys = new SortSpec[2];
     sortKeys[0] = new SortSpec(schema.getColumnByFQN("long"), false, false);
@@ -1134,7 +1136,7 @@ public class TestBSTIndex {
     creater.setLoadNum(LOAD_NUM);
     creater.open();
 
-    SeekableScanner scanner  = (SeekableScanner)(sm.getScanner(meta, new Fragment[]{tablet}));
+    SeekableScanner scanner  = (SeekableScanner)(sm.getFileScanner(meta, new FileFragment[]{tablet}));
     Tuple keyTuple;
     long offset;
     while (true) {
@@ -1155,7 +1157,7 @@ public class TestBSTIndex {
     tuple = new VTuple(keySchema.getColumnNum());
     BSTIndexReader reader = bst.getIndexReader(new Path(testDir, "FindValueInCSV.idx"), keySchema, comp);
     reader.open();
-    scanner  = (SeekableScanner)(sm.getScanner(meta, new Fragment[]{tablet}));
+    scanner  = (SeekableScanner)(sm.getFileScanner(meta, new FileFragment[]{tablet}));
     for(int i = (TUPLE_NUM - 1) ; i > 0  ; i --) {
       tuple.put(0, DatumFactory.createInt8(i));
       tuple.put(1, DatumFactory.createFloat8(i));
@@ -1196,7 +1198,7 @@ public class TestBSTIndex {
 
     FileStatus status = sm.listTableFiles("table1")[0];
     long fileLen = status.getLen();
-    Fragment tablet = new Fragment("table1_1", status.getPath(), meta, 0, fileLen, null);
+    FileFragment tablet = new FileFragment("table1_1", status.getPath(), meta, 0, fileLen, null);
 
     SortSpec [] sortKeys = new SortSpec[2];
     sortKeys[0] = new SortSpec(schema.getColumnByFQN("int"), false, false);
@@ -1214,7 +1216,7 @@ public class TestBSTIndex {
     creater.setLoadNum(LOAD_NUM);
     creater.open();
 
-    SeekableScanner scanner  = (SeekableScanner)(sm.getScanner(meta, new Fragment[]{tablet}));
+    SeekableScanner scanner  = (SeekableScanner)(sm.getFileScanner(meta, new FileFragment[]{tablet}));
     Tuple keyTuple;
     long offset;
     while (true) {
@@ -1238,7 +1240,7 @@ public class TestBSTIndex {
     assertEquals(keySchema, reader.getKeySchema());
     assertEquals(comp, reader.getComparator());
 
-    scanner  = (SeekableScanner)(sm.getScanner(meta, new Fragment[]{tablet}));
+    scanner  = (SeekableScanner)(sm.getFileScanner(meta, new FileFragment[]{tablet}));
     Tuple result;
     for(int i = (TUPLE_NUM - 1) ; i > 0 ; i --) {
       keyTuple = new VTuple(2);

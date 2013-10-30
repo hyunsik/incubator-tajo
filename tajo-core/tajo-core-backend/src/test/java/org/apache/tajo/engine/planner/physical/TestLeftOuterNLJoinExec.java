@@ -20,7 +20,8 @@ package org.apache.tajo.engine.planner.physical;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.tajo.TajoTestingCluster;
-import org.apache.tajo.TaskAttemptContext;
+import org.apache.tajo.storage.fragment.FileFragment;
+import org.apache.tajo.worker.TaskAttemptContext;
 import org.apache.tajo.algebra.Expr;
 import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.proto.CatalogProtos.StoreType;
@@ -90,12 +91,11 @@ public class TestLeftOuterNLJoinExec {
     dep3Schema.addColumn("loc_id", Type.INT4);
 
 
-    TableMeta dep3Meta = CatalogUtil.newTableMeta(dep3Schema,
-        StoreType.CSV);
+    TableMeta dep3Meta = CatalogUtil.newTableMeta(StoreType.CSV);
     Path dep3Path = new Path(testDir, "dep3.csv");
-    Appender appender1 = StorageManagerFactory.getStorageManager(conf).getAppender(dep3Meta, dep3Path);
+    Appender appender1 = StorageManagerFactory.getStorageManager(conf).getAppender(dep3Meta, dep3Schema, dep3Path);
     appender1.init();
-    Tuple tuple = new VTuple(dep3Meta.getSchema().getColumnNum());
+    Tuple tuple = new VTuple(dep3Schema.getColumnNum());
     for (int i = 0; i < 10; i++) {
       tuple.put(new Datum[] { DatumFactory.createInt4(i),
                     DatumFactory.createText("dept_" + i),
@@ -105,7 +105,7 @@ public class TestLeftOuterNLJoinExec {
 
     appender1.flush();
     appender1.close();
-    dep3 = CatalogUtil.newTableDesc("dep3", dep3Meta, dep3Path);
+    dep3 = CatalogUtil.newTableDesc("dep3", dep3Schema, dep3Meta, dep3Path);
     catalog.addTable(dep3);
 
     //----------------- job3 ------------------------------
@@ -120,12 +120,11 @@ public class TestLeftOuterNLJoinExec {
     job3Schema.addColumn("job_title", Type.TEXT);
 
 
-    TableMeta job3Meta = CatalogUtil.newTableMeta(job3Schema,
-        StoreType.CSV);
+    TableMeta job3Meta = CatalogUtil.newTableMeta(StoreType.CSV);
     Path job3Path = new Path(testDir, "job3.csv");
-    Appender appender2 = StorageManagerFactory.getStorageManager(conf).getAppender(job3Meta, job3Path);
+    Appender appender2 = StorageManagerFactory.getStorageManager(conf).getAppender(job3Meta, job3Schema, job3Path);
     appender2.init();
-    Tuple tuple2 = new VTuple(job3Meta.getSchema().getColumnNum());
+    Tuple tuple2 = new VTuple(job3Schema.getColumnNum());
     for (int i = 1; i < 4; i++) {
       int x = 100 + i;
       tuple2.put(new Datum[] { DatumFactory.createInt4(100 + i),
@@ -135,7 +134,7 @@ public class TestLeftOuterNLJoinExec {
 
     appender2.flush();
     appender2.close();
-    job3 = CatalogUtil.newTableDesc("job3", job3Meta, job3Path);
+    job3 = CatalogUtil.newTableDesc("job3", job3Schema, job3Meta, job3Path);
     catalog.addTable(job3);
 
 
@@ -160,11 +159,11 @@ public class TestLeftOuterNLJoinExec {
     emp3Schema.addColumn("job_id", Type.INT4);
 
 
-    TableMeta emp3Meta = CatalogUtil.newTableMeta(emp3Schema, StoreType.CSV);
+    TableMeta emp3Meta = CatalogUtil.newTableMeta(StoreType.CSV);
     Path emp3Path = new Path(testDir, "emp3.csv");
-    Appender appender3 = StorageManagerFactory.getStorageManager(conf).getAppender(emp3Meta, emp3Path);
+    Appender appender3 = StorageManagerFactory.getStorageManager(conf).getAppender(emp3Meta, emp3Schema, emp3Path);
     appender3.init();
-    Tuple tuple3 = new VTuple(emp3Meta.getSchema().getColumnNum());
+    Tuple tuple3 = new VTuple(emp3Schema.getColumnNum());
 
     for (int i = 1; i < 4; i += 2) {
       int x = 10 + i;
@@ -199,7 +198,7 @@ public class TestLeftOuterNLJoinExec {
 
     appender3.flush();
     appender3.close();
-    emp3 = CatalogUtil.newTableDesc("emp3", emp3Meta, emp3Path);
+    emp3 = CatalogUtil.newTableDesc("emp3", emp3Schema, emp3Meta, emp3Path);
     catalog.addTable(emp3);
 
     // ---------------------phone3 --------------------
@@ -212,15 +211,15 @@ public class TestLeftOuterNLJoinExec {
     phone3Schema.addColumn("phone_number", Type.TEXT);
 
 
-    TableMeta phone3Meta = CatalogUtil.newTableMeta(phone3Schema,
-        StoreType.CSV);
+    TableMeta phone3Meta = CatalogUtil.newTableMeta(StoreType.CSV);
     Path phone3Path = new Path(testDir, "phone3.csv");
-    Appender appender5 = StorageManagerFactory.getStorageManager(conf).getAppender(phone3Meta, phone3Path);
+    Appender appender5 = StorageManagerFactory.getStorageManager(conf).getAppender(phone3Meta, phone3Schema,
+        phone3Path);
     appender5.init();
     
     appender5.flush();
     appender5.close();
-    phone3 = CatalogUtil.newTableDesc("phone3", phone3Meta, phone3Path);
+    phone3 = CatalogUtil.newTableDesc("phone3", phone3Schema, phone3Meta, phone3Path);
     catalog.addTable(phone3);
 
     analyzer = new SQLAnalyzer();
@@ -242,12 +241,12 @@ public class TestLeftOuterNLJoinExec {
 
   @Test
   public final void testLeftOuterNLJoinExec0() throws IOException, PlanningException {
-    Fragment[] dep3Frags = StorageManager.splitNG(conf, "dep3", dep3.getMeta(), dep3.getPath(),
+    FileFragment[] dep3Frags = StorageManager.splitNG(conf, "dep3", dep3.getMeta(), dep3.getPath(),
         Integer.MAX_VALUE);
-    Fragment[] emp3Frags = StorageManager.splitNG(conf, "emp3", emp3.getMeta(), emp3.getPath(),
+    FileFragment[] emp3Frags = StorageManager.splitNG(conf, "emp3", emp3.getMeta(), emp3.getPath(),
         Integer.MAX_VALUE);
 
-    Fragment[] merged = TUtil.concat(dep3Frags, emp3Frags);
+    FileFragment[] merged = TUtil.concat(dep3Frags, emp3Frags);
 
     Path workDir = CommonTestingUtil.getTestDir("target/test-data/TestLeftOuterNLJoinExec0");
     TaskAttemptContext ctx = new TaskAttemptContext(conf,
@@ -282,12 +281,12 @@ public class TestLeftOuterNLJoinExec {
 
   @Test
   public final void testLeftOuterNLJoinExec1() throws IOException, PlanningException {
-    Fragment[] job3Frags = StorageManager.splitNG(conf, "job3", job3.getMeta(), job3.getPath(),
+    FileFragment[] job3Frags = StorageManager.splitNG(conf, "job3", job3.getMeta(), job3.getPath(),
         Integer.MAX_VALUE);
-    Fragment[] emp3Frags = StorageManager.splitNG(conf, "emp3", emp3.getMeta(), emp3.getPath(),
+    FileFragment[] emp3Frags = StorageManager.splitNG(conf, "emp3", emp3.getMeta(), emp3.getPath(),
         Integer.MAX_VALUE);
 
-    Fragment[] merged = TUtil.concat(job3Frags, emp3Frags);
+    FileFragment[] merged = TUtil.concat(job3Frags, emp3Frags);
 
 
     Path workDir = CommonTestingUtil.getTestDir("target/test-data/TestLeftOuter_NLJoinExec1");
@@ -326,12 +325,12 @@ public class TestLeftOuterNLJoinExec {
 
   @Test
   public final void testLeftOuter_NLJoinExec2() throws IOException, PlanningException {
-    Fragment[] emp3Frags = StorageManager.splitNG(conf, "emp3", emp3.getMeta(), emp3.getPath(),
+    FileFragment[] emp3Frags = StorageManager.splitNG(conf, "emp3", emp3.getMeta(), emp3.getPath(),
         Integer.MAX_VALUE);
-    Fragment[] job3Frags = StorageManager.splitNG(conf, "job3", job3.getMeta(), job3.getPath(),
+    FileFragment[] job3Frags = StorageManager.splitNG(conf, "job3", job3.getMeta(), job3.getPath(),
         Integer.MAX_VALUE);
 
-    Fragment[] merged = TUtil.concat(emp3Frags, job3Frags);
+    FileFragment[] merged = TUtil.concat(emp3Frags, job3Frags);
 
     Path workDir = CommonTestingUtil.getTestDir("target/test-data/TestLeftOuter_NLJoinExec2");
     TaskAttemptContext ctx = new TaskAttemptContext(conf,
@@ -370,12 +369,12 @@ public class TestLeftOuterNLJoinExec {
 
   @Test
   public final void testLeftOuter_NLJoinExec3() throws IOException, PlanningException {
-    Fragment[] emp3Frags = StorageManager.splitNG(conf, "emp3", emp3.getMeta(), emp3.getPath(),
+    FileFragment[] emp3Frags = StorageManager.splitNG(conf, "emp3", emp3.getMeta(), emp3.getPath(),
         Integer.MAX_VALUE);
-    Fragment[] phone3Frags = StorageManager.splitNG(conf, "phone3", phone3.getMeta(), phone3.getPath(),
+    FileFragment[] phone3Frags = StorageManager.splitNG(conf, "phone3", phone3.getMeta(), phone3.getPath(),
         Integer.MAX_VALUE);
 
-    Fragment[] merged = TUtil.concat(emp3Frags, phone3Frags);
+    FileFragment[] merged = TUtil.concat(emp3Frags, phone3Frags);
 
     Path workDir = CommonTestingUtil.getTestDir("target/test-data/TestLeftOuter_NLJoinExec3");
     TaskAttemptContext ctx = new TaskAttemptContext(conf,
@@ -413,12 +412,12 @@ public class TestLeftOuterNLJoinExec {
 
     @Test
   public final void testLeftOuter_NLJoinExec4() throws IOException, PlanningException {
-    Fragment[] emp3Frags = StorageManager.splitNG(conf, "emp3", emp3.getMeta(), emp3.getPath(),
+    FileFragment[] emp3Frags = StorageManager.splitNG(conf, "emp3", emp3.getMeta(), emp3.getPath(),
         Integer.MAX_VALUE);
-    Fragment[] phone3Frags = StorageManager.splitNG(conf, "phone3", phone3.getMeta(), phone3.getPath(),
+    FileFragment[] phone3Frags = StorageManager.splitNG(conf, "phone3", phone3.getMeta(), phone3.getPath(),
         Integer.MAX_VALUE);
 
-    Fragment[] merged = TUtil.concat(phone3Frags, emp3Frags);
+    FileFragment[] merged = TUtil.concat(phone3Frags, emp3Frags);
 
     Path workDir = CommonTestingUtil.getTestDir("target/test-data/TestLeftOuter_NLJoinExec4");
     TaskAttemptContext ctx = new TaskAttemptContext(conf,

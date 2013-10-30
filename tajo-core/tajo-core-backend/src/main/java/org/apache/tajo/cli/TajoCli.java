@@ -18,7 +18,6 @@
 
 package org.apache.tajo.cli;
 
-import com.google.protobuf.ServiceException;
 import jline.console.ConsoleReader;
 import jline.console.history.FileHistory;
 import jline.console.history.PersistentHistory;
@@ -26,10 +25,11 @@ import org.apache.commons.cli.*;
 import org.apache.commons.lang.StringUtils;
 import org.apache.tajo.QueryId;
 import org.apache.tajo.QueryIdFactory;
+import org.apache.tajo.TajoConstants;
 import org.apache.tajo.TajoProtos.QueryState;
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.TableDesc;
-import org.apache.tajo.catalog.statistics.TableStat;
+import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.client.QueryStatus;
 import org.apache.tajo.client.TajoClient;
 import org.apache.tajo.conf.TajoConf;
@@ -64,9 +64,10 @@ public class TajoCli {
   private static final Class [] registeredCommands = {
       DescTableCommand.class,
       HelpCommand.class,
-      AttachCommand.class,
       DetachCommand.class,
-      ExitCommand.class
+      ExitCommand.class,
+      Copyright.class,
+      Version.class
   };
 
   private static final String HOME_DIR = System.getProperty("user.home");
@@ -101,17 +102,17 @@ public class TajoCli {
 
     // if there is no "-h" option,
     if(hostName == null) {
-      if (conf.getVar(ConfVars.CLIENT_SERVICE_ADDRESS) != null) {
+      if (conf.getVar(ConfVars.TAJO_MASTER_CLIENT_RPC_ADDRESS) != null) {
         // it checks if the client service address is given in configuration and distributed mode.
         // if so, it sets entryAddr.
-        hostName = conf.getVar(ConfVars.CLIENT_SERVICE_ADDRESS).split(":")[0];
+        hostName = conf.getVar(ConfVars.TAJO_MASTER_CLIENT_RPC_ADDRESS).split(":")[0];
       }
     }
     if (port == null) {
-      if (conf.getVar(ConfVars.CLIENT_SERVICE_ADDRESS) != null) {
+      if (conf.getVar(ConfVars.TAJO_MASTER_CLIENT_RPC_ADDRESS) != null) {
         // it checks if the client service address is given in configuration and distributed mode.
         // if so, it sets entryAddr.
-        port = Integer.parseInt(conf.getVar(ConfVars.CLIENT_SERVICE_ADDRESS).split(":")[1]);
+        port = Integer.parseInt(conf.getVar(ConfVars.TAJO_MASTER_CLIENT_RPC_ADDRESS).split(":")[1]);
       }
     }
 
@@ -119,7 +120,7 @@ public class TajoCli {
       System.err.println("ERROR: cannot find valid Tajo server address");
       System.exit(-1);
     } else if (hostName != null && port != null) {
-      conf.setVar(ConfVars.CLIENT_SERVICE_ADDRESS, hostName+":"+port);
+      conf.setVar(ConfVars.TAJO_MASTER_CLIENT_RPC_ADDRESS, hostName+":"+port);
       client = new TajoClient(conf);
     } else if (hostName == null && port == null) {
       client = new TajoClient(conf);
@@ -254,12 +255,10 @@ public class TajoCli {
 
   private void invokeCommand(String [] cmds) {
     // this command should be moved to GlobalEngine
-    Command invoked = null;
+    Command invoked;
     try {
       invoked = commands.get(cmds[0]);
       invoked.invoke(cmds);
-    } catch (IllegalArgumentException iae) {
-      sout.println("usage: " + invoked.getCommand() + " " + invoked.getUsage());
     } catch (Throwable t) {
       sout.println(t.getMessage());
     }
@@ -284,13 +283,16 @@ public class TajoCli {
         sout.flush();
         ((PersistentHistory)this.reader.getHistory()).flush();
         System.exit(0);
-      } else if (cmds[0].equalsIgnoreCase("attach") || cmds[0].equalsIgnoreCase("detach")) {
+      } else if (cmds[0].equalsIgnoreCase("detach") && cmds.length > 1 && cmds[1].equalsIgnoreCase("table")) {
         // this command should be moved to GlobalEngine
         invokeCommand(cmds);
 
       } else { // submit a query to TajoMaster
         ClientProtos.GetQueryStatusResponse response = client.executeQuery(stripped);
-        if (response.getResultCode() == ClientProtos.ResultCode.OK) {
+        if (response == null) {
+          sout.println("response is null");
+        }
+        else if (response.getResultCode() == ClientProtos.ResultCode.OK) {
           QueryId queryId = null;
           try {
             queryId = new QueryId(response.getQueryId());
@@ -368,7 +370,7 @@ public class TajoCli {
 
               ResultSetMetaData rsmd = res.getMetaData();
               TableDesc desc = client.getResultDesc(queryId);
-              TableStat stat = desc.getMeta().getStat();
+              TableStats stat = desc.getStats();
               String volume = FileUtil.humanReadableByteCount(stat.getNumBytes(), false);
               long resultRows = stat.getNumRows();
               sout.println("result: " + desc.getPath() + ", " + resultRows + " rows (" + volume + ")");
@@ -439,10 +441,10 @@ public class TajoCli {
     sb.append("\ntable name: ").append(desc.getName()).append("\n");
     sb.append("table path: ").append(desc.getPath()).append("\n");
     sb.append("store type: ").append(desc.getMeta().getStoreType()).append("\n");
-    if (desc.getMeta().getStat() != null) {
-      sb.append("number of rows: ").append(desc.getMeta().getStat().getNumRows()).append("\n");
+    if (desc.getStats() != null) {
+      sb.append("number of rows: ").append(desc.getStats().getNumRows()).append("\n");
       sb.append("volume: ").append(
-          FileUtil.humanReadableByteCount(desc.getMeta().getStat().getNumBytes(),
+          FileUtil.humanReadableByteCount(desc.getStats().getNumBytes(),
               true)).append("\n");
     }
     sb.append("Options: \n");
@@ -453,8 +455,8 @@ public class TajoCli {
     sb.append("\n");
     sb.append("schema: \n");
 
-    for(int i = 0; i < desc.getMeta().getSchema().getColumnNum(); i++) {
-      Column col = desc.getMeta().getSchema().getColumn(i);
+    for(int i = 0; i < desc.getSchema().getColumnNum(); i++) {
+      Column col = desc.getSchema().getColumn(i);
       sb.append(col.getColumnName()).append("\t").append(col.getDataType().getType());
       if (col.getDataType().hasLength()) {
         sb.append("(").append(col.getDataType().getLength()).append(")");
@@ -496,7 +498,7 @@ public class TajoCli {
 
     @Override
     public String getUsage() {
-      return "[TB_NAME]";
+      return "[table_name]";
     }
 
     @Override
@@ -514,13 +516,28 @@ public class TajoCli {
 
     @Override
     public void invoke(String[] cmd) throws Exception {
-      for (Map.Entry<String,Command> entry : commands.entrySet()) {
-        sout.print(entry.getKey());
-        sout.print(" ");
-        sout.print(entry.getValue().getUsage());
-        sout.print("\t");
-        sout.println(entry.getValue().getDescription());
-      }
+      sout.println();
+
+      sout.println("General");
+      sout.println("  \\copyright  show Apache License 2.0");
+      sout.println("  \\version    show Tajo version");
+      sout.println("  \\?          show help");
+      sout.println("  \\q          quit tsql");
+      sout.println();
+      sout.println();
+
+      sout.println("Informational");
+      sout.println("  \\d         list tables");
+      sout.println("  \\d  NAME   describe table");
+      sout.println();
+      sout.println();
+
+      sout.println("Documentations");
+      sout.println("  tsql guide        http://wiki.apache.org/tajo/tsql");
+      sout.println("  Query language    http://wiki.apache.org/tajo/QueryLanguage");
+      sout.println("  Functions         http://wiki.apache.org/tajo/Functions");
+      sout.println("  Backup & restore  http://wiki.apache.org/tajo/BackupAndRestore");
+      sout.println("  Configuration     http://wiki.apache.org/tajo/Configuration");
       sout.println();
     }
 
@@ -536,37 +553,6 @@ public class TajoCli {
   }
 
   // TODO - This should be dealt as a DDL statement instead of a command
-  public class AttachCommand extends Command {
-    @Override
-    public String getCommand() {
-      return "attach";
-    }
-
-    @Override
-    public void invoke(String[] cmd) throws Exception {
-      if (cmd.length != 3) {
-        throw new IllegalArgumentException();
-      }
-      if (!client.existTable(cmd[1])) {
-        client.attachTable(cmd[1], cmd[2]);
-        sout.println("attached " + cmd[1] + " (" + cmd[2] + ")");
-      } else {
-        sout.println("ERROR:  relation \"" + cmd[1] + "\" already exists");
-      }
-    }
-
-    @Override
-    public String getUsage() {
-      return "TB_NAME PATH";
-    }
-
-    @Override
-    public String getDescription() {
-      return "attach a existing table as a given table name";
-    }
-  }
-
-  // TODO - This should be dealt as a DDL statement instead of a command
   public class DetachCommand extends Command {
     @Override
     public String getCommand() {
@@ -575,12 +561,12 @@ public class TajoCli {
 
     @Override
     public void invoke(String[] cmd) throws Exception {
-      if (cmd.length != 2) {
-        throw new IllegalArgumentException();
+      if (cmd.length != 3) {
+        throw new IllegalArgumentException("usage: detach table [tb_name]");
       } else {
-        if (client.existTable(cmd[1])) {
-          client.detachTable(cmd[1]);
-          sout.println("detached " + cmd[1] + " from tajo");
+        if (client.existTable(cmd[2])) {
+          client.detachTable(cmd[2]);
+          sout.println("Table \"" + cmd[2] + "\" is detached.");
         } else {
           sout.println("ERROR:  table \"" + cmd[1] + "\" does not exist");
         }
@@ -589,12 +575,75 @@ public class TajoCli {
 
     @Override
     public String getUsage() {
-      return "TB_NAME";
+      return "table [table_name]";
     }
 
     @Override
     public String getDescription() {
       return "detach a table, but it does not remove the table directory.";
+    }
+  }
+
+  public class Version extends Command {
+
+    @Override
+    public String getCommand() {
+      return "\\version";
+    }
+
+    @Override
+    public void invoke(String[] cmd) throws Exception {
+      sout.println(TajoConstants.TAJO_VERSION);
+    }
+
+    @Override
+    public String getUsage() {
+      return "";
+    }
+
+    @Override
+    public String getDescription() {
+      return "show Apache License 2.0";
+    }
+  }
+
+  public class Copyright extends Command {
+
+    @Override
+    public String getCommand() {
+      return "\\copyright";
+    }
+
+    @Override
+    public void invoke(String[] cmd) throws Exception {
+      sout.println();
+      sout.println(
+      "  Licensed to the Apache Software Foundation (ASF) under one\n" +
+      "  or more contributor license agreements.  See the NOTICE file\n" +
+      "  distributed with this work for additional information\n" +
+      "  regarding copyright ownership.  The ASF licenses this file\n" +
+      "  to you under the Apache License, Version 2.0 (the\n" +
+      "  \"License\"); you may not use this file except in compliance\n" +
+      "  with the License.  You may obtain a copy of the License at\n" +
+      "\n" +
+      "       http://www.apache.org/licenses/LICENSE-2.0\n" +
+      "\n" +
+      "   Unless required by applicable law or agreed to in writing, software\n" +
+      "   distributed under the License is distributed on an \"AS IS\" BASIS,\n" +
+      "   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n" +
+      "   See the License for the specific language governing permissions and\n" +
+      "   limitations under the License.");
+      sout.println();
+    }
+
+    @Override
+    public String getUsage() {
+      return "";
+    }
+
+    @Override
+    public String getDescription() {
+      return "show Apache License 2.0";
     }
   }
 
@@ -637,7 +686,7 @@ public class TajoCli {
       try {
         invoked.invoke(arguments);
       } catch (IllegalArgumentException ige) {
-        sout.println("usage: " + invoked.getCommand() + " " + invoked.getUsage());
+        sout.println(ige.getMessage());
       } catch (Exception e) {
         sout.println(e.getMessage());
       }

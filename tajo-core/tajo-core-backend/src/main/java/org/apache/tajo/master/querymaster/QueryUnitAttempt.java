@@ -25,7 +25,7 @@ import org.apache.hadoop.yarn.state.*;
 import org.apache.hadoop.yarn.util.RackResolver;
 import org.apache.tajo.QueryUnitAttemptId;
 import org.apache.tajo.TajoProtos.TaskAttemptState;
-import org.apache.tajo.catalog.statistics.TableStat;
+import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.ipc.TajoWorkerProtocol.Partition;
 import org.apache.tajo.ipc.TajoWorkerProtocol.TaskCompletionReport;
 import org.apache.tajo.master.event.*;
@@ -192,7 +192,7 @@ public class QueryUnitAttempt implements EventHandler<TaskAttemptEvent> {
       this.getQueryUnit().setIntermediateData(partitions);
     }
     if (report.hasResultStats()) {
-      this.getQueryUnit().setStats(new TableStat(report.getResultStats()));
+      this.getQueryUnit().setStats(new TableStats(report.getResultStats()));
     }
   }
 
@@ -273,7 +273,6 @@ public class QueryUnitAttempt implements EventHandler<TaskAttemptEvent> {
     @Override
     public void transition(QueryUnitAttempt queryUnitAttempt,
                            TaskAttemptEvent taskAttemptEvent) {
-      LOG.info(">>>>>>>>> Already Assigned: " + queryUnitAttempt.getId());
     }
   }
 
@@ -283,7 +282,6 @@ public class QueryUnitAttempt implements EventHandler<TaskAttemptEvent> {
     @Override
     public void transition(QueryUnitAttempt queryUnitAttempt,
                            TaskAttemptEvent taskAttemptEvent) {
-      LOG.info(">>>>>>>>> Already Done: " + queryUnitAttempt.getId());
     }
   }
 

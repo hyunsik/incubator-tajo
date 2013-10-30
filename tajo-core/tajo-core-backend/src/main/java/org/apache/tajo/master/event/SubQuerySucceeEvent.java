@@ -20,17 +20,11 @@ package org.apache.tajo.master.event;
 
 import org.apache.tajo.ExecutionBlockId;
 import org.apache.tajo.catalog.TableMeta;
+import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.master.querymaster.SubQueryState;
 
 public class SubQuerySucceeEvent extends SubQueryCompletedEvent {
-  private final TableMeta tableMeta;
-
-  public SubQuerySucceeEvent(final ExecutionBlockId id, TableMeta tableMeta) {
+  public SubQuerySucceeEvent(final ExecutionBlockId id) {
     super(id, SubQueryState.SUCCEEDED);
-    this.tableMeta = tableMeta;
-  }
-
-  public TableMeta getTableMeta() {
-    return tableMeta;
   }
 }

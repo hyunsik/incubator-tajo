@@ -18,14 +18,18 @@
 
 package org.apache.tajo.storage;
 
+import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.catalog.TableMeta;
+import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.conf.TajoConf;
+import org.apache.tajo.storage.fragment.FileFragment;
+import org.apache.tajo.storage.fragment.Fragment;
+import org.apache.tajo.storage.fragment.FragmentConvertor;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
@@ -33,16 +37,23 @@ import java.util.List;
 public class MergeScanner implements Scanner {
   private Configuration conf;
   private TableMeta meta;
-  private List<Fragment> fragments;
-  private Iterator<Fragment> iterator;
-  private Fragment currentFragment;
+  private Schema schema;
+  private List<FileFragment> fragments;
+  private Iterator<FileFragment> iterator;
+  private FileFragment currentFragment;
   private Scanner currentScanner;
   private Tuple tuple;
 
-  public MergeScanner(Configuration conf, TableMeta meta, Collection<Fragment> fragments) {
+  public MergeScanner(Configuration conf, Schema schema, TableMeta meta, Collection<FileFragment> rawFragmentList)
+      throws IOException {
     this.conf = conf;
+    this.schema = schema;
     this.meta = meta;
-    this.fragments = new ArrayList<Fragment>(fragments);
+    this.fragments = Lists.newArrayList();
+    for (Fragment f : rawFragmentList) {
+      fragments.add((FileFragment) f);
+    }
+
     iterator = this.fragments.iterator();
   }
 
@@ -62,7 +73,8 @@ public class MergeScanner implements Scanner {
         currentScanner.close();
       }
       currentFragment = iterator.next();
-      currentScanner = StorageManagerFactory.getStorageManager((TajoConf)conf).getScanner(meta, currentFragment);
+      currentScanner = StorageManagerFactory.getStorageManager((TajoConf)conf).getScanner(meta, schema,
+          currentFragment);
       currentScanner.init();
       return currentScanner.next();
     } else {
@@ -75,7 +87,8 @@ public class MergeScanner implements Scanner {
     iterator = fragments.iterator();
     if (iterator.hasNext()) {
       currentFragment = iterator.next();
-      currentScanner = StorageManagerFactory.getStorageManager((TajoConf)conf).getScanner(meta, currentFragment);
+      currentScanner = StorageManagerFactory.getStorageManager((TajoConf)conf).getScanner(meta, schema,
+          currentFragment);
     }
   }
 
@@ -110,7 +123,7 @@ public class MergeScanner implements Scanner {
 
   @Override
   public Schema getSchema() {
-    return meta.getSchema();
+    return schema;
   }
 
   @Override

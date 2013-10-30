@@ -46,7 +46,9 @@ import org.apache.tajo.master.querymaster.SubQueryState;
 import org.apache.tajo.master.rm.TajoWorkerContainer;
 import org.apache.tajo.master.rm.TajoWorkerContainerId;
 import org.apache.tajo.master.rm.WorkerResource;
-import org.apache.tajo.rpc.CallFuture2;
+import org.apache.tajo.rpc.CallFuture;
+import org.apache.tajo.rpc.NettyClientBase;
+import org.apache.tajo.rpc.RpcConnectionPool;
 import org.apache.tajo.util.ApplicationIdUtils;
 
 import java.io.IOException;
@@ -74,7 +76,7 @@ public class TajoResourceAllocator extends AbstractResourceAllocator {
   public TajoResourceAllocator(QueryMasterTask.QueryMasterTaskContext queryTaskContext) {
     this.queryTaskContext = queryTaskContext;
     executorService = Executors.newFixedThreadPool(
-        queryTaskContext.getConf().getIntVar(TajoConf.ConfVars.AM_TASKRUNNER_LAUNCH_PARALLEL_NUM));
+        queryTaskContext.getConf().getIntVar(TajoConf.ConfVars.YARN_RM_TASKRUNNER_LAUNCH_PARALLEL_NUM));
   }
 
   @Override
@@ -221,8 +223,8 @@ public class TajoResourceAllocator extends AbstractResourceAllocator {
     @Override
     public void run() {
       LOG.info("Start TajoWorkerAllocationThread");
-      CallFuture2<TajoMasterProtocol.WorkerResourceAllocationResponse> callBack =
-          new CallFuture2<TajoMasterProtocol.WorkerResourceAllocationResponse>();
+      CallFuture<TajoMasterProtocol.WorkerResourceAllocationResponse> callBack =
+          new CallFuture<TajoMasterProtocol.WorkerResourceAllocationResponse>();
 
       int requiredMemoryMBSlot = 512;  //TODO
       int requiredDiskSlots = 1;  //TODO
@@ -234,8 +236,21 @@ public class TajoResourceAllocator extends AbstractResourceAllocator {
               .setExecutionBlockId(event.getExecutionBlockId().getProto())
               .build();
 
-      queryTaskContext.getQueryMasterContext().getWorkerContext().
-          getTajoMasterRpcClient().allocateWorkerResources(null, request, callBack);
+      RpcConnectionPool connPool = RpcConnectionPool.getPool(queryTaskContext.getConf());
+      NettyClientBase tmClient = null;
+      try {
+        tmClient = connPool.getConnection(
+            queryTaskContext.getQueryMasterContext().getWorkerContext().getTajoMasterAddress(),
+            TajoMasterProtocol.class, true);
+        TajoMasterProtocol.TajoMasterProtocolService masterClientService = tmClient.getStub();
+        masterClientService.allocateWorkerResources(null, request, callBack);
+      } catch (Exception e) {
+        connPool.closeConnection(tmClient);
+        tmClient = null;
+        LOG.error(e.getMessage(), e);
+      } finally {
+        connPool.releaseConnection(tmClient);
+      }
 
       TajoMasterProtocol.WorkerResourceAllocationResponse response = null;
       while(!stopped.get()) {
@@ -261,10 +276,9 @@ public class TajoResourceAllocator extends AbstractResourceAllocator {
         for(TajoMasterProtocol.WorkerAllocatedResource eachWorker: workerHosts) {
           TajoWorkerContainer container = new TajoWorkerContainer();
           NodeIdPBImpl nodeId = new NodeIdPBImpl();
-          String[] tokens = eachWorker.getWorkerHostAndPort().split(":");
 
-          nodeId.setHost(tokens[0]);
-          nodeId.setPort(Integer.parseInt(tokens[1]));
+          nodeId.setHost(eachWorker.getWorkerHost());
+          nodeId.setPort(eachWorker.getPeerRpcPort());
 
           TajoWorkerContainerId containerId = new TajoWorkerContainerId();
 
@@ -277,7 +291,8 @@ public class TajoResourceAllocator extends AbstractResourceAllocator {
 
           WorkerResource workerResource = new WorkerResource();
           workerResource.setAllocatedHost(nodeId.getHost());
-          workerResource.setManagerPort(nodeId.getPort());
+          workerResource.setPeerRpcPort(nodeId.getPort());
+          workerResource.setQueryMasterPort(eachWorker.getQueryMasterPort());
           workerResource.setPullServerPort(eachWorker.getWorkerPullServerPort());
           workerResource.setMemoryMBSlots(requiredMemoryMBSlot);
           workerResource.setDiskSlots(requiredDiskSlots);

@@ -1,3 +1,22 @@
+<%
+  /*
+  * Licensed to the Apache Software Foundation (ASF) under one
+  * or more contributor license agreements. See the NOTICE file
+  * distributed with this work for additional information
+  * regarding copyright ownership. The ASF licenses this file
+  * to you under the Apache License, Version 2.0 (the
+  * "License"); you may not use this file except in compliance
+  * with the License. You may obtain a copy of the License at
+  *
+  * http://www.apache.org/licenses/LICENSE-2.0
+  *
+  * Unless required by applicable law or agreed to in writing, software
+  * distributed under the License is distributed on an "AS IS" BASIS,
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  */
+%>
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 
 <%@ page import="java.util.*" %>
@@ -6,6 +25,7 @@
 <%@ page import="org.apache.tajo.util.*" %>
 <%@ page import="org.apache.tajo.master.querymaster.QueryInProgress" %>
 <%@ page import="java.text.SimpleDateFormat" %>
+<%@ page import="org.apache.tajo.master.rm.WorkerResource" %>
 
 <%
   TajoMaster master = (TajoMaster) StaticHttpServer.getInstance().getAttribute("tajo.info.server.object");
@@ -17,8 +37,17 @@
           JSPUtil.sortQueryInProgress(master.getContext().getQueryJobManager().getFinishedQueries(), true);
 
   SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-  int workerHttpPort = master.getConfig().getInt("tajo.worker.http.port", 28080);
 
+  Map<String, WorkerResource> workers = master.getContext().getResourceManager().getWorkers();
+  Map<String, Integer> portMap = new HashMap<String, Integer>();
+
+  Collection<String> queryMasters = master.getContext().getResourceManager().getQueryMasters();
+  for(String eachQueryMasterKey: queryMasters) {
+    WorkerResource queryMaster = workers.get(eachQueryMasterKey);
+    if(queryMaster != null) {
+      portMap.put(queryMaster.getAllocatedHost(), queryMaster.getHttpPort());
+    }
+  }
 %>
 
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
@@ -44,7 +73,7 @@
     <%
       for(QueryInProgress eachQuery: runningQueries) {
         long time = System.currentTimeMillis() - eachQuery.getQueryInfo().getStartTime();
-        String detailView = "http://" + eachQuery.getQueryInfo().getQueryMasterHost() + ":" + workerHttpPort +
+        String detailView = "http://" + eachQuery.getQueryInfo().getQueryMasterHost() + ":" + portMap.get(eachQuery.getQueryInfo().getQueryMasterHost()) +
                 "/querydetail.jsp?queryId=" + eachQuery.getQueryId();
     %>
     <tr>
@@ -76,7 +105,7 @@
       for(QueryInProgress eachQuery: finishedQueries) {
         long runTime = eachQuery.getQueryInfo().getFinishTime() >= 0 ?
                 eachQuery.getQueryInfo().getFinishTime() - eachQuery.getQueryInfo().getStartTime() : -1;
-        String detailView = "http://" + eachQuery.getQueryInfo().getQueryMasterHost() + ":" + workerHttpPort +
+        String detailView = "http://" + eachQuery.getQueryInfo().getQueryMasterHost() + ":" + portMap.get(eachQuery.getQueryInfo().getQueryMasterHost())  +
                 "/querydetail.jsp?queryId=" + eachQuery.getQueryId();
     %>
     <tr>

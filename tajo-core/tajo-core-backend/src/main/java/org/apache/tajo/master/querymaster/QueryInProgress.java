@@ -28,14 +28,16 @@ import org.apache.hadoop.yarn.service.CompositeService;
 import org.apache.tajo.QueryId;
 import org.apache.tajo.TajoProtos;
 import org.apache.tajo.engine.planner.logical.LogicalRootNode;
+import org.apache.tajo.ipc.QueryMasterProtocol;
+import org.apache.tajo.ipc.QueryMasterProtocol.*;
+import org.apache.tajo.engine.query.QueryContext;
 import org.apache.tajo.ipc.TajoWorkerProtocol;
-import org.apache.tajo.master.QueryContext;
 import org.apache.tajo.master.TajoAsyncDispatcher;
 import org.apache.tajo.master.TajoMaster;
 import org.apache.tajo.master.rm.WorkerResource;
 import org.apache.tajo.master.rm.WorkerResourceManager;
+import org.apache.tajo.rpc.AsyncRpcClient;
 import org.apache.tajo.rpc.NullCallback;
-import org.apache.tajo.rpc.ProtoAsyncRpcClient;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos;
 
 import java.net.InetSocketAddress;
@@ -60,9 +62,9 @@ public class QueryInProgress extends CompositeService {
 
   private final TajoMaster.MasterContext masterContext;
 
-  private ProtoAsyncRpcClient queryMasterRpc;
+  private AsyncRpcClient queryMasterRpc;
 
-  private TajoWorkerProtocol.TajoWorkerProtocolService queryMasterRpcClient;
+  private QueryMasterProtocolService queryMasterRpcClient;
 
   public QueryInProgress(
       TajoMaster.MasterContext masterContext,
@@ -100,13 +102,11 @@ public class QueryInProgress extends CompositeService {
 
     masterContext.getResourceManager().stopQueryMaster(queryId);
 
-    boolean queryMasterStopped = false;
     long startTime = System.currentTimeMillis();
     while(true) {
       try {
         if(masterContext.getResourceManager().isQueryMasterStopped(queryId)) {
           LOG.info(queryId + " QueryMaster stopped");
-          queryMasterStopped = true;
           break;
         }
       } catch (Exception e) {
@@ -141,18 +141,22 @@ public class QueryInProgress extends CompositeService {
     return dispatcher.getEventHandler();
   }
 
-  public void startQueryMaster() {
+  public boolean startQueryMaster() {
     try {
       LOG.info("Initializing QueryInProgress for QueryID=" + queryId);
       WorkerResourceManager resourceManager = masterContext.getResourceManager();
       WorkerResource queryMasterResource = resourceManager.allocateQueryMaster(this);
 
-      if(queryMasterResource != null) {
-        queryInfo.setQueryMasterResource(queryMasterResource);
+      if(queryMasterResource == null) {
+        return false;
       }
+      queryInfo.setQueryMasterResource(queryMasterResource);
       getEventHandler().handle(new QueryJobEvent(QueryJobEvent.Type.QUERY_MASTER_START, queryInfo));
+
+      return true;
     } catch (Exception e) {
       catchException(e);
+      return false;
     }
   }
 
@@ -171,7 +175,7 @@ public class QueryInProgress extends CompositeService {
     }
   }
 
-  public TajoWorkerProtocol.TajoWorkerProtocolService getQueryMasterRpcClient() {
+  public QueryMasterProtocolService getQueryMasterRpcClient() {
     return queryMasterRpcClient;
   }
 
@@ -182,7 +186,7 @@ public class QueryInProgress extends CompositeService {
           queryInfo.getQueryMasterHost() + ":" + queryInfo.getQueryMasterPort());
       LOG.info("Connect to QueryMaster:" + addr);
       //TODO Get Connection from pool
-      queryMasterRpc = new ProtoAsyncRpcClient(TajoWorkerProtocol.class, addr);
+      queryMasterRpc = new AsyncRpcClient(QueryMasterProtocol.class, addr);
       queryMasterRpcClient = queryMasterRpc.getStub();
     }
   }

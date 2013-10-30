@@ -18,6 +18,7 @@
 
 package org.apache.tajo.master.querymaster;
 
+import com.google.common.collect.Maps;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -30,27 +31,31 @@ import org.apache.hadoop.yarn.service.Service;
 import org.apache.tajo.QueryId;
 import org.apache.tajo.TajoProtos;
 import org.apache.tajo.conf.TajoConf;
+import org.apache.tajo.engine.planner.global.GlobalPlanner;
 import org.apache.tajo.ipc.TajoMasterProtocol;
-import org.apache.tajo.master.GlobalPlanner;
 import org.apache.tajo.master.TajoAsyncDispatcher;
 import org.apache.tajo.master.event.QueryStartEvent;
-import org.apache.tajo.rpc.CallFuture2;
-import org.apache.tajo.rpc.NullCallback;
+import org.apache.tajo.rpc.CallFuture;
+import org.apache.tajo.rpc.NettyClientBase;
+import org.apache.tajo.rpc.RpcConnectionPool;
 import org.apache.tajo.storage.AbstractStorageManager;
 import org.apache.tajo.storage.StorageManagerFactory;
 import org.apache.tajo.worker.TajoWorker;
 
-import java.util.*;
-import java.util.concurrent.TimeUnit;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.tajo.ipc.TajoMasterProtocol.TajoHeartbeat;
+import static org.apache.tajo.ipc.TajoMasterProtocol.TajoHeartbeatResponse;
 
 // TODO - when exception, send error status to QueryJobManager
 public class QueryMaster extends CompositeService implements EventHandler {
   private static final Log LOG = LogFactory.getLog(QueryMaster.class.getName());
 
-  private static int QUERY_SESSION_TIMEOUT = 60 * 1000;  //60 sec
+  private int querySessionTimeout;
 
   private Clock clock;
 
@@ -62,9 +67,9 @@ public class QueryMaster extends CompositeService implements EventHandler {
 
   private TajoConf systemConf;
 
-  private Map<QueryId, QueryMasterTask> queryMasterTasks = new HashMap<QueryId, QueryMasterTask>();
+  private Map<QueryId, QueryMasterTask> queryMasterTasks = Maps.newConcurrentMap();
 
-  private Map<QueryId, QueryMasterTask> finishedQueryMasterTasks = new HashMap<QueryId, QueryMasterTask>();
+  private Map<QueryId, QueryMasterTask> finishedQueryMasterTasks = Maps.newConcurrentMap();
 
   private ClientSessionTimeoutCheckThread clientSessionTimeoutCheckThread;
 
@@ -78,6 +83,8 @@ public class QueryMaster extends CompositeService implements EventHandler {
 
   private TajoWorker.WorkerContext workerContext;
 
+  private RpcConnectionPool connPool;
+
   public QueryMaster(TajoWorker.WorkerContext workerContext) {
     super(QueryMaster.class.getName());
     this.workerContext = workerContext;
@@ -86,9 +93,10 @@ public class QueryMaster extends CompositeService implements EventHandler {
   public void init(Configuration conf) {
     LOG.info("QueryMaster init");
     try {
-      systemConf = (TajoConf)conf;
+      this.systemConf = (TajoConf)conf;
+      this.connPool = RpcConnectionPool.getPool(systemConf);
 
-      QUERY_SESSION_TIMEOUT = 60 * 1000;
+      querySessionTimeout = systemConf.getIntVar(TajoConf.ConfVars.QUERY_SESSION_TIMEOUT);
       queryMasterContext = new QueryMasterContext(systemConf);
 
       clock = new SystemClock();
@@ -150,24 +158,37 @@ public class QueryMaster extends CompositeService implements EventHandler {
     super.stop();
 
     LOG.info("QueryMaster stop");
-    if(!queryMasterContext.getWorkerContext().isStandbyMode()) {
+    if(queryMasterContext.getWorkerContext().isYarnContainerMode()) {
       queryMasterContext.getWorkerContext().stopWorker(true);
     }
   }
 
   public void reportQueryStatusToQueryMaster(QueryId queryId, TajoProtos.QueryState state) {
     LOG.info("Send QueryMaster Ready to QueryJobManager:" + queryId);
+    NettyClientBase tmClient = null;
     try {
+      tmClient = connPool.getConnection(queryMasterContext.getWorkerContext().getTajoMasterAddress(),
+          TajoMasterProtocol.class, true);
+      TajoMasterProtocol.TajoMasterProtocolService masterClientService = tmClient.getStub();
+
       TajoHeartbeat.Builder queryHeartbeatBuilder = TajoHeartbeat.newBuilder()
-          .setTajoWorkerHost(workerContext.getTajoWorkerManagerService().getBindAddr().getHostName())
-          .setTajoWorkerPort(workerContext.getTajoWorkerManagerService().getBindAddr().getPort())
+          .setTajoWorkerHost(workerContext.getQueryMasterManagerService().getBindAddr().getHostName())
+          .setPeerRpcPort(workerContext.getPeerRpcPort())
+          .setTajoQueryMasterPort(workerContext.getQueryMasterManagerService().getBindAddr().getPort())
           .setTajoWorkerClientPort(workerContext.getTajoWorkerClientService().getBindAddr().getPort())
           .setState(state)
           .setQueryId(queryId.getProto());
 
-      workerContext.getTajoMasterRpcClient().heartbeat(null, queryHeartbeatBuilder.build(), NullCallback.get());
+      CallFuture<TajoHeartbeatResponse> callBack =
+          new CallFuture<TajoHeartbeatResponse>();
+
+      masterClientService.heartbeat(callBack.getController(), queryHeartbeatBuilder.build(), callBack);
     } catch (Exception e) {
+      connPool.closeConnection(tmClient);
+      tmClient = null;
       LOG.error(e.getMessage(), e);
+    } finally {
+      connPool.releaseConnection(tmClient);
     }
   }
 
@@ -256,17 +277,25 @@ public class QueryMaster extends CompositeService implements EventHandler {
 
     public void stopQuery(QueryId queryId) {
       QueryMasterTask queryMasterTask;
-      synchronized(queryMasterTasks) {
-        queryMasterTask = queryMasterTasks.remove(queryId);
-      }
+      queryMasterTask = queryMasterTasks.remove(queryId);
+      finishedQueryMasterTasks.put(queryId, queryMasterTask);
+
       if(queryMasterTask != null) {
         TajoHeartbeat queryHeartbeat = buildTajoHeartBeat(queryMasterTask);
-        CallFuture2 futuer = new CallFuture2();
-        workerContext.getTajoMasterRpcClient().heartbeat(null, queryHeartbeat, futuer);
+        CallFuture<TajoHeartbeatResponse> future = new CallFuture<TajoHeartbeatResponse>();
+
+        NettyClientBase tmClient = null;
         try {
-          futuer.get(3000, TimeUnit.SECONDS);
-        } catch (Throwable e) {
-          LOG.warn(e);
+          tmClient = connPool.getConnection(queryMasterContext.getWorkerContext().getTajoMasterAddress(),
+              TajoMasterProtocol.class, true);
+          TajoMasterProtocol.TajoMasterProtocolService masterClientService = tmClient.getStub();
+          masterClientService.heartbeat(future.getController(), queryHeartbeat, future);
+        } catch (Exception e) {
+          connPool.closeConnection(tmClient);
+          tmClient = null;
+          LOG.error(e.getMessage(), e);
+        } finally {
+          connPool.releaseConnection(tmClient);
         }
 
         try {
@@ -274,12 +303,10 @@ public class QueryMaster extends CompositeService implements EventHandler {
         } catch (Exception e) {
           LOG.error(e.getMessage(), e);
         }
-
-        finishedQueryMasterTasks.put(queryId, queryMasterTask);
       } else {
         LOG.warn("No query info:" + queryId);
       }
-      if(!workerContext.isStandbyMode()) {
+      if(workerContext.isYarnContainerMode()) {
         stop();
       }
     }
@@ -287,8 +314,9 @@ public class QueryMaster extends CompositeService implements EventHandler {
 
   private TajoHeartbeat buildTajoHeartBeat(QueryMasterTask queryMasterTask) {
     TajoHeartbeat queryHeartbeat = TajoHeartbeat.newBuilder()
-        .setTajoWorkerHost(workerContext.getTajoWorkerManagerService().getBindAddr().getHostName())
-        .setTajoWorkerPort(workerContext.getTajoWorkerManagerService().getBindAddr().getPort())
+        .setTajoWorkerHost(workerContext.getQueryMasterManagerService().getBindAddr().getHostName())
+        .setTajoQueryMasterPort(workerContext.getQueryMasterManagerService().getBindAddr().getPort())
+        .setPeerRpcPort(workerContext.getPeerRpcPort())
         .setTajoWorkerClientPort(workerContext.getTajoWorkerClientService().getBindAddr().getPort())
         .setState(queryMasterTask.getState())
         .setQueryId(queryMasterTask.getQueryId().getProto())
@@ -328,9 +356,17 @@ public class QueryMaster extends CompositeService implements EventHandler {
         }
         synchronized(queryMasterTasks) {
           for(QueryMasterTask eachTask: tempTasks) {
+            NettyClientBase tmClient;
             try {
+              tmClient = connPool.getConnection(queryMasterContext.getWorkerContext().getTajoMasterAddress(),
+                  TajoMasterProtocol.class, true);
+              TajoMasterProtocol.TajoMasterProtocolService masterClientService = tmClient.getStub();
+
+              CallFuture<TajoHeartbeatResponse> callBack =
+                  new CallFuture<TajoHeartbeatResponse>();
+
               TajoHeartbeat queryHeartbeat = buildTajoHeartBeat(eachTask);
-              workerContext.getTajoMasterRpcClient().heartbeat(null, queryHeartbeat, NullCallback.get());
+              masterClientService.heartbeat(callBack.getController(), queryHeartbeat, callBack);
             } catch (Throwable t) {
               t.printStackTrace();
             }
@@ -367,7 +403,7 @@ public class QueryMaster extends CompositeService implements EventHandler {
             try {
               long lastHeartbeat = eachTask.getLastClientHeartbeat();
               long time = System.currentTimeMillis() - lastHeartbeat;
-              if(lastHeartbeat > 0 && time > QUERY_SESSION_TIMEOUT) {
+              if(lastHeartbeat > 0 && time > querySessionTimeout * 1000) {
                 LOG.warn("Query " + eachTask.getQueryId() + " stopped cause query sesstion timeout: " + time + " ms");
                 eachTask.expiredSessionTimeout();
               }
@@ -382,11 +418,11 @@ public class QueryMaster extends CompositeService implements EventHandler {
 
   class FinishedQueryMasterTaskCleanThread extends Thread {
     public void run() {
-      int expireIntervalTime = systemConf.getInt("tajo.worker.history.expire.interval.min", 12 * 60); //12 hour
-      LOG.info("FinishedQueryMasterTaskCleanThread started: expireIntervalTime=" + expireIntervalTime);
+      int expireIntervalTime = systemConf.getIntVar(TajoConf.ConfVars.WORKER_HISTORY_EXPIRE_PERIOD);
+      LOG.info("FinishedQueryMasterTaskCleanThread started: expire interval minutes = " + expireIntervalTime);
       while(!queryMasterStop.get()) {
         try {
-          Thread.sleep(60 * 1000 * 60);   //hourly
+          Thread.sleep(60 * 1000 * 60);   // hourly
         } catch (InterruptedException e) {
           break;
         }

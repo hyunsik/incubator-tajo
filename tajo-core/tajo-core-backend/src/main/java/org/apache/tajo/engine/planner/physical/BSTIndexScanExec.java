@@ -19,7 +19,8 @@
 package org.apache.tajo.engine.planner.physical;
 
 import org.apache.hadoop.fs.Path;
-import org.apache.tajo.TaskAttemptContext;
+import org.apache.tajo.storage.fragment.FileFragment;
+import org.apache.tajo.worker.TaskAttemptContext;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.datum.Datum;
 import org.apache.tajo.engine.eval.EvalContext;
@@ -48,7 +49,7 @@ public class BSTIndexScanExec extends PhysicalExec {
   
   public BSTIndexScanExec(TaskAttemptContext context,
                           AbstractStorageManager sm , ScanNode scanNode ,
-       Fragment fragment, Path fileName , Schema keySchema,
+       FileFragment fragment, Path fileName , Schema keySchema,
        TupleComparator comparator , Datum[] datum) throws IOException {
     super(context, scanNode.getInSchema(), scanNode.getOutSchema());
     this.scanNode = scanNode;
@@ -61,7 +62,7 @@ public class BSTIndexScanExec extends PhysicalExec {
     this.datum = datum;
 
     this.fileScanner = StorageManagerFactory.getSeekableScanner(context.getConf(),
-        fragment.getMeta(), fragment, outSchema);
+        scanNode.getTableDesc().getMeta(), scanNode.getInSchema(), fragment, outSchema);
     this.fileScanner.init();
     this.projector = new Projector(inSchema, outSchema, scanNode.getTargets());
     this.evalContexts = projector.renew();

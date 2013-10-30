@@ -18,7 +18,6 @@
 
 package org.apache.tajo.engine.eval;
 
-import org.apache.hadoop.fs.Path;
 import org.apache.tajo.TajoTestingCluster;
 import org.apache.tajo.algebra.Expr;
 import org.apache.tajo.catalog.*;
@@ -37,6 +36,7 @@ import org.apache.tajo.engine.planner.Target;
 import org.apache.tajo.master.TajoMaster;
 import org.apache.tajo.storage.Tuple;
 import org.apache.tajo.storage.VTuple;
+import org.apache.tajo.util.CommonTestingUtil;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -65,8 +65,8 @@ public class TestEvalTree {
     schema.addColumn("score", INT4);
     schema.addColumn("age", INT4);
 
-    TableMeta meta = CatalogUtil.newTableMeta(schema, StoreType.CSV);
-    TableDesc desc = new TableDescImpl("people", meta, new Path("/"));
+    TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV);
+    TableDesc desc = new TableDesc("people", schema, meta, CommonTestingUtil.getTestDir());
     cat.addTable(desc);
 
     FunctionDesc funcMeta = new FunctionDesc("test_sum", TestSum.class, FunctionType.GENERAL,
@@ -159,7 +159,7 @@ public class TestEvalTree {
 
     EvalNode expr;
 
-    Schema peopleSchema = cat.getTableDesc("people").getMeta().getSchema();
+    Schema peopleSchema = cat.getTableDesc("people").getSchema();
     EvalContext evalCtx;
     expr = getRootSelection(QUERIES[0]);
     evalCtx = expr.newContext();
@@ -609,7 +609,7 @@ public class TestEvalTree {
     assertTrue(not.terminate(evalCtx).asBool());
     
     // Evaluation Test
-    Schema peopleSchema = cat.getTableDesc("people").getMeta().getSchema();
+    Schema peopleSchema = cat.getTableDesc("people").getSchema();
     expr = getRootSelection(NOT[0]);
     evalCtx = expr.newContext();
     expr.eval(evalCtx, peopleSchema, tuples[0]);
@@ -631,7 +631,7 @@ public class TestEvalTree {
   public final void testLike() {
     EvalNode expr;
 
-    Schema peopleSchema = cat.getTableDesc("people").getMeta().getSchema();
+    Schema peopleSchema = cat.getTableDesc("people").getSchema();
     // prefix
     expr = getRootSelection(LIKE[0]);
     EvalContext evalCtx = expr.newContext();

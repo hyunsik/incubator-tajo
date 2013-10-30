@@ -73,8 +73,7 @@ public class LocalTajoTestingUtility {
     client = new TajoClient(conf);
 
     FileSystem fs = util.getDefaultFileSystem();
-    Path rootDir = util.getMaster().
-        getStorageManager().getBaseDir();
+    Path rootDir = util.getMaster().getStorageManager().getWarehouseDir();
     fs.mkdirs(rootDir);
     for (int i = 0; i < tablepaths.length; i++) {
       Path localPath = new Path(tablepaths[i]);
@@ -82,9 +81,8 @@ public class LocalTajoTestingUtility {
       fs.mkdirs(tablePath);
       Path dfsPath = new Path(tablePath, localPath.getName());
       fs.copyFromLocalFile(localPath, dfsPath);
-      TableMeta meta = CatalogUtil.newTableMeta(schemas[i],
-          CatalogProtos.StoreType.CSV, option);
-      client.createTable(names[i], tablePath, meta);
+      TableMeta meta = CatalogUtil.newTableMeta(CatalogProtos.StoreType.CSV, option);
+      client.createExternalTable(names[i], schemas[i], tablePath, meta);
     }
 
     LOG.info("===================================================");

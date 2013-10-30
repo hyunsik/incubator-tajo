@@ -31,6 +31,9 @@ if [ -f "${TAJO_CONF_DIR}/tajo-env.sh" ]; then
 fi
 
 if [ "$TAJO_WORKER_STANDBY_MODE" = "true" ]; then
-  exec "$bin/tajo-daemons.sh" cd "$TAJO_HOME" \; "$bin/tajo-daemon.sh" stop worker
+  "$bin/tajo-daemons.sh" cd "$TAJO_HOME" \; "$bin/tajo-daemon.sh" stop worker
+  if [ -f "${TAJO_CONF_DIR}/querymasters" ]; then
+    "$bin/tajo-daemons.sh" --hosts querymasters cd "$TAJO_HOME" \; "$bin/tajo-daemon.sh" stop querymaster
+  fi
 fi
 

@@ -18,7 +18,6 @@
 
 package org.apache.tajo.catalog;
 
-import com.google.common.base.Preconditions;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.apache.commons.logging.Log;
@@ -33,7 +32,7 @@ import org.apache.tajo.catalog.store.DerbyStore;
 import org.apache.tajo.common.TajoDataTypes.DataType;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.conf.TajoConf.ConfVars;
-import org.apache.tajo.rpc.ProtoBlockingRpcServer;
+import org.apache.tajo.rpc.BlockingRpcServer;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.BoolProto;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.NullProto;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.StringProto;
@@ -70,7 +69,7 @@ public class CatalogServer extends AbstractService {
       List<FunctionDescProto>>();
 
   // RPC variables
-  private ProtoBlockingRpcServer rpcServer;
+  private BlockingRpcServer rpcServer;
   private InetSocketAddress bindAddress;
   private String bindAddressStr;
   final CatalogProtocolHandler handler;
@@ -104,8 +103,7 @@ public class CatalogServer extends AbstractService {
 
     Constructor<?> cons;
     try {
-      Class<?> storeClass =
-          this.conf.getClass(CatalogConstants.STORE_CLASS, DerbyStore.class);
+      Class<?> storeClass = this.conf.getClass(CatalogConstants.STORE_CLASS, DerbyStore.class);
 
       LOG.info("Catalog Store Class: " + storeClass.getCanonicalName());
       cons = storeClass.
@@ -122,8 +120,13 @@ public class CatalogServer extends AbstractService {
     super.init(conf);
   }
 
+  public TajoConf getConf() {
+    return conf;
+  }
+
   public String getCatalogServerName() {
-    return bindAddressStr + ", class=" + this.store.getClass().getSimpleName() + ", jdbc=" + conf.get(CatalogConstants.JDBC_URI);
+    return bindAddressStr + ", store=" + this.store.getClass().getSimpleName() + ", jdbc="
+        + conf.get(CatalogConstants.JDBC_URI);
   }
 
   private void initBuiltinFunctions(List<FunctionDesc> functions)
@@ -137,14 +140,14 @@ public class CatalogServer extends AbstractService {
     String serverAddr = conf.getVar(ConfVars.CATALOG_ADDRESS);
     InetSocketAddress initIsa = NetUtils.createSocketAddr(serverAddr);
     try {
-      this.rpcServer = new ProtoBlockingRpcServer(
+      this.rpcServer = new BlockingRpcServer(
           CatalogProtocol.class,
           handler, initIsa);
       this.rpcServer.start();
 
       this.bindAddress = NetUtils.getConnectAddress(this.rpcServer.getListenAddress());
       this.bindAddressStr = NetUtils.normalizeInetSocketAddress(bindAddress);
-      conf.set(ConfVars.CATALOG_ADDRESS.varname, bindAddressStr);
+      conf.setVar(ConfVars.CATALOG_ADDRESS, bindAddressStr);
     } catch (Exception e) {
       LOG.error("CatalogServer startup failed", e);
       throw new CatalogException(e);
@@ -183,10 +186,10 @@ public class CatalogServer extends AbstractService {
           throw new NoSuchTableException(tableId);
         }
         TableDesc desc = store.getTable(tableId);
-        SchemaProto schemaProto = desc.getMeta().getSchema().getProto();
+        SchemaProto schemaProto = desc.getSchema().getProto();
         SchemaProto qualifiedSchema = CatalogUtil.getQualfiedSchema(tableId, schemaProto);
-        desc.getMeta().setSchema(new Schema(qualifiedSchema));
-        return (TableDescProto) desc.getProto();
+        desc.setSchema(new Schema(qualifiedSchema));
+        return desc.getProto();
       } catch (IOException ioe) {
         // TODO - handle exception
         LOG.error(ioe);
@@ -229,10 +232,6 @@ public class CatalogServer extends AbstractService {
     @Override
     public BoolProto addTable(RpcController controller, TableDescProto tableDesc)
         throws ServiceException {
-      Preconditions.checkArgument(tableDesc.hasId(),
-          "Must be set to the table name");
-      Preconditions.checkArgument(tableDesc.hasPath(),
-          "Must be set to the table URI");
 
       wlock.lock();
       try {
@@ -241,12 +240,12 @@ public class CatalogServer extends AbstractService {
         }
 
         // rewrite schema
-        TableProto.Builder metaBuilder = TableProto.newBuilder(tableDesc.getMeta());
-        metaBuilder.setSchema(tableDesc.getMeta().getSchema());
         TableDescProto.Builder descBuilder = TableDescProto.newBuilder(tableDesc);
-        descBuilder.setMeta(metaBuilder.build());
+        descBuilder.setMeta(tableDesc.getMeta());
+        descBuilder.setSchema(tableDesc.getSchema());
 
-        store.addTable(new TableDescImpl(descBuilder.build()));
+
+        store.addTable(new TableDesc(descBuilder.build()));
 
       } catch (IOException ioe) {
         LOG.error(ioe.getMessage(), ioe);

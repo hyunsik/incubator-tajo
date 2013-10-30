@@ -23,7 +23,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RawLocalFileSystem;
-import org.apache.tajo.TaskAttemptContext;
+import org.apache.tajo.worker.TaskAttemptContext;
 import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.conf.TajoConf;
@@ -68,11 +68,11 @@ public class IndexedStoreExec extends UnaryPhysicalExec {
     Path storeTablePath = new Path(context.getWorkDir(), "output");
     LOG.info("Output data directory: " + storeTablePath);
     this.meta = CatalogUtil
-        .newTableMeta(this.outSchema, CatalogProtos.StoreType.CSV);
+        .newTableMeta(CatalogProtos.StoreType.CSV);
     FileSystem fs = new RawLocalFileSystem();
     fs.mkdirs(storeTablePath);
     this.appender = (FileAppender) StorageManagerFactory.getStorageManager(context.getConf()).getAppender(meta,
-        new Path(storeTablePath, "output"));
+        outSchema, new Path(storeTablePath, "output"));
     this.appender.enableStats();
     this.appender.init();
     this.indexWriter = bst.getIndexWriter(new Path(storeTablePath, "index"),

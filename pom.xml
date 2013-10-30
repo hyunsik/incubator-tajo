@@ -306,13 +306,12 @@
           <excludes>
             <exclude>CHANGES.txt</exclude>
             <exclude>**/workers</exclude>
+            <exclude>**/querymasters</exclude>
             <exclude>**/*.sql</exclude>
             <exclude>**/*.hiveql</exclude>
             <exclude>**/*.schema</exclude>
             <exclude>**/*.tbl</exclude>
-            <exclude>**/*.jsp</exclude>
             <exclude>**/*.js</exclude>
-            <exclude>**/web.xml</exclude>
             <exclude>**/*.result</exclude>
             <!-- generated content -->
             <exclude>**/target/**</exclude>

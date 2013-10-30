@@ -25,6 +25,8 @@ import org.apache.tajo.annotation.NotThreadSafe;
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.engine.eval.*;
+import org.apache.tajo.engine.exception.NoSuchColumnException;
+import org.apache.tajo.engine.exception.VerifyException;
 import org.apache.tajo.engine.planner.graph.DirectedGraphCursor;
 import org.apache.tajo.engine.planner.graph.SimpleDirectedGraph;
 import org.apache.tajo.engine.planner.logical.*;
@@ -82,7 +84,9 @@ public class LogicalPlan {
   }
 
   public String newNonameColumnName(String prefix) {
-    return "?" + prefix + "_" + (noNameColumnId++);
+    String suffix = noNameColumnId == 0 ? "" : String.valueOf(noNameColumnId);
+    noNameColumnId++;
+    return "?" + prefix + suffix;
   }
 
   /**

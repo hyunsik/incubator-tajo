@@ -1,3 +1,22 @@
+<%
+  /*
+  * Licensed to the Apache Software Foundation (ASF) under one
+  * or more contributor license agreements. See the NOTICE file
+  * distributed with this work for additional information
+  * regarding copyright ownership. The ASF licenses this file
+  * to you under the Apache License, Version 2.0 (the
+  * "License"); you may not use this file except in compliance
+  * with the License. You may obtain a copy of the License at
+  *
+  * http://www.apache.org/licenses/LICENSE-2.0
+  *
+  * Unless required by applicable law or agreed to in writing, software
+  * distributed under the License is distributed on an "AS IS" BASIS,
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  */
+%>
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 
 <%@ page import="java.util.*" %>
@@ -9,16 +28,6 @@
 
 <%
   TajoWorker tajoWorker = (TajoWorker) StaticHttpServer.getInstance().getAttribute("tajo.info.server.object");
-
-  List<QueryMasterTask> queryMasterTasks = JSPUtil.sortQueryMasterTask(tajoWorker.getWorkerContext()
-          .getTajoWorkerManagerService().getQueryMaster().getQueryMasterTasks(), true);
-
-  List<QueryMasterTask> finishedQueryMasterTasks = JSPUtil.sortQueryMasterTask(tajoWorker.getWorkerContext()
-          .getTajoWorkerManagerService().getQueryMaster().getFinishedQueryMasterTasks(), true);
-
-  List<TaskRunner> taskRunners = new ArrayList<TaskRunner>(tajoWorker.getWorkerContext().getTaskRunnerManager().getTaskRunners());
-
-  JSPUtil.sortTaskRunner(taskRunners);
 
   SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 %>
@@ -46,18 +55,26 @@
   </table>
   <hr/>
 
-  <h3>Running QueryMaster</h3>
 <%
-  if(queryMasterTasks.isEmpty()) {
-    out.write("No running query master");
-  } else {
+if(tajoWorker.getWorkerContext().isQueryMasterMode()) {
+  List<QueryMasterTask> queryMasterTasks = JSPUtil.sortQueryMasterTask(tajoWorker.getWorkerContext()
+          .getQueryMasterManagerService().getQueryMaster().getQueryMasterTasks(), true);
+
+  List<QueryMasterTask> finishedQueryMasterTasks = JSPUtil.sortQueryMasterTask(tajoWorker.getWorkerContext()
+          .getQueryMasterManagerService().getQueryMaster().getFinishedQueryMasterTasks(), true);
 %>
+  <h3>Running QueryMaster</h3>
+  <%
+    if(queryMasterTasks.isEmpty()) {
+      out.write("No running query master");
+    } else {
+  %>
   <table width="100%" border="1" class="border_table">
     <tr><th>QueryId</th><th>StartTime</th><th>FinishTime</th><th>Progress</th><th>RunTime</th></tr>
-<%
-    for(QueryMasterTask eachQueryMasterTask: queryMasterTasks) {
-      Query query = eachQueryMasterTask.getQuery();
-%>
+    <%
+      for(QueryMasterTask eachQueryMasterTask: queryMasterTasks) {
+        Query query = eachQueryMasterTask.getQuery();
+    %>
     <tr>
       <td align='center'><a href='querydetail.jsp?queryId=<%=query.getId()%>'><%=query.getId()%></a></td>
       <td align='center'><%=df.format(query.getStartTime())%></td>
@@ -65,10 +82,10 @@
       <td align='center'><%=(int)(query.getProgress()*100.0f)%>%</td>
       <td align='right'><%=JSPUtil.getElapsedTime(query.getStartTime(), query.getFinishTime())%></td>
     </tr>
-<%
-    } //end of for
-  } //end of if
-%>
+    <%
+        } //end of for
+      } //end of if
+    %>
   </table>
   <p/>
   <hr/>
@@ -80,10 +97,10 @@
   %>
   <table width="100%" border="1" class="border_table">
     <tr><th>QueryId</th><th>StartTime</th><th>FinishTime</th><th>Progress</th><th>RunTime</th></tr>
-<%
-    for(QueryMasterTask eachQueryMasterTask: finishedQueryMasterTasks) {
-      Query query = eachQueryMasterTask.getQuery();
-%>
+    <%
+      for(QueryMasterTask eachQueryMasterTask: finishedQueryMasterTasks) {
+        Query query = eachQueryMasterTask.getQuery();
+    %>
     <tr>
       <td align='center'><a href='querydetail.jsp?queryId=<%=query.getId()%>'><%=query.getId()%></a></td>
       <td align='center'><%=df.format(query.getStartTime())%></td>
@@ -91,13 +108,19 @@
       <td align='center'><%=(int)(query.getProgress()*100.0f)%>%</td>
       <td align='right'><%=JSPUtil.getElapsedTime(query.getStartTime(), query.getFinishTime())%></td>
     </tr>
-<%
-    } //end of for
-  } //end of if
-%>
+    <%
+        } //end of for
+      } //end of if
+    %>
   </table>
   <p/>
   <hr/>
+<%
+} // end of QueryMaster
+if(tajoWorker.getWorkerContext().isTaskRunnerMode()) {
+  List<TaskRunner> taskRunners = new ArrayList<TaskRunner>(tajoWorker.getWorkerContext().getTaskRunnerManager().getTaskRunners());
+  JSPUtil.sortTaskRunner(taskRunners);
+%>
   <h3>Running Tasks</h3>
   <a href='tasks.jsp'>[All Tasks]</a>
   <table width="100%" border="1" class="border_table">
@@ -111,10 +134,13 @@
       <td><%=eachTaskRunner.getFinishTime() == 0 ? "-" : df.format(eachTaskRunner.getFinishTime())%></td>
       <td><%=JSPUtil.getElapsedTime(eachTaskRunner.getStartTime(), eachTaskRunner.getFinishTime())%></td>
       <td><%=eachTaskRunner.getServiceState()%></td>
-        <%
-  }
+<%
+      }   //end of for
 %>
   </table>
+<%
+} //end of if
+%>
 </div>
 </body>
 </html>

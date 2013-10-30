@@ -18,58 +18,67 @@
 
 package org.apache.tajo.rpc;
 
-import java.util.concurrent.*;
+import com.google.protobuf.RpcCallback;
+import com.google.protobuf.RpcController;
 
-@Deprecated
-class CallFuture implements Future<Object> {
-  private Semaphore sem = new Semaphore(0);
-  private Object response = null;
-  @SuppressWarnings("rawtypes")
-  private Class returnType;
+import java.util.concurrent.Future;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
-  @SuppressWarnings("rawtypes")
-  public CallFuture(Class returnType) {
-    this.returnType = returnType;
+public class CallFuture<T> implements RpcCallback<T>, Future<T> {
+
+  private final Semaphore sem = new Semaphore(0);
+  private boolean done = false;
+  private T response;
+  private RpcController controller;
+
+  public CallFuture() {
+    controller = new DefaultRpcController();
   }
 
-  @SuppressWarnings("rawtypes")
-  public Class getReturnType() {
-    return this.returnType;
+  public RpcController getController() {
+    return controller;
   }
 
   @Override
-  public boolean cancel(boolean arg0) {
-    return false;
+  public void run(T t) {
+    this.response = t;
+    done = true;
+    sem.release();
   }
 
   @Override
-  public Object get() throws InterruptedException, ExecutionException {
+  public boolean cancel(boolean mayInterruptIfRunning) {
+    // TODO - to be implemented
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public boolean isCancelled() {
+    // TODO - to be implemented
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public boolean isDone() {
+    return done;
+  }
+
+  @Override
+  public T get() throws InterruptedException {
     sem.acquire();
+
     return response;
   }
 
   @Override
-  public Object get(long timeout, TimeUnit unit) throws InterruptedException,
-      ExecutionException, TimeoutException {
+  public T get(long timeout, TimeUnit unit)
+      throws InterruptedException, TimeoutException {
     if (sem.tryAcquire(timeout, unit)) {
       return response;
     } else {
       throw new TimeoutException();
     }
-  }
-
-  @Override
-  public boolean isCancelled() {
-    return false;
-  }
-
-  @Override
-  public boolean isDone() {
-    return sem.availablePermits() > 0;
-  }
-
-  public void setResponse(Object response) {
-    this.response = response;
-    sem.release();
   }
 }
