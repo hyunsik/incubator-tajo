@@ -31,6 +31,7 @@ import org.apache.tajo.ipc.TajoWorkerProtocol.TaskCompletionReport;
 import org.apache.tajo.master.event.*;
 import org.apache.tajo.master.event.TaskSchedulerEvent.EventType;
 import org.apache.tajo.master.querymaster.QueryUnit.IntermediateEntry;
+import org.apache.tajo.storage.DataLocation;
 import org.apache.tajo.util.TajoIdUtils;
 
 import java.util.*;
@@ -57,7 +58,7 @@ public class QueryUnitAttempt implements EventHandler<TaskAttemptEvent> {
 
   private final List<String> diagnostics = new ArrayList<String>();
 
-  private static final StateMachineFactory
+  protected static final StateMachineFactory
       <QueryUnitAttempt, TaskAttemptState, TaskAttemptEventType, TaskAttemptEvent>
       stateMachineFactory = new StateMachineFactory
       <QueryUnitAttempt, TaskAttemptState, TaskAttemptEventType, TaskAttemptEvent>
@@ -206,7 +207,7 @@ public class QueryUnitAttempt implements EventHandler<TaskAttemptEvent> {
       if (taskAttempt.isLeafTask()
           && taskAttempt.getQueryUnit().getScanNodes().length == 1) {
         Set<String> racks = new HashSet<String>();
-        for (QueryUnit.DataLocation location : taskAttempt.getQueryUnit().getDataLocations()) {
+        for (DataLocation location : taskAttempt.getQueryUnit().getDataLocations()) {
           racks.add(RackResolver.resolve(location.getHost()).getNetworkLocation());
         }
 

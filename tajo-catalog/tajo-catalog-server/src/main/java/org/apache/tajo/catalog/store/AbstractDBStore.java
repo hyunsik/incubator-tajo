@@ -43,12 +43,14 @@ import java.util.Map.Entry;
 public abstract class AbstractDBStore extends CatalogConstants implements CatalogStore {
   protected final Log LOG = LogFactory.getLog(getClass());
   protected Configuration conf;
-  protected String jdbcUri;
+  protected String connectionId;
+  protected String connectionPassword;
+  protected String catalogUri;
   private Connection conn;
 
   protected static final int VERSION = 1;
 
-  protected abstract String getJDBCDriverName();
+  protected abstract String getCatalogDriverName();
 
   protected abstract Connection createConnection(final Configuration conf) throws SQLException;
 
@@ -60,21 +62,45 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       throws InternalException {
 
     this.conf = conf;
-    this.jdbcUri = conf.get(JDBC_URI);
-    String jdbcDriver = getJDBCDriverName();
+
+    if(conf.get(CatalogConstants.DEPRECATED_CATALOG_URI) != null) {
+      LOG.warn("Configuration parameter " + CatalogConstants.DEPRECATED_CATALOG_URI + " " +
+          "is deprecated. Use " + CatalogConstants.CATALOG_URI + " instead.");
+      this.catalogUri = conf.get(CatalogConstants.DEPRECATED_CATALOG_URI);
+    } else {
+      this.catalogUri = conf.get(CatalogConstants.CATALOG_URI);
+    }
+
+    if(conf.get(CatalogConstants.DEPRECATED_CONNECTION_ID) != null) {
+      LOG.warn("Configuration parameter " + CatalogConstants.DEPRECATED_CONNECTION_ID + " " +
+          "is deprecated. Use " + CatalogConstants.CONNECTION_ID + " instead.");
+      this.connectionId = conf.get(CatalogConstants.DEPRECATED_CONNECTION_ID);
+    } else {
+      this.connectionId = conf.get(CatalogConstants.CONNECTION_ID);
+    }
+
+    if(conf.get(CatalogConstants.DEPRECATED_CONNECTION_PASSWORD) != null) {
+      LOG.warn("Configuration parameter " + CatalogConstants.DEPRECATED_CONNECTION_PASSWORD + " " +
+          "is deprecated. Use " + CatalogConstants.CONNECTION_PASSWORD + " instead.");
+      this.connectionPassword = conf.get(CatalogConstants.DEPRECATED_CONNECTION_PASSWORD);
+    } else {
+      this.connectionPassword = conf.get(CatalogConstants.CONNECTION_PASSWORD);
+    }
+
+    String catalogDriver = getCatalogDriverName();
     try {
-      Class.forName(getJDBCDriverName()).newInstance();
-      LOG.info("Loaded the JDBC driver (" + jdbcDriver + ")");
+      Class.forName(getCatalogDriverName()).newInstance();
+      LOG.info("Loaded the Catalog driver (" + catalogDriver + ")");
     } catch (Exception e) {
-      throw new InternalException("Cannot load JDBC driver " + jdbcDriver, e);
+      throw new InternalException("Cannot load Catalog driver " + catalogDriver, e);
     }
 
     try {
-      LOG.info("Trying to connect database (" + jdbcUri + ")");
+      LOG.info("Trying to connect database (" + catalogUri + ")");
       conn = createConnection(conf);
-      LOG.info("Connected to database (" + jdbcUri + ")");
+      LOG.info("Connected to database (" + catalogUri + ")");
     } catch (SQLException e) {
-      throw new InternalException("Cannot connect to database (" + jdbcUri
+      throw new InternalException("Cannot connect to database (" + catalogUri
           + ")", e);
     }
 
@@ -109,8 +135,8 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
 //    }
   }
 
-  protected String getJDBCUri(){
-    return jdbcUri;
+  protected String getCatalogUri(){
+    return catalogUri;
   }
 
   public Connection getConnection() throws SQLException{
@@ -740,6 +766,6 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
   @Override
   public void close() {
     CatalogUtil.closeSQLWrapper(conn);
-    LOG.info("Shutdown database (" + jdbcUri + ")");
+    LOG.info("Shutdown database (" + catalogUri + ")");
   }
 }

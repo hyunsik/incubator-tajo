@@ -23,11 +23,11 @@
   <parent>
     <groupId>org.apache.tajo</groupId>
     <artifactId>tajo-main</artifactId>
-    <version>0.2.0-SNAPSHOT</version>
+    <version>0.8.0-SNAPSHOT</version>
   </parent>
   <groupId>org.apache.tajo</groupId>
   <artifactId>tajo-project</artifactId>
-  <version>0.2.0-SNAPSHOT</version>
+  <version>0.8.0-SNAPSHOT</version>
   <description>Tajo Project POM</description>
   <name>Tajo Project POM</name>
   <packaging>pom</packaging>
@@ -35,7 +35,8 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-    <tajo.version>0.2.0-SNAPSHOT</tajo.version>
+    <tajo.version>0.8.0-SNAPSHOT</tajo.version>
+    <hadoop.version>2.0.5-alpha</hadoop.version>
   </properties>
 
   <licenses>
@@ -250,10 +251,6 @@
       <snapshots>
         <enabled>true</enabled>
       </snapshots>
-    </repository>
-    <repository>
-      <id>cloudera</id>
-      <url>https://repository.cloudera.com/artifactory/cloudera-repos/</url>
     </repository>
     <repository>
       <id>eclipse-jetty</id>
@@ -812,6 +809,12 @@
     </profile>
     <profile>
       <id>hadoop_cdh-4.3.0</id>
+      <repositories>
+        <repository>
+          <id>cloudera</id>
+          <url>https://repository.cloudera.com/artifactory/cloudera-repos/</url>
+        </repository>
+      </repositories>
       <properties>
         <hadoop.version>2.0.0-cdh4.3.0</hadoop.version>
       </properties>

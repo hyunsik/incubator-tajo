@@ -23,12 +23,12 @@
   <parent>
     <artifactId>tajo-project</artifactId>
     <groupId>org.apache.tajo</groupId>
-    <version>0.2.0-SNAPSHOT</version>
+    <version>0.8.0-SNAPSHOT</version>
     <relativePath>../tajo-project</relativePath>
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <artifactId>tajo-dist</artifactId>
-  <version>0.2.0-SNAPSHOT</version>
+  <version>0.8.0-SNAPSHOT</version>
   <description>Tajo Distribution</description>
   <name>Tajo Distribution</name>
   <packaging>jar</packaging>
@@ -106,6 +106,8 @@
                       run cp -r $ROOT/tajo-core/target/tajo-core-${project.version}/* .
                       run cp -r ${project.basedir}/src/main/bin .
                       run cp -r ${project.basedir}/src/main/conf .
+                      run rm -rf lib/hive-*.jar
+                      run cp -r $ROOT/tajo-catalog/tajo-catalog-server/target/lib/hive-*.jar  lib/
                       run rm -rf lib/tajo-*-${project.version}.jar
                       echo
                       echo "Tajo dist layout available at: ${project.build.directory}/tajo-${project.version}"
@@ -147,6 +149,41 @@
                       <arg line="./dist-tar-stitching.sh"/>
                     </exec>
                   </target>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>visualize</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <phase>compile</phase>
+                <goals>
+                  <goal>java</goal>
+                </goals>
+                <configuration>
+                  <classpathScope>test</classpathScope>
+                  <mainClass>org.apache.hadoop.yarn.util.VisualizeStateMachine</mainClass>
+                  <arguments>
+                    <argument>Tajo</argument>
+                    <argument>org.apache.tajo.master.querymaster.Query,
+                      org.apache.tajo.master.querymaster.SubQuery,
+                      org.apache.tajo.master.querymaster.QueryUnit,
+                      org.apache.tajo.master.querymaster.QueryUnitAttempt
+                    </argument>
+                    <argument>Tajo.gv</argument>
+                  </arguments>
                 </configuration>
               </execution>
             </executions>

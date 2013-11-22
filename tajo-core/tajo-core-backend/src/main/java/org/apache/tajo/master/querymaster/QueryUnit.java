@@ -34,6 +34,7 @@ import org.apache.tajo.engine.planner.logical.*;
 import org.apache.tajo.ipc.TajoWorkerProtocol.Partition;
 import org.apache.tajo.master.TaskState;
 import org.apache.tajo.master.event.*;
+import org.apache.tajo.storage.DataLocation;
 import org.apache.tajo.storage.fragment.FileFragment;
 import org.apache.tajo.storage.fragment.Fragment;
 import org.apache.tajo.util.TajoIdUtils;
@@ -81,7 +82,7 @@ public class QueryUnit implements EventHandler<TaskEvent> {
   private long launchTime;
   private long finishTime;
 
-  private static final StateMachineFactory
+  protected static final StateMachineFactory
       <QueryUnit, TaskState, TaskEventType, TaskEvent> stateMachineFactory =
       new StateMachineFactory
           <QueryUnit, TaskState, TaskEventType, TaskEvent>(TaskState.NEW)
@@ -136,12 +137,11 @@ public class QueryUnit implements EventHandler<TaskEvent> {
 
   public void setDataLocations(FileFragment fragment) {
     String[] hosts = fragment.getHosts();
-    int[] blockCount = fragment.getHostsBlockCount();
     int[] volumeIds = fragment.getDiskIds();
     this.dataLocations = new ArrayList<DataLocation>(hosts.length);
 
     for (int i = 0; i < hosts.length; i++) {
-      this.dataLocations.add(new DataLocation(hosts[i], blockCount[i], volumeIds[i]));
+      this.dataLocations.add(new DataLocation(hosts[i], volumeIds[i]));
     }
   }
 
@@ -526,39 +526,6 @@ public class QueryUnit implements EventHandler<TaskEvent> {
 
     public String getPullAddress() {
       return pullHost + ":" + port;
-    }
-  }
-
-  public static class DataLocation {
-    private String host;
-    private int blockCount; // for Non-Splittable
-    private int volumeId;
-
-    public DataLocation(String host, int blockCount, int volumeId) {
-      this.host = host;
-      this.blockCount = blockCount;
-      this.volumeId = volumeId;
-    }
-
-    public String getHost() {
-      return host;
-    }
-
-    public int getBlockCount() {
-      return blockCount;
-    }
-
-    public int getVolumeId() {
-      return volumeId;
-    }
-
-    @Override
-    public String toString() {
-      return "DataLocation{" +
-          "host=" + host +
-          ", blocks=" + blockCount +
-          ", volumeId=" + volumeId +
-          '}';
     }
   }
 }

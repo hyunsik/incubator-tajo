@@ -474,14 +474,12 @@ public abstract class AbstractStorageManager {
     });
 
     String[] hosts = new String[blkLocations[0].getHosts().length];
-    int[] hostsBlockCount = new int[blkLocations[0].getHosts().length];
 
     for (int i = 0; i < hosts.length; i++) {
       Map.Entry<String, Integer> entry = entries.get((entries.size() - 1) - i);
       hosts[i] = entry.getKey();
-      hostsBlockCount[i] = entry.getValue();
     }
-    return new FileFragment(fragmentId, file, start, length, hosts, hostsBlockCount);
+    return new FileFragment(fragmentId, file, start, length, hosts);
   }
 
   /**
@@ -568,7 +566,7 @@ public abstract class AbstractStorageManager {
       long length = file.getLen();
       if (length > 0) {
         BlockLocation[] blkLocations = fs.getFileBlockLocations(file, 0, length);
-        boolean splittable = isSplittable(meta, schema, inputPath);
+        boolean splittable = isSplittable(meta, schema, path);
         if (blocksMetadataEnabled && fs instanceof DistributedFileSystem) {
           // supported disk volume
           BlockStorageLocation[] blockStorageLocations = ((DistributedFileSystem) fs)
