@@ -359,7 +359,6 @@ public class TajoCli {
       } else {
         if (status.getState() == QueryState.QUERY_SUCCEEDED) {
           sout.println("final state: " + status.getState()
-              + ", init time: " + (((float)(status.getInitTime() - status.getSubmitTime()) / 1000.0) + " sec")
               + ", response time: " + (((float)(status.getFinishTime() - status.getSubmitTime()) / 1000.0)
               + " sec"));
           if (status.hasResult()) {
