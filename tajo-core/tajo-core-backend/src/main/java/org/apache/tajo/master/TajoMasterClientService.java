@@ -312,7 +312,7 @@ public class TajoMasterClientService extends AbstractService {
 
         TableDesc desc;
         try {
-          desc = context.getGlobalEngine().createTableOnDirectory(request.getName(), schema,
+          desc = context.getGlobalEngine().createTableOnPath(request.getName(), schema,
               meta, path, false, partitions);
         } catch (Exception e) {
           return TableResponse.newBuilder()
