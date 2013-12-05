@@ -429,6 +429,10 @@ public class TajoMaster extends CompositeService {
         new FunctionDesc("regexp_replace", RegexpReplace.class, FunctionType.GENERAL,
             CatalogUtil.newSimpleDataType(Type.TEXT),
             CatalogUtil.newSimpleDataTypeArray(Type.TEXT, Type.TEXT, Type.TEXT)));
+    sqlFuncs.add(
+        new FunctionDesc("ascii", Ascii.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.INT4),
+            CatalogUtil.newSimpleDataTypeArray(Type.TEXT)));
 
     sqlFuncs.add(
         new FunctionDesc("length", Length.class, FunctionType.GENERAL,
@@ -553,12 +557,54 @@ public class TajoMaster extends CompositeService {
             CatalogUtil.newSimpleDataType(Type.FLOAT8),
             CatalogUtil.newSimpleDataTypeArray(Type.FLOAT4, Type.FLOAT4)));
 
+    sqlFuncs.add(
+        new FunctionDesc("mod", Mod.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.INT8),
+            CatalogUtil.newSimpleDataTypeArray(Type.INT8, Type.INT8)));
+    sqlFuncs.add(
+        new FunctionDesc("mod", Mod.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.INT8),
+            CatalogUtil.newSimpleDataTypeArray(Type.INT4, Type.INT4)));
+    sqlFuncs.add(
+        new FunctionDesc("mod", Mod.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.INT8),
+            CatalogUtil.newSimpleDataTypeArray(Type.INT4, Type.INT8)));
+    sqlFuncs.add(
+        new FunctionDesc("mod", Mod.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.INT8),
+            CatalogUtil.newSimpleDataTypeArray(Type.INT8, Type.INT4)));
 
+    sqlFuncs.add(
+        new FunctionDesc("div", Div.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.INT8),
+            CatalogUtil.newSimpleDataTypeArray(Type.INT8, Type.INT8)));
+    sqlFuncs.add(
+        new FunctionDesc("div", Div.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.INT8),
+            CatalogUtil.newSimpleDataTypeArray(Type.INT4, Type.INT4)));
+    sqlFuncs.add(
+        new FunctionDesc("div", Div.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.INT8),
+            CatalogUtil.newSimpleDataTypeArray(Type.INT4, Type.INT8)));
+    sqlFuncs.add(
+        new FunctionDesc("div", Div.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.INT8),
+            CatalogUtil.newSimpleDataTypeArray(Type.INT8, Type.INT4)));
 
     sqlFuncs.add(
         new FunctionDesc("initcap", InitCap.class, FunctionType.GENERAL,
             CatalogUtil.newSimpleDataType(Type.TEXT),
             CatalogUtil.newSimpleDataTypeArray(Type.TEXT)));
+
+    sqlFuncs.add(
+        new FunctionDesc("lpad", Lpad.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.TEXT),
+            CatalogUtil.newSimpleDataTypeArray(Type.TEXT, Type.INT4, Type.TEXT)));
+
+    sqlFuncs.add(
+        new FunctionDesc("rpad", Rpad.class, FunctionType.GENERAL,
+            CatalogUtil.newSimpleDataType(Type.TEXT),
+            CatalogUtil.newSimpleDataTypeArray(Type.TEXT, Type.INT4, Type.TEXT)));
 
     return sqlFuncs;
   }

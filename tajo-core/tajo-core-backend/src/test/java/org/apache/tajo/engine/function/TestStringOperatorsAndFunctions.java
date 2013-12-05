@@ -403,4 +403,37 @@ public class TestStringOperatorsAndFunctions extends ExprTestBase {
     testSimpleEval("select initcap('hi bro') ", new String[]{"Hi Bro"});
     testSimpleEval("select initcap('HI BRO') ", new String[]{"Hi Bro"});
   }
+
+  @Test
+  public void testAscii() throws IOException {
+    testSimpleEval("select ascii('abc') as col1 ", new String[]{"97"});
+
+    Schema schema = new Schema();
+    schema.addColumn("col1", TEXT);
+    testEval(schema, "table1", "abc", "select ascii(col1) from table1",
+            new String[]{"97"});
+    testEval(schema, "table1", "12", "select ascii(col1) from table1",
+            new String[]{"49"});
+
+  }
+
+  @Test
+  public void testLpad() throws IOException {
+    testSimpleEval("select lpad('hi', 5, 'xy') ", new String[]{"xyxhi"});
+    testSimpleEval("select LPAD('hello', 7, 'xy') ", new String[]{"xyhello"});
+    testSimpleEval("select LPAD('hello', 3, 'xy') ", new String[]{"hel"});
+    testSimpleEval("select lPAD('hello', 7) ", new String[]{"  hello"});
+    testSimpleEval("select lPAD('가나다라', 3) ", new String[]{"가나다"});
+
+  }
+
+  @Test
+  public void testRpad() throws IOException {
+    testSimpleEval("select rpad('hi', 5, 'xy') ", new String[]{"hixyx"});
+    testSimpleEval("select RPAD('hello', 7, 'xy') ", new String[]{"helloxy"});
+    testSimpleEval("select RPAD('hello', 3, 'xy') ", new String[]{"hel"});
+    testSimpleEval("select rPAD('hello', 7) ", new String[]{"hello  "});
+    testSimpleEval("select rPAD('가나다라', 3) ", new String[]{"가나다"});
+
+  }
 }

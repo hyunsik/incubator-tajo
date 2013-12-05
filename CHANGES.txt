@@ -4,6 +4,14 @@ Release 0.8.0 - unreleased
 
   NEW FEATURES
 
+    TAJO-364: Implement mod/div function. (DaeMyung Kang via jaehwa)
+
+    TAJO-361: Implement rpad function. (Seungun Choe via jaehwa)
+
+    TAJO-359: Implement lpad function. (Seungun Choe via jaehwa)
+
+    TAJO-306: Implement ascii(string) function. (SeongHwa Ahn via jaehwa)
+
     TAJO-354: Fix invalid type to valid type for udfs(bit_length/char_length).
     (DaeMyung Kang via hyunsik)
 
@@ -54,6 +62,9 @@ Release 0.8.0 - unreleased
 
   IMPROVEMENTS
 
+    TAJO-316: Improve GreedyHeuristicJoinOrderAlgorithm to deal with
+    non-commutative joins. (hyunsik)
+
     TAJO-371: Increase the default value of worker memory. (jihoon)
 
     TAJO-284: Add table partitioning entry to Catalog. (jaehwa)
@@ -90,7 +101,10 @@ Release 0.8.0 - unreleased
 
   BUG FIXES
 
-    TAJO-347: Fix bug when to call function with insensitive function name. 
+    TAJO-375: TajoClient can't get result data when different os user
+    (hyoungjunkim via hyunsik)
+
+    TAJO-347: Fix bug when to call function with insensitive function name.
     (DaeMyung Kang via hyunsik)
 
     TAJO-345: MergeScanner should support projectable storages. (jihoon)
