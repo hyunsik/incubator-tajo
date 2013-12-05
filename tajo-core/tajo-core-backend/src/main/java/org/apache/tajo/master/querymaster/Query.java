@@ -105,7 +105,8 @@ public class Query implements EventHandler<QueryEvent> {
 
           // Transitions from RUNNING state
           .addTransition(QueryState.QUERY_RUNNING,
-              EnumSet.of(QueryState.QUERY_RUNNING, QueryState.QUERY_SUCCEEDED, QueryState.QUERY_FAILED),
+              EnumSet.of(QueryState.QUERY_RUNNING, QueryState.QUERY_SUCCEEDED, QueryState.QUERY_FAILED,
+                  QueryState.QUERY_ERROR),
               QueryEventType.SUBQUERY_COMPLETED,
               new SubQueryCompletedTransition())
           .addTransition(QueryState.QUERY_RUNNING, QueryState.QUERY_RUNNING,
@@ -339,6 +340,9 @@ public class Query implements EventHandler<QueryEvent> {
 
           return QueryState.QUERY_SUCCEEDED;
         }
+      } else if (castEvent.getFinalState() == SubQueryState.ERROR) {
+        query.setFinishTime();
+        return QueryState.QUERY_ERROR;
       } else {
         // if at least one subquery is failed, the query is also failed.
         query.setFinishTime();

@@ -134,7 +134,7 @@ public class TajoWorkerClientService extends AbstractService {
       } else {
         switch (query.getState()) {
           case QUERY_SUCCEEDED:
-            builder.setTableDesc((CatalogProtos.TableDescProto)query.getResultDesc().getProto());
+            builder.setTableDesc(query.getResultDesc().getProto());
             break;
           case QUERY_FAILED:
           case QUERY_ERROR:

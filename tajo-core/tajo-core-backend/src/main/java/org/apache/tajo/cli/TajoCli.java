@@ -352,8 +352,10 @@ public class TajoCli {
         }
       }
 
-      if (isFailed(status.getState())) {
-        sout.println(status.getErrorMessage());
+      if (status.getState() == QueryState.QUERY_ERROR) {
+        sout.println("Internal Error!");
+      } else if (status.getState() == QueryState.QUERY_FAILED) {
+        sout.println("Query Failed!");
       } else if (status.getState() == QueryState.QUERY_KILLED) {
         sout.println(queryId + " is killed.");
       } else {
