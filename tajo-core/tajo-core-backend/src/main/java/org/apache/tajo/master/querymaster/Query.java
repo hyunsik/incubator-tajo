@@ -84,7 +84,7 @@ public class Query implements EventHandler<QueryEvent> {
   private final StateMachine<QueryState, QueryEventType, QueryEvent> stateMachine;
 
   // Transition Handler
-  private static final SingleArcTransition INTERAL_ERROR_TRANSITION = new InternalErrorTransition();
+  private static final SingleArcTransition INTERNAL_ERROR_TRANSITION = new InternalErrorTransition();
   private static final DiagnosticsUpdateTransition DIAGNOSTIC_UPDATE_TRANSITION = new DiagnosticsUpdateTransition();
 
   protected static final StateMachineFactory
@@ -101,7 +101,7 @@ public class Query implements EventHandler<QueryEvent> {
               DIAGNOSTIC_UPDATE_TRANSITION)
           .addTransition(QueryState.QUERY_NEW, QueryState.QUERY_ERROR,
               QueryEventType.INTERNAL_ERROR,
-              INTERAL_ERROR_TRANSITION)
+              INTERNAL_ERROR_TRANSITION)
 
           // Transitions from RUNNING state
           .addTransition(QueryState.QUERY_RUNNING,
@@ -114,7 +114,7 @@ public class Query implements EventHandler<QueryEvent> {
               DIAGNOSTIC_UPDATE_TRANSITION)
           .addTransition(QueryState.QUERY_RUNNING, QueryState.QUERY_ERROR,
               QueryEventType.INTERNAL_ERROR,
-              INTERAL_ERROR_TRANSITION)
+              INTERNAL_ERROR_TRANSITION)
 
           // Transitions from FAILED state
           .addTransition(QueryState.QUERY_FAILED, QueryState.QUERY_FAILED,
@@ -122,7 +122,7 @@ public class Query implements EventHandler<QueryEvent> {
               DIAGNOSTIC_UPDATE_TRANSITION)
           .addTransition(QueryState.QUERY_FAILED, QueryState.QUERY_ERROR,
               QueryEventType.INTERNAL_ERROR,
-              INTERAL_ERROR_TRANSITION)
+              INTERNAL_ERROR_TRANSITION)
 
           // Transitions from ERROR state
           .addTransition(QueryState.QUERY_ERROR, QueryState.QUERY_ERROR,
@@ -130,7 +130,7 @@ public class Query implements EventHandler<QueryEvent> {
               DIAGNOSTIC_UPDATE_TRANSITION)
           .addTransition(QueryState.QUERY_ERROR, QueryState.QUERY_ERROR,
               QueryEventType.INTERNAL_ERROR,
-              INTERAL_ERROR_TRANSITION)
+              INTERNAL_ERROR_TRANSITION)
 
           .installTopology();
 
