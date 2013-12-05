@@ -61,8 +61,6 @@ public class TajoContainerProxy extends ContainerProxy {
         container.getId() + "," + container.getNodeId() + ", pullServer=" + port);
 
     assignExecutionBlock(executionBlockId, container);
-
-    context.getEventHandler().handle(new QueryEvent(context.getQueryId(), QueryEventType.INIT_COMPLETED));
   }
 
   private void assignExecutionBlock(ExecutionBlockId executionBlockId, Container container) {

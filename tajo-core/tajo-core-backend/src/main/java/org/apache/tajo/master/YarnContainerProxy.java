@@ -140,8 +140,6 @@ public class YarnContainerProxy extends ContainerProxy {
             + port + " returned for " + containerID);
       }
 
-      context.getEventHandler().handle(new QueryEvent(context.getQueryId(), QueryEventType.INIT_COMPLETED));
-
       this.state = ContainerState.RUNNING;
       this.hostName = containerMgrAddress.split(":")[0];
       context.getResourceAllocator().addContainer(containerID, this);
