@@ -39,7 +39,6 @@ public class QueryStatus {
     state = proto.getState();
     progress = proto.getProgress();
     submitTime = proto.getSubmitTime();
-    initTime = proto.getInitTime();
     finishTime = proto.getFinishTime();
     hasResult = proto.getHasResult();
     if (proto.hasErrorMessage()) {

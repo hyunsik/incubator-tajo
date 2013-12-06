@@ -25,6 +25,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.service.AbstractService;
 import org.apache.tajo.QueryId;
 import org.apache.tajo.QueryIdFactory;
@@ -32,6 +33,7 @@ import org.apache.tajo.TajoIdProtos;
 import org.apache.tajo.TajoProtos;
 import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.exception.NoSuchTableException;
+import org.apache.tajo.catalog.partition.Partitions;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.conf.TajoConf.ConfVars;
 import org.apache.tajo.ipc.ClientProtos;
@@ -165,13 +167,17 @@ public class TajoMasterClientService extends AbstractService {
                                                  GetQueryResultRequest request)
         throws ServiceException {
       QueryId queryId = new QueryId(request.getQueryId());
-      if (queryId.equals(QueryIdFactory.NULL_QUERY_ID)) {
-
-      }
       QueryInProgress queryInProgress = context.getQueryJobManager().getQueryInProgress(queryId);
       QueryInfo queryInfo = queryInProgress.getQueryInfo();
       GetQueryResultResponse.Builder builder
           = GetQueryResultResponse.newBuilder();
+
+      try {
+        //TODO After implementation Tajo's user security feature, Should be modified.
+        builder.setTajoUserName(UserGroupInformation.getCurrentUser().getUserName());
+      } catch (IOException e) {
+        LOG.warn("Can't get current user name");
+      }
       switch (queryInfo.getQueryState()) {
         case QUERY_SUCCEEDED:
           // TODO check this logic needed
@@ -307,11 +313,12 @@ public class TajoMasterClientService extends AbstractService {
 
         Schema schema = new Schema(request.getSchema());
         TableMeta meta = new TableMeta(request.getMeta());
+        Partitions partitions = new Partitions(request.getPartitions());
 
         TableDesc desc;
         try {
-          desc = context.getGlobalEngine().createTableOnDirectory(request.getName(), schema, meta, path,
-              false);
+          desc = context.getGlobalEngine().createTableOnPath(request.getName(), schema,
+              meta, path, false, partitions);
         } catch (Exception e) {
           return TableResponse.newBuilder()
               .setResultCode(ResultCode.ERROR)

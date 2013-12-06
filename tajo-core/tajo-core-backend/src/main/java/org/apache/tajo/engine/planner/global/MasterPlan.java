@@ -51,7 +51,7 @@ public class MasterPlan {
   }
 
   public boolean isTerminal(ExecutionBlock execBlock) {
-    return terminalBlock == execBlock;
+    return terminalBlock.getId().equals(execBlock.getId());
   }
 
   public ExecutionBlock getTerminalBlock() {
@@ -83,6 +83,7 @@ public class MasterPlan {
   
   public void setTerminal(ExecutionBlock root) {
     this.root = root;
+    this.terminalBlock = root;
   }
   
   public ExecutionBlock getRoot() {
@@ -144,7 +145,11 @@ public class MasterPlan {
   }
 
   public boolean isRoot(ExecutionBlock execBlock) {
-    return execBlockGraph.isRoot(execBlock.getId());
+    if (!execBlock.getId().equals(terminalBlock.getId())) {
+      return execBlockGraph.getParent(execBlock.getId()).equals(terminalBlock.getId());
+    } else {
+      return false;
+    }
   }
 
   public boolean isLeaf(ExecutionBlock execBlock) {

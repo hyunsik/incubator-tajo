@@ -32,6 +32,7 @@ import org.apache.tajo.algebra.Expr;
 import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.exception.AlreadyExistsTableException;
 import org.apache.tajo.catalog.exception.NoSuchTableException;
+import org.apache.tajo.catalog.partition.Partitions;
 import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.conf.TajoConf;
@@ -131,7 +132,7 @@ public class GlobalEngine extends AbstractService {
       }
 
       Expr planningContext = hiveQueryMode ? converter.parse(sql) : analyzer.parse(sql);
-      
+
       LogicalPlan plan = createLogicalPlan(planningContext);
       LogicalRootNode rootNode = plan.getRootBlock().getRoot();
 
@@ -245,18 +246,19 @@ public class GlobalEngine extends AbstractService {
       meta = CatalogUtil.newTableMeta(createTable.getStorageType());
     }
 
-    if(!createTable.isExternal()){
+    if(createTable.isExternal()){
+      Preconditions.checkState(createTable.hasPath(), "ERROR: LOCATION must be given.");
+    } else {
       Path tablePath = new Path(sm.getWarehouseDir(), createTable.getTableName().toLowerCase());
       createTable.setPath(tablePath);
-    } else {
-      Preconditions.checkState(createTable.hasPath(), "ERROR: LOCATION must be given.");
     }
 
-    return createTableOnDirectory(createTable.getTableName(), createTable.getSchema(), meta,
-        createTable.getPath(), true);
+    return createTableOnPath(createTable.getTableName(), createTable.getSchema(), meta,
+        createTable.getPath(), !createTable.isExternal(), createTable.getPartitions());
   }
 
-  public TableDesc createTableOnDirectory(String tableName, Schema schema, TableMeta meta, Path path, boolean isCreated)
+  public TableDesc createTableOnPath(String tableName, Schema schema, TableMeta meta,
+                                     Path path, boolean isCreated, Partitions partitions)
       throws IOException {
     if (catalog.existsTable(tableName)) {
       throw new AlreadyExistsTableException(tableName);
@@ -268,8 +270,8 @@ public class GlobalEngine extends AbstractService {
       fs.mkdirs(path);
     }
 
-    if(fs.exists(path) && fs.isFile(path)) {
-      throw new IOException("ERROR: LOCATION must be a directory.");
+    if(!fs.exists(path)) {
+      throw new IOException("ERROR: " + path.toUri() + " does not exist");
     }
 
     long totalSize = 0;
@@ -284,6 +286,7 @@ public class GlobalEngine extends AbstractService {
     stats.setNumBytes(totalSize);
     TableDesc desc = CatalogUtil.newTableDesc(tableName, schema, meta, path);
     desc.setStats(stats);
+    desc.setPartitions(partitions);
     catalog.addTable(desc);
 
     LOG.info("Table " + desc.getName() + " is created (" + desc.getStats().getNumBytes() + ")");

@@ -28,19 +28,19 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.Clock;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.state.*;
-import org.apache.tajo.catalog.TableDesc;
-import org.apache.tajo.catalog.TableMeta;
-import org.apache.tajo.catalog.statistics.TableStats;
-import org.apache.tajo.engine.planner.global.DataChannel;
 import org.apache.tajo.ExecutionBlockId;
 import org.apache.tajo.QueryId;
 import org.apache.tajo.TajoConstants;
 import org.apache.tajo.TajoProtos.QueryState;
 import org.apache.tajo.catalog.CatalogService;
+import org.apache.tajo.catalog.TableDesc;
+import org.apache.tajo.catalog.TableMeta;
+import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.conf.TajoConf;
-import org.apache.tajo.engine.planner.global.MasterPlan;
+import org.apache.tajo.engine.planner.global.DataChannel;
 import org.apache.tajo.engine.planner.global.ExecutionBlock;
 import org.apache.tajo.engine.planner.global.ExecutionBlockCursor;
+import org.apache.tajo.engine.planner.global.MasterPlan;
 import org.apache.tajo.engine.query.QueryContext;
 import org.apache.tajo.master.event.*;
 import org.apache.tajo.storage.AbstractStorageManager;
@@ -83,31 +83,56 @@ public class Query implements EventHandler<QueryEvent> {
   // State Machine
   private final StateMachine<QueryState, QueryEventType, QueryEvent> stateMachine;
 
+  // Transition Handler
+  private static final SingleArcTransition INTERNAL_ERROR_TRANSITION = new InternalErrorTransition();
+  private static final DiagnosticsUpdateTransition DIAGNOSTIC_UPDATE_TRANSITION = new DiagnosticsUpdateTransition();
+
   protected static final StateMachineFactory
       <Query,QueryState,QueryEventType,QueryEvent> stateMachineFactory =
       new StateMachineFactory<Query, QueryState, QueryEventType, QueryEvent>
           (QueryState.QUERY_NEW)
 
-      .addTransition(QueryState.QUERY_NEW,
-          EnumSet.of(QueryState.QUERY_INIT, QueryState.QUERY_FAILED),
-          QueryEventType.INIT, new InitTransition())
+          // Transitions from NEW state
+          .addTransition(QueryState.QUERY_NEW, QueryState.QUERY_RUNNING,
+              QueryEventType.START,
+              new StartTransition())
+          .addTransition(QueryState.QUERY_NEW, QueryState.QUERY_NEW,
+              QueryEventType.DIAGNOSTIC_UPDATE,
+              DIAGNOSTIC_UPDATE_TRANSITION)
+          .addTransition(QueryState.QUERY_NEW, QueryState.QUERY_ERROR,
+              QueryEventType.INTERNAL_ERROR,
+              INTERNAL_ERROR_TRANSITION)
 
-      .addTransition(QueryState.QUERY_INIT, QueryState.QUERY_RUNNING,
-          QueryEventType.START, new StartTransition())
+          // Transitions from RUNNING state
+          .addTransition(QueryState.QUERY_RUNNING,
+              EnumSet.of(QueryState.QUERY_RUNNING, QueryState.QUERY_SUCCEEDED, QueryState.QUERY_FAILED,
+                  QueryState.QUERY_ERROR),
+              QueryEventType.SUBQUERY_COMPLETED,
+              new SubQueryCompletedTransition())
+          .addTransition(QueryState.QUERY_RUNNING, QueryState.QUERY_RUNNING,
+              QueryEventType.DIAGNOSTIC_UPDATE,
+              DIAGNOSTIC_UPDATE_TRANSITION)
+          .addTransition(QueryState.QUERY_RUNNING, QueryState.QUERY_ERROR,
+              QueryEventType.INTERNAL_ERROR,
+              INTERNAL_ERROR_TRANSITION)
 
-      .addTransition(QueryState.QUERY_RUNNING, QueryState.QUERY_RUNNING,
-          QueryEventType.INIT_COMPLETED, new InitCompleteTransition())
-      .addTransition(QueryState.QUERY_RUNNING,
-          EnumSet.of(QueryState.QUERY_RUNNING, QueryState.QUERY_SUCCEEDED,
-              QueryState.QUERY_FAILED),
-          QueryEventType.SUBQUERY_COMPLETED,
-          new SubQueryCompletedTransition())
-      .addTransition(QueryState.QUERY_RUNNING, QueryState.QUERY_ERROR,
-          QueryEventType.INTERNAL_ERROR, new InternalErrorTransition())
-       .addTransition(QueryState.QUERY_ERROR, QueryState.QUERY_ERROR,
-          QueryEventType.INTERNAL_ERROR)
+          // Transitions from FAILED state
+          .addTransition(QueryState.QUERY_FAILED, QueryState.QUERY_FAILED,
+              QueryEventType.DIAGNOSTIC_UPDATE,
+              DIAGNOSTIC_UPDATE_TRANSITION)
+          .addTransition(QueryState.QUERY_FAILED, QueryState.QUERY_ERROR,
+              QueryEventType.INTERNAL_ERROR,
+              INTERNAL_ERROR_TRANSITION)
 
-      .installTopology();
+          // Transitions from ERROR state
+          .addTransition(QueryState.QUERY_ERROR, QueryState.QUERY_ERROR,
+              QueryEventType.DIAGNOSTIC_UPDATE,
+              DIAGNOSTIC_UPDATE_TRANSITION)
+          .addTransition(QueryState.QUERY_ERROR, QueryState.QUERY_ERROR,
+              QueryEventType.INTERNAL_ERROR,
+              INTERNAL_ERROR_TRANSITION)
+
+          .installTopology();
 
   public Query(final QueryMasterTask.QueryMasterTaskContext context, final QueryId id,
                final long appSubmitTime,
@@ -184,15 +209,6 @@ public class Query implements EventHandler<QueryEvent> {
     startTime = clock.getTime();
   }
 
-  public long getInitializationTime() {
-    return initializationTime;
-  }
-
-  public void setInitializationTime() {
-    initializationTime = clock.getTime();
-  }
-
-
   public long getFinishTime() {
     return finishTime;
   }
@@ -259,30 +275,19 @@ public class Query implements EventHandler<QueryEvent> {
     return cursor;
   }
 
-  static class InitTransition
-      implements MultipleArcTransition<Query, QueryEvent, QueryState> {
-
-    @Override
-    public QueryState transition(Query query, QueryEvent queryEvent) {
-      query.setStartTime();
-      //query.context.setState(QueryState.QUERY_INIT);
-      return QueryState.QUERY_INIT;
-    }
-  }
-
   public static class StartTransition
       implements SingleArcTransition<Query, QueryEvent> {
 
     @Override
     public void transition(Query query, QueryEvent queryEvent) {
+      query.setStartTime();
       SubQuery subQuery = new SubQuery(query.context, query.getPlan(),
           query.getExecutionBlockCursor().nextBlock(), query.sm);
       subQuery.setPriority(query.priority--);
       query.addSubQuery(subQuery);
-      LOG.debug("Schedule unit plan: \n" + subQuery.getBlock().getPlan());
 
-      subQuery.handle(new SubQueryEvent(subQuery.getId(),
-          SubQueryEventType.SQ_INIT));
+      subQuery.handle(new SubQueryEvent(subQuery.getId(), SubQueryEventType.SQ_INIT));
+      LOG.debug("Schedule unit plan: \n" + subQuery.getBlock().getPlan());
     }
   }
 
@@ -299,7 +304,7 @@ public class Query implements EventHandler<QueryEvent> {
       // if the subquery is succeeded
       if (castEvent.getFinalState() == SubQueryState.SUCCEEDED) {
         ExecutionBlock nextBlock = cursor.nextBlock();
-        if (!query.getPlan().isTerminal(nextBlock) || !query.getPlan().isRoot(nextBlock)) {
+        if (!query.getPlan().isTerminal(nextBlock)) {
           SubQuery nextSubQuery = new SubQuery(query.context, query.getPlan(), nextBlock, query.sm);
           nextSubQuery.setPriority(query.priority--);
           query.addSubQuery(nextSubQuery);
@@ -335,8 +340,12 @@ public class Query implements EventHandler<QueryEvent> {
 
           return QueryState.QUERY_SUCCEEDED;
         }
+      } else if (castEvent.getFinalState() == SubQueryState.ERROR) {
+        query.setFinishTime();
+        return QueryState.QUERY_ERROR;
       } else {
         // if at least one subquery is failed, the query is also failed.
+        query.setFinishTime();
         return QueryState.QUERY_FAILED;
       }
     }
@@ -406,21 +415,18 @@ public class Query implements EventHandler<QueryEvent> {
     }
   }
 
-  private static class InitCompleteTransition implements
-      SingleArcTransition<Query, QueryEvent> {
+  private static class DiagnosticsUpdateTransition implements SingleArcTransition<Query, QueryEvent> {
     @Override
     public void transition(Query query, QueryEvent event) {
-      if (query.initializationTime == 0) {
-        query.setInitializationTime();
-      }
+      query.addDiagnostic(((QueryDiagnosticsUpdateEvent) event).getDiagnosticUpdate());
     }
   }
 
-  private static class InternalErrorTransition
-      implements SingleArcTransition<Query, QueryEvent> {
+  private static class InternalErrorTransition implements SingleArcTransition<Query, QueryEvent> {
 
     @Override
     public void transition(Query query, QueryEvent event) {
+      query.setFinishTime();
       query.finished(QueryState.QUERY_ERROR);
     }
   }
@@ -452,8 +458,7 @@ public class Query implements EventHandler<QueryEvent> {
         getStateMachine().doTransition(event.getType(), event);
       } catch (InvalidStateTransitonException e) {
         LOG.error("Can't handle this event at current state", e);
-        eventHandler.handle(new QueryEvent(this.id,
-            QueryEventType.INTERNAL_ERROR));
+        eventHandler.handle(new QueryEvent(this.id, QueryEventType.INTERNAL_ERROR));
       }
 
       //notify the eventhandler of state change

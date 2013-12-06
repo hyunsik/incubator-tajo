@@ -19,9 +19,7 @@
 package org.apache.tajo.master.event;
 
 public enum QueryEventType {
-  INIT,
   START,
-  INIT_COMPLETED,
   INTERNAL_ERROR,
   SUBQUERY_COMPLETED,
   KILL,

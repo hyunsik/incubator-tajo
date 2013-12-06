@@ -4,6 +4,51 @@ Release 0.8.0 - unreleased
 
   NEW FEATURES
 
+    TAJO-364: Implement mod/div function. (DaeMyung Kang via jaehwa)
+
+    TAJO-361: Implement rpad function. (Seungun Choe via jaehwa)
+
+    TAJO-359: Implement lpad function. (Seungun Choe via jaehwa)
+
+    TAJO-306: Implement ascii(string) function. (SeongHwa Ahn via jaehwa)
+
+    TAJO-354: Fix invalid type to valid type for udfs(bit_length/char_length).
+    (DaeMyung Kang via hyunsik)
+
+    TAJO-366: Implement trigonometric functions. (Jae Young Lee via jihoon)
+
+    TAJO-358: Implement initcap(string) function. (Seungun Choe via hyunsik)
+
+    TAJO-355: Implement repeat(text,int) function. (DaeMyung Kang via jaehwa)
+
+    TAJO-339: Implement sin( x ) - returns the sine of x (x is in radians). 
+    (Jae Young Lee via jaehwa)
+
+    TAJO-348: Implement octet_length(text). (DaeMyung Kang via jaehwa)
+
+    TAJO-357: Fix invalid filename TestMethFunction to TestMathFUnction.
+    (DaeMyung Kang via hyunsik)
+
+    TAJO-352: Implement right/left(text, size) function. 
+    (DaeMyung Kang via hyunsik)
+
+    TAJO-346: Implement hex function. (DaeMyung Kang via hyunsik)
+
+    TAJO-349: Implement md5(text). (DaeMyung Kang via hyunsik)
+
+    TAJO-351: Implement reverse(text). (DaeMyung Kang via hyunsik)
+
+    TAJO-342: Implement strpos(string, substring) function. 
+    (hyoungjunkim via hyunsik)
+
+    TAJO-350: Implement round, floor, ceil. (hyoungjunkim via hyunsik)
+
+    TAJO-207: Implement bit_length(string) function. (DaeMyung Kang via jihoon)
+
+    TAJO-341: Implement substr function. (hyoungjunkim via hyunsik)
+
+    TAJO-308: Implement length(string) function. (hyoungjunkim via hyunsik)
+
     TAJO-200: RCFile compatible to apache hive. (jinho)
 
     TAJO-176: Implement Tajo JDBC Driver. (Keuntae Park via jihoon)
@@ -16,6 +61,21 @@ Release 0.8.0 - unreleased
     (jihoon)
 
   IMPROVEMENTS
+
+    TAJO-316: Improve GreedyHeuristicJoinOrderAlgorithm to deal with
+    non-commutative joins. (hyunsik)
+
+    TAJO-371: Increase the default value of worker memory. (jihoon)
+
+    TAJO-284: Add table partitioning entry to Catalog. (jaehwa)
+
+    TAJO-317: Improve TajoResourceManager to support more elaborate resource 
+    management. (Keuntae Park via jihoon)
+
+    TAJO-314: Make TaskScheduler be pluggable. (jihoon)
+
+    TAJO-325: QueryState.NEW and QueryState.INIT should be combined into one
+    state. (Min Zhou via hyunsik)
 
     TAJO-313: Support deprecated variables in CatalogConstants. (jaehwa)
 
@@ -41,6 +101,24 @@ Release 0.8.0 - unreleased
 
   BUG FIXES
 
+    TAJO-375: TajoClient can't get result data when different os user
+    (hyoungjunkim via hyunsik)
+
+    TAJO-347: Fix bug when to call function with insensitive function name.
+    (DaeMyung Kang via hyunsik)
+
+    TAJO-345: MergeScanner should support projectable storages. (jihoon)
+
+    TAJO-290: TajoDataType.Type.NULL should be NULL_TYPE. (DaeMyung Kang via 
+    jinho)
+
+    TAJO-332: Invalid row count of CSVScanner. (jinho)
+
+    TAJO-326: In ExecutionBlock, isRoot() and isLeafBlock() return invalid 
+    values. (jihoon)
+
+    TAJO-296: Late registration of Tajo workers. (hyoungjunkim via hyunsik)
+
     TAJO-321: Invalid split file of compressed text file. (jinho)
 
     TAJO-295: ConcurrentModificationException in TaskScheduler. (jinho)
@@ -48,6 +126,8 @@ Release 0.8.0 - unreleased
     TAJO-293: querymasters directory not found in single node setup. (hyunsik)
 
   TASKS
+
+    TAJO-322: Documentation by version. (hyunsik)
 
     TAJO-320: Visualize Tajo statemachine. (Min Zhou via hyunsik)
 

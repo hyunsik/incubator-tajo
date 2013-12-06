@@ -216,7 +216,6 @@ public class TajoClient {
 
   private static boolean isQueryRunnning(QueryState state) {
     return state == QueryState.QUERY_NEW ||
-        state == QueryState.QUERY_INIT ||
         state == QueryState.QUERY_RUNNING ||
         state == QueryState.QUERY_MASTER_LAUNCHED ||
         state == QueryState.QUERY_MASTER_INIT ||
@@ -228,7 +227,9 @@ public class TajoClient {
     if (queryId.equals(QueryIdFactory.NULL_QUERY_ID)) {
       return createNullResultSet(queryId);
     }
-    TableDesc tableDesc = getResultDesc(queryId);
+    GetQueryResultResponse response = getResultResponse(queryId);
+    TableDesc tableDesc = CatalogUtil.newTableDesc(response.getTableDesc());
+    conf.setVar(ConfVars.USERNAME, response.getTajoUserName());
     return new TajoResultSet(this, queryId, conf, tableDesc);
   }
 
@@ -268,7 +269,7 @@ public class TajoClient {
     return new TajoResultSet(this, queryId);
   }
 
-  public TableDesc getResultDesc(QueryId queryId) throws ServiceException {
+  public GetQueryResultResponse getResultResponse(QueryId queryId) throws ServiceException {
     if (queryId.equals(QueryIdFactory.NULL_QUERY_ID)) {
       return null;
     }
@@ -287,7 +288,7 @@ public class TajoClient {
       GetQueryResultResponse response = queryMasterService.getQueryResult(null,
           builder.build());
 
-      return CatalogUtil.newTableDesc(response.getTableDesc());
+      return response;
     } catch (Exception e) {
       throw new ServiceException(e.getMessage(), e);
     } finally {

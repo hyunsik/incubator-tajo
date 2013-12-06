@@ -22,13 +22,13 @@ import org.apache.hadoop.yarn.event.AbstractEvent;
 import org.apache.tajo.ExecutionBlockId;
 import org.apache.tajo.master.event.TaskSchedulerEvent.EventType;
 
-public class TaskSchedulerEvent extends AbstractEvent<EventType> {
+public abstract class TaskSchedulerEvent extends AbstractEvent<EventType> {
   public enum EventType {
     T_SCHEDULE,
     T_SUBQUERY_COMPLETED
   }
 
-  private final ExecutionBlockId executionBlockId;
+  protected final ExecutionBlockId executionBlockId;
 
   public TaskSchedulerEvent(EventType eventType, ExecutionBlockId queryBlockId) {
     super(eventType);

@@ -27,14 +27,18 @@ import org.apache.tajo.QueryId;
 import org.apache.tajo.QueryIdFactory;
 import org.apache.tajo.TajoConstants;
 import org.apache.tajo.TajoProtos.QueryState;
+import org.apache.tajo.algebra.CreateTable;
+import org.apache.tajo.catalog.CatalogUtil;
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.TableDesc;
+import org.apache.tajo.catalog.partition.Specifier;
 import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.client.QueryStatus;
 import org.apache.tajo.client.TajoClient;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.conf.TajoConf.ConfVars;
 import org.apache.tajo.ipc.ClientProtos;
+import org.apache.tajo.jdbc.TajoResultSet;
 import org.apache.tajo.util.FileUtil;
 
 import java.io.File;
@@ -350,18 +354,28 @@ public class TajoCli {
         }
       }
 
-      if (isFailed(status.getState())) {
-        sout.println(status.getErrorMessage());
+      if (status.getState() == QueryState.QUERY_ERROR) {
+        sout.println("Internal Error!");
+      } else if (status.getState() == QueryState.QUERY_FAILED) {
+        sout.println("Query Failed!");
       } else if (status.getState() == QueryState.QUERY_KILLED) {
         sout.println(queryId + " is killed.");
       } else {
         if (status.getState() == QueryState.QUERY_SUCCEEDED) {
           sout.println("final state: " + status.getState()
-              + ", init time: " + (((float)(status.getInitTime() - status.getSubmitTime()) / 1000.0) + " sec")
               + ", response time: " + (((float)(status.getFinishTime() - status.getSubmitTime()) / 1000.0)
               + " sec"));
           if (status.hasResult()) {
-            ResultSet res = client.getQueryResult(queryId);
+            ResultSet res = null;
+            TableDesc desc = null;
+            if (queryId.equals(QueryIdFactory.NULL_QUERY_ID)) {
+              res = client.createNullResultSet(queryId);
+            } else {
+              ClientProtos.GetQueryResultResponse response = client.getResultResponse(queryId);
+              desc = CatalogUtil.newTableDesc(response.getTableDesc());
+              conf.setVar(ConfVars.USERNAME, response.getTajoUserName());
+              res = new TajoResultSet(client, queryId, conf, desc);
+            }
             try {
               if (res == null) {
                 sout.println("OK");
@@ -369,7 +383,7 @@ public class TajoCli {
               }
 
               ResultSetMetaData rsmd = res.getMetaData();
-              TableDesc desc = client.getResultDesc(queryId);
+
               TableStats stat = desc.getStats();
               String volume = FileUtil.humanReadableByteCount(stat.getNumBytes(), false);
               long resultRows = stat.getNumRows();
@@ -463,6 +477,40 @@ public class TajoCli {
       }
       sb.append("\n");
     }
+
+    sb.append("\n");
+    sb.append("Partitions: \n");
+    if (desc.getPartitions() != null) {
+      sb.append("type:").append(desc.getPartitions().getPartitionsType().name()).append("\n");
+      if (desc.getPartitions().getNumPartitions() > 0)
+        sb.append("numbers:").append(desc.getPartitions().getNumPartitions()).append("\n");
+
+      sb.append("columns:").append("\n");
+      for(Column eachColumn: desc.getPartitions().getColumns()) {
+        sb.append("  ");
+        sb.append(eachColumn.getColumnName()).append("\t").append(eachColumn.getDataType().getType());
+        if (eachColumn.getDataType().hasLength()) {
+          sb.append("(").append(eachColumn.getDataType().getLength()).append(")");
+        }
+        sb.append("\n");
+      }
+
+      if (desc.getPartitions().getSpecifiers() != null) {
+        sb.append("specifier:").append("\n");
+        for(Specifier specifier :desc.getPartitions().getSpecifiers()) {
+          sb.append("  ");
+          sb.append("name:").append(specifier.getName());
+          if (!specifier.getExpressions().equals("")) {
+            sb.append(", expressions:").append(specifier.getExpressions());
+          } else {
+            if (desc.getPartitions().getPartitionsType().name().equals(CreateTable.PartitionType.RANGE))
+              sb.append(" expressions: MAXVALUE");
+          }
+          sb.append("\n");
+        }
+      }
+    }
+
     return sb.toString();
   }
 

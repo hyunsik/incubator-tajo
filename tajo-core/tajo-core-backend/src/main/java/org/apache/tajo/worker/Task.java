@@ -38,7 +38,10 @@ import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.engine.json.CoreGsonHelper;
 import org.apache.tajo.engine.planner.PlannerUtil;
-import org.apache.tajo.engine.planner.logical.*;
+import org.apache.tajo.engine.planner.logical.LogicalNode;
+import org.apache.tajo.engine.planner.logical.NodeType;
+import org.apache.tajo.engine.planner.logical.ScanNode;
+import org.apache.tajo.engine.planner.logical.SortNode;
 import org.apache.tajo.engine.planner.physical.PhysicalExec;
 import org.apache.tajo.engine.query.QueryContext;
 import org.apache.tajo.engine.query.QueryUnitRequest;
@@ -157,10 +160,10 @@ public class Task {
     interQuery = request.getProto().getInterQuery();
     if (interQuery) {
       context.setInterQuery();
-      StoreTableNode store = (StoreTableNode) plan;
-      this.partitionType = store.getPartitionType();
+      this.partitionType = context.getDataChannel().getPartitionType();
+
       if (partitionType == PartitionType.RANGE_PARTITION) {
-        SortNode sortNode = store.getChild();
+        SortNode sortNode = (SortNode) PlannerUtil.findTopNode(plan, NodeType.SORT);
         this.finalSchema = PlannerUtil.sortSpecsToSchema(sortNode.getSortKeys());
         this.sortComp = new TupleComparator(finalSchema, sortNode.getSortKeys());
       }

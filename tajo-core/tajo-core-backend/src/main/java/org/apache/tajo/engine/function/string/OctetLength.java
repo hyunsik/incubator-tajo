@@ -16,11 +16,36 @@
  * limitations under the License.
  */
 
-package org.apache.tajo.master;
+package org.apache.tajo.engine.function.string;
 
-import org.apache.hadoop.yarn.event.EventHandler;
-import org.apache.tajo.master.event.TaskSchedulerEvent;
+import org.apache.tajo.catalog.Column;
+import org.apache.tajo.common.TajoDataTypes;
+import org.apache.tajo.datum.Datum;
+import org.apache.tajo.datum.DatumFactory;
+import org.apache.tajo.datum.NullDatum;
+import org.apache.tajo.engine.function.GeneralFunction;
+import org.apache.tajo.storage.Tuple;
 
-public interface TaskScheduler extends EventHandler<TaskSchedulerEvent> {
+/**
+ * Function definition
+ *
+ * INT4 octet_length(string text)
+ */
+public class OctetLength  extends GeneralFunction {
 
+  public OctetLength() {
+    super(new Column[] {
+        new Column("text", TajoDataTypes.Type.TEXT)
+    });
+  }
+
+  @Override
+  public Datum eval(Tuple params) {
+    Datum datum = params.get(0);
+    if(datum instanceof NullDatum) {
+      return NullDatum.get();
+    }
+
+    return DatumFactory.createInt4(datum.asByteArray().length);
+  }
 }
