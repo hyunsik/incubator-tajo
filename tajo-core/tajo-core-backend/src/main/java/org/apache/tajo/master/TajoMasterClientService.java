@@ -31,7 +31,10 @@ import org.apache.tajo.QueryId;
 import org.apache.tajo.QueryIdFactory;
 import org.apache.tajo.TajoIdProtos;
 import org.apache.tajo.TajoProtos;
-import org.apache.tajo.catalog.*;
+import org.apache.tajo.catalog.CatalogService;
+import org.apache.tajo.catalog.Schema;
+import org.apache.tajo.catalog.TableDesc;
+import org.apache.tajo.catalog.TableMeta;
 import org.apache.tajo.catalog.exception.NoSuchTableException;
 import org.apache.tajo.catalog.partition.Partitions;
 import org.apache.tajo.conf.TajoConf;
@@ -336,25 +339,8 @@ public class TajoMasterClientService extends AbstractService {
     }
 
     @Override
-    public BoolProto dropTable(RpcController controller,
-                               StringProto tableNameProto)
-        throws ServiceException {
-      context.getGlobalEngine().dropTable(tableNameProto.getValue());
-      return BOOL_TRUE;
-    }
-
-    @Override
-    public BoolProto detachTable(RpcController controller,
-                                 StringProto tableNameProto)
-        throws ServiceException {
-      String tableName = tableNameProto.getValue();
-      if (!catalog.existsTable(tableName)) {
-        throw new NoSuchTableException(tableName);
-      }
-
-      catalog.deleteTable(tableName);
-
-      LOG.info("Table " + tableName + " is detached");
+    public BoolProto dropTable(RpcController controller, DropTableRequest dropTable) throws ServiceException {
+      context.getGlobalEngine().dropTable(dropTable.getName(), dropTable.getPurge());
       return BOOL_TRUE;
     }
   }

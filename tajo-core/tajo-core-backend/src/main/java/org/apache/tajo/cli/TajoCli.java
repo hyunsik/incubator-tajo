@@ -68,7 +68,6 @@ public class TajoCli {
   private static final Class [] registeredCommands = {
       DescTableCommand.class,
       HelpCommand.class,
-      DetachCommand.class,
       ExitCommand.class,
       Copyright.class,
       Version.class
@@ -355,9 +354,9 @@ public class TajoCli {
       }
 
       if (status.getState() == QueryState.QUERY_ERROR) {
-        sout.println("Internal Error!");
+        sout.println("Internal error!");
       } else if (status.getState() == QueryState.QUERY_FAILED) {
-        sout.println("Query Failed!");
+        sout.println("Query failed!");
       } else if (status.getState() == QueryState.QUERY_KILLED) {
         sout.println(queryId + " is killed.");
       } else {
@@ -597,38 +596,6 @@ public class TajoCli {
     @Override
     public String getDescription() {
       return "show command lists and their usages";
-    }
-  }
-
-  // TODO - This should be dealt as a DDL statement instead of a command
-  public class DetachCommand extends Command {
-    @Override
-    public String getCommand() {
-      return "detach";
-    }
-
-    @Override
-    public void invoke(String[] cmd) throws Exception {
-      if (cmd.length != 3) {
-        throw new IllegalArgumentException("usage: detach table [tb_name]");
-      } else {
-        if (client.existTable(cmd[2])) {
-          client.detachTable(cmd[2]);
-          sout.println("Table \"" + cmd[2] + "\" is detached.");
-        } else {
-          sout.println("ERROR:  table \"" + cmd[1] + "\" does not exist");
-        }
-      }
-    }
-
-    @Override
-    public String getUsage() {
-      return "table [table_name]";
-    }
-
-    @Override
-    public String getDescription() {
-      return "detach a table, but it does not remove the table directory.";
     }
   }
 

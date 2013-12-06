@@ -19,7 +19,6 @@
 package org.apache.tajo.master.event;
 
 import org.apache.tajo.ExecutionBlockId;
-import org.apache.tajo.QueryId;
 
 public class SubQueryDiagnosticsUpdateEvent extends SubQueryEvent {
   private final String msg;

@@ -27,7 +27,6 @@ public class QueryStatus {
   private QueryState state;
   private float progress;
   private long submitTime;
-  private long initTime;
   private long finishTime;
   private boolean hasResult;
   private String errorText;
@@ -71,10 +70,6 @@ public class QueryStatus {
 
   public long getSubmitTime() {
     return this.submitTime;
-  }
-
-  public long getInitTime() {
-    return this.initTime;
   }
 
   public long getFinishTime() {

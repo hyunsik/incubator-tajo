@@ -62,6 +62,9 @@ Release 0.8.0 - unreleased
 
   IMPROVEMENTS
 
+    TAJO-304: drop table command should not remove data files in default.
+    (hyunsik)
+
     TAJO-316: Improve GreedyHeuristicJoinOrderAlgorithm to deal with
     non-commutative joins. (hyunsik)
 
@@ -100,6 +103,16 @@ Release 0.8.0 - unreleased
     (Keuntae Park via jihoon)
 
   BUG FIXES
+
+    TAJO-389: The LazyTuple does not work when number format exception occurs 
+    in text deserializer. (jinho)
+
+    TAJO-387: Query is hanging when errors occurs in Query or SubQuery class.
+    (hyunsik)
+
+    TAJO-268: Temporal files should be removed after query is finished. (jinho)
+
+    TAJO-292: Too many intermediate partition files. (jinho)
 
     TAJO-375: TajoClient can't get result data when different os user
     (hyoungjunkim via hyunsik)
