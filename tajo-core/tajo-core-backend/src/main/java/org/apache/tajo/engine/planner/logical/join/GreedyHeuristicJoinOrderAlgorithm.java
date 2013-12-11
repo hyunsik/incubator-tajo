@@ -230,7 +230,7 @@ public class GreedyHeuristicJoinOrderAlgorithm implements JoinOrderAlgorithm {
       }
 
     default:
-      return getCost(node);
+      return getCost(((UnaryNode) node).getChild());
     }
   }
 }
