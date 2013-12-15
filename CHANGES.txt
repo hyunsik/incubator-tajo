@@ -94,6 +94,9 @@ Release 0.8.0 - unreleased
 
   IMPROVEMENTS
 
+    TAJO-419: Add missing visitor methods of AlgebraVisitor and 
+    BaseAlgebraVisitor. (hyunsik)
+
     TAJO-405: Improve HCatalogStore to support partitioned table. (jaehwa)
 
     TAJO-336: Separate catalog stores into separate modules. (jaehwa)
