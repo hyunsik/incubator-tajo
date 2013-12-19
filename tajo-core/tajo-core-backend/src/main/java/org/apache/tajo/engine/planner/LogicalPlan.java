@@ -788,6 +788,9 @@ public class LogicalPlan {
               if (target.hasAlias() && target.getEvalTree().getType() == EvalType.FIELD) {
                 for (int j = 0; j < targetListManager.getTargets().length; j++) {
                   Target tobeRenamed = targetListManager.getTarget(j);
+                  if (tobeRenamed == null) {
+                    continue;
+                  }
                   EvalNode tobeRenamedExpr = tobeRenamed.getEvalTree();
                   if (tobeRenamedExpr.getType() != EvalType.FIELD) { // if field target does not need to be replaced.
                     boolean unresolved = !targetListManager.isResolved(j);
