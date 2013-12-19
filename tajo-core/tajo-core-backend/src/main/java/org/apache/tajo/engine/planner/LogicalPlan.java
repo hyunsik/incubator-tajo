@@ -747,7 +747,8 @@ public class LogicalPlan {
                   if (getTarget(i).hasAlias()) {
                     newEvaluatedTargetIds.add(i);
                   }
-                } else if (EvalTreeUtil.findDistinctAggFunction(expr).size() == 0) {
+                } else if (EvalTreeUtil.findDistinctAggFunction(expr).size() == 0
+                    && !this.hasAlgebraicExpr(OpType.Join)) {
                   // if this expression does no contain any aggregation function
                   resolveTarget(i);
                   newEvaluatedTargetIds.add(i);
@@ -780,6 +781,27 @@ public class LogicalPlan {
           }
 
           if (newEvaluatedTargetIds.size() > 0) {
+            // Replace existing target lists unresolved but referred to evaluated target.
+            for (int i = 0; i < newEvaluatedTargetIds.size(); i++) {
+              Target target = getTarget(newEvaluatedTargetIds.get(i));
+
+              if (target.hasAlias() && target.getEvalTree().getType() == EvalType.FIELD) {
+                for (int j = 0; j < targetListManager.getTargets().length; j++) {
+                  Target tobeRenamed = targetListManager.getTarget(j);
+                  EvalNode tobeRenamedExpr = tobeRenamed.getEvalTree();
+                  if (tobeRenamedExpr.getType() != EvalType.FIELD) { // if field target does not need to be replaced.
+                    boolean unresolved = !targetListManager.isResolved(j);
+                    Set<Column> targetEvals = EvalTreeUtil.findDistinctRefColumns(tobeRenamedExpr);
+                    boolean matched = targetEvals.contains(((FieldEval)target.getEvalTree()).getColumnRef());
+                    if (unresolved && matched) {
+                      EvalTreeUtil.replace(tobeRenamedExpr, target.getEvalTree(),
+                          new FieldEval(target.getAlias(), target.getDataType()));
+                    }
+                  }
+                }
+              }
+            }
+
             // fill addedTargets with output columns and new expression columns (e.g., aliased column or expressions)
             Target[] addedTargets = new Target[baseSchema.getColumnNum() + newEvaluatedTargetIds.size()];
             PlannerUtil.schemaToTargets(baseSchema, addedTargets);

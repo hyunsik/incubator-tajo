@@ -100,4 +100,16 @@ public class IsNullEval extends BinaryEval {
       this.result = DatumFactory.createBool(false);
     }
   }
+
+  @Deprecated
+  public void preOrder(EvalNodeVisitor visitor) {
+    visitor.visit(this);
+    leftExpr.preOrder(visitor);
+  }
+
+  @Deprecated
+  public void postOrder(EvalNodeVisitor visitor) {
+    leftExpr.postOrder(visitor);
+    visitor.visit(this);
+  }
 }

@@ -356,8 +356,14 @@ public class PlannerUtil {
 
       // if the references only indicate two relation, the condition can be
       // pushed into a join operator.
-      if (tableIds.size() != 2) {
-        return false;
+      if (tableIds.size() == 1) {
+        for (Column col : columnRefs) {
+          if (node.getInSchema().getColumnByFQN(col.getQualifiedName()) != null) {
+            return true;
+          } else {
+            return false;
+          }
+        }
       }
 
       String [] outer = getRelationLineage(joinNode.getLeftChild());

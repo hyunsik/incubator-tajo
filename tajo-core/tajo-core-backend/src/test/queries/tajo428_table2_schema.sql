@@ -1,0 +1,2 @@
+create external table table2 (id int, name text, score float, type text) using csv
+with ('csvfile.delimiter'='|', 'csvfile.null'='NULL') location 'file:////home/hyunsik/Code/tajo/tajo-4/tajo-core/tajo-core-backend/src/test/queries/tajo428_table2.tbl';

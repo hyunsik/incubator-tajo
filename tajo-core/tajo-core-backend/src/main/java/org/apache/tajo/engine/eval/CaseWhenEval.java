@@ -35,7 +35,6 @@ import java.util.List;
 
 public class CaseWhenEval extends EvalNode implements GsonObject {
   @Expose private List<IfThenEval> whens = Lists.newArrayList();
-  @Expose private EvalNode elseResult;
 
   public CaseWhenEval() {
     super(EvalType.CASE);
@@ -50,20 +49,21 @@ public class CaseWhenEval extends EvalNode implements GsonObject {
   }
 
   public boolean hasElse() {
-    return this.elseResult != null;
+    return leftExpr != null;
   }
 
   public EvalNode getElse() {
-    return elseResult;
+    return leftExpr;
   }
 
+  // left is else result
   public void setElseResult(EvalNode elseResult) {
-    this.elseResult = elseResult;
+    setLeftExpr(elseResult);
   }
 
   @Override
   public EvalContext newContext() {
-    return new CaseContext(whens, elseResult != null ? elseResult.newContext() : null);
+    return new CaseContext(whens, leftExpr != null ? leftExpr.newContext() : null);
   }
 
   @Override
@@ -73,7 +73,7 @@ public class CaseWhenEval extends EvalNode implements GsonObject {
 
   @Override
   public String getName() {
-    return "?";
+    return "?case";
   }
 
   public void eval(EvalContext ctx, Schema schema, Tuple tuple) {
@@ -82,8 +82,8 @@ public class CaseWhenEval extends EvalNode implements GsonObject {
       whens.get(i).eval(caseCtx.contexts[i], schema, tuple);
     }
 
-    if (elseResult != null) { // without else clause
-      elseResult.eval(caseCtx.elseCtx, schema, tuple);
+    if (leftExpr != null) { // without else clause
+      leftExpr.eval(caseCtx.elseCtx, schema, tuple);
     }
   }
 
@@ -95,8 +95,8 @@ public class CaseWhenEval extends EvalNode implements GsonObject {
         return whens.get(i).getThenResult(caseCtx.contexts[i]);
       }
     }
-    if (elseResult != null) { // without else clause
-      return elseResult.terminate(caseCtx.elseCtx);
+    if (leftExpr != null) { // without else clause
+      return leftExpr.terminate(caseCtx.elseCtx);
     } else {
       return DatumFactory.createNullDatum();
     }
@@ -109,7 +109,7 @@ public class CaseWhenEval extends EvalNode implements GsonObject {
      sb.append(when).append("\n");
     }
 
-    sb.append("ELSE ").append(elseResult).append(" END\n");
+    sb.append("ELSE ").append(leftExpr).append(" END\n");
 
     return sb.toString();
   }
@@ -120,8 +120,8 @@ public class CaseWhenEval extends EvalNode implements GsonObject {
     for (IfThenEval when : whens) {
       when.preOrder(visitor);
     }
-    if (elseResult != null) { // without else clause
-      elseResult.preOrder(visitor);
+    if (leftExpr != null) { // without else clause
+      leftExpr.preOrder(visitor);
     }
   }
 
@@ -130,8 +130,8 @@ public class CaseWhenEval extends EvalNode implements GsonObject {
     for (IfThenEval when : whens) {
       when.postOrder(visitor);
     }
-    if (elseResult != null) { // without else clause
-      elseResult.postOrder(visitor);
+    if (leftExpr != null) { // without else clause
+      leftExpr.postOrder(visitor);
     }
     visitor.visit(this);
   }
@@ -146,7 +146,7 @@ public class CaseWhenEval extends EvalNode implements GsonObject {
           return false;
         }
       }
-      return TUtil.checkEquals(elseResult, other.elseResult);
+      return TUtil.checkEquals(leftExpr, other.leftExpr);
     } else {
       return false;
     }

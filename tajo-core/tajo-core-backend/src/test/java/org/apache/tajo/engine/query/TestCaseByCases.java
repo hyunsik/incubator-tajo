@@ -20,11 +20,13 @@ package org.apache.tajo.engine.query;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import org.apache.tajo.IntegrationTest;
 import org.apache.tajo.TpchTestBase;
 import org.apache.tajo.client.ResultSetUtil;
 import org.apache.tajo.util.FileUtil;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 
 import java.io.File;
 import java.io.IOException;
@@ -36,6 +38,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+@Category(IntegrationTest.class)
 public class TestCaseByCases {
   private static TpchTestBase tpch;
 
@@ -78,5 +81,17 @@ public class TestCaseByCases {
     } finally {
       res.close();
     }
+  }
+
+  @Test
+  public final void testTAJO428Case() throws Exception {
+    ResultSet res = tpch.execute(FileUtil.readTextFile(new File("src/test/queries/tajo428_table1_schema.sql")));
+    res.close();
+    res = tpch.execute(FileUtil.readTextFile(new File("src/test/queries/tajo428_table2_schema.sql")));
+    res.close();
+
+    res = tpch.execute(FileUtil.readTextFile(new File("src/test/queries/tajo428_case.sql")));
+    System.out.println(ResultSetUtil.prettyFormat(res));
+    res.close();
   }
 }

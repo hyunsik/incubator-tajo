@@ -56,10 +56,10 @@ public class EvalTreeUtil {
       if (evalNode.equals(target)) {
         EvalNode parent = stack.peek();
 
-        if (parent.getLeftExpr().equals(evalNode)) {
+        if (parent.getLeftExpr() != null && parent.getLeftExpr().equals(evalNode)) {
           parent.setLeftExpr(tobeReplaced);
         }
-        if (parent.getRightExpr().equals(evalNode)) {
+        if (parent.getRightExpr() != null && parent.getRightExpr().equals(evalNode)) {
           parent.setRightExpr(tobeReplaced);
         }
       }
