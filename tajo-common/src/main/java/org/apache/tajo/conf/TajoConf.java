@@ -136,6 +136,7 @@ public class TajoConf extends YarnConfiguration {
     //////////////////////////////////
     PULLSERVER_PORT("tajo.pullserver.port", 0),
     SHUFFLE_SSL_ENABLED_KEY("tajo.pullserver.ssl.enabled", false),
+    SHUFFLE_FILE_FORMAT("tajo.shuffle.file-format", "RAW"),
 
     //////////////////////////////////
     // Storage Configuration
@@ -195,8 +196,11 @@ public class TajoConf extends YarnConfiguration {
     //////////////////////////////////
     // Task Configuration
     TASK_DEFAULT_MEMORY("tajo.task.memory-slot-mb.default", 512),
-    TASK_DEFAULT_DISK("tajo.task.disk-slot.default", 1.0f)
+    TASK_DEFAULT_DISK("tajo.task.disk-slot.default", 1.0f),
     //////////////////////////////////
+
+    // Metrics
+    METRICS_PROPERTY_FILENAME("tajo.metrics.property.file", "tajo-metrics.properties")
     ;
 
     public final String varname;

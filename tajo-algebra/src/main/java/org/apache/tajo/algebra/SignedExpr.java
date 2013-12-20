@@ -18,50 +18,21 @@
 
 package org.apache.tajo.algebra;
 
-import org.apache.tajo.util.TUtil;
+public class SignedExpr extends UnaryOperator {
+  private boolean negative;
 
-public class Target extends Expr {
-  private Expr expr;
-  private String alias;
-
-  public Target(Expr expr) {
-    super(OpType.Target);
-    this.expr = expr;
+  public SignedExpr(boolean negative, Expr operand) {
+    super(OpType.Sign);
+    this.negative = negative;
+    setChild(operand);
   }
 
-  public Target(Expr expr, String alias) {
-    this(expr);
-    setAlias(alias);
-  }
-
-  public Expr getExpr() {
-    return expr;
-  }
-
-  public boolean hasAlias() {
-    return this.alias != null;
-  }
-
-  public String getAlias() {
-    return this.alias;
-  }
-
-  public void setAlias(String alias) {
-    this.alias = alias;
+  public boolean isNegative() {
+    return negative;
   }
 
   @Override
-  public boolean equalsTo(Expr obj) {
-    if (obj instanceof Target) {
-      Target another = (Target) obj;
-      return expr.equals(another.expr) && TUtil.checkEquals(alias, another.alias);
-    }
-
-    return false;
-  }
-
-  @Override
-  public String toJson() {
-    return JsonHelper.toJson(this);
+  boolean equalsTo(Expr expr) {
+    return negative == ((SignedExpr)expr).negative;
   }
 }

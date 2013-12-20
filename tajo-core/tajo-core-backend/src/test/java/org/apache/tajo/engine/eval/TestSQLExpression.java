@@ -61,6 +61,12 @@ public class TestSQLExpression extends ExprTestBase {
   }
 
   @Test
+  public void testCastWithNestedFunction() throws IOException {
+    testSimpleEval("select to_timestamp(CAST(split_part('1386577650.123', '.', 1) as INT8));",
+        new String[] {"1970-01-17 10:09:37"});
+  }
+
+  @Test
   public void testCastFromTable() throws IOException {
     Schema schema = new Schema();
     schema.addColumn("col1", TEXT);
@@ -69,5 +75,26 @@ public class TestSQLExpression extends ExprTestBase {
         new String[]{"123.0", "234.0"});
     testEval(schema, "table1", "123,234", "select col1::float, col2::float from table1",
         new String[]{"123.0", "234.0"});
+    testEval(schema, "table1", "1980-04-01 01:50:01,234", "select col1::timestamp, col2::float from table1 " +
+        "where col1 = '1980-04-01 01:50:01'::timestamp",
+        new String[]{"1980-04-01 01:50:01", "234.0"});
+
+    testSimpleEval("select '1980-04-01 01:50:01'::timestamp;", new String [] {"1980-04-01 01:50:01"});
+    testSimpleEval("select '1980-04-01 01:50:01'::timestamp::bigint::timestamp", new String [] {"1980-04-01 01:50:01"});
+    testSimpleEval("select cast (('1980-04-01 01:50:01'::timestamp)::bigint as timestamp)",
+        new String [] {"1980-04-01 01:50:01"});
+    testSimpleEval("select to_timestamp(cast ('1970-01-17 10:09:37'::timestamp as int8));",
+        new String [] {"1970-01-17 10:09:37"});
+  }
+
+  @Test
+  public void testBooleanLiteral() throws IOException {
+    testSimpleEval("select true", new String[] {"t"});
+    testSimpleEval("select false", new String[] {"f"});
+
+    Schema schema = new Schema();
+    schema.addColumn("col1", TEXT);
+    schema.addColumn("col2", TEXT);
+    testEval(schema, "table1", "123,234", "select col1, col2 from table1 where true", new String[]{"123", "234"});
   }
 }

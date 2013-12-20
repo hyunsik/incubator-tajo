@@ -32,7 +32,7 @@ import org.apache.tajo.algebra.Expr;
 import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.exception.AlreadyExistsTableException;
 import org.apache.tajo.catalog.exception.NoSuchTableException;
-import org.apache.tajo.catalog.partition.Partitions;
+import org.apache.tajo.catalog.partition.PartitionDesc;
 import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.conf.TajoConf;
@@ -86,13 +86,12 @@ public class GlobalEngine extends AbstractService {
       analyzer = new SQLAnalyzer();
       converter = new HiveConverter();
       planner = new LogicalPlanner(context.getCatalog());
-      optimizer = new LogicalOptimizer();
+      optimizer = new LogicalOptimizer(context.getConf());
       verifier = new LogicalPlanVerifier(context.getConf(), context.getCatalog());
 
       hookManager = new DistributedQueryHookManager();
       hookManager.addHook(new CreateTableHook());
       hookManager.addHook(new InsertHook());
-
     } catch (Throwable t) {
       LOG.error(t.getMessage(), t);
     }
@@ -128,8 +127,11 @@ public class GlobalEngine extends AbstractService {
       LOG.info("hive.query.mode:" + hiveQueryMode);
 
       if (hiveQueryMode) {
+        context.getSystemMetrics().counter("Query", "numHiveMode").inc();
         queryContext.setHiveQueryMode();
       }
+
+      context.getSystemMetrics().counter("Query", "totalQuery").inc();
 
       Expr planningContext = hiveQueryMode ? converter.parse(sql) : analyzer.parse(sql);
 
@@ -138,11 +140,13 @@ public class GlobalEngine extends AbstractService {
 
       GetQueryStatusResponse.Builder responseBuilder = GetQueryStatusResponse.newBuilder();
       if (PlannerUtil.checkIfDDLPlan(rootNode)) {
+        context.getSystemMetrics().counter("Query", "numDDLQuery").inc();
         updateQuery(rootNode.getChild());
         responseBuilder.setQueryId(QueryIdFactory.NULL_QUERY_ID.getProto());
         responseBuilder.setResultCode(ClientProtos.ResultCode.OK);
         responseBuilder.setState(TajoProtos.QueryState.QUERY_SUCCEEDED);
       } else {
+        context.getSystemMetrics().counter("Query", "numDMLQuery").inc();
         hookManager.doHooks(queryContext, plan);
 
         QueryJobManager queryJobManager = this.context.getQueryJobManager();
@@ -169,6 +173,7 @@ public class GlobalEngine extends AbstractService {
 
       return response;
     } catch (Throwable t) {
+      context.getSystemMetrics().counter("Query", "errorQuery").inc();
       LOG.error("\nStack Trace:\n" + StringUtils.stringifyException(t));
       GetQueryStatusResponse.Builder responseBuilder = GetQueryStatusResponse.newBuilder();
       responseBuilder.setQueryId(QueryIdFactory.NULL_QUERY_ID.getProto());
@@ -229,7 +234,7 @@ public class GlobalEngine extends AbstractService {
     if (!state.verified()) {
       StringBuilder sb = new StringBuilder();
       for (String error : state.getErrorMessages()) {
-        sb.append("ERROR: ").append(error).append("\n");
+        sb.append(error).append("\n");
       }
       throw new VerifyException(sb.toString());
     }
@@ -258,7 +263,7 @@ public class GlobalEngine extends AbstractService {
   }
 
   public TableDesc createTableOnPath(String tableName, Schema schema, TableMeta meta,
-                                     Path path, boolean isCreated, Partitions partitions)
+                                     Path path, boolean isCreated, PartitionDesc partitionDesc)
       throws IOException {
     if (catalog.existsTable(tableName)) {
       throw new AlreadyExistsTableException(tableName);
@@ -286,7 +291,9 @@ public class GlobalEngine extends AbstractService {
     stats.setNumBytes(totalSize);
     TableDesc desc = CatalogUtil.newTableDesc(tableName, schema, meta, path);
     desc.setStats(stats);
-    desc.setPartitions(partitions);
+    if (partitionDesc != null) {
+      desc.setPartitions(partitionDesc);
+    }
     catalog.addTable(desc);
 
     LOG.info("Table " + desc.getName() + " is created (" + desc.getStats().getNumBytes() + ")");
@@ -482,11 +489,20 @@ public class GlobalEngine extends AbstractService {
         storeNode.setChild(childBlocks.get(0).getRoot());
       }
 
+      // If InsertNode contains table partition information, StoreNode must has it.
+      if (insertNode.hasTargetTable()) {
+        if (insertNode.getTargetTable().getPartitions() != null) {
+          storeNode.setPartitions(insertNode.getTargetTable().getPartitions());
+        }
+      }
+
       // find a subquery query of insert node and merge root block and subquery into one query block.
       PlannerUtil.replaceNode(plan.getRootBlock().getRoot(), storeNode, NodeType.INSERT);
       plan.getRootBlock().refresh();
       LogicalPlan.QueryBlock subBlock = plan.getBlock(insertNode.getSubQuery());
+      // remove the sub block and connection from a block graph.
       plan.removeBlock(subBlock);
+      plan.getQueryBlockGraph().removeEdge(subBlock.getName(), LogicalPlan.ROOT_BLOCK);
     }
   }
 }

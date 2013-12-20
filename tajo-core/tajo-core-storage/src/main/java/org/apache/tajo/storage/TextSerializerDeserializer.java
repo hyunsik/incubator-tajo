@@ -30,7 +30,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 //Compatibility with Apache Hive
-public class TextSerializeDeserialize implements SerializeDeserialize {
+public class TextSerializerDeserializer implements SerializerDeserializer {
   public static byte[] trueBytes = "true".getBytes();
   public static byte[] falseBytes = "false".getBytes();
   private ProtobufJsonFormat protobufJsonFormat = ProtobufJsonFormat.getInstance();
@@ -76,6 +76,8 @@ public class TextSerializeDeserialize implements SerializeDeserialize {
       case FLOAT4:
       case FLOAT8:
       case INET4:
+      case DATE:
+      case TIMESTAMP:
         bytes = datum.asTextBytes();
         length = bytes.length;
         out.write(bytes);
@@ -143,6 +145,14 @@ public class TextSerializeDeserialize implements SerializeDeserialize {
             : DatumFactory.createText(chars);
         break;
       }
+      case DATE:
+        datum = isNull(bytes, offset, length, nullCharacters) ? NullDatum.get()
+            : DatumFactory.createDate(new String(bytes, offset, length));
+        break;
+      case TIMESTAMP:
+        datum = isNull(bytes, offset, length, nullCharacters) ? NullDatum.get()
+            : DatumFactory.createTimeStamp(new String(bytes, offset, length));
+        break;
       case PROTOBUF: {
         if (isNull(bytes, offset, length, nullCharacters)) {
           datum = NullDatum.get();

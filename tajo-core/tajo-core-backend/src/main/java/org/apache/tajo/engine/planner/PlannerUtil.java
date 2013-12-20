@@ -545,7 +545,7 @@ public class PlannerUtil {
    * @return true if two operands refers to columns and the operator is comparison,
    */
   public static boolean isJoinQual(EvalNode qual) {
-    if (EvalTreeUtil.isComparisonOperator(qual)) {
+    if (AlgebraicUtil.isComparisonOperator(qual)) {
       List<Column> left = EvalTreeUtil.findAllColumnRefs(qual.getLeftExpr());
       List<Column> right = EvalTreeUtil.findAllColumnRefs(qual.getRightExpr());
 
@@ -677,9 +677,11 @@ public class PlannerUtil {
     return copy;
   }
 
-  public static <T extends LogicalNode> T clone(LogicalNode node) {
+  public static <T extends LogicalNode> T clone(LogicalPlan plan, LogicalNode node) {
     try {
-      return (T) node.clone();
+      T copy = (T) node.clone();
+      copy.setPID(plan.newPID());
+      return copy;
     } catch (CloneNotSupportedException e) {
       throw new RuntimeException(e);
     }

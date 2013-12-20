@@ -73,7 +73,8 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
       execPlan = createPlanRecursive(context, logicalPlan);
       if (execPlan instanceof StoreTableExec
           || execPlan instanceof IndexedStoreExec
-          || execPlan instanceof PartitionedStoreExec) {
+          || execPlan instanceof PartitionedStoreExec
+          || execPlan instanceof ColumnPartitionedTableStoreExec) {
         return execPlan;
       } else if (context.getDataChannel() != null) {
         return buildOutputOperator(context, logicalPlan, execPlan);
@@ -89,7 +90,7 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
                                            PhysicalExec execPlan) throws IOException {
     DataChannel channel = context.getDataChannel();
     StoreTableNode storeTableNode = new StoreTableNode(UNGENERATED_PID, channel.getTargetId().toString());
-    storeTableNode.setStorageType(CatalogProtos.StoreType.CSV);
+    if(context.isInterQuery()) storeTableNode.setStorageType(context.getDataChannel().getStoreType());
     storeTableNode.setInSchema(plan.getOutSchema());
     storeTableNode.setOutSchema(plan.getOutSchema());
     if (channel.getPartitionType() != PartitionType.NONE_PARTITION) {
@@ -137,7 +138,9 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
         leftExec = createPlanRecursive(ctx, subQueryNode.getSubQuery());
         return leftExec;
 
-      } case SCAN:
+      }
+      case PARTITIONS_SCAN:
+      case SCAN:
         leftExec = createScanPlan(ctx, (ScanNode) logicalNode);
         return leftExec;
 
@@ -633,6 +636,19 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
       return new TunnelExec(ctx, plan.getOutSchema(), subOp);
     }
 
+    // Find partitioned table
+    if (plan.getPartitions() != null) {
+      if (plan.getPartitions().getPartitionsType().equals(CatalogProtos.PartitionsType.COLUMN)) {
+        return new ColumnPartitionedTableStoreExec(ctx, plan, subOp);
+      } else if (plan.getPartitions().getPartitionsType().equals(CatalogProtos.PartitionsType.HASH)) {
+        // TODO
+      } else if (plan.getPartitions().getPartitionsType().equals(CatalogProtos.PartitionsType.RANGE)) {
+        // TODO
+      } else if (plan.getPartitions().getPartitionsType().equals(CatalogProtos.PartitionsType.LIST)) {
+        // TODO
+      }
+    }
+
     return new StoreTableExec(ctx, plan, subOp);
   }
 
@@ -757,7 +773,7 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
 
     FragmentProto [] fragmentProtos = ctx.getTables(annotation.getTableName());
     List<FileFragment> fragments =
-        FragmentConvertor.convert(ctx.getConf(), CatalogProtos.StoreType.CSV, fragmentProtos);
+        FragmentConvertor.convert(ctx.getConf(), ctx.getDataChannel().getStoreType(), fragmentProtos);
 
     String indexName = IndexUtil.getIndexNameOfFrag(fragments.get(0), annotation.getSortKeys());
     Path indexPath = new Path(sm.getTablePath(annotation.getTableName()), "index");

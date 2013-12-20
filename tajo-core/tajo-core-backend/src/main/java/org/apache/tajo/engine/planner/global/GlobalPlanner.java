@@ -27,6 +27,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
 import org.apache.tajo.algebra.JoinType;
 import org.apache.tajo.catalog.*;
+import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.engine.eval.AggregationFunctionCallEval;
 import org.apache.tajo.engine.eval.EvalTreeUtil;
@@ -43,18 +44,17 @@ public class GlobalPlanner {
   private static Log LOG = LogFactory.getLog(GlobalPlanner.class);
 
   private TajoConf conf;
-  private AbstractStorageManager sm;
+  private CatalogProtos.StoreType storeType;
 
   public GlobalPlanner(final TajoConf conf, final AbstractStorageManager sm)
       throws IOException {
     this.conf = conf;
-    this.sm = sm;
+    this.storeType = CatalogProtos.StoreType.valueOf(conf.getVar(TajoConf.ConfVars.SHUFFLE_FILE_FORMAT).toUpperCase());
+    Preconditions.checkArgument(storeType != null);
   }
 
   public class GlobalPlanContext {
     MasterPlan plan;
-    LogicalNode topmost;
-
     Map<Integer, ExecutionBlock> execBlockMap = Maps.newHashMap();
   }
 
@@ -68,7 +68,8 @@ public class GlobalPlanner {
     globalPlanContext.plan = masterPlan;
     LOG.info(masterPlan.getLogicalPlan());
 
-    LogicalNode inputPlan = PlannerUtil.clone(masterPlan.getLogicalPlan().getRootBlock().getRoot());
+    LogicalNode inputPlan = PlannerUtil.clone(masterPlan.getLogicalPlan(),
+        masterPlan.getLogicalPlan().getRootBlock().getRoot());
     LogicalNode lastNode = planner.visitChild(globalPlanContext, masterPlan.getLogicalPlan(), inputPlan,
         new Stack<LogicalNode>());
 
@@ -77,6 +78,7 @@ public class GlobalPlanner {
     if (childExecBlock.getPlan() != null) {
       ExecutionBlock terminalBlock = masterPlan.createTerminalBlock();
       DataChannel dataChannel = new DataChannel(childExecBlock, terminalBlock, NONE_PARTITION, 1);
+      dataChannel.setStoreType(CatalogProtos.StoreType.CSV);
       dataChannel.setSchema(lastNode.getOutSchema());
       masterPlan.addConnect(dataChannel);
       masterPlan.setTerminal(terminalBlock);
@@ -100,6 +102,7 @@ public class GlobalPlanner {
     ExecutionBlock childBlock = leftTable ? leftBlock : rightBlock;
 
     DataChannel channel = new DataChannel(childBlock, parent, HASH_PARTITION, 32);
+    channel.setStoreType(storeType);
     if (join.getJoinType() != JoinType.CROSS) {
       Column [][] joinColumns = PlannerUtil.joinJoinKeyForEachTable(join.getJoinQual(),
           leftBlock.getPlan().getOutSchema(), rightBlock.getPlan().getOutSchema());
@@ -113,7 +116,7 @@ public class GlobalPlanner {
   }
 
   private ExecutionBlock buildJoinPlan(GlobalPlanContext context, JoinNode joinNode,
-                                          ExecutionBlock leftBlock, ExecutionBlock rightBlock)
+                                       ExecutionBlock leftBlock, ExecutionBlock rightBlock)
       throws PlanningException {
     MasterPlan masterPlan = context.plan;
     ExecutionBlock currentBlock;
@@ -174,6 +177,13 @@ public class GlobalPlanner {
     return currentBlock;
   }
 
+  /**
+   * If a query contains a distinct aggregation function, the query does not
+   * perform pre-aggregation in the first phase. Instead, in the fist phase,
+   * the query performs only hash shuffle. Then, the query performs the
+   * sort aggregation in the second phase. At that time, the aggregation
+   * function should be executed as the first phase.
+   */
   private ExecutionBlock buildDistinctGroupBy(GlobalPlanContext context, ExecutionBlock childBlock,
                                               GroupbyNode groupbyNode) {
     // setup child block
@@ -188,6 +198,9 @@ public class GlobalPlanner {
       for (AggregationFunctionCallEval function : functions) {
         if (function.isDistinct()) {
           columnsForDistinct.addAll(EvalTreeUtil.findDistinctRefColumns(function));
+        } else {
+          // See the comment of this method. the aggregation function should be executed as the first phase.
+          function.setFirstPhase();
         }
       }
     }
@@ -204,6 +217,7 @@ public class GlobalPlanner {
     channel = new DataChannel(childBlock, currentBlock, HASH_PARTITION, 32);
     channel.setPartitionKey(groupbyNode.getGroupingColumns());
     channel.setSchema(topMostOfFirstPhase.getOutSchema());
+    channel.setStoreType(storeType);
 
     // setup current block with channel
     ScanNode scanNode = buildInputExecutor(context.plan.getLogicalPlan(), channel);
@@ -240,11 +254,11 @@ public class GlobalPlanner {
           dataChannel.setSchema(firstPhaseGroupBy.getOutSchema());
 
           ExecutionBlock subBlock = masterPlan.getExecBlock(dataChannel.getSrcId());
-          GroupbyNode g1 = PlannerUtil.clone(firstPhaseGroupBy);
+          GroupbyNode g1 = PlannerUtil.clone(context.plan.getLogicalPlan(), firstPhaseGroupBy);
           g1.setChild(subBlock.getPlan());
           subBlock.setPlan(g1);
 
-          GroupbyNode g2 = PlannerUtil.clone(groupbyNode);
+          GroupbyNode g2 = PlannerUtil.clone(context.plan.getLogicalPlan(), groupbyNode);
           ScanNode scanNode = buildInputExecutor(masterPlan.getLogicalPlan(), dataChannel);
           g2.setChild(scanNode);
           currentBlock.setPlan(g2);
@@ -262,6 +276,7 @@ public class GlobalPlanner {
           channel.setPartitionKey(firstPhaseGroupBy.getGroupingColumns());
         }
         channel.setSchema(firstPhaseGroupBy.getOutSchema());
+        channel.setStoreType(storeType);
 
         ScanNode scanNode = buildInputExecutor(masterPlan.getLogicalPlan(), channel);
         groupbyNode.setChild(scanNode);
@@ -274,16 +289,23 @@ public class GlobalPlanner {
     return currentBlock;
   }
 
-  private ExecutionBlock buildSortPlan(MasterPlan masterPlan, ExecutionBlock childBlock, SortNode currentNode) {
+  private ExecutionBlock buildSortPlan(GlobalPlanContext context, ExecutionBlock childBlock, SortNode currentNode) {
+    MasterPlan masterPlan = context.plan;
     ExecutionBlock currentBlock;
 
-    SortNode firstSortNode = PlannerUtil.clone(currentNode);
+    SortNode firstSortNode = PlannerUtil.clone(context.plan.getLogicalPlan(), currentNode);
+    LogicalNode childBlockPlan = childBlock.getPlan();
+    firstSortNode.setChild(childBlockPlan);
+    // sort is a non-projectable operator. So, in/out schemas are the same to its child operator.
+    firstSortNode.setInSchema(childBlockPlan.getOutSchema());
+    firstSortNode.setOutSchema(childBlockPlan.getOutSchema());
     childBlock.setPlan(firstSortNode);
 
     currentBlock = masterPlan.newExecutionBlock();
     DataChannel channel = new DataChannel(childBlock, currentBlock, RANGE_PARTITION, 32);
     channel.setPartitionKey(PlannerUtil.sortSpecsToSchema(currentNode.getSortKeys()).toArray());
-    channel.setSchema(currentNode.getOutSchema());
+    channel.setSchema(firstSortNode.getOutSchema());
+    channel.setStoreType(storeType);
 
     ScanNode secondScan = buildInputExecutor(masterPlan.getLogicalPlan(), channel);
     currentNode.setChild(secondScan);
@@ -308,7 +330,13 @@ public class GlobalPlanner {
                                        Stack<LogicalNode> stack) throws PlanningException {
       LogicalNode child = super.visitProjection(context, plan, node, stack);
 
-      return handleUnaryNode(context, child, node);
+      ExecutionBlock execBlock = context.execBlockMap.remove(child.getPID());
+
+      node.setChild(execBlock.getPlan());
+      node.setInSchema(execBlock.getPlan().getOutSchema());
+      execBlock.setPlan(node);
+      context.execBlockMap.put(node.getPID(), execBlock);
+      return node;
     }
 
     @Override
@@ -316,14 +344,14 @@ public class GlobalPlanner {
         throws PlanningException {
       LogicalNode child = super.visitLimit(context, plan, node, stack);
 
-      ExecutionBlock block = null;
+      ExecutionBlock block;
       block = context.execBlockMap.remove(child.getPID());
       if (child.getType() == NodeType.SORT) {
         node.setChild(block.getPlan());
         block.setPlan(node);
 
         ExecutionBlock childBlock = context.plan.getChild(block, 0);
-        LimitNode childLimit = PlannerUtil.clone(node);
+        LimitNode childLimit = PlannerUtil.clone(context.plan.getLogicalPlan(), node);
         childLimit.setChild(childBlock.getPlan());
         childBlock.setPlan(childLimit);
 
@@ -338,14 +366,16 @@ public class GlobalPlanner {
         DataChannel newChannel = new DataChannel(block, newExecBlock, HASH_PARTITION, 1);
         newChannel.setPartitionKey(new Column[]{});
         newChannel.setSchema(node.getOutSchema());
+        newChannel.setStoreType(storeType);
+
         ScanNode scanNode = buildInputExecutor(plan, newChannel);
-        LimitNode parentLimit = PlannerUtil.clone(node);
+        LimitNode parentLimit = PlannerUtil.clone(context.plan.getLogicalPlan(), node);
         parentLimit.setChild(scanNode);
         newExecBlock.setPlan(parentLimit);
         context.plan.addConnect(newChannel);
-        context.execBlockMap.put(node.getPID(), newExecBlock);
+        context.execBlockMap.put(parentLimit.getPID(), newExecBlock);
+        node = parentLimit;
       }
-
 
       return node;
     }
@@ -357,7 +387,7 @@ public class GlobalPlanner {
       LogicalNode child = super.visitSort(context, plan, node, stack);
 
       ExecutionBlock childBlock = context.execBlockMap.remove(child.getPID());
-      ExecutionBlock newExecBlock = buildSortPlan(context.plan, childBlock, node);
+      ExecutionBlock newExecBlock = buildSortPlan(context, childBlock, node);
       context.execBlockMap.put(node.getPID(), newExecBlock);
 
       return node;
@@ -380,9 +410,11 @@ public class GlobalPlanner {
                                    Stack<LogicalNode> stack) throws PlanningException {
       LogicalNode child = super.visitFilter(context, plan, node, stack);
 
-      ExecutionBlock childBlock = context.execBlockMap.remove(child.getPID());
-      childBlock.setPlan(child);
-      context.execBlockMap.put(node.getPID(), childBlock);
+      ExecutionBlock execBlock = context.execBlockMap.remove(child.getPID());
+      node.setChild(execBlock.getPlan());
+      node.setInSchema(execBlock.getPlan().getOutSchema());
+      execBlock.setPlan(node);
+      context.execBlockMap.put(node.getPID(), execBlock);
 
       return node;
     }
@@ -441,6 +473,7 @@ public class GlobalPlanner {
 
       for (ExecutionBlock childBlocks : queryBlockBlocks) {
         DataChannel channel = new DataChannel(childBlocks, execBlock, NONE_PARTITION, 1);
+        channel.setStoreType(storeType);
         context.plan.addConnect(channel);
       }
 
@@ -461,8 +494,6 @@ public class GlobalPlanner {
     public LogicalNode visitExcept(GlobalPlanContext context, LogicalPlan plan, ExceptNode node,
                                    Stack<LogicalNode> stack) throws PlanningException {
       LogicalNode child = super.visitExcept(context, plan, node, stack);
-      context.topmost = node;
-
       return handleUnaryNode(context, child, node);
     }
 
@@ -470,8 +501,6 @@ public class GlobalPlanner {
     public LogicalNode visitIntersect(GlobalPlanContext context, LogicalPlan plan, IntersectNode node,
                                       Stack<LogicalNode> stack) throws PlanningException {
       LogicalNode child = super.visitIntersect(context, plan, node, stack);
-      context.topmost = node;
-
       return handleUnaryNode(context, child, node);
     }
 
@@ -479,15 +508,12 @@ public class GlobalPlanner {
     public LogicalNode visitTableSubQuery(GlobalPlanContext context, LogicalPlan plan, TableSubQueryNode node,
                                           Stack<LogicalNode> stack) throws PlanningException {
       LogicalNode child = super.visitTableSubQuery(context, plan, node, stack);
-
       return handleUnaryNode(context, child, node);
     }
 
     @Override
     public LogicalNode visitScan(GlobalPlanContext context, LogicalPlan plan, ScanNode node, Stack<LogicalNode> stack)
         throws PlanningException {
-      context.topmost = node;
-
       ExecutionBlock newExecBlock = context.plan.newExecutionBlock();
       newExecBlock.setPlan(node);
       context.execBlockMap.put(node.getPID(), newExecBlock);
@@ -498,9 +524,10 @@ public class GlobalPlanner {
     public LogicalNode visitStoreTable(GlobalPlanContext context, LogicalPlan plan, StoreTableNode node,
                                        Stack<LogicalNode> stack) throws PlanningException {
       LogicalNode child = super.visitStoreTable(context, plan, node, stack);
-      context.topmost = node;
 
       ExecutionBlock execBlock = context.execBlockMap.remove(child.getPID());
+      node.setChild(execBlock.getPlan());
+      node.setInSchema(execBlock.getPlan().getOutSchema());
       execBlock.setPlan(node);
       context.execBlockMap.put(node.getPID(), execBlock);
 
@@ -512,8 +539,6 @@ public class GlobalPlanner {
                                    Stack<LogicalNode> stack)
         throws PlanningException {
       LogicalNode child = super.visitInsert(context, plan, node, stack);
-      context.topmost = node;
-
       ExecutionBlock execBlock = context.execBlockMap.remove(child.getPID());
       execBlock.setPlan(node);
       context.execBlockMap.put(node.getPID(), execBlock);

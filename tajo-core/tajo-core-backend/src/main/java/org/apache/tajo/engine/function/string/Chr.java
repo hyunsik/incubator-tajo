@@ -16,19 +16,39 @@
  * limitations under the License.
  */
 
-package org.apache.tajo.storage;
+package org.apache.tajo.engine.function.string;
 
 import org.apache.tajo.catalog.Column;
+import org.apache.tajo.common.TajoDataTypes;
 import org.apache.tajo.datum.Datum;
+import org.apache.tajo.datum.DatumFactory;
+import org.apache.tajo.datum.NullDatum;
+import org.apache.tajo.engine.function.GeneralFunction;
+import org.apache.tajo.storage.Tuple;
 
-import java.io.IOException;
-import java.io.OutputStream;
+/**
+ * Function definition
+ *
+ * char chr(value int4)
+ */
 
+public class Chr extends GeneralFunction {
+  public Chr() {
+    super(new Column[]{
+            new Column("text", TajoDataTypes.Type.INT4)
+    });
+  }
 
-public interface SerializeDeserialize {
+  @Override
+  public Datum eval(Tuple params) {
+    Datum datum = params.get(0);
+    if (datum instanceof NullDatum) return NullDatum.get();
 
-  public int serialize(Column col, Datum datum, OutputStream out, byte[] nullCharacters) throws IOException;
-
-  public Datum deserialize(Column col, byte[] bytes, int offset, int length, byte[] nullCharacters) throws IOException;
-
+    int value = datum.asInt4();
+    if (value <= 0 || value > 65525) {
+        return NullDatum.get();
+    } else {
+        return DatumFactory.createText(String.valueOf((char)value));
+    }
+  }
 }

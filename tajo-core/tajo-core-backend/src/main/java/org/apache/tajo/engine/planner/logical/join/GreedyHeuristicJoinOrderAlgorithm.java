@@ -20,7 +20,7 @@ package org.apache.tajo.engine.planner.logical.join;
 
 import org.apache.tajo.algebra.JoinType;
 import org.apache.tajo.catalog.Schema;
-import org.apache.tajo.engine.eval.EvalTreeUtil;
+import org.apache.tajo.engine.eval.AlgebraicUtil;
 import org.apache.tajo.engine.planner.LogicalPlan;
 import org.apache.tajo.engine.planner.PlannerUtil;
 import org.apache.tajo.engine.planner.PlanningException;
@@ -90,7 +90,7 @@ public class GreedyHeuristicJoinOrderAlgorithm implements JoinOrderAlgorithm {
     joinNode.setInSchema(mergedSchema);
     joinNode.setOutSchema(mergedSchema);
     if (joinEdge.hasJoinQual()) {
-      joinNode.setJoinQual(EvalTreeUtil.transformCNF2Singleton(joinEdge.getJoinQual()));
+      joinNode.setJoinQual(AlgebraicUtil.createSingletonExprFromCNF(joinEdge.getJoinQual()));
     }
     return joinNode;
   }
@@ -193,6 +193,7 @@ public class GreedyHeuristicJoinOrderAlgorithm implements JoinOrderAlgorithm {
     }
   }
 
+  // TODO - costs of other operator operators (e.g., group-by and sort) should be computed in proper manners.
   public static double getCost(LogicalNode node) {
     switch (node.getType()) {
 
@@ -205,7 +206,7 @@ public class GreedyHeuristicJoinOrderAlgorithm implements JoinOrderAlgorithm {
       double filterFactor = 1;
       if (joinNode.hasJoinQual()) {
         filterFactor = Math.pow(DEFAULT_SELECTION_FACTOR,
-            EvalTreeUtil.getConjNormalForm(joinNode.getJoinQual()).length);
+            AlgebraicUtil.toConjunctiveNormalFormArray(joinNode.getJoinQual()).length);
         return getCost(joinNode.getLeftChild()) * getCost(joinNode.getRightChild()) * filterFactor;
       } else {
         return Math.pow(getCost(joinNode.getLeftChild()) * getCost(joinNode.getRightChild()), 2);
@@ -214,7 +215,7 @@ public class GreedyHeuristicJoinOrderAlgorithm implements JoinOrderAlgorithm {
     case SELECTION:
       SelectionNode selectionNode = (SelectionNode) node;
       return getCost(selectionNode.getChild()) *
-          Math.pow(DEFAULT_SELECTION_FACTOR, EvalTreeUtil.getConjNormalForm(selectionNode.getQual()).length);
+          Math.pow(DEFAULT_SELECTION_FACTOR, AlgebraicUtil.toConjunctiveNormalFormArray(selectionNode.getQual()).length);
 
     case TABLE_SUBQUERY:
       TableSubQueryNode subQueryNode = (TableSubQueryNode) node;
@@ -229,8 +230,18 @@ public class GreedyHeuristicJoinOrderAlgorithm implements JoinOrderAlgorithm {
         return Long.MAX_VALUE;
       }
 
+    case UNION:
+      UnionNode unionNode = (UnionNode) node;
+      return getCost(unionNode.getLeftChild()) + getCost(unionNode.getRightChild());
+
+    case EXCEPT:
+    case INTERSECT:
+      throw new UnsupportedOperationException("getCost() does not support EXCEPT or INTERSECT yet");
+
     default:
-      return getCost(node);
+      // all binary operators (join, union, except, and intersect) are handled in the above cases.
+      // So, we need to handle only unary nodes in default.
+      return getCost(((UnaryNode) node).getChild());
     }
   }
 }

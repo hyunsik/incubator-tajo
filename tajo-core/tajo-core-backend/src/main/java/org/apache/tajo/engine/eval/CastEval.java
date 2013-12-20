@@ -36,6 +36,10 @@ public class CastEval extends EvalNode {
     this.target = target;
   }
 
+  public EvalNode getOperand() {
+    return operand;
+  }
+
   @Override
   public EvalContext newContext() {
     CastContext castContext = new CastContext();
@@ -79,6 +83,8 @@ public class CastEval extends EvalNode {
         return DatumFactory.createFloat8(operand.terminate(castContext.childCtx).asFloat8());
       case TEXT:
         return DatumFactory.createText(operand.terminate(castContext.childCtx).asTextBytes());
+      case TIMESTAMP:
+        return DatumFactory.createTimestamp(operand.terminate(castContext.childCtx));
       case BLOB:
         return DatumFactory.createBlob(operand.terminate(castContext.childCtx).asByteArray());
       default:
@@ -105,11 +111,11 @@ public class CastEval extends EvalNode {
   @Override
   public void preOrder(EvalNodeVisitor visitor) {
     visitor.visit(this);
-    visitor.visit(operand);
+    operand.preOrder(visitor);
   }
 
   public void postOrder(EvalNodeVisitor visitor) {
-    visitor.visit(operand);
+    operand.postOrder(visitor);
     visitor.visit(this);
   }
 

@@ -27,7 +27,7 @@ import org.apache.tajo.util.Bytes;
 import java.io.IOException;
 import java.io.OutputStream;
 
-public class BinarySerializeDeserialize implements SerializeDeserialize {
+public class BinarySerializerDeserializer implements SerializerDeserializer {
 
   static final byte[] INVALID_UTF__SINGLE_BYTE = {(byte) Integer.parseInt("10111111", 2)};
 
@@ -87,8 +87,9 @@ public class BinarySerializeDeserialize implements SerializeDeserialize {
         out.write(bytes, 0, length);
         break;
       case NULL_TYPE:
-      default:
         break;
+      default:
+        throw new IOException("Does not support type");
     }
     return length;
   }
