@@ -4,7 +4,13 @@ Release 0.8.0 - unreleased
 
   NEW FEATURES
 
-    TAJO-338 - Add Query Optimization Part for Column-Partitioned Tables.
+    TAJO-437: Timestamp literal support. (hyunsik)
+
+    TAJO-382: Implement encode/decode functions. (Seungun Choe via jihoon)
+
+    TAJO-436: Implement ceiling(FLOAT8) function. (DaeMyung Kang via hyunsik)
+
+    TAJO-338 : Add Query Optimization Part for Column-Partitioned Tables.
     (hyunsik)
 
     TAJO-333: Add metric system to Tajo. (hyoungjunkim via jihoon)
@@ -97,6 +103,8 @@ Release 0.8.0 - unreleased
 
   IMPROVEMENTS
 
+    TAJO-435: Improve intermediate file. (jinho)
+
     TAJO-424: Make serializer/deserializer configurable in CSVFile. (jinho)
 
     TAJO-419: Add missing visitor methods of AlgebraVisitor and
@@ -157,6 +165,16 @@ Release 0.8.0 - unreleased
     (Keuntae Park via jihoon)
 
   BUG FIXES
+
+    TAJO-450: Incorrect inet4datum comparison. (jinho)
+
+    TAJO-182: Comparison of primitive values including null value should
+    return NULL. (hyunsik)
+
+    TAJO-431: HCatalogStore can't write any data using INSERT OVERWRITE clause.
+    (jaehwa)
+
+    TAJO-442: Cast operator with nested functions causes NPE. (hyunsik)
 
     TAJO-426: HCatalogStore created partitions automatically. (jaehwa)
 
