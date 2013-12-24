@@ -26,8 +26,6 @@ import org.apache.tajo.util.DateTimeUtil;
 
 public class DateDatum extends Datum {
   public static final int SIZE = 4;
-  /** ISO 8601/SQL standard format - ex) 1997-12-17 */
-  public static final String DEFAULT_FORMAT_STRING = "yyyy-MM-dd";
   /** Julian date */
   @Expose private int julianDates;
 
@@ -73,8 +71,7 @@ public class DateDatum extends Datum {
     quad = julian / 1461;
     julian -= quad * 1461;
     long y = julian * 4 / 1461;
-    julian = ((y != 0) ? ((julian + 305) % 365) : ((julian + 306) % 366))
-        + 123;
+    julian = ((y != 0) ? ((julian + 305) % 365) : ((julian + 306) % 366)) + 123;
     y += quad * 4;
 
     quad = julian * 2141 / 65536;
@@ -142,7 +139,7 @@ public class DateDatum extends Datum {
   @Override
   public String asChars() {
     int [] dateFields = DateTimeUtil.julianToDate(julianDates);
-    return String.format("%d-%d-%d", dateFields[0], dateFields[1], dateFields[2]);
+    return String.format("%04d-%02d-%02d", dateFields[0], dateFields[1], dateFields[2]);
   }
 
   @Override

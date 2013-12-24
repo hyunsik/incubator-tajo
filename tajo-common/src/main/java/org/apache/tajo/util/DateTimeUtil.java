@@ -146,7 +146,7 @@ public class DateTimeUtil {
        idx++;
       }
 
-      if (idx == (length - 1)) {
+      if (idx == length) {
         return -1;	/* end of string after separator */
       }
 

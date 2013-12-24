@@ -19,12 +19,10 @@
 package org.apache.tajo.datum;
 
 import org.apache.tajo.common.TajoDataTypes.Type;
-import org.apache.tajo.datum.exception.InvalidCastException;
 import org.apache.tajo.json.CommonGsonHelper;
 import org.junit.Test;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.*;
 
 public class TestDateDatum {
   private static String DATE = "1980-04-01";
@@ -49,16 +47,16 @@ public class TestDateDatum {
     assertEquals(d, copy);
 	}
 
-  @Test(expected = InvalidCastException.class)
+  @Test
 	public final void testAsFloat4() {
     Datum d = DatumFactory.createDate(DATE);
-    d.asFloat4();
+    assertTrue(d.asInt4() == d.asFloat4());
 	}
 
-  @Test(expected = InvalidCastException.class)
+  @Test
 	public final void testAsFloat8() {
     Datum d = DatumFactory.createDate(DATE);
-    d.asFloat8();
+    assertTrue(d.asInt4() == d.asFloat8());
 	}
 
 	@Test
