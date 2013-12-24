@@ -18,34 +18,32 @@
 
 package org.apache.tajo.datum;
 
+import com.google.gson.annotations.Expose;
 import org.apache.tajo.common.TajoDataTypes;
-import org.apache.tajo.datum.exception.InvalidCastException;
 import org.apache.tajo.datum.exception.InvalidOperationException;
 import org.apache.tajo.util.Bytes;
-import org.joda.time.LocalDate;
-import org.joda.time.format.DateTimeFormat;
-import org.joda.time.format.DateTimeFormatter;
+import org.apache.tajo.util.DateTimeUtil;
 
 public class DateDatum extends Datum {
   public static final int SIZE = 4;
   /** ISO 8601/SQL standard format - ex) 1997-12-17 */
   public static final String DEFAULT_FORMAT_STRING = "yyyy-MM-dd";
-  private static final DateTimeFormatter DEFAULT_FORMATTER = DateTimeFormat.forPattern(DEFAULT_FORMAT_STRING);
-  private LocalDate date;
+  /** Julian date */
+  @Expose private int julianDates;
 
-  public DateDatum(int value) {
+  public DateDatum(int julian) {
     super(TajoDataTypes.Type.DATE);
-    date = decode(value);
+    this.julianDates = julian;
+  }
+
+  public DateDatum(int year, int monthOfYear, int dayOfMonth) {
+    super(TajoDataTypes.Type.DATE);
+    julianDates = DateTimeUtil.dateToJulian(year, monthOfYear, dayOfMonth);
   }
 
   public DateDatum(String dateStr) {
     super(TajoDataTypes.Type.DATE);
-    this.date = LocalDate.parse(dateStr, DEFAULT_FORMATTER);
-  }
-
-  public DateDatum(LocalDate date) {
-    super(TajoDataTypes.Type.DATE);
-    this.date = date;
+    julianDates = DateTimeUtil.decodeDate(dateStr);
   }
 
   public DateDatum(byte [] bytes) {
@@ -53,19 +51,68 @@ public class DateDatum extends Datum {
   }
 
   public int getYear() {
-    return date.getYear();
+    long julian = julianDates;
+    julian += 32044;
+    long quad = julian / 146097;
+    long extra = (julian - quad * 146097) * 4 + 3;
+    julian += 60 + quad * 3 + extra / 146097;
+    quad = julian / 1461;
+    julian -= quad * 1461;
+    long y = julian * 4 / 1461;
+    y += quad * 4;
+
+    return (int)(y - 4800);
   }
 
   public int getMonthOfYear() {
-    return date.getMonthOfYear();
+    long julian = julianDates;
+    julian += 32044;
+    long quad = julian / 146097;
+    long extra = (julian - quad * 146097) * 4 + 3;
+    julian += 60 + quad * 3 + extra / 146097;
+    quad = julian / 1461;
+    julian -= quad * 1461;
+    long y = julian * 4 / 1461;
+    julian = ((y != 0) ? ((julian + 305) % 365) : ((julian + 306) % 366))
+        + 123;
+    y += quad * 4;
+
+    quad = julian * 2141 / 65536;
+    int month = (int) ((quad + 10) % DateTimeUtil.MONTHS_PER_YEAR + 1);
+
+    return month;
   }
 
+  /**
+   * Get day-of-week (0..6 == Sun..Sat)
+   */
   public int getDayOfWeek() {
-    return date.getDayOfWeek();
+    long day;
+
+    day = julianDates;
+
+    day += 1;
+    day %= 7;
+
+    return (int) day;
   }
 
   public int getDayOfMonth() {
-    return date.getDayOfMonth();
+
+    long julian = julianDates;
+    julian += 32044;
+    long quad = julian / 146097;
+    long extra = (julian - quad * 146097) * 4 + 3;
+    julian += 60 + quad * 3 + extra / 146097;
+    quad = julian / 1461;
+    julian -= quad * 1461;
+    long y = julian * 4 / 1461;
+    julian = ((y != 0) ? ((julian + 305) % 365) : ((julian + 306) % 366))
+        + 123;
+    y += quad * 4;
+
+    quad = julian * 2141 / 65536;
+    return (int)(julian - 7834 * quad / 256);
   }
 
   public String toString() {
@@ -74,52 +121,28 @@ public class DateDatum extends Datum {
 
   @Override
   public int asInt4() {
-    return encode();
-  }
-
-  private static LocalDate decode(int val) {
-    int year = (val >> 16);
-    int monthOfYear = (0xFFFF & val) >> 8;
-    int dayOfMonth = (0x00FF & val);
-    return new LocalDate(year, monthOfYear, dayOfMonth);
-  }
-
-  /**
-   *   Year     MonthOfYear   DayOfMonth
-   *  31-16       15-8          7 - 0
-   *
-   * 0xFF 0xFF    0xFF          0xFF
-   */
-  private int encode() {
-    int instance = 0;
-    instance |= (date.getYear() << 16); // 1970 ~ : 2 bytes
-    instance |= (date.getMonthOfYear() << 8); // 1 - 12 : 1 byte
-    instance |= (date.getDayOfMonth()); // 0 - 31 : 1 byte
-    return instance;
+    return julianDates;
   }
 
   @Override
   public long asInt8() {
-    return encode();
+    return julianDates;
   }
 
   @Override
   public float asFloat4() {
-    throw new InvalidCastException();
+    return julianDates;
   }
 
   @Override
   public double asFloat8() {
-    throw new InvalidCastException();
+    return julianDates;
   }
 
   @Override
   public String asChars() {
-    return date.toString(DEFAULT_FORMATTER);
-  }
-
-  public String toChars(String format) {
-    return date.toString(format);
+    int [] dateFields = DateTimeUtil.julianToDate(julianDates);
+    return String.format("%d-%d-%d", dateFields[0], dateFields[1], dateFields[2]);
   }
 
   @Override
@@ -129,13 +152,13 @@ public class DateDatum extends Datum {
 
   @Override
   public byte [] asByteArray() {
-    return Bytes.toBytes(encode());
+    return Bytes.toBytes(julianDates);
   }
 
   @Override
   public Datum equalsTo(Datum datum) {
-    if (datum.type() == TajoDataTypes.Type.TIME) {
-      return DatumFactory.createBool(date.equals(((DateDatum) datum).date));
+    if (datum.type() == TajoDataTypes.Type.DATE) {
+      return DatumFactory.createBool(julianDates == datum.asInt4());
     } else if (datum.isNull()) {
       return datum;
     } else {
@@ -146,7 +169,8 @@ public class DateDatum extends Datum {
   @Override
   public int compareTo(Datum datum) {
     if (datum.type() == TajoDataTypes.Type.DATE) {
-      return date.compareTo(((DateDatum)datum).date);
+      DateDatum another = (DateDatum) datum;
+      return julianDates - another.julianDates;
     } else if (datum.type() == TajoDataTypes.Type.NULL_TYPE) {
       return -1;
     } else {
@@ -157,7 +181,7 @@ public class DateDatum extends Datum {
   public boolean equals(Object obj) {
     if (obj instanceof DateDatum) {
       DateDatum another = (DateDatum) obj;
-      return date.isEqual(another.date);
+      return julianDates == another.julianDates;
     } else {
       throw new InvalidOperationException();
     }
@@ -165,6 +189,10 @@ public class DateDatum extends Datum {
 
   @Override
   public int hashCode() {
-    return date.hashCode();
+    return julianDates;
+  }
+
+  public static DateDatum newInstance(int year, int monthOfYear, int dayOfMonth) {
+    return new DateDatum(year, monthOfYear, dayOfMonth);
   }
 }

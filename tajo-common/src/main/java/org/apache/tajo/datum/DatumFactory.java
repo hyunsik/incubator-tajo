@@ -257,7 +257,7 @@ public class DatumFactory {
   }
 
   public static DateDatum createDate(String dateStr) {
-    return new DateDatum(LocalDate.parse(dateStr));
+    return new DateDatum(dateStr);
   }
 
   public static TimeDatum createTime(long instance) {

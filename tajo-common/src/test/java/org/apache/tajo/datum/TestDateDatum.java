@@ -103,9 +103,9 @@ public class TestDateDatum {
 
   @Test
   public final void testGetFields() {
-    DateDatum d = DatumFactory.createDate(DATE);
-    assertEquals(1980, d.getYear());
-    assertEquals(4, d.getMonthOfYear());
-    assertEquals(1, d.getDayOfMonth());
+    DateDatum d = DateDatum.newInstance(2013, 12, 24);
+    assertEquals(2013, d.getYear());
+    assertEquals(12, d.getMonthOfYear());
+    assertEquals(24, d.getDayOfMonth());
   }
 }
