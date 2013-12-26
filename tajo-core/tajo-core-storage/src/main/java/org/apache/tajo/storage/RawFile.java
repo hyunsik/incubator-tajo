@@ -443,7 +443,7 @@ public class RawFile {
             break;
 
           case TIMESTAMP:
-            buffer.putLong(((TimestampDatum)t.get(i)).getMillis());
+            buffer.putLong(((TimestampDatum)t.get(i)).getTimestamp());
             break;
 
           case BLOB : {

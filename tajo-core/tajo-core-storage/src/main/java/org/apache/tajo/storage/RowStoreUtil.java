@@ -181,7 +181,7 @@ public class RowStoreUtil {
             bb.put(_string);
             break;
           case DATE: bb.putInt(tuple.get(i).asInt4()); break;
-          case TIMESTAMP: bb.putLong(((TimestampDatum)tuple.get(i)).getMillis()); break;
+          case TIMESTAMP: bb.putLong(((TimestampDatum)tuple.get(i)).getTimestamp()); break;
           case BLOB:
             byte [] bytes = tuple.get(i).asByteArray();
             bb.putInt(bytes.length);

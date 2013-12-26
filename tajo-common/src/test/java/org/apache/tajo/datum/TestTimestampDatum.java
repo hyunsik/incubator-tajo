@@ -28,62 +28,49 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
 public class TestTimestampDatum {
-
-  private static int timestamp;
-
-  @BeforeClass
-  public static void setUp() {
-    timestamp = (int) (System.currentTimeMillis() / 1000);
-  }
+  public static TimestampDatum d =
+      new TimestampDatum(2013, 12, 25, 13, 32, 36, 999999);
 
 	@Test
 	public final void testType() {
-		Datum d = DatumFactory.createTimeStamp(timestamp);
     assertEquals(Type.TIMESTAMP, d.type());
 	}
 	
 	@Test(expected = InvalidCastException.class)
 	public final void testAsInt4() {
-    Datum d = DatumFactory.createTimeStamp(timestamp);
     d.asInt4();
 	}
 
-  @Test(expected = InvalidCastException.class)
+  @Test
 	public final void testAsInt8() {
-    Datum d = DatumFactory.createTimeStamp(timestamp);
-    assertEquals(timestamp, d.asInt8());
+    System.out.println(d.asInt8());
 	}
 
   @Test(expected = InvalidCastException.class)
 	public final void testAsFloat4() {
-    Datum d = DatumFactory.createTimeStamp(timestamp);
     d.asFloat4();
 	}
 
   @Test(expected = InvalidCastException.class)
 	public final void testAsFloat8() {
-    int instance = 1386577582;
-    Datum d = DatumFactory.createTimeStamp(instance);
     d.asFloat8();
 	}
 
 	@Test
 	public final void testAsText() {
-    Datum d = DatumFactory.createTimeStamp("1980-04-01 01:50:01");
+    assertEquals("2013-12-25 13:32:36.999999", d.asChars());
     Datum copy = DatumFactory.createTimeStamp(d.asChars());
     assertEquals(d, copy);
 	}
 
   @Test
   public final void testAsByteArray() {
-    TimestampDatum d = DatumFactory.createTimeStamp(timestamp);
-    TimestampDatum copy = new TimestampDatum(d.asByteArray());
+    Datum copy = new TimestampDatum(d.asByteArray());
     assertEquals(d, copy);
   }
 
 	@Test
   public final void testSize() {
-    Datum d = DatumFactory.createTimeStamp(timestamp);
     assertEquals(TimestampDatum.SIZE, d.asByteArray().length);
   }
 
@@ -95,19 +82,25 @@ public class TestTimestampDatum {
 
   @Test
   public final void testToJson() {
-    Datum d = DatumFactory.createTimeStamp(timestamp);
     Datum copy = CommonGsonHelper.fromJson(d.toJson(), Datum.class);
     assertEquals(d, copy);
   }
 
   @Test
+  public final void testGetUnixtime() {
+    TimestampDatum d = new TimestampDatum(2013, 12, 25, 13, 32, 36, 999999);
+    System.out.println(d.getUnixTimestamp());
+  }
+
+  @Test
   public final void testGetFields() {
-    TimestampDatum d = DatumFactory.createTimeStamp("1980-04-01 01:50:01");
-    assertEquals(1980, d.getYear());
-    assertEquals(4, d.getMonthOfYear());
-    assertEquals(1, d.getDayOfMonth());
-    assertEquals(1, d.getHourOfDay());
-    assertEquals(50, d.getMinuteOfHour());
-    assertEquals(01, d.getSecondOfMinute());
+    TimestampDatum d = new TimestampDatum(2013, 12, 25, 13, 32, 36, 999999);
+    assertEquals(2013, d.getYear());
+    assertEquals(12, d.getMonthOfYear());
+    assertEquals(25, d.getDayOfMonth());
+    assertEquals(13, d.getHourOfDay());
+    assertEquals(32, d.getMinuteOfHour());
+    assertEquals(36, d.getSecondOfMinute());
+    assertEquals(999999, d.getMillisOfSecond());
   }
 }

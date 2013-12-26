@@ -20,84 +20,121 @@ package org.apache.tajo.datum;
 
 import org.apache.tajo.common.TajoDataTypes;
 import org.apache.tajo.datum.exception.InvalidOperationException;
+import org.apache.tajo.datum.exception.ValueOutOfRangeException;
 import org.apache.tajo.util.Bytes;
+import org.apache.tajo.util.DateTimeUtil;
 import org.joda.time.DateTime;
-import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
 public class TimestampDatum extends Datum {
   public static final int SIZE = 8;
-  /** ISO 8601/SQL standard format - ex) 1997-12-17 07:37:16-08 */
-  public static final String DEFAULT_FORMAT_STRING = "yyyy-MM-dd HH:mm:ss";
-  private static final DateTimeFormatter DEFAULT_FORMATTER = DateTimeFormat.forPattern(DEFAULT_FORMAT_STRING);
-  private DateTime dateTime;
+  private long timestamp;
 
   public TimestampDatum(int timestamp) {
     super(TajoDataTypes.Type.TIMESTAMP);
-    dateTime = new DateTime((long)timestamp * 1000);
+
   }
 
   public TimestampDatum(DateTime dateTime) {
     super(TajoDataTypes.Type.TIMESTAMP);
-    this.dateTime = dateTime;
+
   }
 
   TimestampDatum(byte [] bytes) {
     super(TajoDataTypes.Type.TIMESTAMP);
-    this.dateTime = new DateTime(Bytes.toLong(bytes));
+    this.timestamp = Bytes.toLong(bytes);
   }
 
   public TimestampDatum(String datetime) {
     super(TajoDataTypes.Type.TIMESTAMP);
-    this.dateTime = DateTime.parse(datetime, DEFAULT_FORMATTER);
+    this.timestamp = DateTimeUtil.parseDateTime();
   }
 
-  public int getUnixTime() {
-    return (int) (dateTime.getMillis() / 1000);
+  public TimestampDatum(int years, int months, int days, int hours, int minutes, int seconds, int fraction) {
+    super(TajoDataTypes.Type.TIMESTAMP);
+
+    /* Julian day routines are not correct for negative Julian days */
+    if (!DateTimeUtil.isValidJulianDate(years, months, days)) {
+      throw new ValueOutOfRangeException("Out of Range Julian days");
+    }
+
+    long date = DateTimeUtil.toJulianDate(years, months, days) - DateTimeUtil.POSTGRES_EPOCH_JDATE;
+    long time = DateTimeUtil.toTime(hours, minutes, seconds, fraction);
+
+    timestamp = date * DateTimeUtil.USECS_PER_DAY + time;
+	  /* check for major overflow */
+    if ((timestamp - time) / DateTimeUtil.USECS_PER_DAY != date) {
+      throw new ValueOutOfRangeException("Out of Range of Time");
+    }
+	  /* check for just-barely overflow (okay except time-of-day wraps) */
+	  /* caution: we want to allow 1999-12-31 24:00:00 */
+    if ((timestamp < 0 && date > 0) || (timestamp > 0 && date < -1)) {
+      throw new ValueOutOfRangeException("Out of Range of Date");
+    }
+
+    /* TODO - time zone
+    if (tzp != NULL) {
+      timestamp = dt2local(*result, -(*tzp));
+    }
+    */
   }
 
-  public long getMillis() {
-    return dateTime.getMillis();
+  /**
+   * It's the same value to asInt8().
+   * @return The Timestamp
+   */
+  public long getTimestamp() {
+    return timestamp;
   }
 
-  public DateTime getDateTime() {
-    return dateTime;
+  public int getUnixTimestamp() {
+    return DateTimeUtil.timestampToUnixtime(timestamp);
   }
 
   public int getYear() {
-    return dateTime.getYear();
+    DateTimeUtil.TimeMeta tm = new DateTimeUtil.TimeMeta();
+    DateTimeUtil.timestampToTimeMeta(timestamp, tm);
+    return tm.years;
   }
 
   public int getMonthOfYear() {
-    return dateTime.getMonthOfYear();
+    DateTimeUtil.TimeMeta tm = new DateTimeUtil.TimeMeta();
+    DateTimeUtil.timestampToTimeMeta(timestamp, tm);
+    return tm.monthOfYear;
   }
 
   public int getDayOfWeek() {
-    return dateTime.getDayOfWeek();
+    return 0;
   }
 
   public int getDayOfMonth() {
-    return dateTime.getDayOfMonth();
+    DateTimeUtil.TimeMeta tm = new DateTimeUtil.TimeMeta();
+    DateTimeUtil.timestampToTimeMeta(timestamp, tm);
+    return tm.dayOfMonth;
   }
 
   public int getHourOfDay() {
-    return dateTime.getHourOfDay();
+    DateTimeUtil.TimeMeta tm = new DateTimeUtil.TimeMeta();
+    DateTimeUtil.timestampToTimeMeta(timestamp, tm);
+    return tm.hours;
   }
 
   public int getMinuteOfHour() {
-    return dateTime.getMinuteOfHour();
-  }
-
-  public int getSecondOfDay() {
-    return dateTime.getSecondOfDay();
+    DateTimeUtil.TimeMeta tm = new DateTimeUtil.TimeMeta();
+    DateTimeUtil.timestampToTimeMeta(timestamp, tm);
+    return tm.minutes;
   }
 
   public int getSecondOfMinute() {
-    return dateTime.getSecondOfMinute();
+    DateTimeUtil.TimeMeta tm = new DateTimeUtil.TimeMeta();
+    DateTimeUtil.timestampToTimeMeta(timestamp, tm);
+    return tm.secs;
   }
 
   public int getMillisOfSecond() {
-    return dateTime.getMillisOfSecond();
+    DateTimeUtil.TimeMeta tm = new DateTimeUtil.TimeMeta();
+    DateTimeUtil.timestampToTimeMeta(timestamp, tm);
+    return tm.fsecs;
   }
 
   public String toString() {
@@ -105,12 +142,19 @@ public class TimestampDatum extends Datum {
   }
 
   @Override
+  public long asInt8() {
+    return timestamp;
+  }
+
+  @Override
   public String asChars() {
-    return dateTime.toString(DEFAULT_FORMATTER);
+    DateTimeUtil.TimeMeta tm = new DateTimeUtil.TimeMeta();
+    DateTimeUtil.timestampToTimeMeta(timestamp, tm);
+    return DateTimeUtil.encodeDateTime(tm, DateTimeUtil.DateStyle.ISO_DATES);
   }
 
   public String toChars(DateTimeFormatter format) {
-    return dateTime.toString(format);
+    return "";
   }
 
   @Override
@@ -120,13 +164,13 @@ public class TimestampDatum extends Datum {
 
   @Override
   public byte [] asByteArray() {
-    return Bytes.toBytes(dateTime.getMillis());
+    return Bytes.toBytes(timestamp);
   }
 
   @Override
   public Datum equalsTo(Datum datum) {
     if (datum.type() == TajoDataTypes.Type.TIME) {
-      return DatumFactory.createBool(dateTime.equals(((TimestampDatum) datum).dateTime));
+      return timestamp == datum.asInt8() ? BooleanDatum.TRUE : BooleanDatum.FALSE;
     } else if (datum.isNull()) {
       return datum;
     } else {
@@ -137,7 +181,8 @@ public class TimestampDatum extends Datum {
   @Override
   public int compareTo(Datum datum) {
     if (datum.type() == TajoDataTypes.Type.TIMESTAMP) {
-      return dateTime.compareTo(((TimestampDatum)datum).dateTime);
+      TimestampDatum another = (TimestampDatum) datum;
+      return (timestamp < another.timestamp) ? -1 : ((timestamp > another.timestamp) ? 1 : 0);
     } else if (datum.isNull()) {
       return -1;
     } else {
@@ -148,7 +193,7 @@ public class TimestampDatum extends Datum {
   public boolean equals(Object obj) {
     if (obj instanceof TimestampDatum) {
       TimestampDatum another = (TimestampDatum) obj;
-      return dateTime.isEqual(another.dateTime);
+      return timestamp == another.timestamp;
     } else {
       throw new InvalidOperationException();
     }

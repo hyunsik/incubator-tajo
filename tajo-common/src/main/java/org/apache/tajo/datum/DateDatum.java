@@ -36,7 +36,7 @@ public class DateDatum extends Datum {
 
   public DateDatum(int year, int monthOfYear, int dayOfMonth) {
     super(TajoDataTypes.Type.DATE);
-    julianDates = DateTimeUtil.dateToJulian(year, monthOfYear, dayOfMonth);
+    julianDates = DateTimeUtil.toJulianDate(year, monthOfYear, dayOfMonth);
   }
 
   public DateDatum(String dateStr) {
@@ -138,8 +138,9 @@ public class DateDatum extends Datum {
 
   @Override
   public String asChars() {
-    int [] dateFields = DateTimeUtil.julianToDate(julianDates);
-    return String.format("%04d-%02d-%02d", dateFields[0], dateFields[1], dateFields[2]);
+    DateTimeUtil.TimeMeta tm = new DateTimeUtil.TimeMeta();
+    DateTimeUtil.julianToDate(julianDates, tm);
+    return String.format("%04d-%02d-%02d", tm.years, tm.monthOfYear, tm.dayOfMonth);
   }
 
   @Override
@@ -167,7 +168,7 @@ public class DateDatum extends Datum {
   public int compareTo(Datum datum) {
     if (datum.type() == TajoDataTypes.Type.DATE) {
       DateDatum another = (DateDatum) datum;
-      return julianDates - another.julianDates;
+      return (julianDates < another.julianDates) ? -1 : ((julianDates > another.julianDates) ? 1 : 0);
     } else if (datum.type() == TajoDataTypes.Type.NULL_TYPE) {
       return -1;
     } else {
