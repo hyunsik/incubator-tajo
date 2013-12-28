@@ -97,18 +97,9 @@ public class LogicalOptimizer {
   }
 
   private static class JoinGraphContext {
-    LogicalPlan.QueryBlock block;
     JoinGraph joinGraph = new JoinGraph();
     Set<EvalNode> quals = Sets.newHashSet();
     Set<String> relationsForProduct = Sets.newHashSet();
-
-    public JoinGraphContext(LogicalPlan.QueryBlock block) {
-      this.block = block;
-    }
-
-    public LogicalPlan.QueryBlock getBlock() {
-      return block;
-    }
   }
 
   private static class JoinGraphBuilder extends BasicLogicalPlanVisitor<JoinGraphContext, LogicalNode> {
@@ -125,7 +116,7 @@ public class LogicalOptimizer {
      */
     public static JoinGraphContext buildJoinGraph(LogicalPlan plan, LogicalPlan.QueryBlock block)
         throws PlanningException {
-      JoinGraphContext joinGraphContext = new JoinGraphContext(block);
+      JoinGraphContext joinGraphContext = new JoinGraphContext();
       instance.visit(joinGraphContext, plan, block);
       return joinGraphContext;
     }
@@ -143,7 +134,7 @@ public class LogicalOptimizer {
         throws PlanningException {
       super.visitJoin(joinGraphContext, plan, block, joinNode, stack);
       if (joinNode.hasJoinQual()) {
-        joinGraphContext.joinGraph.addJoin(plan, joinGraphContext.block, joinNode);
+        joinGraphContext.joinGraph.addJoin(plan, block, joinNode);
       } else {
         LogicalNode leftChild = joinNode.getLeftChild();
         LogicalNode rightChild = joinNode.getRightChild();

@@ -558,28 +558,24 @@ public class GlobalPlanner {
     }
   }
 
-  private class UnionsFinderContext {
-    List<UnionNode> unionList = new ArrayList<UnionNode>();
-  }
-
   @SuppressWarnings("unused")
-  private class ConsecutiveUnionFinder extends BasicLogicalPlanVisitor<UnionsFinderContext, LogicalNode> {
+  private class ConsecutiveUnionFinder extends BasicLogicalPlanVisitor<List<UnionNode>, LogicalNode> {
     @Override
-    public LogicalNode visitUnion(UnionsFinderContext context, LogicalPlan plan, LogicalPlan.QueryBlock queryBlock,
+    public LogicalNode visitUnion(List<UnionNode> unionNodeList, LogicalPlan plan, LogicalPlan.QueryBlock queryBlock,
                                   UnionNode node, Stack<LogicalNode> stack)
         throws PlanningException {
       if (node.getType() == NodeType.UNION) {
-        context.unionList.add(node);
+        unionNodeList.add(node);
       }
 
       stack.push(node);
       TableSubQueryNode leftSubQuery = node.getLeftChild();
       TableSubQueryNode rightSubQuery = node.getRightChild();
       if (leftSubQuery.getSubQuery().getType() == NodeType.UNION) {
-        visit(context, plan, queryBlock, leftSubQuery, stack);
+        visit(unionNodeList, plan, queryBlock, leftSubQuery, stack);
       }
       if (rightSubQuery.getSubQuery().getType() == NodeType.UNION) {
-        visit(context, plan, queryBlock, rightSubQuery, stack);
+        visit(unionNodeList, plan, queryBlock, rightSubQuery, stack);
       }
       stack.pop();
 

@@ -71,7 +71,7 @@ public class ProjectionPushDownRule extends
     }
 
     Stack<LogicalNode> stack = new Stack<LogicalNode>();
-    PushDownContext context = new PushDownContext(topmostBlock);
+    PushDownContext context = new PushDownContext();
     context.plan = plan;
 
     if (topmostBlock.getProjection() != null && topmostBlock.getProjection().isAllProjected()) {
@@ -86,25 +86,16 @@ public class ProjectionPushDownRule extends
   }
 
   public static class PushDownContext {
-    LogicalPlan.QueryBlock queryBlock;
     LogicalPlan plan;
     TargetListManager targetListManager;
     Set<Column> upperRequired;
 
-    public PushDownContext(LogicalPlan.QueryBlock block) {
-      this.queryBlock = block;
-    }
+    public PushDownContext() {}
 
     public PushDownContext(ProjectionPushDownRule.PushDownContext context) {
       this.plan = context.plan;
-      this.queryBlock = context.queryBlock;
       this.targetListManager = context.targetListManager;
       this.upperRequired = context.upperRequired;
-    }
-
-    public PushDownContext(ProjectionPushDownRule.PushDownContext context, LogicalPlan.QueryBlock queryBlock) {
-      this(context);
-      this.queryBlock = queryBlock;
     }
   }
 
@@ -149,7 +140,7 @@ public class ProjectionPushDownRule extends
       child.setOutSchema(context.targetListManager.getUpdatedSchema());
       if (stack.isEmpty()) {
         // update the child node's output schemas
-        context.queryBlock.setRoot(child);
+        block.setRoot(child);
       } else if (stack.peek().getType() == NodeType.TABLE_SUBQUERY) {
         ((TableSubQueryNode)stack.peek()).setSubQuery(childNode);
       } else {
@@ -270,7 +261,7 @@ public class ProjectionPushDownRule extends
 
     Stack<LogicalNode> newStack = new Stack<LogicalNode>();
     newStack.push(node);
-    PushDownContext newContext = new PushDownContext(subBlock);
+    PushDownContext newContext = new PushDownContext();
 
     newContext.upperRequired = new HashSet<Column>();
 
@@ -453,11 +444,11 @@ public class ProjectionPushDownRule extends
     LogicalPlan.QueryBlock leftBlock = plan.getChildBlocks(block).get(0);
     LogicalPlan.QueryBlock rightBlock = plan.getChildBlocks(block).get(1);
 
-    PushDownContext leftContext = new PushDownContext(context, leftBlock);
+    PushDownContext leftContext = new PushDownContext(context);
     leftContext.targetListManager = buildSubBlockTargetList(plan, leftBlock,
         (TableSubQueryNode) setNode.getLeftChild(), context.upperRequired);
 
-    PushDownContext rightContext = new PushDownContext(context, rightBlock);
+    PushDownContext rightContext = new PushDownContext(context);
     rightContext.targetListManager = buildSubBlockTargetList(plan, rightBlock,
         (TableSubQueryNode) setNode.getRightChild(), context.upperRequired);
 
