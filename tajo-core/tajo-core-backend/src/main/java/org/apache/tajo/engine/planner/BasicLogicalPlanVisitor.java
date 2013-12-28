@@ -61,6 +61,8 @@ public class BasicLogicalPlanVisitor<CONTEXT, RESULT> implements LogicalPlanVisi
       case ROOT:
         current = visitRoot(context, plan, block, (LogicalRootNode) node, stack);
         break;
+      case EXPRS:
+        return null;
       case PROJECTION:
         current = visitProjection(context, plan, block, (ProjectionNode) node, stack);
         break;
