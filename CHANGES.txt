@@ -4,6 +4,10 @@ Release 0.8.0 - unreleased
 
   NEW FEATURES
 
+    TAJO-381: Implement find_in_set function. (Jae Young Lee via hyunsik)
+
+    TAJO-439: Time literal support. (DaeMyung Kang via jihoon)
+
     TAJO-437: Timestamp literal support. (hyunsik)
 
     TAJO-382: Implement encode/decode functions. (Seungun Choe via jihoon)
@@ -103,6 +107,8 @@ Release 0.8.0 - unreleased
 
   IMPROVEMENTS
 
+    TAJO-432: Add shuffle phase for column-partitioned table store. (Min Zhou via jihoon)
+
     TAJO-135: Bump up hadoop to 2.2.0. (jihoon)
 
     TAJO-435: Improve intermediate file. (jinho)
@@ -167,6 +173,12 @@ Release 0.8.0 - unreleased
     (Keuntae Park via jihoon)
 
   BUG FIXES
+
+    TAJO-452: Timstamp literal with fractional seconds results in 
+    java.lang.ArrayIndexOutOfBoundsException. (Keuntae Park via hyunsik)
+
+    TAJO-454: pass invalid argument to DateTime constructor in LogicalPlanner.
+    (DaeMyung Kang via hyunsik)
 
     TAJO-451: Update documentation and version constant for Tajo 0.8.
     (hyunsik)
