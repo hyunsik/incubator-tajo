@@ -74,7 +74,7 @@ public class PlannerUtil {
   public static Collection<String> getRelationLineageWithinQueryBlock(LogicalPlan plan, LogicalNode node)
       throws PlanningException {
     RelationFinderVisitor visitor = new RelationFinderVisitor();
-    visitor.visit(null, plan, node);
+    visitor.visitWithoutQueryBlock(null, plan, node);
     return visitor.getFoundRelations();
   }
 
@@ -137,7 +137,7 @@ public class PlannerUtil {
   public static void replaceNode(LogicalPlan plan, LogicalNode startNode, LogicalNode oldNode, LogicalNode newNode) {
     LogicalNodeReplaceVisitor replacer = new LogicalNodeReplaceVisitor(oldNode, newNode);
     try {
-      replacer.visit(null, plan, startNode);
+      replacer.visitWithoutQueryBlock(null, plan, startNode);
     } catch (PlanningException e) {
       e.printStackTrace();
     }

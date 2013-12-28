@@ -53,7 +53,7 @@ public class FilterPushDownRule extends BasicLogicalPlanVisitor<Set<EvalNode>, L
   @Override
   public LogicalPlan rewrite(LogicalPlan plan) throws PlanningException {
     for (LogicalPlan.QueryBlock block : plan.getQueryBlocks()) {
-      this.visit(new HashSet<EvalNode>(), plan, block.getRoot());
+      this.visitWithoutQueryBlock(new HashSet<EvalNode>(), plan, block.getRoot());
     }
 
     return plan;

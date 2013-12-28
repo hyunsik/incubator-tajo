@@ -40,12 +40,12 @@ public class BasicLogicalPlanVisitor<CONTEXT, RESULT> implements LogicalPlanVisi
       throws PlanningException {
   }
 
-  public CONTEXT visit(CONTEXT context, LogicalPlan plan, LogicalPlan.QueryBlock block) throws PlanningException {
+  public CONTEXT visitFromQueryBlock(CONTEXT context, LogicalPlan plan, LogicalPlan.QueryBlock block) throws PlanningException {
     visit(context, plan, block, block.getRoot(), new Stack<LogicalNode>());
     return context;
   }
 
-  public CONTEXT visit(CONTEXT context, LogicalPlan plan, LogicalNode node) throws PlanningException {
+  public CONTEXT visitWithoutQueryBlock(CONTEXT context, LogicalPlan plan, LogicalNode node) throws PlanningException {
     visit(context, plan, null, node, new Stack<LogicalNode>());
     return context;
   }

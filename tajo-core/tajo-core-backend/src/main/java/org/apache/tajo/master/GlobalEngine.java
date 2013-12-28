@@ -229,7 +229,7 @@ public class GlobalEngine extends AbstractService {
     }
 
     VerificationState state = new VerificationState();
-    verifier.visit(state, plan, plan.getRootBlock());
+    verifier.visitFromQueryBlock(state, plan, plan.getRootBlock());
 
     if (!state.verified()) {
       StringBuilder sb = new StringBuilder();
