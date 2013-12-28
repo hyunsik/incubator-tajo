@@ -86,10 +86,10 @@ public class PlannerUtil {
     }
 
     @Override
-    public LogicalNode visitChild(Object context, LogicalPlan plan, LogicalNode node, Stack<LogicalNode> stack)
-        throws PlanningException {
+    public LogicalNode visit(Object context, LogicalPlan plan, LogicalPlan.QueryBlock block, LogicalNode node,
+                             Stack<LogicalNode> stack) throws PlanningException {
       if (node.getType() != NodeType.TABLE_SUBQUERY) {
-        super.visitChild(context, plan, node, stack);
+        super.visit(context, plan, block, node, stack);
       }
 
       if (node instanceof RelationNode) {
@@ -153,9 +153,9 @@ public class PlannerUtil {
     }
 
     @Override
-    public LogicalNode visitChild(Object context, LogicalPlan plan, LogicalNode node, Stack<LogicalNode> stack)
-        throws PlanningException {
-      super.visitChild(context, plan, node, stack);
+    public LogicalNode visit(Object context, LogicalPlan plan, LogicalPlan.QueryBlock block, LogicalNode node,
+                                  Stack<LogicalNode> stack) throws PlanningException {
+      super.visit(context, plan, null, node, stack);
 
       if (node.deepEquals(target)) {
         LogicalNode parent = stack.peek();
