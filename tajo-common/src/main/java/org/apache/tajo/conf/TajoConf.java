@@ -81,6 +81,10 @@ public class TajoConf extends YarnConfiguration {
     TAJO_MASTER_CLIENT_RPC_ADDRESS("tajo.master.client-rpc.address", "localhost:26002"),
     TAJO_MASTER_INFO_ADDRESS("tajo.master.info-http.address", "0.0.0.0:26080"),
 
+    // Session
+    SESSION_EXPIRE_CHECK_INTERVAL("tajo.session.expiry.check-interval-secs", 30),
+    SESSION_EXPIRE_INTERVAL("tajo.session.expiry.max-interval-secs", 600),
+
     // QueryMaster resource
     TAJO_QUERYMASTER_DISK_SLOT("tajo.qm.resource.disk.slots", 0.0f),
     TAJO_QUERYMASTER_MEMORY_MB("tajo.qm.resource.memory-mb", 512),
@@ -107,7 +111,7 @@ public class TajoConf extends YarnConfiguration {
     WORKER_RESOURCE_DEDICATED_MEMORY_RATIO("tajo.worker.resource.dedicated-memory-ratio", 0.8f),
 
     // Tajo Worker History
-    WORKER_HISTORY_EXPIRE_PERIOD("tajo.worker.history.expire-interval-minutes", 12 * 60), // 12 hours
+    WORKER_HISTORY_EXPIRE_PERIOD("tajo.worker.history.expiry-interval-minutes", 12 * 60), // 12 hours
 
     WORKER_HEARTBEAT_TIMEOUT("tajo.worker.heartbeat.timeout", 120 * 1000),  //120 sec
 
@@ -282,7 +286,12 @@ public class TajoConf extends YarnConfiguration {
       String typeString() { return name().toUpperCase();}
       abstract void checkType(String value) throws Exception;
     }
+
+    public Class getVarClass() {
+      return this.valClass;
+    }
   }
+
 
   public static int getIntVar(Configuration conf, ConfVars var) {
     assert (var.valClass == Integer.class);
