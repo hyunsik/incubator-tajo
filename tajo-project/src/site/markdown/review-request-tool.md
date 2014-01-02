@@ -50,7 +50,7 @@ sudo easy_install argparse
 ### <a name="Usage"></a>Usage
 
 ```
-$ dev-support/request-patch-review.py --help
+$ ./request-patch-review.py --help
 usage: request-patch-review.py [-h] -b BRANCH -j JIRA [-s SUMMARY]
                                [-d DESCRIPTION] [-c CHANGE_DESCRIPTION]
                                [-r REVIEWBOARD] [-t TESTING] [-db]
@@ -82,25 +82,25 @@ optional arguments:
  * Specify the branch against which the patch should be created (-b)
  * Specify the corresponding JIRA (-j)
  * Specify an optional summary (-s) and description (-d) for the reviewboard
-  * If there are not given, the summary and description of the first review request in reviewboard are copied from the corresponding JIRA issue.
+  * If they are not given, the summary and description of the first review request in reviewboard are borrowed from the corresponding JIRA issue.
  
 Example:
 
 ```
- dev-support/request-patch-review.py -b origin/master -j TAJO-543
+$ ./request-patch-review.py -b origin/master -j TAJO-543
 ```
 
 ### <a name="UpdatePatch"></a>Update patch
  * Specify the remote branch against which the patch should be created (-b)
  * Specify the corresponding JIRA (--jira)
  * Specify the rb to be updated (-r)
- * Specify an optional summary (-s) and description (-d) for the reviewboard, if you want to update it
- * Specify an change description (-c) for the reviewboard, if you want to describe it. The change description indicates the description of what changed in this revision of the review request.
+ * Specify an optional summary (-s) and description (-d) for the reviewboard, if you want to update them.
+ * Specify a change description (-c) for the reviewboard, if you want to describe it. The change description is what changed in this revision of the review request.
  
 Example:
 
 ```
-$ dev-support/request-patch-review.py -b origin/master -j TAJO-543 -r 14081 -c "Add more unit tests"
+$ ./request-patch-review.py -b origin/master -j TAJO-543 -r 14081 -c "Add more unit tests"
 ```
 
 ## Preparation
@@ -115,7 +115,7 @@ sudo easy_install jira-python
 
  2. Configure JIRA username and password
  
-Include a ${HOME}/.jira.ini file in your $HOME directory that contains your Apache JIRA username and password
+Create a ${HOME}/.jira.ini file in your $HOME directory that contains your Apache JIRA username and password
 
 ```
 $ cat ~/.jira.ini
