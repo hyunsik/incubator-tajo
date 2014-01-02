@@ -648,6 +648,15 @@ public class LogicalPlan {
       return blockName;
     }
 
+    public void updateTargetList(LogicalPlanner planner, QueryBlock block, NewTargetListManager targetManager, LogicalNode node) throws PlanningException {
+
+      Set<TargetExpr> tobeRemoved = new HashSet<TargetExpr>();
+      for (TargetExpr target : targetManager.getRawTargets()) {
+
+        planner.createEvalTree(LogicalPlan.this, block, target.getExpr());
+      }
+    }
+
     ///////////////////////////////////////////////////////////////////////////
     //                 Target List Management Methods
     ///////////////////////////////////////////////////////////////////////////

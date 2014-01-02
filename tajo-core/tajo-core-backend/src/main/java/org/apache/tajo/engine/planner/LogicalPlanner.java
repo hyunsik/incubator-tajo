@@ -89,10 +89,12 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   public static class PlanContext {
     LogicalPlan plan;
     QueryBlock block;
+    NewTargetListManager targetListManager;
 
     public PlanContext(LogicalPlan plan, QueryBlock block) {
       this.plan = plan;
       this.block = block;
+      this.targetListManager = new NewTargetListManager();
     }
   }
 
@@ -139,7 +141,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     context.block.postVisit(current, stack);
     if (current instanceof Projectable) {
       // check and set evaluated targets and update in/out schemas
-      context.block.checkAndResolveTargets(current);
+      //context.block.checkAndResolveTargets(current);
+      context.block.updateTargetList(this, context.block, context.targetListManager, current);
     }
 
     return current;
@@ -187,6 +190,10 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       scanNode = new ScanNode(context.plan.newPID(), desc, relation.getAlias());
     } else {
       scanNode = new ScanNode(context.plan.newPID(), desc);
+    }
+
+    for (Column column : scanNode.getOutSchema().getColumns()) {
+      context.targetListManager.addTarget(new Target(new FieldEval(column)));
     }
 
     return scanNode;
@@ -657,6 +664,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
     if (!projection.isAllProjected()) {
       block.targetListManager = new TargetListManager(plan, projection);
+      context.targetListManager.addRawTargets(projection.getTargets());
     }
 
     if (!projection.hasChild()) {
