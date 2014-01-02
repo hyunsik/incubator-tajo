@@ -22,7 +22,7 @@
  * [Setup](#Setup)
  * [Usage](#Usage)
  * [Upload the first patch] (#UploadFirstPatch)
- * [Update patch] (#UpdatePatch)
+ * [Update the existing patch] (#UpdatePatch)
 * [Preparation] (#Preparation)
  * [Jira command line tool] (#JiraTool)
  * [Reviewboard] (#Reviewboard)
@@ -90,7 +90,7 @@ Example:
 $ ./request-patch-review.py -b origin/master -j TAJO-543
 ```
 
-### <a name="UpdatePatch"></a>Update patch
+### <a name="UpdatePatch"></a>Update the existing patch
  * Specify the remote branch against which the patch should be created (-b)
  * Specify the corresponding JIRA (--jira)
  * Specify the rb to be updated (-r)
@@ -103,7 +103,7 @@ Example:
 $ ./request-patch-review.py -b origin/master -j TAJO-543 -r 14081 -c "Add more unit tests"
 ```
 
-## Preparation
+## <a name="Preparation"></a>Preparation
 ### <a name="JiraTool"></a>JIRA command line tool
  1. Download the JIRA command line package
 
