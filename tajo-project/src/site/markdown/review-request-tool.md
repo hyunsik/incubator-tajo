@@ -1,8 +1,38 @@
-## Tajo JIRA and Reviewboard script
+<!--
+  Licensed to the Apache Software Foundation (ASF) under one
+  or more contributor license agreements.  See the NOTICE file
+  distributed with this work for additional information
+  regarding copyright ownership.  The ASF licenses this file
+  to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
 
-### Setup
- 1. Follow instructions here to setup the jira-python package
- 1. Follow instructions here to setup the reviewboard python tools
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+
+## Table of Contents
+
+* [Tajo Review Request Tool] (#ReviewTool)
+ * [Setup](#Setup)
+ * [Usage](#Usage)
+ * [Upload the first patch] (#UploadFirstPatch)
+ * [Update patch] (#UpdatePatch)
+* [Preparation] (#Preparation)
+ * [Jira command line tool] (#JiraTool)
+ * [Reviewboard] (#Reviewboard)
+* [FAQ] (#FAQ)
+
+## <a name="ReviewTool"></a>Tajo Review Request Tool
+
+### <a name="Setup"></a>Setup
+ 1. Follow instructions here to [setup the jira-python package] (#JiraTool)
+ 1. Follow instructions here to [setup the reviewboard python tools] (#Reviewboard)
  1. Install the argparse module
  
 Linux
@@ -17,7 +47,7 @@ Mac
 sudo easy_install argparse
 ```
 
-### Usage
+### <a name="Usage"></a>Usage
 
 ```
 $ dev-support/request-patch-review.py --help
@@ -30,7 +60,7 @@ Tajo patch review tool
 optional arguments:
   -h, --help            show this help message and exit
   -b BRANCH, --branch BRANCH
-                        Tracking branch to create diff against
+                        Tracking a remote branch to create diff against
   -j JIRA, --jira JIRA  JIRA corresponding to the reviewboard
   -s SUMMARY, --summary SUMMARY
                         Summary for the reviewboard
@@ -46,7 +76,7 @@ optional arguments:
   -db, --debug          Enable debug mode
 ```
 
-### Upload the first patch
+### <a name="UploadFirstPatch"></a> Upload the first patch
 **You should create a jira issue prior to a patch review request.**
 
  * Specify the branch against which the patch should be created (-b)
@@ -57,11 +87,11 @@ optional arguments:
 Example:
 
 ```
- dev-support/request-patch-review.py -b origin/trunk -j TAJO-543
+ dev-support/request-patch-review.py -b origin/master -j TAJO-543
 ```
 
-### Update patch
- * Specify the branch against which the patch should be created (-b)
+### <a name="UpdatePatch"></a>Update patch
+ * Specify the remote branch against which the patch should be created (-b)
  * Specify the corresponding JIRA (--jira)
  * Specify the rb to be updated (-r)
  * Specify an optional summary (-s) and description (-d) for the reviewboard, if you want to update it
@@ -70,10 +100,11 @@ Example:
 Example:
 
 ```
-$ dev-support/request-patch-review.py -b origin/trunk -j TAJO-543 -r 14081 -c "Add more unit tests"
+$ dev-support/request-patch-review.py -b origin/master -j TAJO-543 -r 14081 -c "Add more unit tests"
 ```
 
-### JIRA command line tool
+## Preparation
+### <a name="JiraTool"></a>JIRA command line tool
  1. Download the JIRA command line package
 
 Install the jira-python package
@@ -92,7 +123,7 @@ user=hyunsik
 password=***********
 ```
 
-### Reviewboard
+### <a name="Reviewboard"></a>Reviewboard
 This is a quick tutorial on using Review Board with Tajo.
 
 #### 1. Install the post-review tool
@@ -129,7 +160,7 @@ REPOSITORY = 'git://git.apache.org/incubator-tajo.git'
 TARGET_GROUPS = 'Tajo'
 ```
 
-### FAQ
+## <a name="FAR"></a>FAQ
 **When I run the script, it throws the following error and exits**
 
 ```
@@ -139,7 +170,7 @@ There don't seem to be any diffs
 
 There are 2 reasons that can cause this -
  * The code is not checked into your local branch
- * The -b branch is not pointing to the remote branch. In the example above, "trunk" is specified as the branch, which is the local branch. The correct value for the -b (--branch) option is the remote branch. "git branch -r" gives the list of the remote branch names.
+ * The -b branch is not pointing to the remote branch. In the example above, "master" is specified as the branch, which is the local branch. The correct value for the -b (--branch) option is the remote branch. "git branch -r" gives the list of the remote branch names.
  
 **When I run the script, it throws the following error and exits**
 
