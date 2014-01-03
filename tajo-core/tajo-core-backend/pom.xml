@@ -50,6 +50,14 @@
   </repositories>
 
   <build>
+    <testResources>
+      <testResource>
+        <directory>${project.basedir}/src/test/queries</directory>
+      </testResource>
+      <testResource>
+        <directory>${project.basedir}/src/test/results</directory>
+      </testResource>
+    </testResources>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -59,6 +67,45 @@
           <target>1.6</target>
           <encoding>${project.build.sourceEncoding}</encoding>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-resources-plugin</artifactId>
+        <version>2.6</version>
+        <!--
+        <executions>
+          <execution>
+            <id>add-test-queries</id>
+            <phase>process-test-resources</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.testOutputDirectory}/queries</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>${project.basedir}/src/test/queries</directory>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+          <execution>
+            <id>add-test-results</id>
+            <phase>process-test-resources</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.testOutputDirectory}/results</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>${project.basedir}/src/test/results</directory>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+        </executions>
+        -->
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
