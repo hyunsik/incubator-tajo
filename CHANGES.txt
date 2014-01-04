@@ -110,6 +110,11 @@ Release 0.8.0 - unreleased
 
   IMPROVEMENTS
 
+    TAJO-464: Rename the name 'partition', actually meaning shuffle to 
+    'shuffle'. (hyunsik)
+
+    TAJO-385: Refactoring TaskScheduler to assign multiple fragments. (jihoon)
+
     TAJO-468: Implements task's detail info page in WEB UI.
     (hyoungjunkim via hyunsik)
 
@@ -186,6 +191,12 @@ Release 0.8.0 - unreleased
     (Keuntae Park via jihoon)
 
   BUG FIXES
+
+    TAJO-470: Fetcher's finished time and file length is changed in WEB UI.
+    (hyoungjunkim via hyunsik)
+
+    TAJO-469: CTAS with no column definition will get  a NPE.
+    (Min Zhou via hyunsik)
 
     TAJO-467: Too many open FD when master failed. (hyoungjunkim via hyunsik)
 
