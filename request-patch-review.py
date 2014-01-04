@@ -27,7 +27,7 @@ def main():
   popt.add_argument('-s', '--summary', action='store', dest='summary', required=False, help='Summary for the reviewboard')
   popt.add_argument('-d', '--description', action='store', dest='description', required=False, help='Description for reviewboard')
   popt.add_argument('-c', '--change-description', action='store', dest='change_description', required=False, help='Description of what changed in this revision of the review request when updating an existing request')
-  popt.add_argument('-pa', '--patch-available', action='store_true', required=False, help='Transite the JIRA status to Patch Available. If its status is already Patch Available, it updates the status of the JIRA issue by transiting its status to Open and Patch Available sequentially.')
+  popt.add_argument('-pa', '--patch-available', action='store_true', dest='patch_available', required=False, help='Transite the JIRA status to Patch Available. If its status is already Patch Available, it updates the status of the JIRA issue by transiting its status to Open and Patch Available sequentially.')
   popt.add_argument('-r', '--rb', action='store', dest='reviewboard', required=False, help='Review board that needs to be updated')
   popt.add_argument('-t', '--testing-done', action='store', dest='testing', required=False, help='Text for the Testing Done section of the reviewboard')
   popt.add_argument('-db', '--debug', action='store_true', required=False, help='Enable debug mode')
@@ -88,7 +88,7 @@ def main():
   if opt.reviewboard and opt.change_description:
     rb_command=rb_command + " --change-description '" + opt.change_description + "'"
   if not opt.reviewboard: # if a review request is created
-    rb_command=rb_command + " --description \"" + description + "\""
+    rb_command=rb_command + " --description '" + description + "'"
   if opt.testing:
     rb_command=rb_command + " --testing-done=" + opt.testing
   if opt.debug:
@@ -132,7 +132,7 @@ def main():
   jira.add_comment(opt.jira, comment)
 
   # Transition the jira status to Patch Available
-  if opt.patch-available:
+  if opt.patch_available:
     if issue.status.id == '10002': # If the jira status is already Patch Available (id - 10002)
       jira.transition_issue(issue, '731') # Cancel (id - 731) the uploaded patch
       issue = jira.issue(opt.jira)
