@@ -54,22 +54,20 @@ import static org.junit.Assert.*;
  *
  * This class basically uses four resource directories:
  * <ul>
- *   <li>src/test/resources/dataset - contains a set of data files. All files in this directory are shared with
- *   all test classes.</li>
+ *   <li>src/test/resources/dataset - contains a set of data files. It contains sub directories, each of which
+ *   corresponds each test class. All data files in each sub directory can be used in the corresponding test class.</li>
  *
- *   <li>src/test/resources/ddls - contains a set of DDL files, each of which contains a create or drop table
- *   statement</li>
- *
- *   <li>src/test/resources/queries - This is the query directory. It contains sub directories,
- *   each of which corresponds each test class. All query files in each sub directory can be used
- *   in the corresponding test class.
+ *   <li>src/test/resources/queries - This is the query directory. It contains sub directories, each of which
+ *   corresponds each test class. All query files in each sub directory can be used in the corresponding test
+ *   class.</li>
  *
  *   <li>src/test/resources/results - This is the result directory. It contains sub directories, each of which
  *   corresponds each test class. All result files in each sub directory can be used in the corresponding test class.
+ *   </li>
  * </ul>
  *
- * For example, if you create a test class named <code>TestJoinQuery</code>,
- * you should create a pair of query and result set directories as follows:
+ * For example, if you create a test class named <code>TestJoinQuery</code>, you should create a pair of query and
+ * result set directories as follows:
  *
  * <pre>
  *   src-|
@@ -93,22 +91,28 @@ import static org.junit.Assert.*;
  * <code>QueryTestCaseBase</code> basically provides the following methods:
  * <ul>
  *  <li><code>{@link #executeQuery()}</code> - executes a corresponding query and returns an ResultSet instance</li>
- *  <li><code>{@link #executeQuery(String)}</code> - executes a given query file found in the corresponding
- *  directory</li>
- *  <li><code>assertResultSet()</code> - check if the query result is equivalent to the corresponding result</code></li>
+ *  <li><code>{@link #executeQuery(String)}</code> - executes a given query file included in the corresponding query
+ *  file in the current class's query directory</li>
+ *  <li><code>assertResultSet()</code> - check if the query result is equivalent to the expected result included
+ *  in the corresponding result file in the current class's result directory.</li>
  *  <li><code>cleanQuery()</code> - clean up all resources</li>
  *  <li><code>executeDDL()</code> - execute a DDL query like create or drop table.</li>
  * </ul>
  *
- * {@link #executeQuery()} and {@link #assertResultSet(java.sql.ResultSet)} methods automatically finds a query file
- * to be executed and a result to be compared, which are corresponding to the running class and method.
- *
  * In order to make use of the above methods, query files and results file must be as follows:
  * <ul>
- *   <li>Each query file must have the file extension '.sql'.</li>
- *   <li>Each result file must have the file extension '.result'</li>
- *   <li>A pair of query and result must be placed on the same subdirectory and must have the same filename except
- *   for extensions</li>
+ *  <li>Each query file must be located on the subdirectory whose structure must be src/resources/queries/${ClassName},
+ *  where ${ClassName} indicates an actual test class's simple name.</li>
+ *  <li>Each result file must be located on the subdirectory whose structure must be src/resources/results/${ClassName},
+ *  where ${ClassName} indicates an actual test class's simple name.</li>
+ * </ul>
+ *
+ * Especially, {@link #executeQuery() and {@link #assertResultSet(java.sql.ResultSet)} methods automatically finds
+ * a query file to be executed and a result to be compared, which are corresponding to the running class and method.
+ * For them, query and result files additionally must be follows as:
+ * <ul>
+ *  <li>Each result file must have the file extension '.result'</li>
+ *  <li>Each query file must have the file extension '.sql'.</li>
  * </ul>
  */
 public class QueryTestCaseBase {
