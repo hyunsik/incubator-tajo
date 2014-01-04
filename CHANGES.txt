@@ -110,6 +110,16 @@ Release 0.8.0 - unreleased
 
   IMPROVEMENTS
 
+    TAJO-464: Rename the name 'partition', actually meaning shuffle to 
+    'shuffle'. (hyunsik)
+
+    TAJO-385: Refactoring TaskScheduler to assign multiple fragments. (jihoon)
+
+    TAJO-468: Implements task's detail info page in WEB UI.
+    (hyoungjunkim via hyunsik)
+
+    TAJO-466: Supporting TIME types in DatumFactory.createFromInt8. (DaeMyung Kang via jihoon)
+
     TAJO-458: Visit methods of LogicalPlanVisitor should take a query block
     as parameter. (hyunsik)
 
@@ -181,6 +191,8 @@ Release 0.8.0 - unreleased
     (Keuntae Park via jihoon)
 
   BUG FIXES
+
+    TAJO-467: Too many open FD when master failed. (hyoungjunkim via hyunsik)
 
     TAJO-455: Throw PlanningException when Creating table with Partition
     exception COLUMN. (DaeMyung Kang via hyunsik)
