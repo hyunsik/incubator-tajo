@@ -51,17 +51,19 @@ sudo easy_install argparse
 
 ```
 $ ./request-patch-review.py --help
-usage: request-patch-review.py [-h] -b BRANCH -j JIRA [-s SUMMARY]
-                               [-d DESCRIPTION] [-c CHANGE_DESCRIPTION]
+usage: request-patch-review.py [-h] -b BRANCH -j JIRA [-skip-rb] [-s SUMMARY]
+                               [-d DESCRIPTION] [-c CHANGE_DESCRIPTION] [-pa]
                                [-r REVIEWBOARD] [-t TESTING] [-db]
 
-Tajo patch review tool
+Kafka patch review tool
 
 optional arguments:
   -h, --help            show this help message and exit
   -b BRANCH, --branch BRANCH
-                        Tracking a remote branch to create diff against
+                        Tracking branch to create diff against
   -j JIRA, --jira JIRA  JIRA corresponding to the reviewboard
+  -skip-rb, --skip-reviewboard
+                        Skip a review request to reviewboard.
   -s SUMMARY, --summary SUMMARY
                         Summary for the reviewboard
   -d DESCRIPTION, --description DESCRIPTION
@@ -69,11 +71,17 @@ optional arguments:
   -c CHANGE_DESCRIPTION, --change-description CHANGE_DESCRIPTION
                         Description of what changed in this revision of the
                         review request when updating an existing request
+  -pa, --patch-available
+                        Transite the JIRA status to Patch Available. If its
+                        status is already Patch Available, it updates the
+                        status of the JIRA issue by transiting its status to
+                        Open and Patch Available sequentially.
   -r REVIEWBOARD, --rb REVIEWBOARD
                         Review board that needs to be updated
   -t TESTING, --testing-done TESTING
                         Text for the Testing Done section of the reviewboard
   -db, --debug          Enable debug mode
+
 ```
 
 ### <a name="UploadFirstPatch"></a> Upload the first patch
