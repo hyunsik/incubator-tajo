@@ -137,7 +137,7 @@ def main():
 
   # Transition the jira status to Patch Available
   if opt.patch_available:
-    if issue.status.id == '10002': # If the jira status is already Patch Available (id - 10002)
+    if issue.fields.status.id == '10002': # If the jira status is already Patch Available (id - 10002)
       jira.transition_issue(issue, '731') # Cancel (id - 731) the uploaded patch
       issue = jira.issue(opt.jira)
     jira.transition_issue(issue, '10002')
