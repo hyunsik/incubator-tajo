@@ -1,0 +1,1 @@
+select o_custkey as num from orders union select c_custkey as num from customer;

@@ -19,39 +19,22 @@
 package org.apache.tajo.engine.query;
 
 import org.apache.tajo.QueryTestCaseBase;
-import org.apache.tajo.util.FileUtil;
 import org.junit.Test;
 
-import java.io.File;
-import java.io.IOException;
 import java.sql.ResultSet;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
 public class TestCaseByCases extends QueryTestCaseBase {
-
-  public TestCaseByCases() throws IOException {
-  }
-
   @Test
   public final void testTAJO415Case() throws Exception {
     ResultSet res = executeQuery();
-    verifyQuery(res);
+    assertResultSet(res);
     cleanupQuery(res);
   }
 
   @Test
   public final void testTAJO418Case() throws Exception {
-    ResultSet res = testingCluster.execute(FileUtil.readTextFile(new File("src/test/queries/tajo418_case.sql")));
-    try {
-      assertTrue(res.next());
-      assertEquals("R", res.getString(1));
-      assertEquals("F", res.getString(2));
-      assertFalse(res.next());
-    } finally {
-      res.close();
-    }
+    ResultSet res = executeQuery();
+    assertResultSet(res);
+    cleanupQuery(res);
   }
 }
