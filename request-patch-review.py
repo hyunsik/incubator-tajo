@@ -66,7 +66,7 @@ def main():
   p.close()
 
   # update the specified remote branch
-  git_remote_update="git fetch " + remote_name + " " + branch_name
+  git_remote_update="git fetch " + remote_name
   print "Updating your remote branche " + opt.branch + " to pull the latest changes"
   p=os.popen(git_remote_update)
   p.close()
