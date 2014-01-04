@@ -117,7 +117,7 @@ public class LogicalOptimizer {
     public static JoinGraphContext buildJoinGraph(LogicalPlan plan, LogicalPlan.QueryBlock block)
         throws PlanningException {
       JoinGraphContext joinGraphContext = new JoinGraphContext();
-      instance.visitFromQueryBlock(joinGraphContext, plan, block);
+      instance.visit(joinGraphContext, plan, block);
       return joinGraphContext;
     }
 
@@ -163,7 +163,7 @@ public class LogicalOptimizer {
 
     public static String buildJoinOrderString(LogicalPlan plan, LogicalPlan.QueryBlock block) throws PlanningException {
       StringBuilder originalOrder = new StringBuilder();
-      instance.visitFromQueryBlock(originalOrder, plan, block);
+      instance.visit(originalOrder, plan, block);
       return originalOrder.toString();
     }
 
@@ -222,7 +222,7 @@ public class LogicalOptimizer {
 
     public static double computeCost(LogicalPlan plan, LogicalPlan.QueryBlock block) throws PlanningException {
       CostContext costContext = new CostContext();
-      instance.visitFromQueryBlock(costContext, plan, block);
+      instance.visit(costContext, plan, block);
       return costContext.accumulatedCost;
     }
 

@@ -38,9 +38,6 @@
 	  <module>tajo-core-pullserver</module>
   </modules>
 
-  <repositories>
-  </repositories>
-
   <build>
     <plugins>
       <plugin>

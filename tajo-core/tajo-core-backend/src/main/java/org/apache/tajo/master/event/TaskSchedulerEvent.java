@@ -30,9 +30,9 @@ public abstract class TaskSchedulerEvent extends AbstractEvent<EventType> {
 
   protected final ExecutionBlockId executionBlockId;
 
-  public TaskSchedulerEvent(EventType eventType, ExecutionBlockId queryBlockId) {
+  public TaskSchedulerEvent(EventType eventType, ExecutionBlockId executionBlockId) {
     super(eventType);
-    this.executionBlockId = queryBlockId;
+    this.executionBlockId = executionBlockId;
   }
 
   public ExecutionBlockId getExecutionBlockId() {

@@ -25,9 +25,9 @@ import org.apache.hadoop.yarn.state.*;
 import org.apache.tajo.QueryUnitAttemptId;
 import org.apache.tajo.TajoProtos.TaskAttemptState;
 import org.apache.tajo.catalog.statistics.TableStats;
-import org.apache.tajo.ipc.TajoWorkerProtocol.Partition;
 import org.apache.tajo.ipc.TajoWorkerProtocol.TaskCompletionReport;
 import org.apache.tajo.master.event.*;
+import org.apache.tajo.master.event.QueryUnitAttemptScheduleEvent.QueryUnitAttemptScheduleContext;
 import org.apache.tajo.master.event.TaskSchedulerEvent.EventType;
 import org.apache.tajo.master.querymaster.QueryUnit.IntermediateEntry;
 import org.apache.tajo.util.TajoIdUtils;
@@ -38,6 +38,8 @@ import java.util.List;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+import static org.apache.tajo.ipc.TajoWorkerProtocol.ShuffleFileOutput;
 
 public class QueryUnitAttempt implements EventHandler<TaskAttemptEvent> {
 
@@ -57,6 +59,8 @@ public class QueryUnitAttempt implements EventHandler<TaskAttemptEvent> {
   private final Lock writeLock;
 
   private final List<String> diagnostics = new ArrayList<String>();
+
+  private final QueryUnitAttemptScheduleContext scheduleContext;
 
   protected static final StateMachineFactory
       <QueryUnitAttempt, TaskAttemptState, TaskAttemptEventType, TaskAttemptEvent>
@@ -109,8 +113,10 @@ public class QueryUnitAttempt implements EventHandler<TaskAttemptEvent> {
     stateMachine;
 
 
-  public QueryUnitAttempt(final QueryUnitAttemptId id, final QueryUnit queryUnit,
+  public QueryUnitAttempt(final QueryUnitAttemptScheduleContext scheduleContext,
+                          final QueryUnitAttemptId id, final QueryUnit queryUnit,
                           final EventHandler eventHandler) {
+    this.scheduleContext = scheduleContext;
     this.id = id;
     this.expire = QueryUnitAttempt.EXPIRE_TIME;
     this.queryUnit = queryUnit;
@@ -181,13 +187,13 @@ public class QueryUnitAttempt implements EventHandler<TaskAttemptEvent> {
   }
 
   private void fillTaskStatistics(TaskCompletionReport report) {
-    if (report.getPartitionsCount() > 0) {
-      this.getQueryUnit().setPartitions(report.getPartitionsList());
+    if (report.getShuffleFileOutputsCount() > 0) {
+      this.getQueryUnit().setPartitions(report.getShuffleFileOutputsList());
 
       List<IntermediateEntry> partitions = new ArrayList<IntermediateEntry>();
-      for (Partition p : report.getPartitionsList()) {
+      for (ShuffleFileOutput p : report.getShuffleFileOutputsList()) {
         IntermediateEntry entry = new IntermediateEntry(getId().getQueryUnitId().getId(),
-            getId().getId(), p.getPartitionKey(), getHost(), getPullServerPort());
+            getId().getId(), p.getPartId(), getHost(), getPullServerPort());
         partitions.add(entry);
       }
       this.getQueryUnit().setIntermediateData(partitions);
@@ -203,9 +209,9 @@ public class QueryUnitAttempt implements EventHandler<TaskAttemptEvent> {
     @Override
     public void transition(QueryUnitAttempt taskAttempt,
                            TaskAttemptEvent taskAttemptEvent) {
-      TaskAttemptScheduleEvent castEvent = (TaskAttemptScheduleEvent) taskAttemptEvent;
-      taskAttempt.eventHandler.handle(
-          TaskSchedulerEventFactory.getTaskSchedulerEvent(castEvent.getConf(), taskAttempt, EventType.T_SCHEDULE));
+      taskAttempt.eventHandler.handle(new QueryUnitAttemptScheduleEvent(
+          EventType.T_SCHEDULE, taskAttempt.getQueryUnit().getId().getExecutionBlockId(),
+          taskAttempt.scheduleContext, taskAttempt));
     }
   }
 

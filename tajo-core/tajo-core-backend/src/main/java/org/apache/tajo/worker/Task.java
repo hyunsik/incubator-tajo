@@ -93,6 +93,9 @@ public class Task {
   private static int failed = 0;
   private static int succeeded = 0;
 
+  private long startTime;
+  private long finishTime;
+
   /**
    * flag that indicates whether progress update needs to be sent to parent.
    * If true, it has been set. If false, it has been reset.
@@ -101,7 +104,7 @@ public class Task {
   private AtomicBoolean progressFlag = new AtomicBoolean(false);
 
   // TODO - to be refactored
-  private PartitionType partitionType = null;
+  private ShuffleType shuffleType = null;
   private Schema finalSchema = null;
   private TupleComparator sortComp = null;
 
@@ -160,9 +163,9 @@ public class Task {
     interQuery = request.getProto().getInterQuery();
     if (interQuery) {
       context.setInterQuery();
-      this.partitionType = context.getDataChannel().getPartitionType();
+      this.shuffleType = context.getDataChannel().getShuffleType();
 
-      if (partitionType == PartitionType.RANGE_PARTITION) {
+      if (shuffleType == ShuffleType.RANGE_SHUFFLE) {
         SortNode sortNode = (SortNode) PlannerUtil.findTopNode(plan, NodeType.SORT);
         this.finalSchema = PlannerUtil.sortSpecsToSchema(sortNode.getSortKeys());
         this.sortComp = new TupleComparator(finalSchema, sortNode.getSortKeys());
@@ -182,7 +185,7 @@ public class Task {
     LOG.info("==================================");
     LOG.info("* Subquery " + request.getId() + " is initialized");
     LOG.info("* InterQuery: " + interQuery
-        + (interQuery ? ", Use " + this.partitionType  + " partitioning":""));
+        + (interQuery ? ", Use " + this.shuffleType + " partitioning":""));
 
     LOG.info("* Fragments (num: " + request.getFragments().size() + ")");
     LOG.info("* Fetches (total:" + request.getFetches().size() + ") :");
@@ -223,6 +226,10 @@ public class Task {
     return taskId;
   }
 
+  public static Log getLog() {
+    return LOG;
+  }
+
   // getters and setters for flag
   void setProgressFlag() {
     progressFlag.set(true);
@@ -253,6 +260,10 @@ public class Task {
   public void setState(TaskAttemptState status) {
     context.setState(status);
     setProgressFlag();
+  }
+
+  public TaskAttemptContext getContext() {
+    return context;
   }
 
   public boolean hasFetchPhase() {
@@ -315,13 +326,13 @@ public class Task {
       builder.setResultStats(new TableStats().getProto());
     }
 
-    Iterator<Entry<Integer,String>> it = context.getRepartitions();
+    Iterator<Entry<Integer,String>> it = context.getShuffleFileOutputs();
     if (it.hasNext()) {
       do {
         Entry<Integer,String> entry = it.next();
-        Partition.Builder part = Partition.newBuilder();
-        part.setPartitionKey(entry.getKey());
-        builder.addPartitions(part.build());
+        ShuffleFileOutput.Builder part = ShuffleFileOutput.newBuilder();
+        part.setPartId(entry.getKey());
+        builder.addShuffleFileOutputs(part.build());
       } while (it.hasNext());
     }
 
@@ -340,6 +351,7 @@ public class Task {
   }
 
   public void run() {
+    startTime = System.currentTimeMillis();
     String errorMessage = null;
     try {
       context.setState(TaskAttemptState.TA_RUNNING);
@@ -365,7 +377,6 @@ public class Task {
       errorMessage = ExceptionUtils.getStackTrace(e);
       LOG.error(errorMessage);
       aborted = true;
-
     } finally {
       setProgressFlag();
       stopped = true;
@@ -373,6 +384,11 @@ public class Task {
 
       if (killed || aborted) {
         context.setProgress(0.0f);
+        if(killed) {
+          context.setState(TaskAttemptState.TA_KILLED);
+        } else {
+          context.setState(TaskAttemptState.TA_FAILED);
+        }
 
         TaskFatalErrorReport.Builder errorBuilder =
             TaskFatalErrorReport.newBuilder()
@@ -394,6 +410,7 @@ public class Task {
       } else {
         // if successful
         context.setProgress(1.0f);
+        context.setState(TaskAttemptState.TA_SUCCEEDED);
 
         // stopping the status report
         try {
@@ -407,6 +424,8 @@ public class Task {
         succeeded++;
       }
 
+      finishTime = System.currentTimeMillis();
+
       cleanupTask();
       LOG.info("Task Counter - total:" + completed + ", succeeded: " + succeeded
           + ", failed: " + failed);
@@ -414,7 +433,48 @@ public class Task {
   }
 
   public void cleanupTask() {
+    taskRunnerContext.addTaskHistory(getId(), getTaskHistory());
     taskRunnerContext.getTasks().remove(getId());
+  }
+
+  public TaskHistory getTaskHistory() {
+    TaskHistory taskHistory = new TaskHistory();
+    taskHistory.setStartTime(startTime);
+    taskHistory.setFinishTime(finishTime);
+    if (context.getOutputPath() != null) {
+      taskHistory.setOutputPath(context.getOutputPath().toString());
+    }
+
+    if (context.getWorkDir() != null) {
+      taskHistory.setWorkingPath(context.getWorkDir().toString());
+    }
+
+    try {
+      taskHistory.setStatus(getStatus().toString());
+      taskHistory.setProgress(context.getProgress());
+
+      if (hasFetchPhase()) {
+        Map<URI, TaskHistory.FetcherHistory> fetcherHistories = new HashMap<URI, TaskHistory.FetcherHistory>();
+
+        for(Fetcher eachFetcher: fetcherRunners) {
+          TaskHistory.FetcherHistory fetcherHistory = new TaskHistory.FetcherHistory();
+          fetcherHistory.setStartTime(eachFetcher.getStartTime());
+          fetcherHistory.setFinishTime(eachFetcher.getFinishTime());
+          fetcherHistory.setStatus(eachFetcher.getStatus());
+          fetcherHistory.setUri(eachFetcher.getURI().toString());
+          fetcherHistory.setFileLen(eachFetcher.getFileLen());
+
+          fetcherHistories.put(eachFetcher.getURI(), fetcherHistory);
+        }
+
+        taskHistory.setFetchers(fetcherHistories);
+      }
+    } catch (Exception e) {
+      taskHistory.setStatus(StringUtils.stringifyException(e));
+      e.printStackTrace();
+    }
+
+    return taskHistory;
   }
 
   public int hashCode() {

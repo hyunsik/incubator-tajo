@@ -229,7 +229,7 @@ public class GlobalEngine extends AbstractService {
     }
 
     VerificationState state = new VerificationState();
-    verifier.visitFromQueryBlock(state, plan, plan.getRootBlock());
+    verifier.visit(state, plan, plan.getRootBlock());
 
     if (!state.verified()) {
       StringBuilder sb = new StringBuilder();
@@ -371,6 +371,9 @@ public class GlobalEngine extends AbstractService {
       String tableName = storeTableNode.getTableName();
       queryContext.setOutputTable(tableName);
       queryContext.setOutputPath(new Path(TajoConf.getWarehouseDir(context.getConf()), tableName));
+      if(storeTableNode.getPartitions() != null) {
+        queryContext.setPartitions(storeTableNode.getPartitions());
+      }
       queryContext.setCreateTable();
     }
   }

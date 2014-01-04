@@ -18,42 +18,26 @@
 
 package org.apache.tajo.engine.planner.logical;
 
-import com.google.common.base.Preconditions;
 import com.google.gson.annotations.Expose;
-import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Options;
 import org.apache.tajo.catalog.partition.PartitionDesc;
 import org.apache.tajo.engine.planner.PlanString;
 import org.apache.tajo.util.TUtil;
 
 import static org.apache.tajo.catalog.proto.CatalogProtos.StoreType;
-import static org.apache.tajo.ipc.TajoWorkerProtocol.PartitionType;
-import static org.apache.tajo.ipc.TajoWorkerProtocol.PartitionType.LIST_PARTITION;
 
-public class StoreTableNode extends UnaryNode implements Cloneable {
-  @Expose private String tableName;
-  @Expose private StoreType storageType = StoreType.CSV;
-  @Expose private PartitionType partitionType;
-  @Expose private int numPartitions;
-  @Expose private Column [] partitionKeys;
-  @Expose private Options options;
+public class StoreTableNode extends PersistentStoreNode implements Cloneable {
   @Expose private boolean isCreatedTable = false;
   @Expose private boolean isOverwritten = false;
   @Expose private PartitionDesc partitionDesc;
 
   public StoreTableNode(int pid, String tableName) {
-    super(pid, NodeType.STORE);
-    this.tableName = tableName;
+    super(pid, tableName);
   }
 
   public StoreTableNode(int pid, String tableName, PartitionDesc partitionDesc) {
-    super(pid, NodeType.STORE);
-    this.tableName = tableName;
+    super(pid, tableName);
     this.partitionDesc = partitionDesc;
-  }
-
-  public final String getTableName() {
-    return this.tableName;
   }
 
   public void setStorageType(StoreType storageType) {
@@ -62,39 +46,6 @@ public class StoreTableNode extends UnaryNode implements Cloneable {
 
   public StoreType getStorageType() {
     return this.storageType;
-  }
-    
-  public final int getNumPartitions() {
-    return this.numPartitions;
-  }
-  
-  public final boolean hasPartitionKey() {
-    return this.partitionKeys != null;
-  }
-  
-  public final Column [] getPartitionKeys() {
-    return this.partitionKeys;
-  }
-
-  public final void setDefaultParition() {
-    this.partitionType = LIST_PARTITION;
-    this.partitionKeys = null;
-    this.numPartitions = 1;
-  }
-  
-  public final void setPartitions(PartitionType type, Column [] keys, int numPartitions) {
-    Preconditions.checkArgument(keys.length >= 0, 
-        "At least one partition key must be specified.");
-    Preconditions.checkArgument(numPartitions > 0,
-        "The number of partitions must be positive: %s", numPartitions);
-
-    this.partitionType = type;
-    this.partitionKeys = keys;
-    this.numPartitions = numPartitions;
-  }
-
-  public PartitionType getPartitionType() {
-    return this.partitionType;
   }
 
   public boolean hasOptions() {
@@ -139,11 +90,6 @@ public class StoreTableNode extends UnaryNode implements Cloneable {
     if (obj instanceof StoreTableNode) {
       StoreTableNode other = (StoreTableNode) obj;
       boolean eq = super.equals(other);
-      eq = eq && this.tableName.equals(other.tableName);
-      eq = eq && this.storageType.equals(other.storageType);
-      eq = eq && this.numPartitions == other.numPartitions;
-      eq = eq && TUtil.checkEquals(partitionKeys, other.partitionKeys);
-      eq = eq && TUtil.checkEquals(options, other.options);
       eq = eq && isCreatedTable == other.isCreatedTable;
       eq = eq && isOverwritten == other.isOverwritten;
       eq = eq && TUtil.checkEquals(partitionDesc, other.partitionDesc);
@@ -156,11 +102,6 @@ public class StoreTableNode extends UnaryNode implements Cloneable {
   @Override
   public Object clone() throws CloneNotSupportedException {
     StoreTableNode store = (StoreTableNode) super.clone();
-    store.tableName = tableName;
-    store.storageType = storageType != null ? storageType : null;
-    store.numPartitions = numPartitions;
-    store.partitionKeys = partitionKeys != null ? partitionKeys.clone() : null;
-    store.options = options != null ? (Options) options.clone() : null;
     store.isCreatedTable = isCreatedTable;
     store.isOverwritten = isOverwritten;
     store.partitionDesc = partitionDesc;
@@ -172,17 +113,6 @@ public class StoreTableNode extends UnaryNode implements Cloneable {
     sb.append("\"Store\": {\"table\": \""+tableName);
     if (storageType != null) {
       sb.append(", storage: "+ storageType.name());
-    }
-    sb.append(", partnum: ").append(numPartitions).append("}")
-    .append(", ");
-    if (partitionKeys != null) {
-      sb.append("\"partition keys: [");
-      for (int i = 0; i < partitionKeys.length; i++) {
-        sb.append(partitionKeys[i]);
-        if (i < partitionKeys.length - 1)
-          sb.append(",");
-      }
-      sb.append("],");
     }
     
     sb.append("\n  \"out schema\": ").append(getOutSchema()).append(",")
