@@ -303,7 +303,7 @@ public class SQLAnalyzer extends SQLParserBaseVisitor<Expr> {
     Sort.SortSpec specs [] = new Sort.SortSpec[size];
     for (int i = 0; i < size; i++) {
       SQLParser.Sort_specifierContext specContext = ctx.sort_specifier_list().sort_specifier(i);
-      ColumnReferenceExpr column = visitColumn_reference(specContext.column);
+      Expr column = visitRow_value_predicand(specContext.key);
       specs[i] = new Sort.SortSpec(column);
       if (specContext.order_specification() != null) {
         if (specContext.order.DESC() != null) {

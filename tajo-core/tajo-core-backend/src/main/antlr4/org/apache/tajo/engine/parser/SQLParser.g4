@@ -1123,7 +1123,7 @@ sort_specifier_list
   ;
 
 sort_specifier
-  : column=column_reference order=order_specification? null_order=null_ordering?
+  : key=row_value_predicand order=order_specification? null_order=null_ordering?
   ;
 
 order_specification

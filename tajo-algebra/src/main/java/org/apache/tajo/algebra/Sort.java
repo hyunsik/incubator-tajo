@@ -49,12 +49,12 @@ public class Sort extends UnaryOperator {
   }
 
   public static class SortSpec {
-    private ColumnReferenceExpr key;
+    private Expr key;
     private boolean asc = true;
     @SerializedName("null_first")
     private boolean nullFirst = false;
 
-    public SortSpec(final ColumnReferenceExpr key) {
+    public SortSpec(final Expr key) {
       this.key = key;
     }
 
@@ -88,7 +88,7 @@ public class Sort extends UnaryOperator {
       this.nullFirst = true;
     }
 
-    public final ColumnReferenceExpr getKey() {
+    public final Expr getKey() {
       return this.key;
     }
 

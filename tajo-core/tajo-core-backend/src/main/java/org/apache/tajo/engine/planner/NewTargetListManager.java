@@ -18,13 +18,11 @@
 
 package org.apache.tajo.engine.planner;
 
-import com.google.common.collect.BiMap;
-import com.google.common.collect.HashBiMap;
-import com.google.common.collect.ImmutableSet;
 import org.apache.tajo.algebra.ColumnReferenceExpr;
 import org.apache.tajo.algebra.Expr;
 import org.apache.tajo.algebra.OpType;
 import org.apache.tajo.algebra.TargetExpr;
+import org.apache.tajo.engine.eval.EvalNode;
 import org.apache.tajo.engine.eval.FieldEval;
 
 import java.util.*;
@@ -33,12 +31,10 @@ import java.util.*;
  * It manages a list of targets.
  */
 public class NewTargetListManager {
-  private LinkedHashMap<String, Target> targets = new LinkedHashMap<String, Target>();
+  private Map<String, EvalNode> nameToEvalMap = new LinkedHashMap<String, EvalNode>();
+  private LinkedHashMap<String, Expr> nameToExprMap = new LinkedHashMap<String, Expr>();
+  private LinkedHashMap<Expr, String> exprToNameMap = new LinkedHashMap<Expr, String>();
   private LinkedHashMap<String, Boolean> resolvedFlags = new LinkedHashMap<String, Boolean>();
-
-  private Set<TargetExpr> rawTargets = new LinkedHashSet<TargetExpr>();
-  private BiMap<String, TargetExpr> nameToRawTargets = HashBiMap.create();
-  private Map<TargetExpr, Target> rawsToTargets = new LinkedHashMap<TargetExpr, Target>();
 
   private LogicalPlan plan;
 
@@ -46,9 +42,29 @@ public class NewTargetListManager {
     this.plan = plan;
   }
 
+  public boolean isResolved(String name) {
+    return resolvedFlags.containsKey(name) && resolvedFlags.get(name);
+  }
+
+  public String addExpr(String alias, Expr expr) {
+    if (exprToNameMap.containsKey(expr)) {
+      return exprToNameMap.get(expr);
+    } else {
+      nameToExprMap.put(alias, expr);
+      exprToNameMap.put(expr, alias);
+      resolvedFlags.put(alias, false);
+      return alias;
+    }
+  }
+
   public String addExpr(Expr expr) {
-    String name = plan.newNonameColumnName(expr.getType().name());
-    return addRawTarget(new TargetExpr(expr, name));
+    String name;
+    if (expr.getType() == OpType.Column) {
+      name = ((ColumnReferenceExpr)expr).getCanonicalName();
+    } else {
+      name = plan.newNonameColumnName(expr.getType().name());
+    }
+    return addExpr(name, expr);
   }
 
   public String [] addExprArray(Expr[] exprs) {
@@ -59,85 +75,68 @@ public class NewTargetListManager {
     return names;
   }
 
-  public String addRawTarget(TargetExpr targetExpr) {
-    if (nameToRawTargets.containsValue(targetExpr)) {
-      return nameToRawTargets.inverse().get(targetExpr);
+  public String addTargetExpr(TargetExpr targetExpr) {
+    if (targetExpr.hasAlias()) {
+      return addExpr(targetExpr.getAlias(), targetExpr.getExpr());
     } else {
-      String name;
-      if (targetExpr.hasAlias()) {
-        name = targetExpr.getAlias();
-      } else {
-        if (targetExpr.getExpr().getType() == OpType.Column) {
-          name = ((ColumnReferenceExpr)targetExpr.getExpr()).getCanonicalName();
-        } else {
-          name = plan.newNonameColumnName(targetExpr.getExpr().getType().name());
-        }
-      }
-      targetExpr.setAlias(name);
-      rawTargets.add(targetExpr);
-      nameToRawTargets.put(targetExpr.getAlias(), targetExpr);
-      return targetExpr.getAlias();
+      return addExpr(targetExpr.getExpr());
     }
   }
 
-  public Target [] getTargets() {
-    return targets.values().toArray(new Target[targets.size()]);
-  }
-
-  public String [] addRawTargetArray(TargetExpr[] targets) {
+  public String [] addTargetExprArray(TargetExpr[] targets) {
     String [] names = new String[targets.length];
     for (int i = 0; i < targets.length; i++) {
-      names[i] = addRawTarget(targets[i]);
+      names[i] = addTargetExpr(targets[i]);
     }
     return names;
   }
 
   public Collection<TargetExpr> getRawTargets() {
-    return ImmutableSet.copyOf(rawTargets);
+    List<TargetExpr> targetExprList = new ArrayList<TargetExpr>();
+    for (Map.Entry<String, Expr> entry: nameToExprMap.entrySet()) {
+      targetExprList.add(new TargetExpr(entry.getValue(), entry.getKey()));
+    }
+    return targetExprList;
   }
 
-
-  public void switchTarget(String name, Target target) {
-    switchTarget(nameToRawTargets.get(name), target);
-  }
-
-  public void switchTarget(TargetExpr rawTarget, Target target) {
-    rawsToTargets.put(rawTarget, target);
-    targets.put(target.getCanonicalName(), target);
-
-    rawTargets.remove(rawTarget);
-    nameToRawTargets.remove(rawTarget.getAlias());
-
-    resolvedFlags.put(rawTarget.getAlias(), true);
+  public void switchTarget(String name, EvalNode evalNode) {
+    nameToEvalMap.put(name, evalNode);
+//    Expr expr = nameToExprMap.remove(name);
+//    exprToNameMap.remove(expr);
+    resolvedFlags.put(name, true);
   }
 
   public Target getTarget(String name) {
-//    if (targets.containsKey(name)) {
-      return targets.get(name);
-//    } else {
-//      if (nameToRawTargets.containsKey(name)) {
-//        try {
-//          EvalNode evalNode = planner.createEvalTree(plan, block, nameToRawTargets.get(name));
-//          Target target = new Target(evalNode, name);
-//          targets.put(name, target);
-//          nameToRawTargets.remove(name);
-//        } catch (PlanningException e) {
-//          e.printStackTrace();
-//        }
-//      }
-//    }
-//    return null;
-  }
-
-  public Target getTarget(TargetExpr target) {
-    if (resolvedFlags.containsKey(target.getAlias()) && resolvedFlags.get(target.getAlias())) {
-      return new Target(new FieldEval(targets.get(target.getAlias()).getColumnSchema()), target.getAlias());
+    if (resolvedFlags.containsKey(name)) {
+      return new Target(new FieldEval(name, nameToEvalMap.get(name).getValueType()));
     } else {
-      return rawsToTargets.get(target);
+      if (nameToEvalMap.containsKey(name)) {
+        return new Target(nameToEvalMap.get(name), name);
+      } else {
+        return null;
+      }
     }
   }
 
+  public Target getTarget(Expr expr) {
+    if (exprToNameMap.containsKey(expr)) {
+      String name = exprToNameMap.get(expr);
+      if (nameToEvalMap.containsKey(name)) {
+        EvalNode evalNode = nameToEvalMap.get(name);
+        return new Target(evalNode, name);
+      } else {
+        return null;
+      }
+    } else {
+      return null;
+    }
+  }
+
+  public TargetExpr getRawTarget(String name) {
+    return new TargetExpr(nameToExprMap.get(name), name);
+  }
+
   public String toString() {
-    return "rawTargets=" + nameToRawTargets.size() + ", targets=" + targets.size();
+    return "rawTargets=" + nameToExprMap.size() + ", targets=" + nameToEvalMap.size();
   }
 }
