@@ -128,11 +128,11 @@ public class TestEvalTree {
   public static Target[] getRawTargets(String query) throws PlanningException {
     Expr expr = analyzer.parse(query);
     LogicalPlan plan = planner.createPlan(expr);
-    Target [] targets = plan.getRootBlock().getTargetListManager().getUnresolvedTargets();
-    for (Target t : targets) {
-      assertJsonSerDer(t.getEvalTree());
-    }
-    return targets;
+//    Target [] targets = plan.getRootBlock().getTargetListManager().getUnresolvedTargets();
+//    for (Target t : targets) {
+//      assertJsonSerDer(t.getEvalTree());
+//    }
+    return null;
   }
 
   public static EvalNode getRootSelection(String query) {

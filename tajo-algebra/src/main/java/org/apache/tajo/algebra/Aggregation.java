@@ -73,19 +73,19 @@ public class Aggregation extends UnaryOperator {
 
   public static class GroupElement implements JsonSerializable {
     private GroupType group_type;
-    private ColumnReferenceExpr[] columns;
+    private Expr [] grouping_sets;
 
-    public GroupElement(GroupType groupType, ColumnReferenceExpr[] columns) {
+    public GroupElement(GroupType groupType, Expr[] grouping_sets) {
       this.group_type = groupType;
-      this.columns = columns;
+      this.grouping_sets = grouping_sets;
     }
 
     public GroupType getType() {
       return this.group_type;
     }
 
-    public ColumnReferenceExpr[] getColumns() {
-      return this.columns;
+    public Expr[] getGroupingSets() {
+      return this.grouping_sets;
     }
 
     public String toString() {
@@ -101,7 +101,7 @@ public class Aggregation extends UnaryOperator {
       if (obj instanceof GroupElement) {
         GroupElement other = (GroupElement) obj;
         return group_type.equals(other) &&
-            TUtil.checkEquals(columns, other.columns);
+            TUtil.checkEquals(grouping_sets, other.grouping_sets);
       }
 
       return false;

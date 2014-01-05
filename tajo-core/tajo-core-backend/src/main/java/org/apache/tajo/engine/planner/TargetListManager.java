@@ -35,7 +35,7 @@ import java.util.Set;
  * It manages a list of targets.
  */
 public class TargetListManager {
-  private final LogicalPlan plan;
+  private LogicalPlan plan;
   private boolean [] resolvedFlags;
   private Projection projection;
   private Target[] targets;
@@ -71,7 +71,7 @@ public class TargetListManager {
   }
 
   public TargetListManager(LogicalPlan plan, String blockName) {
-    this(plan, plan.getBlock(blockName).getTargetListManager().getUnresolvedTargets());
+    //this(plan, plan.getBlock(blockName).getTargetListManager().getUnresolvedTargets());
   }
 
   public Target getTarget(int id) {

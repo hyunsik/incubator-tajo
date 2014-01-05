@@ -223,7 +223,7 @@ public class GlobalEngine extends AbstractService {
   private LogicalPlan createLogicalPlan(Expr expression) throws PlanningException {
 
     LogicalPlan plan = planner.createPlan(expression);
-    optimizer.optimize(plan);
+    //optimizer.optimize(plan);
     if (LOG.isDebugEnabled()) {
       LOG.debug("LogicalPlan:\n" + plan.getRootBlock().getRoot());
     }

@@ -19,7 +19,6 @@
 package org.apache.tajo.engine.planner;
 
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import org.apache.tajo.algebra.*;
 import org.apache.tajo.annotation.NotThreadSafe;
 import org.apache.tajo.catalog.Column;
@@ -84,9 +83,9 @@ public class LogicalPlan {
   }
 
   public String newNonameColumnName(String prefix) {
-    String suffix = noNameColumnId == 0 ? "" : String.valueOf(noNameColumnId);
+    String suffix = "_" + String.valueOf(noNameColumnId);
     noNameColumnId++;
-    return "?" + prefix + suffix;
+    return "$" + prefix.toLowerCase() + "_" + suffix;
   }
 
   /**
@@ -151,7 +150,7 @@ public class LogicalPlan {
   public Column resolveColumn(QueryBlock block, LogicalNode currentNode, ColumnReferenceExpr columnRef)
       throws PlanningException {
 
-    if (columnRef.hasQualifier()) { // if a column referenec is qualified
+    if (columnRef.hasQualifier()) { // if a column reference is qualified
 
       RelationNode relationOp = block.getRelation(columnRef.getQualifier());
 
@@ -180,20 +179,7 @@ public class LogicalPlan {
 
     } else { // if a column reference is not qualified
 
-      // if current logical node is available
-      if (currentNode != null && currentNode.getOutSchema() != null) {
-        Column found = currentNode.getOutSchema().getColumnByName(columnRef.getName());
-        if (found != null) {
-          return found;
-        }
-      }
-
-      if (block.getLatestNode() != null) {
-        Column found = block.getLatestNode().getOutSchema().getColumnByName(columnRef.getName());
-        if (found != null) {
-          return found;
-        }
-      }
+      // Trying to find the column within the current block
 
       // Trying to find columns from other relations in the current block
       List<Column> candidates = TUtil.newList();
@@ -222,6 +208,14 @@ public class LogicalPlan {
         return ensureUniqueColumn(candidates);
       }
 
+//      Target target = block.targetListManager.getTarget(columnRef.getName());
+//      if (target != null) {
+//        candidates.add(target.getColumnSchema());
+//      }
+//      if (!candidates.isEmpty()) {
+//        return ensureUniqueColumn(candidates);
+//      }
+
       // Trying to find columns from schema in current block.
       if (block.getSchema() != null) {
         Column found = block.getSchema().getColumnByName(columnRef.getName());
@@ -242,9 +236,6 @@ public class LogicalPlan {
    * replace the found column if the column is renamed to an alias name
    */
   public Column getColumnOrAliasedColumn(QueryBlock block, Column column) throws PlanningException {
-    if (block.targetListManager.isResolve(column)) {
-      column = block.targetListManager.getResolvedColumn(column);
-    }
     return column;
   }
 
@@ -384,7 +375,7 @@ public class LogicalPlan {
     private InsertNode insertNode;
     private Schema schema;
 
-    TargetListManager targetListManager;
+    NewTargetListManager targetListManager;
 
     /** It contains a planning log for this block */
     private List<String> planingHistory = Lists.newArrayList();
@@ -412,6 +403,11 @@ public class LogicalPlan {
         rootType = rootNode.getChild().getType();
       }
       queryBlockByPID.put(blockRoot.getPID(), this);
+    }
+
+
+    public Target [] getCurrentTargets() {
+      return null;
     }
 
     public <NODE extends LogicalNode> NODE getRoot() {
@@ -648,15 +644,6 @@ public class LogicalPlan {
       return blockName;
     }
 
-    public void updateTargetList(LogicalPlanner planner, QueryBlock block, NewTargetListManager targetManager, LogicalNode node) throws PlanningException {
-
-      Set<TargetExpr> tobeRemoved = new HashSet<TargetExpr>();
-      for (TargetExpr target : targetManager.getRawTargets()) {
-
-        planner.createEvalTree(LogicalPlan.this, block, target.getExpr());
-      }
-    }
-
     ///////////////////////////////////////////////////////////////////////////
     //                 Target List Management Methods
     ///////////////////////////////////////////////////////////////////////////
@@ -668,184 +655,5 @@ public class LogicalPlan {
     //                        TARGET LIST
     //
     ///////////////////////////////////////////////////////////////////////////
-
-    public void initTargetList(Target[] original) {
-      targetListManager = new TargetListManager(LogicalPlan.this, original);
-    }
-
-    public boolean isTargetResolved(int targetId) {
-      return targetListManager.isResolved(targetId);
-    }
-
-    public void resolveAllTargetList() {
-      targetListManager.resolveAll();
-    }
-
-    public void resolveTarget(int idx) {
-      targetListManager.resolve(idx);
-    }
-
-    public boolean isAlreadyTargetCreated(int idx) {
-      return getTarget(idx) != null;
-    }
-
-    public Target getTarget(int idx) {
-      return targetListManager.getTarget(idx);
-    }
-
-    public int getTargetListNum() {
-      return targetListManager.size();
-    }
-
-    public void fillTarget(int idx) throws PlanningException {
-      Target target = planner.createTarget(LogicalPlan.this, this, getProjection().getTargets()[idx]);
-      // below code reaches only when target is created.
-      targetListManager.fill(idx, target);
-    }
-
-    public boolean checkIfTargetCanBeEvaluated(int targetId, LogicalNode node) {
-      return isAlreadyTargetCreated(targetId)
-          && PlannerUtil.canBeEvaluated(targetListManager.getTarget(targetId).getEvalTree(), node);
-    }
-
-    public TargetListManager getTargetListManager() {
-      return targetListManager;
-    }
-
-    public Target [] getCurrentTargets() {
-      return targetListManager.getTargets();
-    }
-
-    public Schema updateSchema() {
-      return targetListManager.getUpdatedSchema();
-    }
-
-    public void fillTargets() throws PlanningException {
-      for (int i = 0; i < getTargetListNum(); i++) {
-        if (!isAlreadyTargetCreated(i)) {
-          try {
-            fillTarget(i);
-          } catch (VerifyException e) {
-          }
-        }
-      }
-    }
-
-    public void checkAndResolveTargets(LogicalNode node) throws PlanningException {
-      // If all columns are projected and do not include any expression
-      if (getProjection().isAllProjected() && node instanceof RelationNode) {
-        initTargetList(PlannerUtil.schemaToTargets(node.getOutSchema()));
-        resolveAllTargetList();
-
-      } else {
-        // fill a target if an annotated target can be created.
-        // Some targets which are based on multiple relations can be created only in a join node.
-        fillTargets();
-
-        // add target to list if a target can be evaluated at this node
-        List<Integer> newEvaluatedTargetIds = new ArrayList<Integer>();
-        for (int i = 0; i < getTargetListNum(); i++) {
-          if (getTarget(i) != null && !isTargetResolved(i)) {
-            EvalNode expr = getTarget(i).getEvalTree();
-
-            if (checkIfTargetCanBeEvaluated(i, node)) {
-
-              if (node instanceof RelationNode) { // for scan node
-                if (expr.getType() == EvalType.FIELD) {
-                  resolveTarget(i);
-                  if (getTarget(i).hasAlias()) {
-                    newEvaluatedTargetIds.add(i);
-                  }
-                } else if (EvalTreeUtil.findDistinctAggFunction(expr).size() == 0) {
-                  // if this expression does no contain any aggregation function
-                  resolveTarget(i);
-                  newEvaluatedTargetIds.add(i);
-                }
-
-              } else if (node instanceof GroupbyNode) { // for grouping
-                if (EvalTreeUtil.findDistinctAggFunction(expr).size() > 0) {
-                  resolveTarget(i);
-                  newEvaluatedTargetIds.add(i);
-                }
-
-              } else if (node instanceof JoinNode) { // for join
-                if (EvalTreeUtil.findDistinctAggFunction(expr).size() == 0) {
-                  // if this expression does no contain any aggregation function,
-                  resolveTarget(i);
-                  newEvaluatedTargetIds.add(i);
-                }
-              }
-            }
-          }
-        }
-
-        if (node instanceof ScanNode || node instanceof JoinNode) {
-
-          Schema baseSchema = null;
-          if (node instanceof ScanNode) {
-            baseSchema = ((ScanNode)node).getTableSchema();
-          } else if (node instanceof JoinNode) {
-            baseSchema = node.getInSchema(); // composite schema
-          }
-
-          if (newEvaluatedTargetIds.size() > 0) {
-            // fill addedTargets with output columns and new expression columns (e.g., aliased column or expressions)
-            Target[] addedTargets = new Target[baseSchema.getColumnNum() + newEvaluatedTargetIds.size()];
-            PlannerUtil.schemaToTargets(baseSchema, addedTargets);
-            int baseIdx = baseSchema.getColumnNum();
-            for (int i = 0; i < newEvaluatedTargetIds.size(); i++) {
-              addedTargets[baseIdx + i] = getTarget(newEvaluatedTargetIds.get(i));
-            }
-
-            // set targets to ScanNode because it needs to evaluate expressions
-            ((Projectable)node).setTargets(addedTargets);
-            // the output schema of ScanNode has to have the combination of the original output and newly-added targets.
-            node.setOutSchema(LogicalPlanner.getProjectedSchema(LogicalPlan.this, addedTargets));
-          } else {
-            // if newEvaluatedTargetIds == 0, the original input schema will be used as the output schema.
-            node.setOutSchema(node.getInSchema());
-          }
-        } else if (node instanceof GroupbyNode) {
-          // Set the current targets to the GroupByNode because the GroupByNode is the last projection operator.
-          GroupbyNode groupbyNode = (GroupbyNode) node;
-          groupbyNode.setTargets(targetListManager.getUpdatedTarget(Sets.newHashSet(newEvaluatedTargetIds)));
-          //groupbyNode.setTargets(getCurrentTargets());
-          boolean distinct = false;
-          for (Target target : groupbyNode.getTargets()) {
-            for (AggregationFunctionCallEval aggrFunc : EvalTreeUtil.findDistinctAggFunction(target.getEvalTree())) {
-              if (aggrFunc.isDistinct()) {
-                distinct = true;
-                break;
-              }
-            }
-          }
-          groupbyNode.setDistinct(distinct);
-          node.setOutSchema(updateSchema());
-
-          // if a having condition is given,
-          if (hasHaving()) {
-            EvalNode havingCondition = planner.createEvalTree(LogicalPlan.this, this, getHaving().getQual());
-            List<AggregationFunctionCallEval> aggrFunctions = EvalTreeUtil.findDistinctAggFunction(havingCondition);
-
-            if (aggrFunctions.size() == 0) {
-              groupbyNode.setHavingCondition(havingCondition);
-            } else {
-              Target [] addedTargets = new Target[aggrFunctions.size()];
-              for (int i = 0; i < aggrFunctions.size(); i++) {
-                Target aggrFunctionTarget = new Target(aggrFunctions.get(i),
-                    newNonameColumnName(aggrFunctions.get(i).getName()));
-                addedTargets[i] = aggrFunctionTarget;
-                EvalTreeUtil.replace(havingCondition, aggrFunctions.get(i),
-                    new FieldEval(aggrFunctionTarget.getColumnSchema()));
-              }
-              Target [] updatedTargets = TUtil.concat(groupbyNode.getTargets(), addedTargets);
-              groupbyNode.setTargets(updatedTargets);
-              groupbyNode.setHavingCondition(havingCondition);
-              groupbyNode.setHavingSchema(PlannerUtil.targetToSchema(groupbyNode.getTargets()));
-            }
-          }
-        }
-      }
-    }
   }
 }

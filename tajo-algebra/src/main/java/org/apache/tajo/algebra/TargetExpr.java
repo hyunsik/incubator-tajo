@@ -60,6 +60,10 @@ public class TargetExpr extends Expr {
     return false;
   }
 
+  public String toString() {
+    return expr.toString() + (hasAlias() ? " AS " + alias : "");
+  }
+
   @Override
   public String toJson() {
     return JsonHelper.toJson(this);

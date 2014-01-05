@@ -37,9 +37,6 @@ import java.util.Map;
 
 import static org.apache.tajo.algebra.Aggregation.GroupElement;
 import static org.apache.tajo.algebra.CreateTable.*;
-
-import org.apache.tajo.algebra.DateValue;
-import org.apache.tajo.algebra.TimeValue;
 import static org.apache.tajo.common.TajoDataTypes.Type;
 import static org.apache.tajo.engine.parser.SQLParser.*;
 
@@ -285,13 +282,13 @@ public class SQLAnalyzer extends SQLParserBaseVisitor<Expr> {
             ctx.grouping_element_list().grouping_element().get(i);
         if (element.ordinary_grouping_set() != null) {
           groups[i] = new GroupElement(GroupType.OrdinaryGroup,
-              getColumnReferences(element.ordinary_grouping_set().column_reference_list()));
+              getRowValuePredicands(element.ordinary_grouping_set().row_value_predicand_list()));
         } else if (element.rollup_list() != null) {
           groups[i] = new GroupElement(GroupType.Rollup,
-              getColumnReferences(element.rollup_list().c.column_reference_list()));
+              getRowValuePredicands(element.rollup_list().c.row_value_predicand_list()));
         } else if (element.cube_list() != null) {
           groups[i] = new GroupElement(GroupType.Cube,
-              getColumnReferences(element.cube_list().c.column_reference_list()));
+              getRowValuePredicands(element.cube_list().c.row_value_predicand_list()));
         }
       }
       clause.setGroups(groups);
@@ -385,6 +382,14 @@ public class SQLAnalyzer extends SQLParserBaseVisitor<Expr> {
 
     join.setRight(visitTable_primary(ctx.right));
     return join;
+  }
+
+  private Expr [] getRowValuePredicands(Row_value_predicand_listContext ctx) {
+    Expr [] rowValuePredicands = new Expr[ctx.row_value_predicand().size()];
+    for (int i = 0; i < rowValuePredicands.length; i++) {
+      rowValuePredicands[i] = visitRow_value_predicand(ctx.row_value_predicand(i));
+    }
+    return rowValuePredicands;
   }
 
   private ColumnReferenceExpr [] getColumnReferences(Column_reference_listContext ctx) {

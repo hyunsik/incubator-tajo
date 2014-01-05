@@ -784,8 +784,8 @@ grouping_element
   ;
 
 ordinary_grouping_set
-  : column_reference_list
-  | LEFT_PAREN column_reference_list RIGHT_PAREN
+  : row_value_predicand_list
+  | LEFT_PAREN row_value_predicand_list RIGHT_PAREN
   ;
 
 rollup_list
@@ -802,6 +802,10 @@ empty_grouping_set
 
 having_clause
   : HAVING boolean_value_expression
+  ;
+
+row_value_predicand_list
+  : row_value_predicand (COMMA row_value_predicand)*
   ;
 
 /*

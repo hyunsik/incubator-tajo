@@ -106,7 +106,8 @@ public class TestEvalTreeUtil {
     if (plan.getRootBlock().getRoot().getType() == NodeType.EXPRS) {
       return ((EvalExprNode)plan.getRootBlock().getRoot()).getExprs();
     } else {
-      return plan.getRootBlock().getTargetListManager().getUnresolvedTargets();
+//      return plan.getRootBlock().getTargetListManager().getUnresolvedTargets();
+      return null;
     }
   }
 
@@ -188,7 +189,7 @@ public class TestEvalTreeUtil {
   public final void testGetContainExprs() throws CloneNotSupportedException, PlanningException {
     Expr expr = analyzer.parse(QUERIES[1]);
     LogicalPlan plan = planner.createPlan(expr);
-    Target [] targets = plan.getRootBlock().getTargetListManager().getUnresolvedTargets();
+    Target [] targets = null; //plan.getRootBlock().getTargetListManager().getUnresolvedTargets();
     Column col1 = new Column("people.score", TajoDataTypes.Type.INT4);
     Collection<EvalNode> exprs =
         EvalTreeUtil.getContainExpr(targets[0].getEvalTree(), col1);
@@ -274,7 +275,7 @@ public class TestEvalTreeUtil {
 
     Expr expr = analyzer.parse(QUERIES[1]);
     LogicalPlan plan = planner.createPlan(expr);
-    targets = plan.getRootBlock().getTargetListManager().getUnresolvedTargets();
+    targets = null; //plan.getRootBlock().getTargetListManager().getUnresolvedTargets();
     Column col1 = new Column("people.score", TajoDataTypes.Type.INT4);
     Collection<EvalNode> exprs =
         EvalTreeUtil.getContainExpr(targets[0].getEvalTree(), col1);

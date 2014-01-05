@@ -271,22 +271,22 @@ public class ProjectionPushDownRule extends
     } else {
       if (!subBlock.hasGrouping()) {
         List<Target> projectedTarget = new ArrayList<Target>();
-        for (Target target : subBlock.getTargetListManager().getUnresolvedTargets()) {
-          for (Column column : context.upperRequired) {
-            if (column.hasQualifier() && !node.getTableName().equals(column.getQualifier())) {
-              continue;
-            }
-            if (target.getColumnSchema().getColumnName().equalsIgnoreCase(column.getColumnName())) {
-              projectedTarget.add(target);
-            }
-          }
-        }
+//        for (Target target : subBlock.getTargetListManager().getUnresolvedTargets()) {
+//          for (Column column : context.upperRequired) {
+//            if (column.hasQualifier() && !node.getTableName().equals(column.getQualifier())) {
+//              continue;
+//            }
+//            if (target.getColumnSchema().getColumnName().equalsIgnoreCase(column.getColumnName())) {
+//              projectedTarget.add(target);
+//            }
+//          }
+//        }
         newContext.targetListManager = new TargetListManager(plan,
             projectedTarget.toArray(new Target[projectedTarget.size()]));
 
       } else {
-        newContext.targetListManager = new TargetListManager(plan,
-            subBlock.getTargetListManager().getUnresolvedTargets());
+//        newContext.targetListManager = new TargetListManager(plan,
+//            subBlock.getTargetListManager().getUnresolvedTargets());
       }
     }
 
@@ -424,16 +424,16 @@ public class ProjectionPushDownRule extends
       LogicalPlan.QueryBlock subQueryBlock, TableSubQueryNode subQueryNode, Set<Column> upperRequired) {
     TargetListManager subBlockTargetList;
     List<Target> projectedTarget = new ArrayList<Target>();
-    for (Target target : subQueryBlock.getTargetListManager().getUnresolvedTargets()) {
-      for (Column column : upperRequired) {
-        if (!subQueryNode.getTableName().equals(column.getQualifier())) {
-          continue;
-        }
-        if (target.getColumnSchema().getColumnName().equalsIgnoreCase(column.getColumnName())) {
-          projectedTarget.add(target);
-        }
-      }
-    }
+//    for (Target target : subQueryBlock.getTargetListManager().getUnresolvedTargets()) {
+//      for (Column column : upperRequired) {
+//        if (!subQueryNode.getTableName().equals(column.getQualifier())) {
+//          continue;
+//        }
+//        if (target.getColumnSchema().getColumnName().equalsIgnoreCase(column.getColumnName())) {
+//          projectedTarget.add(target);
+//        }
+//      }
+//    }
     subBlockTargetList = new TargetListManager(plan, projectedTarget.toArray(new Target[projectedTarget.size()]));
     return subBlockTargetList;
   }

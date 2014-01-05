@@ -77,7 +77,8 @@ public class ExprTestBase {
   private static Target[] getRawTargets(String query) throws PlanningException {
     Expr expr = analyzer.parse(query);
     LogicalPlan plan = planner.createPlan(expr);
-    Target [] targets = plan.getRootBlock().getTargetListManager().getUnresolvedTargets();
+//    Target [] targets = plan.getRootBlock().getTargetListManager().getUnresolvedTargets();
+    Target [] targets = null;
     if (targets == null) {
       throw new PlanningException("Wrong query statement or query plan: " + query);
     }
