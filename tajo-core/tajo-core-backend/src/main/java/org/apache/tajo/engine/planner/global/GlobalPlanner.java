@@ -285,26 +285,47 @@ public class GlobalPlanner {
 
   private ExecutionBlock buildSortPlan(GlobalPlanContext context, ExecutionBlock childBlock, SortNode currentNode) {
     MasterPlan masterPlan = context.plan;
-    ExecutionBlock currentBlock;
+    ExecutionBlock currentBlock = null;
 
     SortNode firstSortNode = PlannerUtil.clone(context.plan.getLogicalPlan(), currentNode);
-    LogicalNode childBlockPlan = childBlock.getPlan();
-    firstSortNode.setChild(childBlockPlan);
-    // sort is a non-projectable operator. So, in/out schemas are the same to its child operator.
-    firstSortNode.setInSchema(childBlockPlan.getOutSchema());
-    firstSortNode.setOutSchema(childBlockPlan.getOutSchema());
-    childBlock.setPlan(firstSortNode);
 
-    currentBlock = masterPlan.newExecutionBlock();
-    DataChannel channel = new DataChannel(childBlock, currentBlock, RANGE_PARTITION, 32);
-    channel.setPartitionKey(PlannerUtil.sortSpecsToSchema(currentNode.getSortKeys()).toArray());
-    channel.setSchema(firstSortNode.getOutSchema());
+    if (firstSortNode.getChild().getType() == NodeType.TABLE_SUBQUERY &&
+        ((TableSubQueryNode)firstSortNode.getChild()).getSubQuery().getType() == NodeType.UNION) {
 
-    ScanNode secondScan = buildInputExecutor(masterPlan.getLogicalPlan(), channel);
-    currentNode.setChild(secondScan);
-    currentNode.setInSchema(secondScan.getOutSchema());
-    currentBlock.setPlan(currentNode);
-    masterPlan.addConnect(channel);
+      currentBlock = childBlock;
+      for (DataChannel channel : masterPlan.getIncomingChannels(childBlock.getId())) {
+        channel.setPartition(RANGE_PARTITION, PlannerUtil.sortSpecsToSchema(currentNode.getSortKeys()).toArray(), 32);
+        channel.setSchema(firstSortNode.getOutSchema());
+
+        ExecutionBlock subBlock = masterPlan.getExecBlock(channel.getSrcId());
+        SortNode s1 = PlannerUtil.clone(context.plan.getLogicalPlan(), firstSortNode);
+        s1.setChild(subBlock.getPlan());
+        subBlock.setPlan(s1);
+
+        ScanNode secondScan = buildInputExecutor(masterPlan.getLogicalPlan(), channel);
+        currentNode.setChild(secondScan);
+        currentNode.setInSchema(secondScan.getOutSchema());
+        currentBlock.setPlan(currentNode);
+      }
+    } else {
+      LogicalNode childBlockPlan = childBlock.getPlan();
+      firstSortNode.setChild(childBlockPlan);
+      // sort is a non-projectable operator. So, in/out schemas are the same to its child operator.
+      firstSortNode.setInSchema(childBlockPlan.getOutSchema());
+      firstSortNode.setOutSchema(childBlockPlan.getOutSchema());
+      childBlock.setPlan(firstSortNode);
+
+      currentBlock = masterPlan.newExecutionBlock();
+      DataChannel channel = new DataChannel(childBlock, currentBlock, RANGE_PARTITION, 32);
+      channel.setPartitionKey(PlannerUtil.sortSpecsToSchema(currentNode.getSortKeys()).toArray());
+      channel.setSchema(firstSortNode.getOutSchema());
+
+      ScanNode secondScan = buildInputExecutor(masterPlan.getLogicalPlan(), channel);
+      currentNode.setChild(secondScan);
+      currentNode.setInSchema(secondScan.getOutSchema());
+      currentBlock.setPlan(currentNode);
+      masterPlan.addConnect(channel);
+    }
 
     return currentBlock;
   }
@@ -438,12 +459,14 @@ public class GlobalPlanner {
 
       ExecutionBlock leftBlock = context.execBlockMap.remove(leftChild.getPID());
       ExecutionBlock rightBlock = context.execBlockMap.remove(rightChild.getPID());
-      if (leftChild.getType() == NodeType.UNION) {
+      if (leftChild.getType() == NodeType.TABLE_SUBQUERY &&
+          ((TableSubQueryNode)leftChild).getSubQuery().getType() == NodeType.UNION) {
         unionBlocks.add(leftBlock);
       } else {
         queryBlockBlocks.add(leftBlock);
       }
-      if (rightChild.getType() == NodeType.UNION) {
+      if (rightChild.getType() == NodeType.TABLE_SUBQUERY &&
+          ((TableSubQueryNode)rightChild).getSubQuery().getType() == NodeType.UNION) {
         unionBlocks.add(rightBlock);
       } else {
         queryBlockBlocks.add(rightBlock);
@@ -457,7 +480,7 @@ public class GlobalPlanner {
       }
 
       for (ExecutionBlock childBlocks : unionBlocks) {
-        UnionNode union = (UnionNode) childBlocks.getPlan();
+        UnionNode union = (UnionNode) ((TableSubQueryNode) childBlocks.getPlan()).getSubQuery();
         queryBlockBlocks.add(context.execBlockMap.get(union.getLeftChild().getPID()));
         queryBlockBlocks.add(context.execBlockMap.get(union.getRightChild().getPID()));
       }

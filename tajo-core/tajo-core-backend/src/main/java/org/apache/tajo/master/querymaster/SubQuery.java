@@ -394,26 +394,37 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
     List<ColumnStats> columnStatses = Lists.newArrayList();
 
     MasterPlan masterPlan = subQuery.getMasterPlan();
+//    Iterator<ExecutionBlock> it = masterPlan.getChilds(subQuery.getBlock()).iterator();
+//    while (it.hasNext()) {
+//      ExecutionBlock block = it.next();
+//      SubQuery childSubQuery = subQuery.context.getSubQuery(block.getId());
+//      childStat = childSubQuery.getTableStat();
+//      avgRows += childStat.getAvgRows();
+//      columnStatses.addAll(childStat.getColumnStats());
+//      numBlocks += childStat.getNumBlocks();
+//      numBytes += childStat.getNumBytes();
+//      numPartitions += childStat.getNumPartitions();
+//      numRows += childStat.getNumRows();
+//    }
+
+    List<TableStats> stats = Lists.newArrayList();
     Iterator<ExecutionBlock> it = masterPlan.getChilds(subQuery.getBlock()).iterator();
     while (it.hasNext()) {
       ExecutionBlock block = it.next();
       SubQuery childSubQuery = subQuery.context.getSubQuery(block.getId());
-      childStat = childSubQuery.getTableStat();
-      avgRows += childStat.getAvgRows();
-      columnStatses.addAll(childStat.getColumnStats());
-      numBlocks += childStat.getNumBlocks();
-      numBytes += childStat.getNumBytes();
-      numPartitions += childStat.getNumPartitions();
-      numRows += childStat.getNumRows();
+      for (QueryUnit unit : childSubQuery.getQueryUnits()) {
+        stats.add(unit.getStats());
+      }
     }
+    TableStats tableStats = StatisticsUtil.aggregateTableStat(stats);
 
-    stat.setColumnStats(columnStatses);
-    stat.setNumBlocks(numBlocks);
-    stat.setNumBytes(numBytes);
-    stat.setNumPartitions(numPartitions);
-    stat.setNumRows(numRows);
-    stat.setAvgRows(avgRows);
-    return stat;
+//    stat.setColumnStats(columnStatses);
+//    stat.setNumBlocks(numBlocks);
+//    stat.setNumBytes(numBytes);
+//    stat.setNumPartitions(numPartitions);
+//    stat.setNumRows(numRows);
+//    stat.setAvgRows(avgRows);
+    return tableStats;
   }
 
   private TableStats computeStatFromTasks() {

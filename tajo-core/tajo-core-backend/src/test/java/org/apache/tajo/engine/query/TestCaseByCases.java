@@ -79,4 +79,13 @@ public class TestCaseByCases {
       res.close();
     }
   }
+
+  @Test
+  public final void testExtraQ1() throws Exception {
+    ResultSet res = tpch.execute(FileUtil.readTextFile(new File("src/test/queries/case1_schema.sql")));
+    res.close();
+    res = tpch.execute(FileUtil.readTextFile(new File("src/test/queries/case1_test.sql")));
+    System.out.println(ResultSetUtil.prettyFormat(res));
+    res.close();
+  }
 }
