@@ -590,7 +590,7 @@ public class LogicalPlan {
       this.planingHistory.add(history);
     }
 
-    public boolean postVisit(LogicalNode node, Stack<OpType> path) {
+    public boolean postVisit(LogicalNode node, Stack<Expr> path) {
       if (nodeMap.containsKey(node.getPID())) {
         return false;
       }

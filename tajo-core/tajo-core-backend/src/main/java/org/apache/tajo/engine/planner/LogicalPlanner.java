@@ -99,7 +99,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     LogicalPlan plan = new LogicalPlan(this);
     LogicalNode subroot;
 
-    Stack<OpType> stack = new Stack<OpType>();
+    Stack<Expr> stack = new Stack<Expr>();
 
     QueryBlock rootBlock = plan.newAndGetBlock(LogicalPlan.ROOT_BLOCK);
     PlanContext context = new PlanContext(plan, rootBlock);
@@ -114,12 +114,12 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     return plan;
   }
 
-  public void preHook(PlanContext context, Stack<OpType> stack, Expr expr) {
+  public void preHook(PlanContext context, Stack<Expr> stack, Expr expr) {
     context.block = checkIfNewBlockOrGet(context.plan, context.block.getName());
     context.block.setAlgebraicExpr(expr);
   }
 
-  public LogicalNode postHook(PlanContext context, Stack<OpType> stack, Expr expr, LogicalNode current)
+  public LogicalNode postHook(PlanContext context, Stack<Expr> stack, Expr expr, LogicalNode current)
       throws PlanningException {
     // Post work
     if ((expr.getType() == OpType.RelationList && ((RelationList) expr).size() == 1)
@@ -146,11 +146,11 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     }
   }
 
-  public TableSubQueryNode visitTableSubQuery(PlanContext context, Stack<OpType> stack, TablePrimarySubQuery expr)
+  public TableSubQueryNode visitTableSubQuery(PlanContext context, Stack<Expr> stack, TablePrimarySubQuery expr)
       throws PlanningException {
     QueryBlock newBlock = context.plan.newAndGetBlock(expr.getName());
     PlanContext newContext = new PlanContext(context.plan, newBlock);
-    Stack<OpType> newStack = new Stack<OpType>();
+    Stack<Expr> newStack = new Stack<Expr>();
     LogicalNode child = visit(newContext, newStack, expr.getSubQuery());
     context.plan.connectBlocks(newContext.block, context.block, BlockType.TableSubQuery);
     return new TableSubQueryNode(context.plan.newPID(), expr.getName(), child);
@@ -158,7 +158,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
 
   @Override
-  public ScanNode visitRelation(PlanContext context, Stack<OpType> stack, Relation expr)
+  public ScanNode visitRelation(PlanContext context, Stack<Expr> stack, Relation expr)
       throws PlanningException {
     // 1. init phase
 
@@ -226,7 +226,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     JOIN SECTION
    ===============================================================================================*/
   @Override
-  public LogicalNode visitRelationList(PlanContext context, Stack<OpType> stack, RelationList relations)
+  public LogicalNode visitRelationList(PlanContext context, Stack<Expr> stack, RelationList relations)
       throws PlanningException {
 
     LogicalNode current = visit(context, stack, relations.getRelations()[0]);
@@ -246,14 +246,14 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   }
 
   @Override
-  public LogicalNode visitJoin(PlanContext context, Stack<OpType> stack, Join join)
+  public LogicalNode visitJoin(PlanContext context, Stack<Expr> stack, Join join)
       throws PlanningException {
     // Phase 1: Init
     LogicalPlan plan = context.plan;
     QueryBlock block = context.block;
 
     // Phase 2: build child plans
-    stack.push(OpType.Join);
+    stack.push(join);
     LogicalNode left = visit(context, stack, join.getLeft());
     LogicalNode right = visit(context, stack, join.getRight());
     stack.pop();
@@ -346,24 +346,24 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
    ===============================================================================================*/
 
   @Override
-  public LogicalNode visitUnion(PlanContext context, Stack<OpType> stack, SetOperation setOperation)
+  public LogicalNode visitUnion(PlanContext context, Stack<Expr> stack, SetOperation setOperation)
       throws PlanningException {
     return buildSetPlan(context, stack, setOperation);
   }
 
   @Override
-  public LogicalNode visitExcept(PlanContext context, Stack<OpType> stack, SetOperation setOperation)
+  public LogicalNode visitExcept(PlanContext context, Stack<Expr> stack, SetOperation setOperation)
       throws PlanningException {
     return buildSetPlan(context, stack, setOperation);
   }
 
   @Override
-  public LogicalNode visitIntersect(PlanContext context, Stack<OpType> stack, SetOperation setOperation)
+  public LogicalNode visitIntersect(PlanContext context, Stack<Expr> stack, SetOperation setOperation)
       throws PlanningException {
     return buildSetPlan(context, stack, setOperation);
   }
 
-  private LogicalNode buildSetPlan(PlanContext context, Stack<OpType> stack, SetOperation setOperation)
+  private LogicalNode buildSetPlan(PlanContext context, Stack<Expr> stack, SetOperation setOperation)
       throws PlanningException {
 
     // 1. Init Phase
@@ -372,13 +372,13 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
     // 2. Build Child Plans
     PlanContext leftContext = new PlanContext(plan, plan.newNoNameBlock());
-    Stack<OpType> leftStack = new Stack<OpType>();
+    Stack<Expr> leftStack = new Stack<Expr>();
     LogicalNode left = visit(leftContext, leftStack, setOperation.getLeft());
     TableSubQueryNode leftSubQuery = new TableSubQueryNode(plan.newPID(), leftContext.block.getName(), left);
     context.plan.connectBlocks(leftContext.block, context.block, BlockType.TableSubQuery);
 
     PlanContext rightContext = new PlanContext(plan, plan.newNoNameBlock());
-    Stack<OpType> rightStack = new Stack<OpType>();
+    Stack<Expr> rightStack = new Stack<Expr>();
     LogicalNode right = visit(rightContext, rightStack, setOperation.getRight());
     TableSubQueryNode rightSubQuery = new TableSubQueryNode(plan.newPID(), rightContext.block.getName(), right);
     context.plan.connectBlocks(rightContext.block, context.block, BlockType.TableSubQuery);
@@ -412,7 +412,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   }
 
   @Override
-  public SelectionNode visitFilter(PlanContext context, Stack<OpType> stack, Selection selection)
+  public SelectionNode visitFilter(PlanContext context, Stack<Expr> stack, Selection selection)
       throws PlanningException {
     // 1. init phase:
     LogicalPlan plan = context.plan;
@@ -421,7 +421,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     String qualName = context.block.targetListManager.addExpr(selection.getQual());
 
     // 2. build child plans:
-    stack.push(OpType.Filter);
+    stack.push(selection);
     LogicalNode child = visit(context, stack, selection.getChild());
     stack.pop();
 
@@ -454,7 +454,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
    ===============================================================================================*/
 
   @Override
-  public LogicalNode visitGroupBy(PlanContext context, Stack<OpType> stack, Aggregation aggregation)
+  public LogicalNode visitGroupBy(PlanContext context, Stack<Expr> stack, Aggregation aggregation)
       throws PlanningException {
 
     // 1. Initialization Phase:
@@ -464,7 +464,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     String [] groupingSets = context.block.targetListManager.addExprArray(aggregation.getGroupSet()[0].getGroupingSets());
 
     // 2. Build Child Plan Phase:
-    stack.push(OpType.Aggregation);
+    stack.push(aggregation);
     LogicalNode child = visit(context, stack, aggregation.getChild());
     stack.pop();
 
@@ -615,7 +615,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
    ===============================================================================================*/
 
   @Override
-  public SortNode visitSort(PlanContext context, Stack<OpType> stack, Sort sort) throws PlanningException {
+  public SortNode visitSort(PlanContext context, Stack<Expr> stack, Sort sort) throws PlanningException {
     int sortKeyNum = sort.getSortSpecs().length;
     Sort.SortSpec[] sortSpecs = sort.getSortSpecs();
     String [] sortKeyNames = new String[sortKeyNum];
@@ -625,7 +625,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     }
 
     // 2. Build Child Plans:
-    stack.push(OpType.Sort);
+    stack.push(sort);
     LogicalNode child = visit(context, stack, sort.getChild());
     //child = insertGroupbyNodeIfUnresolved(plan, block, child, stack);
     stack.pop();
@@ -650,13 +650,13 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   }
 
   @Override
-  public LimitNode visitLimit(PlanContext context, Stack<OpType> stack, Limit limit) throws PlanningException {
+  public LimitNode visitLimit(PlanContext context, Stack<Expr> stack, Limit limit) throws PlanningException {
     // 1. Init Phase:
     LogicalPlan plan = context.plan;
     QueryBlock block = context.block;
 
     // build child plans
-    stack.push(OpType.Limit);
+    stack.push(limit);
     LogicalNode child = visit(context, stack, limit.getChild());
     stack.pop();
 
@@ -677,17 +677,29 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
    ===============================================================================================*/
 
   @Override
-  public LogicalNode visitProjection(PlanContext context, Stack<OpType> stack, Projection projection)
+  public LogicalNode visitProjection(PlanContext context, Stack<Expr> stack, Projection projection)
       throws PlanningException {
 
     //1: init Phase
     LogicalPlan plan = context.plan;
     QueryBlock block = context.block;
 
-    String [] targetNames = null;
+    String [] targetNames = new String[projection.size()];
     if (!projection.isAllProjected()) {
       block.targetListManager = new NewTargetListManager(plan, this, context.block);
-      targetNames = context.block.targetListManager.addTargetExprArray(projection.getTargets());
+      DissectedExpr dissectedExpr = null;
+      TargetExpr rawTarget;
+      for (int i = 0; i < projection.getTargets().length; i++) {
+        rawTarget = projection.getTargets()[i];
+        dissectedExpr = dissectedExpr(rawTarget.getExpr());
+        if (rawTarget.hasAlias()) {
+          targetNames[i] = context.block.targetListManager.addTargetExpr(
+              new TargetExpr(dissectedExpr.outer, rawTarget.getAlias()));
+        } else {
+          targetNames[i] = context.block.targetListManager.addExpr(dissectedExpr.outer);
+        }
+      }
+
     }
 
     if (!projection.hasChild()) {
@@ -702,7 +714,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     }
 
     // 2: Build Child Plans
-    stack.push(OpType.Projection);
+    stack.push(projection);
     LogicalNode child = visit(context, stack, projection.getChild());
     child = insertGroupbyNodeIfUnresolved(plan, block, child, targetNames, stack);
     stack.pop();
@@ -744,13 +756,180 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     return projectionNode;
   }
 
+  class DissectedExpr {
+    LogicalPlan plan;
+    Expr outer;
+    List<TargetExpr> aggregation = new ArrayList<TargetExpr>();
+    List<TargetExpr> inner = new ArrayList<TargetExpr>();
+  }
+
+  DissectedExpr dissectedExpr(Expr expr) throws PlanningException {
+    DissectedExprVisitor visitor = new DissectedExprVisitor();
+    DissectedExpr dissectedExpr = new DissectedExpr();
+
+    // early pruning
+    if (expr.getType() == OpType.Column || expr.getType() == OpType.Literal || expr.getType() == OpType.NullLiteral) {
+      dissectedExpr.outer = expr;
+    } else {
+      visitor.visit(dissectedExpr, new Stack<Expr>(), expr);
+    }
+    return dissectedExpr;
+  }
+
+  private class DissectedExprVisitor extends BasicAlgebraVisitor<DissectedExpr> {
+    public Expr visit(DissectedExpr ctx, Stack<Expr> stack, Expr expr) throws PlanningException {
+      if (expr instanceof GeneralSetFunctionExpr) {
+
+      } else {
+        super.visit(ctx, stack, expr);
+      }
+
+      ctx.outer = expr;
+      return expr;
+    }
+
+    @Override
+    public Expr visitAnd(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
+      return null;
+    }
+
+    @Override
+    public Expr visitOr(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
+      return null;
+    }
+
+    @Override
+    public Expr visitNot(DissectedExpr ctx, Stack<Expr> stack, NotExpr expr) throws PlanningException {
+      return null;
+    }
+
+    @Override
+    public Expr visitEquals(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
+      return null;
+    }
+
+    @Override
+    public Expr visitNotEquals(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
+      return null;
+    }
+
+    @Override
+    public Expr visitLessThan(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
+      return null;
+    }
+
+    @Override
+    public Expr visitLessThanOrEquals(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
+      return null;
+    }
+
+    @Override
+    public Expr visitGreaterThan(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
+      return null;
+    }
+
+    @Override
+    public Expr visitGreaterThanOrEquals(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws
+        PlanningException {
+      return null;
+    }
+
+    @Override
+    public Expr visitBetween(DissectedExpr ctx, Stack<Expr> stack, BetweenPredicate expr) throws PlanningException {
+      return null;
+    }
+
+    @Override
+    public Expr visitCaseWhen(DissectedExpr ctx, Stack<Expr> stack, CaseWhenPredicate expr) throws PlanningException {
+      return null;
+    }
+
+    @Override
+    public Expr visitInPredicate(DissectedExpr ctx, Stack<Expr> stack, InPredicate expr) throws PlanningException {
+      return null;
+    }
+
+    @Override
+    public Expr visitExistsPredicate(DissectedExpr ctx, Stack<Expr> stack, ExistsPredicate expr) throws PlanningException {
+      return expr;
+    }
+
+    @Override
+    public Expr visitLikePredicate(DissectedExpr ctx, Stack<Expr> stack, PatternMatchPredicate expr) throws PlanningException {
+      return expr;
+    }
+
+    @Override
+    public Expr visitSimilarToPredicate(DissectedExpr ctx, Stack<Expr> stack, PatternMatchPredicate expr) throws
+        PlanningException {
+      return expr;
+    }
+
+    @Override
+    public Expr visitRegexpPredicate(DissectedExpr ctx, Stack<Expr> stack, PatternMatchPredicate expr) throws
+        PlanningException {
+      return expr;
+    }
+
+    @Override
+    public Expr visitConcatenate(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
+      return expr;
+    }
+
+    @Override
+    public Expr visitPlus(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
+      return expr;
+    }
+
+    @Override
+    public Expr visitMinus(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
+      return expr;
+    }
+
+    @Override
+    public Expr visitMultiply(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
+      return expr;
+    }
+
+    @Override
+    public Expr visitDivide(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
+      return expr;
+    }
+
+    @Override
+    public Expr visitModular(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
+      return expr;
+    }
+
+    @Override
+    public Expr visitSign(DissectedExpr ctx, Stack<Expr> stack, SignedExpr expr) throws PlanningException {
+      return expr;
+    }
+
+    @Override
+    public Expr visitGeneralSetFunction(DissectedExpr ctx, Stack<Expr> stack, GeneralSetFunctionExpr expr) throws PlanningException {
+      for (int i = 0; i < expr.getParams().length; i++) {
+        Expr param  = expr.getParams()[i];
+        String name = ctx.plan.newNonameColumnName(param.getType().name());
+        ctx.inner.add(new TargetExpr(param, name));
+        expr.getParams()[i] = new TargetExpr(new ColumnReferenceExpr(name));
+      }
+      return expr;
+    }
+
+    @Override
+    public Expr visitCastExpr(DissectedExpr ctx, Stack<Expr> stack, CastExpr expr) throws PlanningException {
+      return null;
+    }
+  }
+
   /**
    * Insert a group-by operator before a sort or a projection operator.
    * It is used only when a group-by clause is not given.
    */
   private LogicalNode insertGroupbyNodeIfUnresolved(LogicalPlan plan, QueryBlock block,
                                                     LogicalNode child, String [] targetNames,
-                                                    Stack<OpType> stack) throws PlanningException {
+                                                    Stack<Expr> stack) throws PlanningException {
 
     if (!block.isGroupingResolved()) {
       GroupbyNode groupbyNode = new GroupbyNode(plan.newPID(), new Column[] {});
@@ -775,9 +954,10 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     }
   }
 
-  private boolean isNoUpperProjection(Stack<OpType> stack) {
-    for (OpType node : stack) {
-      if (!( (node == OpType.Projection) || (node == OpType.Aggregation) || (node == OpType.Join) )) {
+  private boolean isNoUpperProjection(Stack<Expr> stack) {
+    for (Expr expr : stack) {
+      OpType type = expr.getType();
+      if (!( (type == OpType.Projection) || (type == OpType.Aggregation) || (type == OpType.Join) )) {
         return false;
       }
     }
@@ -790,13 +970,13 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
    ===============================================================================================*/
 
   @Override
-  public LogicalNode visitCreateTable(PlanContext context, Stack<OpType> stack, CreateTable expr)
+  public LogicalNode visitCreateTable(PlanContext context, Stack<Expr> stack, CreateTable expr)
       throws PlanningException {
 
     String tableName = expr.getTableName();
 
     if (expr.hasSubQuery()) {
-      stack.add(OpType.CreateTable);
+      stack.add(expr);
       LogicalNode subQuery = visit(context, stack, expr.getSubQuery());
       stack.pop();
       StoreTableNode storeNode = new StoreTableNode(context.plan.newPID(), tableName);
@@ -1061,11 +1241,11 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     return new Column(columnDefinition.getColumnName(), convertDataType(columnDefinition));
   }
 
-  public LogicalNode visitInsert(PlanContext context, Stack<OpType> stack, Insert expr) throws PlanningException {
-    stack.push(expr.getType());
+  public LogicalNode visitInsert(PlanContext context, Stack<Expr> stack, Insert expr) throws PlanningException {
+    stack.push(expr);
     QueryBlock newQueryBlock = context.plan.newNoNameBlock();
     PlanContext newContext = new PlanContext(context.plan, newQueryBlock);
-    Stack<OpType> subStack = new Stack<OpType>();
+    Stack<Expr> subStack = new Stack<Expr>();
     LogicalNode subQuery = visit(newContext, subStack, expr.getSubQuery());
     context.plan.connectBlocks(newQueryBlock, context.block, BlockType.TableSubQuery);
     stack.pop();
@@ -1116,7 +1296,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   }
 
   @Override
-  public LogicalNode visitDropTable(PlanContext context, Stack<OpType> stack, DropTable dropTable) {
+  public LogicalNode visitDropTable(PlanContext context, Stack<Expr> stack, DropTable dropTable) {
     DropTableNode dropTableNode = new DropTableNode(context.plan.newPID(), dropTable.getTableName(),
         dropTable.isPurge());
     return dropTableNode;

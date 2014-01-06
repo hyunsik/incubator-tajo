@@ -37,9 +37,11 @@ public class NewTargetListManager {
   private LinkedHashMap<String, Boolean> resolvedFlags = new LinkedHashMap<String, Boolean>();
 
   private LogicalPlan plan;
+  private LogicalPlanner planner;
 
   public NewTargetListManager(LogicalPlan plan, LogicalPlanner planner, LogicalPlan.QueryBlock block) {
     this.plan = plan;
+    this.planner = planner;
   }
 
   public boolean isResolved(String name) {
