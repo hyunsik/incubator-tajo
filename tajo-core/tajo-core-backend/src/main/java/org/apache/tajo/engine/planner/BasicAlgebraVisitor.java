@@ -107,10 +107,7 @@ public class BasicAlgebraVisitor<CONTEXT> extends BaseAlgebraVisitor<CONTEXT, Ex
   @Override
   public Expr visitSimpleTableSubQuery(CONTEXT ctx, Stack<Expr> stack, SimpleTableSubQuery expr)
       throws PlanningException {
-    stack.push(expr);
-    visit(ctx, stack, expr.getSubQuery());
-    stack.pop();
-    return expr;
+    return visitDefaultUnaryExpr(ctx, stack, expr);
   }
 
   @Override
@@ -139,10 +136,7 @@ public class BasicAlgebraVisitor<CONTEXT> extends BaseAlgebraVisitor<CONTEXT, Ex
 
   @Override
   public Expr visitScalarSubQuery(CONTEXT ctx, Stack<Expr> stack, ScalarSubQuery expr) throws PlanningException {
-    stack.push(expr);
-    visit(ctx, stack, expr.getSubQuery());
-    stack.pop();
-    return expr;
+    return visitDefaultUnaryExpr(ctx, stack, expr);
   }
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -258,10 +252,7 @@ public class BasicAlgebraVisitor<CONTEXT> extends BaseAlgebraVisitor<CONTEXT, Ex
 
   @Override
   public Expr visitIsNullPredicate(CONTEXT ctx, Stack<Expr> stack, IsNullPredicate expr) throws PlanningException {
-    stack.push(expr);
-    visit(ctx, stack, expr.getPredicand());
-    stack.pop();
-    return expr;
+    return visitDefaultUnaryExpr(ctx, stack, expr);
   }
 
   @Override
@@ -281,10 +272,7 @@ public class BasicAlgebraVisitor<CONTEXT> extends BaseAlgebraVisitor<CONTEXT, Ex
 
   @Override
   public Expr visitExistsPredicate(CONTEXT ctx, Stack<Expr> stack, ExistsPredicate expr) throws PlanningException {
-    stack.push(expr);
-    visit(ctx, stack, expr.getSubQuery());
-    stack.pop();
-    return expr;
+    return visitDefaultUnaryExpr(ctx, stack, expr);
   }
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////////////

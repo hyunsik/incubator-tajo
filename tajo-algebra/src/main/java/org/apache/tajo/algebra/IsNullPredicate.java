@@ -18,14 +18,13 @@
 
 package org.apache.tajo.algebra;
 
-public class IsNullPredicate extends Expr {
+public class IsNullPredicate extends UnaryOperator {
   private final boolean not;
-  private final Expr predicand;
 
   public IsNullPredicate(boolean not, Expr column) {
     super(OpType.IsNullPredicate);
     this.not = not;
-    this.predicand = column;
+    setChild(column);
   }
 
   public boolean isNot() {
@@ -33,12 +32,12 @@ public class IsNullPredicate extends Expr {
   }
 
   public Expr getPredicand() {
-    return predicand;
+    return getChild();
   }
 
   @Override
   boolean equalsTo(Expr expr) {
     IsNullPredicate nullPredicate = (IsNullPredicate) expr;
-    return not == nullPredicate.not && predicand.equals(nullPredicate.predicand);
+    return not == nullPredicate.not;
   }
 }

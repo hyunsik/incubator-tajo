@@ -20,7 +20,7 @@ package org.apache.tajo.algebra;
 
 import com.google.common.base.Preconditions;
 
-public class PatternMatchPredicate extends Expr {
+public class PatternMatchPredicate extends BinaryOperator {
   private boolean not;
   private Expr columnRef;
   private Expr pattern;
@@ -33,9 +33,11 @@ public class PatternMatchPredicate extends Expr {
         opType == OpType.LikePredicate || opType == OpType.SimilarToPredicate || opType == OpType.Regexp,
         "pattern matching predicate is only available: " + opType.name());
     this.not = not;
+    this.caseInsensitive = caseInsensitive;
+    setLeft(columnRef);
+    setRight(pattern);
     this.columnRef = predicand;
     this.pattern = pattern;
-    this.caseInsensitive = caseInsensitive;
   }
 
   public PatternMatchPredicate(OpType opType, boolean not, Expr predicand, Expr pattern) {
