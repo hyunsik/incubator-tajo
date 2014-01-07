@@ -126,7 +126,9 @@ public class DefaultTaskScheduler extends AbstractTaskScheduler {
   @Override
   public void stop() {
     stopEventHandling = true;
-    schedulingThread.interrupt();
+    if (schedulingThread != null) {
+      schedulingThread.interrupt();
+    }
 
     // Return all of request callbacks instantly.
     for (TaskRequestEvent req : taskRequests.taskRequestQueue) {
@@ -178,9 +180,9 @@ public class DefaultTaskScheduler extends AbstractTaskScheduler {
         if (context.isLeafQuery()) {
           QueryUnitAttemptScheduleContext queryUnitContext = new QueryUnitAttemptScheduleContext();
           QueryUnit task = SubQuery.newEmptyQueryUnit(context, queryUnitContext, subQuery, nextTaskId++);
-          task.setFragment2(castEvent.getLeftFragment());
+          task.setFragment(castEvent.getLeftFragment());
           if (castEvent.getRightFragment() != null) {
-            task.setFragment2(castEvent.getRightFragment());
+            task.setFragment(castEvent.getRightFragment());
           }
           subQuery.getEventHandler().handle(new TaskEvent(task.getId(), TaskEventType.T_SCHEDULE));
         } else {
@@ -195,9 +197,9 @@ public class DefaultTaskScheduler extends AbstractTaskScheduler {
         QueryUnit task = SubQuery.newEmptyQueryUnit(context, queryUnitContext, subQuery, nextTaskId++);
         for (Entry<String, List<URI>> eachFetch : fetches.entrySet()) {
           task.addFetches(eachFetch.getKey(), eachFetch.getValue());
-          task.setFragment2(fragmentsForNonLeafTask[0]);
+          task.setFragment(fragmentsForNonLeafTask[0]);
           if (fragmentsForNonLeafTask[1] != null) {
-            task.setFragment2(fragmentsForNonLeafTask[1]);
+            task.setFragment(fragmentsForNonLeafTask[1]);
           }
         }
         subQuery.getEventHandler().handle(new TaskEvent(task.getId(), TaskEventType.T_SCHEDULE));

@@ -110,7 +110,13 @@ Release 0.8.0 - unreleased
 
   IMPROVEMENTS
 
-    TAJO-464: Rename the name 'partition', actually meaning shuffle to 
+    TAJO-471: Extract ColumnPartitonUtils class for ColumnPartition rewrite.
+    (DaeMyung Kang via hyunsik)
+
+    TAJO-476: Add a test development kit for unit tests based on executions
+    of queries. (hyunsik)
+
+    TAJO-464: Rename the name 'partition', actually meaning shuffle to
     'shuffle'. (hyunsik)
 
     TAJO-385: Refactoring TaskScheduler to assign multiple fragments. (jihoon)
@@ -191,6 +197,9 @@ Release 0.8.0 - unreleased
     (Keuntae Park via jihoon)
 
   BUG FIXES
+
+    TAJO-479: Rename obsolete name 'partition' to 'shuffle and fix the broken
+    taskdetail.jsp. (hyunsik).
 
     TAJO-470: Fetcher's finished time and file length is changed in WEB UI.
     (hyoungjunkim via hyunsik)
