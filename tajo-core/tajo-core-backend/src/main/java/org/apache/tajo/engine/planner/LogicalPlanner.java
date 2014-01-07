@@ -468,14 +468,15 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     LogicalNode child = visit(context, stack, aggregation.getChild());
     stack.pop();
 
-    Target [] targets = new Target[block.getProjection().size()];
-    for (int i = 0; i < block.getProjection().size(); i++) {
-      TargetExpr rawTarget = block.getProjection().getTargets()[i];
-      targets[i] = block.targetListManager.getTarget(rawTarget.getExpr());
-      if (targets[i] == null) {
-        EvalNode evalNode = createEvalTree(plan, block, rawTarget.getExpr());
-        targets[i] = new Target(evalNode, rawTarget.getAlias());
-        block.targetListManager.switchTarget(rawTarget.getAlias(), targets[i].getEvalTree());
+    Set<Target> evaluatedTargets = new LinkedHashSet<Target>();
+    for (TargetExpr rawTarget : context.block.targetListManager.getRawTargets()) {
+      try {
+        EvalNode evalNode = createEvalTree(context.plan, context.block, rawTarget.getExpr());
+        if (EvalTreeUtil.findDistinctAggFunction(evalNode).size() > 0) {
+          context.block.targetListManager.switchTarget(rawTarget.getAlias(), evalNode);
+          evaluatedTargets.add(new Target(evalNode, rawTarget.getAlias()));
+        }
+      } catch (VerifyException ve) {
       }
     }
 
@@ -494,12 +495,20 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
             createEvalTree(plan, block, aggregation.getHavingCondition()));
       }
 
-      groupingNode.setTargets(targets);
+      List<Target> targets = new ArrayList<Target>();
+
+      for (Column column : groupingColumns) {
+        if (child.getOutSchema().contains(column.getQualifiedName())) {
+          targets.add(new Target(new FieldEval(column)));
+        }
+      }
+      targets.addAll(evaluatedTargets);
+      groupingNode.setTargets(targets.toArray(new Target[targets.size()]));
       // 4. Set Child Plan and Update Input Schemes Phase
       groupingNode.setChild(child);
       block.setGroupbyNode(groupingNode);
       groupingNode.setInSchema(child.getOutSchema());
-      groupingNode.setOutSchema(PlannerUtil.targetToSchema(targets));
+      groupingNode.setOutSchema(PlannerUtil.targetToSchema(groupingNode.getTargets()));
 
       // 5. Update Output Schema and Targets for Upper Plan
 
@@ -691,15 +700,18 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       TargetExpr rawTarget;
       for (int i = 0; i < projection.getTargets().length; i++) {
         rawTarget = projection.getTargets()[i];
-        dissectedExpr = dissectedExpr(rawTarget.getExpr());
+        dissectedExpr = dissectedExpr(plan, rawTarget.getExpr());
+
         if (rawTarget.hasAlias()) {
           targetNames[i] = context.block.targetListManager.addTargetExpr(
               new TargetExpr(dissectedExpr.outer, rawTarget.getAlias()));
         } else {
           targetNames[i] = context.block.targetListManager.addExpr(dissectedExpr.outer);
         }
-      }
 
+        context.block.targetListManager.addTargetExprArray(dissectedExpr.aggregation);
+        context.block.targetListManager.addTargetExprArray(dissectedExpr.inner);
+      }
     }
 
     if (!projection.hasChild()) {
@@ -719,17 +731,20 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     child = insertGroupbyNodeIfUnresolved(plan, block, child, targetNames, stack);
     stack.pop();
 
-    // All targets must be evaluable before the projection.
-//    Preconditions.checkState(block.getTargetListManager().isAllResolved(),
-//        "Some targets cannot be evaluated in the query block \"%s\"", block.getName());
-
     ProjectionNode projectionNode;
     if (projection.isAllProjected()) {
       projectionNode = new ProjectionNode(context.plan.newPID(), PlannerUtil.schemaToTargets(child.getOutSchema()));
     } else {
       Target [] targets = new Target[projection.size()];
       for (int i = 0; i < targetNames.length; i++) {
-        targets[i] = context.block.targetListManager.getTarget(targetNames[i]);
+        if (context.block.targetListManager.isResolved(targetNames[i])) {
+          targets[i] = context.block.targetListManager.getTarget(targetNames[i]);
+        } else {
+          EvalNode evalNode = createEvalTree(plan, block,
+              context.block.targetListManager.getRawTarget(targetNames[i]).getExpr());
+          targets[i] = new Target(evalNode, targetNames[i]);
+          context.block.targetListManager.switchTarget(targetNames[i], evalNode);
+        }
       }
       projectionNode = new ProjectionNode(context.plan.newPID(), targets);
     }
@@ -761,11 +776,15 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     Expr outer;
     List<TargetExpr> aggregation = new ArrayList<TargetExpr>();
     List<TargetExpr> inner = new ArrayList<TargetExpr>();
+
+    DissectedExpr(LogicalPlan plan) {
+      this.plan = plan;
+    }
   }
 
-  DissectedExpr dissectedExpr(Expr expr) throws PlanningException {
+  DissectedExpr dissectedExpr(LogicalPlan plan, Expr expr) throws PlanningException {
     DissectedExprVisitor visitor = new DissectedExprVisitor();
-    DissectedExpr dissectedExpr = new DissectedExpr();
+    DissectedExpr dissectedExpr = new DissectedExpr(plan);
 
     // early pruning
     if (expr.getType() == OpType.Column || expr.getType() == OpType.Literal || expr.getType() == OpType.NullLiteral) {
@@ -773,155 +792,150 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     } else {
       visitor.visit(dissectedExpr, new Stack<Expr>(), expr);
     }
+
     return dissectedExpr;
   }
 
-  private class DissectedExprVisitor extends BasicAlgebraVisitor<DissectedExpr> {
-    public Expr visit(DissectedExpr ctx, Stack<Expr> stack, Expr expr) throws PlanningException {
-      if (expr instanceof GeneralSetFunctionExpr) {
+  private class DissectedExprVisitor extends SimpleAlgebraVisitor<DissectedExpr> {
 
-      } else {
-        super.visit(ctx, stack, expr);
-      }
-
+    /**
+     * The posthook is called before each expression is visited.
+     */
+    public Expr postHook(DissectedExpr ctx, Stack<Expr> stack, Expr expr, Expr current) throws PlanningException {
       ctx.outer = expr;
-      return expr;
+      return current;
     }
 
-    @Override
-    public Expr visitAnd(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
-      return null;
-    }
-
-    @Override
-    public Expr visitOr(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
-      return null;
-    }
-
-    @Override
-    public Expr visitNot(DissectedExpr ctx, Stack<Expr> stack, NotExpr expr) throws PlanningException {
-      return null;
-    }
-
-    @Override
-    public Expr visitEquals(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
-      return null;
-    }
-
-    @Override
-    public Expr visitNotEquals(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
-      return null;
-    }
-
-    @Override
-    public Expr visitLessThan(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
-      return null;
-    }
-
-    @Override
-    public Expr visitLessThanOrEquals(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
-      return null;
-    }
-
-    @Override
-    public Expr visitGreaterThan(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
-      return null;
-    }
-
-    @Override
-    public Expr visitGreaterThanOrEquals(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws
-        PlanningException {
-      return null;
-    }
-
-    @Override
-    public Expr visitBetween(DissectedExpr ctx, Stack<Expr> stack, BetweenPredicate expr) throws PlanningException {
-      return null;
+    private boolean isAggregationFunction(Expr expr) {
+      return expr.getType() == OpType.GeneralSetFunction || expr.getType() == OpType.CountRowsFunction;
     }
 
     @Override
     public Expr visitCaseWhen(DissectedExpr ctx, Stack<Expr> stack, CaseWhenPredicate expr) throws PlanningException {
-      return null;
-    }
-
-    @Override
-    public Expr visitInPredicate(DissectedExpr ctx, Stack<Expr> stack, InPredicate expr) throws PlanningException {
-      return null;
-    }
-
-    @Override
-    public Expr visitExistsPredicate(DissectedExpr ctx, Stack<Expr> stack, ExistsPredicate expr) throws PlanningException {
-      return expr;
-    }
-
-    @Override
-    public Expr visitLikePredicate(DissectedExpr ctx, Stack<Expr> stack, PatternMatchPredicate expr) throws PlanningException {
-      return expr;
-    }
-
-    @Override
-    public Expr visitSimilarToPredicate(DissectedExpr ctx, Stack<Expr> stack, PatternMatchPredicate expr) throws
-        PlanningException {
-      return expr;
-    }
-
-    @Override
-    public Expr visitRegexpPredicate(DissectedExpr ctx, Stack<Expr> stack, PatternMatchPredicate expr) throws
-        PlanningException {
-      return expr;
-    }
-
-    @Override
-    public Expr visitConcatenate(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
-      return expr;
-    }
-
-    @Override
-    public Expr visitPlus(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
-      return expr;
-    }
-
-    @Override
-    public Expr visitMinus(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
-      return expr;
-    }
-
-    @Override
-    public Expr visitMultiply(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
-      return expr;
-    }
-
-    @Override
-    public Expr visitDivide(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
-      return expr;
-    }
-
-    @Override
-    public Expr visitModular(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
-      return expr;
-    }
-
-    @Override
-    public Expr visitSign(DissectedExpr ctx, Stack<Expr> stack, SignedExpr expr) throws PlanningException {
-      return expr;
-    }
-
-    @Override
-    public Expr visitGeneralSetFunction(DissectedExpr ctx, Stack<Expr> stack, GeneralSetFunctionExpr expr) throws PlanningException {
-      for (int i = 0; i < expr.getParams().length; i++) {
-        Expr param  = expr.getParams()[i];
-        String name = ctx.plan.newNonameColumnName(param.getType().name());
-        ctx.inner.add(new TargetExpr(param, name));
-        expr.getParams()[i] = new TargetExpr(new ColumnReferenceExpr(name));
+      stack.push(expr);
+      for (CaseWhenPredicate.WhenExpr when : expr.getWhens()) {
+        if (isAggregationFunction(when.getCondition())) {
+          String referenceName = ctx.plan.newGneratedColumnName(when.getCondition());
+          ctx.aggregation.add(new TargetExpr(when.getCondition(), referenceName));
+          when.setCondition(new ColumnReferenceExpr(referenceName));
+        }
+        if (isAggregationFunction(when.getResult())) {
+          String referenceName = ctx.plan.newGneratedColumnName(when.getResult());
+          ctx.aggregation.add(new TargetExpr(when.getResult(), referenceName));
+          when.setResult(new ColumnReferenceExpr(referenceName));
+        }
       }
+      if (expr.hasElseResult()) {
+        if (isAggregationFunction(expr.getElseResult())) {
+          String referenceName = ctx.plan.newGneratedColumnName(expr.getElseResult());
+          ctx.aggregation.add(new TargetExpr(expr.getElseResult(), referenceName));
+          expr.setElseResult(new ColumnReferenceExpr(referenceName));
+        }
+      }
+      stack.pop();
       return expr;
     }
+
+    @Override
+    public Expr visitUnaryOperator(DissectedExpr ctx, Stack<Expr> stack, UnaryOperator expr) throws PlanningException {
+      super.visitUnaryOperator(ctx, stack, expr);
+      if (isAggregationFunction(expr.getChild())) {
+        // Get an anonymous column name and replace the aggregation function by the column name
+        String refName = ctx.plan.newGneratedColumnName(expr.getChild());
+        ctx.aggregation.add(new TargetExpr(expr.getChild(), refName));
+        expr.setChild(new ColumnReferenceExpr(refName));
+      }
+
+      return expr;
+    }
+
+    @Override
+    public Expr visitBinaryOperator(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
+      super.visitBinaryOperator(ctx, stack, expr);
+
+      ////////////////////////
+      // For Left Term
+      ////////////////////////
+
+      if (isAggregationFunction(expr.getLeft())) {
+        String leftRefName = ctx.plan.newGneratedColumnName(expr.getLeft());
+        ctx.aggregation.add(new TargetExpr(expr.getLeft(), leftRefName));
+        expr.setLeft(new ColumnReferenceExpr(leftRefName));
+      }
+
+
+      ////////////////////////
+      // For Right Term
+      ////////////////////////
+      if (isAggregationFunction(expr.getRight())) {
+        String rightRefName = ctx.plan.newGneratedColumnName(expr.getRight());
+        ctx.aggregation.add(new TargetExpr(expr.getRight(), rightRefName));
+        expr.setRight(new ColumnReferenceExpr(rightRefName));
+      }
+
+      return expr;
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Function Section
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    @Override
+    public Expr visitFunction(DissectedExpr ctx, Stack<Expr> stack, FunctionExpr expr) throws PlanningException {
+      stack.push(expr);
+
+      Expr param;
+      for (int i = 0; i < expr.getParams().length; i++) {
+        param = expr.getParams()[i];
+        visit(ctx, stack, param);
+
+        if (isAggregationFunction(param)) {
+          String referenceName = ctx.plan.newGneratedColumnName(param);
+          ctx.aggregation.add(new TargetExpr(param, referenceName));
+          expr.getParams()[i] = new ColumnReferenceExpr(referenceName);
+        }
+      }
+
+      stack.pop();
+
+      return expr;
+    }
+
+    @Override
+    public Expr visitGeneralSetFunction(DissectedExpr ctx, Stack<Expr> stack, GeneralSetFunctionExpr expr)
+        throws PlanningException {
+      stack.push(expr);
+
+      Expr param;
+      for (int i = 0; i < expr.getParams().length; i++) {
+        param = expr.getParams()[i];
+        visit(ctx, stack, param);
+
+        String referenceName = ctx.plan.newGneratedColumnName(param);
+        ctx.inner.add(new TargetExpr(param, referenceName));
+        expr.getParams()[i] = new ColumnReferenceExpr(referenceName);
+      }
+      stack.pop();
+      return expr;
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Literal Section
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     @Override
     public Expr visitCastExpr(DissectedExpr ctx, Stack<Expr> stack, CastExpr expr) throws PlanningException {
-      return null;
+      super.visitCastExpr(ctx, stack, expr);
+      if (expr.getChild().getType() == OpType.GeneralSetFunction
+          || expr.getChild().getType() == OpType.CountRowsFunction) {
+        String referenceName = ctx.plan.newGneratedColumnName(expr.getChild());
+        ctx.aggregation.add(new TargetExpr(expr.getChild(), referenceName));
+        expr.setChild(new ColumnReferenceExpr(referenceName));
+      }
+      return expr;
     }
   }
+
 
   /**
    * Insert a group-by operator before a sort or a projection operator.

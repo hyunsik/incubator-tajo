@@ -23,7 +23,6 @@ import org.apache.tajo.algebra.*;
 import org.apache.tajo.annotation.NotThreadSafe;
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Schema;
-import org.apache.tajo.engine.eval.*;
 import org.apache.tajo.engine.exception.NoSuchColumnException;
 import org.apache.tajo.engine.exception.VerifyException;
 import org.apache.tajo.engine.planner.graph.DirectedGraphCursor;
@@ -83,7 +82,31 @@ public class LogicalPlan {
   }
 
   public String newNonameColumnName(String prefix) {
-    String suffix = "_" + String.valueOf(noNameColumnId);
+    String suffix = String.valueOf(noNameColumnId);
+    noNameColumnId++;
+    return "$" + prefix.toLowerCase() + "_" + suffix;
+  }
+
+  public String newGneratedColumnName(Expr expr) {
+    String prefix;
+
+    switch (expr.getType()) {
+    case CountRowsFunction:
+      prefix = "count";
+      break;
+    case GeneralSetFunction:
+      GeneralSetFunctionExpr setFunction = (GeneralSetFunctionExpr) expr;
+      prefix = setFunction.getSignature();
+      break;
+    case Function:
+      FunctionExpr function = (FunctionExpr) expr;
+      prefix = function.getSignature();
+      break;
+    default:
+      prefix = expr.getType().name();
+    }
+
+    String suffix = String.valueOf(noNameColumnId);
     noNameColumnId++;
     return "$" + prefix.toLowerCase() + "_" + suffix;
   }
@@ -180,6 +203,13 @@ public class LogicalPlan {
     } else { // if a column reference is not qualified
 
       // Trying to find the column within the current block
+
+      if (block.getLatestNode() != null) {
+        Column found = block.getLatestNode().getOutSchema().getColumnByName(columnRef.getName());
+        if (found != null) {
+          return found;
+        }
+      }
 
       // Trying to find columns from other relations in the current block
       List<Column> candidates = TUtil.newList();

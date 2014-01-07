@@ -18,7 +18,7 @@
 
 package org.apache.tajo.algebra;
 
-import com.google.gson.annotations.SerializedName;
+import com.google.common.base.Objects;
 import org.apache.tajo.util.TUtil;
 
 public class Sort extends UnaryOperator {
@@ -38,6 +38,11 @@ public class Sort extends UnaryOperator {
   }
 
   @Override
+  public int hashCode() {
+    return Objects.hashCode(sortSpecs);
+  }
+
+  @Override
   public boolean equalsTo(Expr expr) {
     Sort another = (Sort) expr;
     return TUtil.checkEquals(sortSpecs, another.sortSpecs);
@@ -51,7 +56,6 @@ public class Sort extends UnaryOperator {
   public static class SortSpec {
     private Expr key;
     private boolean asc = true;
-    @SerializedName("null_first")
     private boolean nullFirst = false;
 
     public SortSpec(final Expr key) {
@@ -90,6 +94,10 @@ public class Sort extends UnaryOperator {
 
     public final Expr getKey() {
       return this.key;
+    }
+
+    public int hashCode() {
+      return Objects.hashCode(asc, key, nullFirst);
     }
 
     public boolean equals(Object obj) {

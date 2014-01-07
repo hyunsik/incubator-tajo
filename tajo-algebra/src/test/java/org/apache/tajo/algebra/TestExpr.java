@@ -36,6 +36,7 @@ public class TestExpr {
         new LiteralValue("1", LiteralType.Unsigned_Integer),
         new LiteralValue("2", LiteralType.Unsigned_Integer));
 
+    assertEquals(expr1.hashCode(), expr2.hashCode());
     assertEquals(expr1, expr2);
 
     Expr expr3 = new BinaryOperator(OpType.Minus,

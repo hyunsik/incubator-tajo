@@ -20,6 +20,8 @@ package org.apache.tajo.algebra;
 
 import org.apache.tajo.util.TUtil;
 
+import java.util.Objects;
+
 public class FunctionExpr extends Expr {
   private String signature;
   private Expr[] params;
@@ -60,6 +62,11 @@ public class FunctionExpr extends Expr {
 
   public void setParams(Expr[] params) {
     this.params = params;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(signature, params);
   }
 
   @Override

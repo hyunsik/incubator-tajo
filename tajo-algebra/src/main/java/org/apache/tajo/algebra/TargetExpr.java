@@ -18,15 +18,15 @@
 
 package org.apache.tajo.algebra;
 
+import com.google.common.base.Objects;
 import org.apache.tajo.util.TUtil;
 
-public class TargetExpr extends Expr {
-  private Expr expr;
+public class TargetExpr extends UnaryOperator {
   private String alias;
 
   public TargetExpr(Expr expr) {
     super(OpType.Target);
-    this.expr = expr;
+    setChild(expr);
   }
 
   public TargetExpr(Expr expr, String alias) {
@@ -35,7 +35,7 @@ public class TargetExpr extends Expr {
   }
 
   public Expr getExpr() {
-    return expr;
+    return getChild();
   }
 
   public boolean hasAlias() {
@@ -51,17 +51,22 @@ public class TargetExpr extends Expr {
   }
 
   @Override
+  public int hashCode() {
+    return Objects.hashCode(alias, getChild());
+  }
+
+  @Override
   public boolean equalsTo(Expr obj) {
     if (obj instanceof TargetExpr) {
       TargetExpr another = (TargetExpr) obj;
-      return expr.equals(another.expr) && TUtil.checkEquals(alias, another.alias);
+      return TUtil.checkEquals(alias, another.alias);
     }
 
     return false;
   }
 
   public String toString() {
-    return expr.toString() + (hasAlias() ? " AS " + alias : "");
+    return getChild().toString() + (hasAlias() ? " AS " + alias : "");
   }
 
   @Override

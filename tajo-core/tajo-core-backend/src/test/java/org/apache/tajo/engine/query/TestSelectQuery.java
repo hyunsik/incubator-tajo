@@ -193,14 +193,9 @@ public class TestSelectQuery extends QueryTestCaseBase {
   }
 
   @Test
-  public final void testWhereCond9() throws Exception {
-    ResultSet res = tpch.execute("select l_orderkey + l_partkey = 4 as value from lineitem where l_orderkey + l_partkey = 4");
-    try {
-      assertTrue(res.next());
-      assertEquals(4, res.getInt(1));
-      assertFalse(res.next());
-    } finally {
-      res.close();
-    }
+  public final void testDuplicateExprInWhere() throws Exception {
+    ResultSet res = executeQuery();
+    System.out.println(resultSetToString(res));
+    cleanupQuery(res);
   }
 }

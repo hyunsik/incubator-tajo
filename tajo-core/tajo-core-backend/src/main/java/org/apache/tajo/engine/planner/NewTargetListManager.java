@@ -22,6 +22,7 @@ import org.apache.tajo.algebra.ColumnReferenceExpr;
 import org.apache.tajo.algebra.Expr;
 import org.apache.tajo.algebra.OpType;
 import org.apache.tajo.algebra.TargetExpr;
+import org.apache.tajo.annotation.Nullable;
 import org.apache.tajo.engine.eval.EvalNode;
 import org.apache.tajo.engine.eval.FieldEval;
 
@@ -85,12 +86,17 @@ public class NewTargetListManager {
     }
   }
 
-  public String [] addTargetExprArray(TargetExpr[] targets) {
-    String [] names = new String[targets.length];
-    for (int i = 0; i < targets.length; i++) {
-      names[i] = addTargetExpr(targets[i]);
+  public String [] addTargetExprArray(@Nullable Collection<TargetExpr> targets) {
+    if (targets != null) {
+      String [] names = new String[targets.size()];
+      int i = 0;
+      for (TargetExpr target : targets) {
+        names[i++] = addTargetExpr(target);
+      }
+      return names;
+    } else {
+      return null;
     }
-    return names;
   }
 
   public Collection<TargetExpr> getRawTargets() {
@@ -109,7 +115,7 @@ public class NewTargetListManager {
   }
 
   public Target getTarget(String name) {
-    if (resolvedFlags.containsKey(name)) {
+    if (resolvedFlags.containsKey(name) && resolvedFlags.get(name)) {
       return new Target(new FieldEval(name, nameToEvalMap.get(name).getValueType()));
     } else {
       if (nameToEvalMap.containsKey(name)) {
@@ -123,12 +129,7 @@ public class NewTargetListManager {
   public Target getTarget(Expr expr) {
     if (exprToNameMap.containsKey(expr)) {
       String name = exprToNameMap.get(expr);
-      if (nameToEvalMap.containsKey(name)) {
-        EvalNode evalNode = nameToEvalMap.get(name);
-        return new Target(evalNode, name);
-      } else {
-        return null;
-      }
+      return getTarget(name);
     } else {
       return null;
     }

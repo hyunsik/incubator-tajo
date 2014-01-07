@@ -254,22 +254,41 @@ public class BaseAlgebraVisitor<CONTEXT, RESULT> implements AlgebraVisitor<CONTE
 
   @Override
   public RESULT visitProjection(CONTEXT ctx, Stack<Expr> stack, Projection expr) throws PlanningException {
-    return visitDefaultUnaryExpr(ctx, stack, expr);
+    stack.push(expr);
+    for (TargetExpr target : expr.getTargets()) {
+      visit(ctx, stack, target);
+    }
+    RESULT result = visit(ctx, stack, expr.getChild());
+    stack.pop();
+    return result;
   }
 
   @Override
   public RESULT visitLimit(CONTEXT ctx, Stack<Expr> stack, Limit expr) throws PlanningException {
-    return visitDefaultUnaryExpr(ctx, stack, expr);
+    stack.push(expr);
+    visit(ctx, stack, expr.getFetchFirstNum());
+    RESULT result = visit(ctx, stack, expr.getChild());
+    stack.pop();
+    return result;
   }
 
   @Override
   public RESULT visitSort(CONTEXT ctx, Stack<Expr> stack, Sort expr) throws PlanningException {
-    return visitDefaultUnaryExpr(ctx, stack, expr);
+    stack.push(expr);
+    for (Sort.SortSpec sortSpec : expr.getSortSpecs()) {
+      visit(ctx, stack, sortSpec.getKey());
+    }
+    RESULT result = visit(ctx, stack, expr.getChild());
+    return result;
   }
 
   @Override
   public RESULT visitHaving(CONTEXT ctx, Stack<Expr> stack, Having expr) throws PlanningException {
-    return visitDefaultUnaryExpr(ctx, stack, expr);
+    stack.push(expr);
+    visit(ctx, stack, expr.getQual());
+    RESULT result = visit(ctx, stack, expr.getChild());
+    stack.pop();
+    return result;
   }
 
   @Override
@@ -279,12 +298,21 @@ public class BaseAlgebraVisitor<CONTEXT, RESULT> implements AlgebraVisitor<CONTE
 
   @Override
   public RESULT visitJoin(CONTEXT ctx, Stack<Expr> stack, Join expr) throws PlanningException {
-    return visitDefaultBinaryExpr(ctx, stack, expr);
+    stack.push(expr);
+    visit(ctx, stack, expr.getQual());
+    visit(ctx, stack, expr.getLeft());
+    RESULT result = visit(ctx, stack, expr.getRight());
+    stack.pop();
+    return result;
   }
 
   @Override
   public RESULT visitFilter(CONTEXT ctx, Stack<Expr> stack, Selection expr) throws PlanningException {
-    return visitDefaultUnaryExpr(ctx, stack, expr);
+    stack.push(expr);
+    visit(ctx, stack, expr.getQual());
+    RESULT result = visit(ctx, stack, expr.getChild());
+    stack.pop();
+    return result;
   }
 
   @Override
@@ -480,31 +508,22 @@ public class BaseAlgebraVisitor<CONTEXT, RESULT> implements AlgebraVisitor<CONTE
   ///////////////////////////////////////////////////////////////////////////////////////////////////////////
   // String Operator or Pattern Matching Predicates Section
   ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-  private RESULT visitPatternMatchPredicate(CONTEXT ctx, Stack<Expr> stack, PatternMatchPredicate expr)
-      throws PlanningException {
-    stack.push(expr);
-    RESULT result = visit(ctx, stack, expr.getPredicand());
-    visit(ctx, stack, expr.getPattern());
-    stack.pop();
-    return result;
-  }
   @Override
   public RESULT visitLikePredicate(CONTEXT ctx, Stack<Expr> stack, PatternMatchPredicate expr)
       throws PlanningException {
-    return visitPatternMatchPredicate(ctx, stack, expr);
+    return visitDefaultBinaryExpr(ctx, stack, expr);
   }
 
   @Override
   public RESULT visitSimilarToPredicate(CONTEXT ctx, Stack<Expr> stack, PatternMatchPredicate expr)
       throws PlanningException {
-    return visitPatternMatchPredicate(ctx, stack, expr);
+    return visitDefaultBinaryExpr(ctx, stack, expr);
   }
 
   @Override
   public RESULT visitRegexpPredicate(CONTEXT ctx, Stack<Expr> stack, PatternMatchPredicate expr)
       throws PlanningException {
-    return visitPatternMatchPredicate(ctx, stack, expr);
+    return visitDefaultBinaryExpr(ctx, stack, expr);
   }
 
   @Override
@@ -558,10 +577,7 @@ public class BaseAlgebraVisitor<CONTEXT, RESULT> implements AlgebraVisitor<CONTE
 
   @Override
   public RESULT visitTargetExpr(CONTEXT ctx, Stack<Expr> stack, TargetExpr expr) throws PlanningException {
-    stack.push(expr);
-    RESULT result = visit(ctx, stack, expr.getExpr());
-    stack.pop();
-    return result;
+    return visitDefaultUnaryExpr(ctx, stack, expr);
   }
 
   @Override

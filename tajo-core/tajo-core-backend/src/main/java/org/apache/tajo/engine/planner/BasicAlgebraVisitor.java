@@ -34,8 +34,8 @@ public class BasicAlgebraVisitor<CONTEXT> extends BaseAlgebraVisitor<CONTEXT, Ex
   /**
    * The posthook is called before each expression is visited.
    */
-  public Expr postHook(CONTEXT ctx, Stack<Expr> stack, Expr expr, Expr current) throws PlanningException {
-    return current;
+  public Expr postHook(CONTEXT ctx, Stack<Expr> stack, Expr expr, Expr result) throws PlanningException {
+    return result;
   }
 
   private Expr visitDefaultUnaryExpr(CONTEXT ctx, Stack<Expr> stack, UnaryOperator expr) throws PlanningException {
@@ -56,22 +56,41 @@ public class BasicAlgebraVisitor<CONTEXT> extends BaseAlgebraVisitor<CONTEXT, Ex
 
   @Override
   public Expr visitProjection(CONTEXT ctx, Stack<Expr> stack, Projection expr) throws PlanningException {
-    return visitDefaultUnaryExpr(ctx, stack, expr);
+    stack.push(expr);
+    for (TargetExpr target : expr.getTargets()) {
+      visit(ctx, stack, target);
+    }
+    visit(ctx, stack, expr.getChild());
+    stack.pop();
+    return expr;
   }
 
   @Override
   public Expr visitLimit(CONTEXT ctx, Stack<Expr> stack, Limit expr) throws PlanningException {
-    return visitDefaultUnaryExpr(ctx, stack, expr);
+    stack.push(expr);
+    visit(ctx, stack, expr.getFetchFirstNum());
+    visit(ctx, stack, expr.getChild());
+    stack.pop();
+    return expr;
   }
 
   @Override
   public Expr visitSort(CONTEXT ctx, Stack<Expr> stack, Sort expr) throws PlanningException {
-    return visitDefaultUnaryExpr(ctx, stack, expr);
+    stack.push(expr);
+    for (Sort.SortSpec sortSpec : expr.getSortSpecs()) {
+      visit(ctx, stack, sortSpec.getKey());
+    }
+    visit(ctx, stack, expr.getChild());
+    return expr;
   }
 
   @Override
   public Expr visitHaving(CONTEXT ctx, Stack<Expr> stack, Having expr) throws PlanningException {
-    return visitDefaultUnaryExpr(ctx, stack, expr);
+    stack.push(expr);
+    visit(ctx, stack, expr.getQual());
+    visit(ctx, stack, expr.getChild());
+    stack.pop();
+    return expr;
   }
 
   @Override
@@ -81,12 +100,21 @@ public class BasicAlgebraVisitor<CONTEXT> extends BaseAlgebraVisitor<CONTEXT, Ex
 
   @Override
   public Expr visitJoin(CONTEXT ctx, Stack<Expr> stack, Join expr) throws PlanningException {
-    return visitDefaultBinaryExpr(ctx, stack, expr);
+    stack.push(expr);
+    visit(ctx, stack, expr.getQual());
+    visit(ctx, stack, expr.getLeft());
+    visit(ctx, stack, expr.getRight());
+    stack.pop();
+    return expr;
   }
 
   @Override
   public Expr visitFilter(CONTEXT ctx, Stack<Expr> stack, Selection expr) throws PlanningException {
-    return visitDefaultUnaryExpr(ctx, stack, expr);
+    stack.push(expr);
+    visit(ctx, stack, expr.getQual());
+    Expr result = visit(ctx, stack, expr.getChild());
+    stack.pop();
+    return result;
   }
 
   @Override
@@ -278,31 +306,22 @@ public class BasicAlgebraVisitor<CONTEXT> extends BaseAlgebraVisitor<CONTEXT, Ex
   ///////////////////////////////////////////////////////////////////////////////////////////////////////////
   // String Operator or Pattern Matching Predicates Section
   ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-  private Expr visitPatternMatchPredicate(CONTEXT ctx, Stack<Expr> stack, PatternMatchPredicate expr)
-      throws PlanningException {
-    stack.push(expr);
-    visit(ctx, stack, expr.getPredicand());
-    visit(ctx, stack, expr.getPattern());
-    stack.pop();
-    return expr;
-  }
   @Override
   public Expr visitLikePredicate(CONTEXT ctx, Stack<Expr> stack, PatternMatchPredicate expr)
       throws PlanningException {
-    return visitPatternMatchPredicate(ctx, stack, expr);
+    return visitDefaultBinaryExpr(ctx, stack, expr);
   }
 
   @Override
   public Expr visitSimilarToPredicate(CONTEXT ctx, Stack<Expr> stack, PatternMatchPredicate expr)
       throws PlanningException {
-    return visitPatternMatchPredicate(ctx, stack, expr);
+    return visitDefaultBinaryExpr(ctx, stack, expr);
   }
 
   @Override
   public Expr visitRegexpPredicate(CONTEXT ctx, Stack<Expr> stack, PatternMatchPredicate expr)
       throws PlanningException {
-    return visitPatternMatchPredicate(ctx, stack, expr);
+    return visitDefaultBinaryExpr(ctx, stack, expr);
   }
 
   @Override
@@ -351,15 +370,12 @@ public class BasicAlgebraVisitor<CONTEXT> extends BaseAlgebraVisitor<CONTEXT, Ex
   @Override
   public Expr visitColumnReference(CONTEXT ctx, Stack<Expr> stack, ColumnReferenceExpr expr)
       throws PlanningException {
-    return null;
+    return expr;
   }
 
   @Override
   public Expr visitTargetExpr(CONTEXT ctx, Stack<Expr> stack, TargetExpr expr) throws PlanningException {
-    stack.push(expr);
-    visit(ctx, stack, expr.getExpr());
-    stack.pop();
-    return expr;
+    return visitDefaultUnaryExpr(ctx, stack, expr);
   }
 
   @Override

@@ -22,8 +22,6 @@ import com.google.common.base.Preconditions;
 
 public class PatternMatchPredicate extends BinaryOperator {
   private boolean not;
-  private Expr columnRef;
-  private Expr pattern;
   private boolean caseInsensitive;
 
   public PatternMatchPredicate(OpType opType, boolean not, Expr predicand, Expr pattern,
@@ -34,10 +32,8 @@ public class PatternMatchPredicate extends BinaryOperator {
         "pattern matching predicate is only available: " + opType.name());
     this.not = not;
     this.caseInsensitive = caseInsensitive;
-    setLeft(columnRef);
+    setLeft(predicand);
     setRight(pattern);
-    this.columnRef = predicand;
-    this.pattern = pattern;
   }
 
   public PatternMatchPredicate(OpType opType, boolean not, Expr predicand, Expr pattern) {
@@ -49,11 +45,11 @@ public class PatternMatchPredicate extends BinaryOperator {
   }
 
   public Expr getPredicand() {
-    return this.columnRef;
+    return getLeft();
   }
 
   public Expr getPattern() {
-    return this.pattern;
+    return getRight();
   }
 
   public boolean isCaseInsensitive() {
@@ -63,9 +59,6 @@ public class PatternMatchPredicate extends BinaryOperator {
   boolean equalsTo(Expr expr) {
     PatternMatchPredicate another = (PatternMatchPredicate) expr;
     return opType == another.opType &&
-        not == another.not &&
-        columnRef.equals(another.columnRef) &&
-        pattern.equals(another.pattern) &&
-        caseInsensitive == another.caseInsensitive;
+        not == another.not && caseInsensitive == another.caseInsensitive;
   }
 }

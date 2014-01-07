@@ -18,6 +18,7 @@
 
 package org.apache.tajo.algebra;
 
+import com.google.common.base.Objects;
 import org.apache.tajo.util.TUtil;
 
 public class Projection extends UnaryOperator implements Cloneable {
@@ -56,6 +57,10 @@ public class Projection extends UnaryOperator implements Cloneable {
 
   public void setTargets(TargetExpr[] targets) {
     this.targets = targets;
+  }
+
+  public int hashCode() {
+    return Objects.hashCode(all, distinct, targets, getChild());
   }
 
   @Override

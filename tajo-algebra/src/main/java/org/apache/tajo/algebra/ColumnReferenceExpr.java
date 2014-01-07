@@ -18,6 +18,7 @@
 
 package org.apache.tajo.algebra;
 
+import com.google.common.base.Objects;
 import org.apache.tajo.util.TUtil;
 
 public class ColumnReferenceExpr extends Expr {
@@ -57,6 +58,11 @@ public class ColumnReferenceExpr extends Expr {
     } else {
       return name;
     }
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hashCode(name, qualifier);
   }
 
   public boolean equalsTo(Expr expr) {

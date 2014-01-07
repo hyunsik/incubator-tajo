@@ -18,6 +18,7 @@
 
 package org.apache.tajo.algebra;
 
+import com.google.common.base.Objects;
 import org.apache.tajo.util.TUtil;
 
 public class Aggregation extends UnaryOperator {
@@ -62,6 +63,11 @@ public class Aggregation extends UnaryOperator {
   }
 
   @Override
+  public int hashCode() {
+    return Objects.hashCode(targets, groups, havingCondition);
+  }
+
+  @Override
   public boolean equalsTo(Expr expr) {
     Aggregation another = (Aggregation) expr;
     boolean a = TUtil.checkEquals(groups, another.groups);
@@ -97,6 +103,12 @@ public class Aggregation extends UnaryOperator {
       return JsonHelper.toJson(this);
     }
 
+    @Override
+    public int hashCode() {
+      return Objects.hashCode(group_type, grouping_sets);
+    }
+
+    @Override
     public boolean equals(Object obj) {
       if (obj instanceof GroupElement) {
         GroupElement other = (GroupElement) obj;

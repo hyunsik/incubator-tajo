@@ -22,48 +22,103 @@ import org.apache.tajo.algebra.*;
 
 import java.util.Stack;
 
+/**
+ * <code>SimpleAlgebraVisitor</code> provides a simple and fewer visit methods. It makes building concrete class easier.
+ */
 public abstract class SimpleAlgebraVisitor<CONTEXT> extends BasicAlgebraVisitor<CONTEXT> {
 
-  /**
-   * The prehook is called before each expression is visited.
-   */
-  public void preHook(CONTEXT ctx, Stack<Expr> stack, Expr expr) throws PlanningException {
+  public Expr visit(CONTEXT ctx, Stack<Expr> stack, Expr expr) throws PlanningException {
+    preHook(ctx, stack, expr);
+    if (expr instanceof UnaryOperator) {
+      visitUnaryOperator(ctx, stack, (UnaryOperator) expr);
+    } else if (expr instanceof BinaryOperator) {
+      visitBinaryOperator(ctx, stack, (BinaryOperator) expr);
+    } else {
+      super.visit(ctx, stack, expr);
+    }
+    postHook(ctx, stack, expr, expr);
+    return expr;
   }
 
-
-  /**
-   * The posthook is called before each expression is visited.
-   */
-  public Expr postHook(CONTEXT ctx, Stack<Expr> stack, Expr expr, Expr current) throws PlanningException {
-    return current;
+  public Expr visitUnaryOperator(CONTEXT ctx, Stack<Expr> stack, UnaryOperator expr) throws PlanningException {
+    stack.push(expr);
+    visit(ctx, stack, expr.getChild());
+    stack.pop();
+    return expr;
   }
 
-  abstract Expr visitUnaryOperator(CONTEXT ctx, Stack<Expr> stack, UnaryOperator expr) throws PlanningException;
+  public Expr visitBinaryOperator(CONTEXT ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
+    stack.push(expr);
+    visit(ctx, stack, expr.getLeft());
+    visit(ctx, stack, expr.getRight());
+    stack.pop();
+    return expr;
+  }
 
-  abstract Expr visitBinaryOperator(CONTEXT ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException;
+  ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+  // Relational Operator Section
+  ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   @Override
-  public abstract Expr visitTableSubQuery(CONTEXT ctx, Stack<Expr> stack, TablePrimarySubQuery expr)
-      throws PlanningException;
+  public Expr visitProjection(CONTEXT ctx, Stack<Expr> stack, Projection expr) throws PlanningException {
+    return super.visitProjection(ctx, stack, expr);
+  }
 
   @Override
-  public abstract Expr visitRelationList(CONTEXT ctx, Stack<Expr> stack, RelationList expr) throws PlanningException;
+  public Expr visitLimit(CONTEXT ctx, Stack<Expr> stack, Limit expr) throws PlanningException {
+    return super.visitLimit(ctx, stack, expr);
+  }
+
+  @Override
+  public Expr visitSort(CONTEXT ctx, Stack<Expr> stack, Sort expr) throws PlanningException {
+    return super.visitSort(ctx, stack, expr);
+  }
+
+  @Override
+  public Expr visitHaving(CONTEXT ctx, Stack<Expr> stack, Having expr) throws PlanningException {
+    return super.visitHaving(ctx, stack, expr);
+  }
+
+  public Expr visitFilter(CONTEXT ctx, Stack<Expr> stack, Selection expr) throws PlanningException {
+    return super.visitFilter(ctx, stack, expr);
+  }
+
+  @Override
+  public Expr visitJoin(CONTEXT ctx, Stack<Expr> stack, Join expr) throws PlanningException {
+    return super.visitJoin(ctx, stack, expr);
+  }
+
+  @Override
+  public Expr visitTableSubQuery(CONTEXT ctx, Stack<Expr> stack, TablePrimarySubQuery expr) throws PlanningException {
+    return super.visitTableSubQuery(ctx, stack, expr);
+  }
+
+  @Override
+  public Expr visitRelationList(CONTEXT ctx, Stack<Expr> stack, RelationList expr) throws PlanningException {
+    return super.visitRelationList(ctx, stack, expr);
+  }
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////////////
   // Data Definition Language Section
   ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   @Override
-  public abstract Expr visitCreateTable(CONTEXT ctx, Stack<Expr> stack, CreateTable expr) throws PlanningException;
+  public Expr visitCreateTable(CONTEXT ctx, Stack<Expr> stack, CreateTable expr) throws PlanningException {
+    return super.visitCreateTable(ctx, stack, expr);
+  }
 
   @Override
-  public abstract Expr visitDropTable(CONTEXT ctx, Stack<Expr> stack, DropTable expr) throws PlanningException;
+  public Expr visitDropTable(CONTEXT ctx, Stack<Expr> stack, DropTable expr) throws PlanningException {
+    return super.visitDropTable(ctx, stack, expr);
+  }
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////////////
   // Insert or Update Section
   ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  public abstract Expr visitInsert(CONTEXT ctx, Stack<Expr> stack, Insert expr) throws PlanningException;
+  public Expr visitInsert(CONTEXT ctx, Stack<Expr> stack, Insert expr) throws PlanningException {
+    return super.visitInsert(ctx, stack, expr);
+  }
 
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -71,77 +126,18 @@ public abstract class SimpleAlgebraVisitor<CONTEXT> extends BasicAlgebraVisitor<
   ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   @Override
-  public abstract Expr visitBetween(CONTEXT ctx, Stack<Expr> stack, BetweenPredicate expr) throws PlanningException;
-
-  @Override
-  public abstract Expr visitCaseWhen(CONTEXT ctx, Stack<Expr> stack, CaseWhenPredicate expr) throws PlanningException;
-
-  @Override
-  public abstract Expr visitValueListExpr(CONTEXT ctx, Stack<Expr> stack, ValueListExpr expr) throws PlanningException;
-
-
-  ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-  // String Operator or Pattern Matching Predicates Section
-  ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-  private Expr visitPatternMatchPredicate(CONTEXT ctx, Stack<Expr> stack, PatternMatchPredicate expr)
-      throws PlanningException {
-    stack.push(expr);
-    visit(ctx, stack, expr.getPredicand());
-    visit(ctx, stack, expr.getPattern());
-    stack.pop();
-    return expr;
-  }
-  @Override
-  public Expr visitLikePredicate(CONTEXT ctx, Stack<Expr> stack, PatternMatchPredicate expr)
-      throws PlanningException {
-    return visitPatternMatchPredicate(ctx, stack, expr);
+  public Expr visitBetween(CONTEXT ctx, Stack<Expr> stack, BetweenPredicate expr) throws PlanningException {
+    return super.visitBetween(ctx, stack, expr);
   }
 
   @Override
-  public Expr visitSimilarToPredicate(CONTEXT ctx, Stack<Expr> stack, PatternMatchPredicate expr)
-      throws PlanningException {
-    return visitPatternMatchPredicate(ctx, stack, expr);
+  public Expr visitCaseWhen(CONTEXT ctx, Stack<Expr> stack, CaseWhenPredicate expr) throws PlanningException {
+    return super.visitCaseWhen(ctx, stack, expr);
   }
 
   @Override
-  public Expr visitRegexpPredicate(CONTEXT ctx, Stack<Expr> stack, PatternMatchPredicate expr)
-      throws PlanningException {
-    return visitPatternMatchPredicate(ctx, stack, expr);
-  }
-
-  @Override
-  public Expr visitConcatenate(CONTEXT ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
-    return visitBinaryOperator(ctx, stack, expr);
-  }
-
-  ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-  // Arithmetic Operators
-  ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-  @Override
-  public Expr visitPlus(CONTEXT ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
-    return visitBinaryOperator(ctx, stack, expr);
-  }
-
-  @Override
-  public Expr visitMinus(CONTEXT ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
-    return visitBinaryOperator(ctx, stack, expr);
-  }
-
-  @Override
-  public Expr visitMultiply(CONTEXT ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
-    return visitBinaryOperator(ctx, stack, expr);
-  }
-
-  @Override
-  public Expr visitDivide(CONTEXT ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
-    return visitBinaryOperator(ctx, stack, expr);
-  }
-
-  @Override
-  public Expr visitModular(CONTEXT ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
-    return visitBinaryOperator(ctx, stack, expr);
+  public Expr visitValueListExpr(CONTEXT ctx, Stack<Expr> stack, ValueListExpr expr) throws PlanningException {
+    return super.visitValueListExpr(ctx, stack, expr);
   }
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -149,32 +145,8 @@ public abstract class SimpleAlgebraVisitor<CONTEXT> extends BasicAlgebraVisitor<
   ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   @Override
-  public Expr visitSign(CONTEXT ctx, Stack<Expr> stack, SignedExpr expr) throws PlanningException {
-    return visitUnaryOperator(ctx, stack, expr);
-  }
-
-  @Override
-  public Expr visitColumnReference(CONTEXT ctx, Stack<Expr> stack, ColumnReferenceExpr expr)
-      throws PlanningException {
-    return null;
-  }
-
-  @Override
-  public Expr visitTargetExpr(CONTEXT ctx, Stack<Expr> stack, TargetExpr expr) throws PlanningException {
-    stack.push(expr);
-    visit(ctx, stack, expr.getExpr());
-    stack.pop();
-    return expr;
-  }
-
-  @Override
   public Expr visitFunction(CONTEXT ctx, Stack<Expr> stack, FunctionExpr expr) throws PlanningException {
-    stack.push(expr);
-    for (Expr param : expr.getParams()) {
-      visit(ctx, stack, param);
-    }
-    stack.pop();
-    return expr;
+    return super.visitFunction(ctx, stack, expr);
   }
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -184,18 +156,13 @@ public abstract class SimpleAlgebraVisitor<CONTEXT> extends BasicAlgebraVisitor<
   @Override
   public Expr visitCountRowsFunction(CONTEXT ctx, Stack<Expr> stack, CountRowsFunctionExpr expr)
       throws PlanningException {
-    return expr;
+    return super.visitCountRowsFunction(ctx, stack, expr);
   }
 
   @Override
   public Expr visitGeneralSetFunction(CONTEXT ctx, Stack<Expr> stack, GeneralSetFunctionExpr expr)
       throws PlanningException {
-    stack.push(expr);
-    for (Expr param : expr.getParams()) {
-      visit(ctx, stack, param);
-    }
-    stack.pop();
-    return expr;
+    return super.visitGeneralSetFunction(ctx, stack, expr);
   }
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -204,34 +171,31 @@ public abstract class SimpleAlgebraVisitor<CONTEXT> extends BasicAlgebraVisitor<
 
   @Override
   public Expr visitDataType(CONTEXT ctx, Stack<Expr> stack, DataTypeExpr expr) throws PlanningException {
-    return expr;
+    return super.visitDataType(ctx, stack, expr);
   }
 
   @Override
   public Expr visitCastExpr(CONTEXT ctx, Stack<Expr> stack, CastExpr expr) throws PlanningException {
-    stack.push(expr);
-    visit(ctx, stack, expr.getOperand());
-    stack.pop();
-    return expr;
+    return super.visitCastExpr(ctx, stack, expr);
   }
 
   @Override
   public Expr visitLiteral(CONTEXT ctx, Stack<Expr> stack, LiteralValue expr) throws PlanningException {
-    return expr;
+    return super.visitLiteral(ctx, stack, expr);
   }
 
   @Override
   public Expr visitNullLiteral(CONTEXT ctx, Stack<Expr> stack, NullLiteral expr) throws PlanningException {
-    return expr;
+    return super.visitNullLiteral(ctx, stack, expr);
   }
 
   @Override
   public Expr visitTimestampLiteral(CONTEXT ctx, Stack<Expr> stack, TimestampLiteral expr) throws PlanningException {
-    return expr;
+    return super.visitTimestampLiteral(ctx, stack, expr);
   }
 
   @Override
   public Expr visitTimeLiteral(CONTEXT ctx, Stack<Expr> stack, TimeLiteral expr) throws PlanningException {
-    return expr;
+    return super.visitTimeLiteral(ctx, stack, expr);
   }
 }

@@ -18,6 +18,8 @@
 
 package org.apache.tajo.algebra;
 
+import com.google.common.base.Objects;
+
 public class IsNullPredicate extends UnaryOperator {
   private final boolean not;
 
@@ -33,6 +35,10 @@ public class IsNullPredicate extends UnaryOperator {
 
   public Expr getPredicand() {
     return getChild();
+  }
+
+  public int hashCode() {
+    return Objects.hashCode(not, getChild());
   }
 
   @Override

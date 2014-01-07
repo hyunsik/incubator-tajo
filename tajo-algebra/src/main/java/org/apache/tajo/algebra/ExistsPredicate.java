@@ -18,6 +18,8 @@
 
 package org.apache.tajo.algebra;
 
+import com.google.common.base.Objects;
+
 public class ExistsPredicate extends UnaryOperator {
   private boolean not;
 
@@ -33,6 +35,11 @@ public class ExistsPredicate extends UnaryOperator {
 
   public SimpleTableSubQuery getSubQuery() {
     return (SimpleTableSubQuery) getChild();
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hashCode(not, getChild());
   }
 
   @Override
