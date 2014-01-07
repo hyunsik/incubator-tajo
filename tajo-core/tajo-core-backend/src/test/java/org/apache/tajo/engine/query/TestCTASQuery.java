@@ -67,7 +67,7 @@ public class TestCTASQuery {
     CatalogService catalog = cluster.getMaster().getCatalog();
     TableDesc desc = catalog.getTableDesc(tableName);
     assertTrue(catalog.existsTable(tableName));
-    assertTrue(desc.getSchema().contains("testCtasWithoutTableDefinition.col1"));
+    assertTrue(desc.getSchema().containsByQualifiedName("testCtasWithoutTableDefinition.col1"));
     PartitionDesc partitionDesc = desc.getPartitions();
     assertEquals(partitionDesc.getPartitionsType(), CatalogProtos.PartitionsType.COLUMN);
     assertEquals("key", partitionDesc.getColumns().get(0).getColumnName());

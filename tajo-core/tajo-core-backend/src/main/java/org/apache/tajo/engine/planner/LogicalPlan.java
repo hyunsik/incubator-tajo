@@ -405,7 +405,7 @@ public class LogicalPlan {
     private InsertNode insertNode;
     private Schema schema;
 
-    NewTargetListManager targetListManager;
+    EvalExprManager evalLists;
 
     /** It contains a planning log for this block */
     private List<String> planingHistory = Lists.newArrayList();

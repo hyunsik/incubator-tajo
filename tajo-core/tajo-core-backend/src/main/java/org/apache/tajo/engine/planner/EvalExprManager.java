@@ -31,7 +31,7 @@ import java.util.*;
 /**
  * It manages a list of targets.
  */
-public class NewTargetListManager {
+public class EvalExprManager {
   private Map<String, EvalNode> nameToEvalMap = new LinkedHashMap<String, EvalNode>();
   private LinkedHashMap<String, Expr> nameToExprMap = new LinkedHashMap<String, Expr>();
   private LinkedHashMap<Expr, String> exprToNameMap = new LinkedHashMap<Expr, String>();
@@ -40,30 +40,37 @@ public class NewTargetListManager {
   private LogicalPlan plan;
   private LogicalPlanner planner;
 
-  public NewTargetListManager(LogicalPlan plan, LogicalPlanner planner, LogicalPlan.QueryBlock block) {
+  public EvalExprManager(LogicalPlan plan, LogicalPlanner planner, LogicalPlan.QueryBlock block) {
     this.plan = plan;
     this.planner = planner;
   }
 
   public boolean isResolved(String name) {
-    return resolvedFlags.containsKey(name) && resolvedFlags.get(name);
+    String normalized = name.toLowerCase();
+    return resolvedFlags.containsKey(normalized) && resolvedFlags.get(normalized);
   }
 
   public String addExpr(String alias, Expr expr) {
     if (exprToNameMap.containsKey(expr)) {
       return exprToNameMap.get(expr);
     } else {
-      nameToExprMap.put(alias, expr);
-      exprToNameMap.put(expr, alias);
-      resolvedFlags.put(alias, false);
-      return alias;
+      String normalized = alias.toLowerCase();
+      nameToExprMap.put(normalized, expr);
+      exprToNameMap.put(expr, normalized);
+      resolvedFlags.put(normalized, false);
+      return normalized;
     }
   }
 
   public String addExpr(Expr expr) {
     String name;
+
+    // all columns are projected automatically. BTW, should we add column reference to this list?
     if (expr.getType() == OpType.Column) {
       name = ((ColumnReferenceExpr)expr).getCanonicalName();
+      if (nameToExprMap.containsKey(name)) { // if it is column and another one already exists, skip.
+        return name;
+      }
     } else {
       name = plan.newNonameColumnName(expr.getType().name());
     }
@@ -73,7 +80,17 @@ public class NewTargetListManager {
   public String [] addExprArray(Expr[] exprs) {
     String [] names = new String[exprs.length];
     for (int i = 0; i < exprs.length; i++) {
-      names[i] = addExpr(exprs[i]);
+      Expr expr = exprs[i];
+      if (expr.getType() == OpType.Column) {
+        String referenceName = ((ColumnReferenceExpr)expr).getCanonicalName();
+        if (nameToExprMap.containsKey(referenceName)) {
+          names[i] = referenceName;
+        } else {
+          names[i] = addExpr(exprs[i]);
+        }
+      } else {
+        names[i] = addExpr(exprs[i]);
+      }
     }
     return names;
   }
@@ -87,7 +104,7 @@ public class NewTargetListManager {
   }
 
   public String [] addTargetExprArray(@Nullable Collection<TargetExpr> targets) {
-    if (targets != null) {
+    if (targets != null || targets.size() > 0) {
       String [] names = new String[targets.size()];
       int i = 0;
       for (TargetExpr target : targets) {
@@ -108,18 +125,18 @@ public class NewTargetListManager {
   }
 
   public void switchTarget(String name, EvalNode evalNode) {
-    nameToEvalMap.put(name, evalNode);
-//    Expr expr = nameToExprMap.remove(name);
-//    exprToNameMap.remove(expr);
-    resolvedFlags.put(name, true);
+    String normalized = name.toLowerCase();
+    nameToEvalMap.put(normalized, evalNode);
+    resolvedFlags.put(normalized, true);
   }
 
   public Target getTarget(String name) {
-    if (resolvedFlags.containsKey(name) && resolvedFlags.get(name)) {
-      return new Target(new FieldEval(name, nameToEvalMap.get(name).getValueType()));
+    String normalized = name;
+    if (resolvedFlags.containsKey(normalized) && resolvedFlags.get(normalized)) {
+      return new Target(new FieldEval(normalized, nameToEvalMap.get(normalized).getValueType()));
     } else {
-      if (nameToEvalMap.containsKey(name)) {
-        return new Target(nameToEvalMap.get(name), name);
+      if (nameToEvalMap.containsKey(normalized)) {
+        return new Target(nameToEvalMap.get(normalized), name);
       } else {
         return null;
       }
@@ -135,8 +152,13 @@ public class NewTargetListManager {
     }
   }
 
+  public String [] getTargetNames() {
+    return nameToEvalMap.keySet().toArray(new String[nameToEvalMap.size()]);
+  }
+
   public TargetExpr getRawTarget(String name) {
-    return new TargetExpr(nameToExprMap.get(name), name);
+    String normalized = name.toLowerCase();
+    return new TargetExpr(nameToExprMap.get(normalized), normalized);
   }
 
   public String toString() {

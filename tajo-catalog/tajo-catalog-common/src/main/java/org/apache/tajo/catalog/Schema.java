@@ -108,6 +108,17 @@ public class Schema implements ProtoObject<SchemaProto>, Cloneable, GsonObject {
     return fields.get(id);
   }
 
+  public Column getColumn(Column column) {
+    if (!contains(column)) {
+      return null;
+    }
+    if (column.hasQualifier()) {
+      return fields.get(fieldsByQualifiedName.get(column.getQualifiedName()));
+    } else {
+      return fields.get(fieldsByName.get(column.getColumnName()).get(0));
+    }
+  }
+
 	public Column getColumnByFQN(String qualifiedName) {
 		Integer cid = fieldsByQualifiedName.get(qualifiedName.toLowerCase());
 		return cid != null ? fields.get(cid) : null;
@@ -155,11 +166,46 @@ public class Schema implements ProtoObject<SchemaProto>, Cloneable, GsonObject {
 	public List<Column> getColumns() {
 		return ImmutableList.copyOf(fields);
 	}
-	
-	public boolean contains(String colName) {
-		return fieldsByQualifiedName.containsKey(colName.toLowerCase());
 
+  public boolean contains(String name) {
+    if (fieldsByQualifiedName.containsKey(name)) {
+      return true;
+    }
+    if (fieldsByName.containsKey(name)) {
+      if (fieldsByName.size() > 1) {
+        throw new RuntimeException("Ambiguous Column name");
+      }
+      return true;
+    }
+
+    return false;
+  }
+
+  public boolean contains(Column column) {
+    if (column.hasQualifier()) {
+      return fieldsByQualifiedName.containsKey(column.getQualifiedName());
+    } else {
+      if (fieldsByName.containsKey(column.getColumnName())) {
+        int num = fieldsByName.get(column.getColumnName()).size();
+        if (num == 0) {
+          throw new IllegalStateException("No such column name: " + column.getColumnName());
+        }
+        if (num > 1) {
+          throw new RuntimeException("Ambiguous column name: " + column.getColumnName());
+        }
+        return true;
+      }
+      return false;
+    }
+  }
+	
+	public boolean containsByQualifiedName(String qualifiedName) {
+		return fieldsByQualifiedName.containsKey(qualifiedName.toLowerCase());
 	}
+
+  public boolean containsByName(String colName) {
+    return fieldsByName.containsKey(colName);
+  }
 
   public boolean containsAll(Collection<Column> columns) {
     return fields.containsAll(columns);

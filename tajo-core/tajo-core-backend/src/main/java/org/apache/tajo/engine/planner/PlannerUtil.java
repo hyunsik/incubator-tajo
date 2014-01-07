@@ -264,7 +264,7 @@ public class PlannerUtil {
       Schema targetSchema = PlannerUtil.targetToSchema(targetArray);
       List<Target> newTarget = Lists.newArrayList();
       for (Column column : groupBy.getGroupingColumns()) {
-        if (!targetSchema.contains(column.getQualifiedName())) {
+        if (!targetSchema.containsByQualifiedName(column.getQualifiedName())) {
           newTarget.add(new Target(new FieldEval(column)));
         }
       }
@@ -409,7 +409,7 @@ public class PlannerUtil {
     } else {
 
       for (Column col : columnRefs) {
-        if (!node.getInSchema().contains(col.getQualifiedName())) {
+        if (!node.getInSchema().containsByQualifiedName(col.getQualifiedName())) {
           return false;
         }
       }
@@ -619,7 +619,7 @@ public class PlannerUtil {
           for (int j = 0; j < schemas.length; j++) {
           // check whether the column is for either outer or inner
           // 0 is outer, and 1 is inner
-            if (schemas[j].contains(column.getQualifiedName())) {
+            if (schemas[j].containsByQualifiedName(column.getQualifiedName())) {
               pair[j] = column;
             }
           }
@@ -647,7 +647,9 @@ public class PlannerUtil {
       } else {
         name = t.getEvalTree().getName();
       }
-      schema.addColumn(name, type);
+      if (!schema.containsByQualifiedName(name)) {
+        schema.addColumn(name, type);
+      }
     }
 
     return schema;

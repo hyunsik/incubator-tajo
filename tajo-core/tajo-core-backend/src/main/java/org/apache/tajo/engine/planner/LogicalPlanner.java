@@ -84,7 +84,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     public PlanContext(LogicalPlan plan, QueryBlock block) {
       this.plan = plan;
       this.block = block;
-      this.block.targetListManager = new NewTargetListManager(plan, LogicalPlanner.this, block);
+      this.block.evalLists = new EvalExprManager(plan, LogicalPlanner.this, block);
     }
   }
 
@@ -181,11 +181,11 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
     // set targets
     Set<Target> evaluatedTargets = new LinkedHashSet<Target>();
-    for (TargetExpr rawTarget : context.block.targetListManager.getRawTargets()) {
+    for (TargetExpr rawTarget : context.block.evalLists.getRawTargets()) {
       try {
         EvalNode evalNode = createEvalTree(context.plan, context.block, rawTarget.getExpr());
         if (PlannerUtil.canBeEvaluated(evalNode, scanNode) && EvalTreeUtil.findDistinctAggFunction(evalNode).size() == 0) {
-          context.block.targetListManager.switchTarget(rawTarget.getAlias(), evalNode);
+          context.block.evalLists.switchTarget(rawTarget.getAlias(), evalNode);
           evaluatedTargets.add(new Target(evalNode, rawTarget.getAlias()));
         }
       } catch (VerifyException ve) {
@@ -194,8 +194,15 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
     List<Target> targets = new ArrayList<Target>();
     for (Column column : scanNode.getInSchema().getColumns()) {
+      outer:
+      for (String targetName : context.block.evalLists.getTargetNames()) {
+        if (column.getQualifiedName().equals(targetName)) {
+          continue outer;
+        }
+      }
       targets.add(new Target(new FieldEval(column)));
     }
+
     targets.addAll(evaluatedTargets);
 
     scanNode.setTargets(targets.toArray(new Target[targets.size()]));
@@ -403,7 +410,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     setOp.setOutSchema(outSchema);
 
     if (isNoUpperProjection(stack)) {
-      block.targetListManager = new NewTargetListManager(plan, this, leftContext.block);
+      block.evalLists = new EvalExprManager(plan, this, leftContext.block);
 //      block.targetListManager.resolveAll();
 //      block.setSchema(block.targetListManager.getUpdatedSchema());
     }
@@ -418,18 +425,18 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     LogicalPlan plan = context.plan;
     QueryBlock block = context.block;
 
-    String qualName = context.block.targetListManager.addExpr(selection.getQual());
+    String qualName = context.block.evalLists.addExpr(selection.getQual());
 
     // 2. build child plans:
     stack.push(selection);
     LogicalNode child = visit(context, stack, selection.getChild());
     stack.pop();
 
-    Target target = context.block.targetListManager.getTarget(qualName);
+    Target target = context.block.evalLists.getTarget(qualName);
     EvalNode evalNode;
     if (target == null) {
       evalNode = createEvalTree(plan, block, selection.getQual());
-      block.targetListManager.switchTarget(qualName, evalNode);
+      block.evalLists.switchTarget(qualName, evalNode);
     } else {
       evalNode = target.getEvalTree();
     }
@@ -457,11 +464,11 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   public LogicalNode visitGroupBy(PlanContext context, Stack<Expr> stack, Aggregation aggregation)
       throws PlanningException {
 
-    // 1. Initialization Phase:
+    // Initialization Phase:
     LogicalPlan plan = context.plan;
     QueryBlock block = context.block;
 
-    String [] groupingSets = context.block.targetListManager.addExprArray(aggregation.getGroupSet()[0].getGroupingSets());
+    String [] groupingSets = block.evalLists.addExprArray(aggregation.getGroupSet()[0].getGroupingSets());
 
     // 2. Build Child Plan Phase:
     stack.push(aggregation);
@@ -469,11 +476,11 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     stack.pop();
 
     Set<Target> evaluatedTargets = new LinkedHashSet<Target>();
-    for (TargetExpr rawTarget : context.block.targetListManager.getRawTargets()) {
+    for (TargetExpr rawTarget : context.block.evalLists.getRawTargets()) {
       try {
         EvalNode evalNode = createEvalTree(context.plan, context.block, rawTarget.getExpr());
         if (EvalTreeUtil.findDistinctAggFunction(evalNode).size() > 0) {
-          context.block.targetListManager.switchTarget(rawTarget.getAlias(), evalNode);
+          context.block.evalLists.switchTarget(rawTarget.getAlias(), evalNode);
           evaluatedTargets.add(new Target(evalNode, rawTarget.getAlias()));
         }
       } catch (VerifyException ve) {
@@ -486,7 +493,11 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     if (groupElements[0].getType() == GroupType.OrdinaryGroup) { // for group-by
       Column [] groupingColumns = new Column[aggregation.getGroupSet()[0].getGroupingSets().length];
       for (int i = 0; i < groupingColumns.length; i++) {
-        groupingColumns[i] = context.block.targetListManager.getTarget(groupingSets[i]).getColumnSchema();
+        if (block.evalLists.isResolved(groupingSets[i])) {
+          groupingColumns[i] = block.evalLists.getTarget(groupingSets[i]).getColumnSchema();
+        } else {
+
+        }
       }
 
       GroupbyNode groupingNode = new GroupbyNode(plan.newPID(), groupingColumns);
@@ -498,8 +509,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       List<Target> targets = new ArrayList<Target>();
 
       for (Column column : groupingColumns) {
-        if (child.getOutSchema().contains(column.getQualifiedName())) {
-          targets.add(new Target(new FieldEval(column)));
+        if (child.getOutSchema().contains(column)) {
+          targets.add(new Target(new FieldEval(child.getOutSchema().getColumn(column))));
         }
       }
       targets.addAll(evaluatedTargets);
@@ -517,83 +528,6 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     } else {
       throw new InvalidQueryException("Not support grouping");
     }
-  }
-
-//  private UnionNode createGroupByUnion(final LogicalPlan plan,
-//                                       final QueryBlock block,
-//                                       final LogicalNode subNode,
-//                                       final List<Column[]> cuboids,
-//                                       final int idx) {
-//    UnionNode union;
-//    try {
-//      if ((cuboids.size() - idx) > 2) {
-//        GroupbyNode g1 = new GroupbyNode(plan.newPID(), cuboids.get(idx));
-//        Target[] clone = cloneTargets(block.getCurrentTargets());
-//
-//        g1.setTargets(clone);
-//        g1.setChild((LogicalNode) subNode.clone());
-//        g1.setInSchema(g1.getChild().getOutSchema());
-//        Schema outSchema = getProjectedSchema(plan, block.getCurrentTargets());
-//        g1.setOutSchema(outSchema);
-//
-//        LogicalNode right = createGroupByUnion(plan, block, subNode, cuboids, idx+1);
-//        union = new UnionNode(plan.newPID(), g1, right);
-//        union.setInSchema(g1.getOutSchema());
-//        union.setOutSchema(g1.getOutSchema());
-//
-//        return union;
-//      } else {
-//        GroupbyNode g1 = new GroupbyNode(plan.newPID(), cuboids.get(idx));
-//        Target[] clone = cloneTargets(block.getCurrentTargets());
-//        g1.setTargets(clone);
-//        g1.setChild((LogicalNode) subNode.clone());
-//        g1.setInSchema(g1.getChild().getOutSchema());
-//        Schema outSchema = getProjectedSchema(plan, clone);
-//        g1.setOutSchema(outSchema);
-//
-//        GroupbyNode g2 = new GroupbyNode(plan.newPID(), cuboids.get(idx+1));
-//        clone = cloneTargets(block.getCurrentTargets());
-//        g2.setTargets(clone);
-//        g2.setChild((LogicalNode) subNode.clone());
-//        g2.setInSchema(g1.getChild().getOutSchema());
-//        outSchema = getProjectedSchema(plan, clone);
-//        g2.setOutSchema(outSchema);
-//        union = new UnionNode(plan.newPID(), g1, g2);
-//        union.setInSchema(g1.getOutSchema());
-//        union.setOutSchema(g1.getOutSchema());
-//
-//        return union;
-//      }
-//    } catch (CloneNotSupportedException cnse) {
-//      LOG.error(cnse);
-//      throw new InvalidQueryException(cnse);
-//    }
-//  }
-
-  /**
-   * It transforms a list of column references into a list of annotated columns with considering aliased expressions.
-   */
-  private Column[] annotateGroupingColumn(LogicalPlan plan, QueryBlock block,
-                                           ColumnReferenceExpr[] columnRefs, LogicalNode child)
-      throws PlanningException {
-
-    Column[] columns = new Column[columnRefs.length];
-    for (int i = 0; i < columnRefs.length; i++) {
-      columns[i] = plan.resolveColumn(block, null, columnRefs[i]);
-      columns[i] = plan.getColumnOrAliasedColumn(block, columns[i]);
-    }
-
-    return columns;
-  }
-
-  private static Target[] cloneTargets(Target[] sourceTargets)
-      throws CloneNotSupportedException {
-    Target[] clone = new Target[sourceTargets.length];
-    for (int i = 0; i < sourceTargets.length; i++) {
-      clone[i] = (Target) sourceTargets[i].clone();
-    }
-
-    return clone;
   }
 
   public static final Column[] ALL= Lists.newArrayList().toArray(new Column[0]);
@@ -630,7 +564,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     String [] sortKeyNames = new String[sortKeyNum];
 
     for (int i = 0; i < sortKeyNum; i++) {
-      sortKeyNames[i] = context.block.targetListManager.addExpr(sortSpecs[i].getKey());
+      sortKeyNames[i] = context.block.evalLists.addExpr(sortSpecs[i].getKey());
     }
 
     // 2. Build Child Plans:
@@ -643,8 +577,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     SortSpec[] annotatedSortSpecs = new SortSpec[sortKeyNum];
     Column column = null;
     for (int i = 0; i < sort.getSortSpecs().length; i++) {
-      if (context.block.targetListManager.isResolved(sortKeyNames[i])) {
-        column = context.block.targetListManager.getTarget(sortKeyNames[i]).getColumnSchema();
+      if (context.block.evalLists.isResolved(sortKeyNames[i])) {
+        column = context.block.evalLists.getTarget(sortKeyNames[i]).getColumnSchema();
       }
       annotatedSortSpecs[i] = new SortSpec(column, sortSpecs[i].isAscending(), sortSpecs[i].isNullFirst());
     }
@@ -685,6 +619,33 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     PROJECTION SECTION
    ===============================================================================================*/
 
+
+  private static boolean existsAggregationFunction(Expr expr) throws PlanningException {
+    AggregationFunctionFinder finder = new AggregationFunctionFinder();
+    AggFunctionFoundResult result = new AggFunctionFoundResult();
+    finder.visit(result, new Stack<Expr>(), expr);
+    return result.found;
+  }
+
+  static class AggFunctionFoundResult {
+    boolean found;
+  }
+  static class AggregationFunctionFinder extends SimpleAlgebraVisitor<AggFunctionFoundResult> {
+    @Override
+    public Expr visitCountRowsFunction(AggFunctionFoundResult ctx, Stack<Expr> stack, CountRowsFunctionExpr expr)
+        throws PlanningException {
+      ctx.found = true;
+      return super.visitCountRowsFunction(ctx, stack, expr);
+    }
+
+    @Override
+    public Expr visitGeneralSetFunction(AggFunctionFoundResult ctx, Stack<Expr> stack, GeneralSetFunctionExpr expr)
+        throws PlanningException {
+      ctx.found = true;
+      return super.visitGeneralSetFunction(ctx, stack, expr);
+    }
+  }
+
   @Override
   public LogicalNode visitProjection(PlanContext context, Stack<Expr> stack, Projection projection)
       throws PlanningException {
@@ -695,80 +656,92 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
     String [] targetNames = new String[projection.size()];
     if (!projection.isAllProjected()) {
-      block.targetListManager = new NewTargetListManager(plan, this, context.block);
+      block.evalLists = new EvalExprManager(plan, this, context.block);
       DissectedExpr dissectedExpr = null;
       TargetExpr rawTarget;
       for (int i = 0; i < projection.getTargets().length; i++) {
         rawTarget = projection.getTargets()[i];
-        dissectedExpr = dissectedExpr(plan, rawTarget.getExpr());
 
-        if (rawTarget.hasAlias()) {
-          targetNames[i] = context.block.targetListManager.addTargetExpr(
-              new TargetExpr(dissectedExpr.outer, rawTarget.getAlias()));
-        } else {
-          targetNames[i] = context.block.targetListManager.addExpr(dissectedExpr.outer);
+        if (existsAggregationFunction(rawTarget)) {
+          block.setHasGrouping();
         }
 
-        context.block.targetListManager.addTargetExprArray(dissectedExpr.aggregation);
-        context.block.targetListManager.addTargetExprArray(dissectedExpr.inner);
+        // dissect an expression into more parts (at most dissected into three parts)
+        dissectedExpr = dissectedExpr(plan, rawTarget.getExpr());
+
+        // Get all projecting references
+        if (rawTarget.hasAlias()) {
+          targetNames[i] = block.evalLists.addTargetExpr(new TargetExpr(dissectedExpr.outer, rawTarget.getAlias()));
+        } else {
+          targetNames[i] = block.evalLists.addExpr(dissectedExpr.outer);
+        }
+
+        // Add sub-expressions from dissected parts.
+        block.evalLists.addTargetExprArray(dissectedExpr.aggregation);
+        block.evalLists.addTargetExprArray(dissectedExpr.inner);
       }
     }
 
+    // When a select statement with from clause is given
     if (!projection.hasChild()) {
-      EvalExprNode evalOnly =
-          new EvalExprNode(context.plan.newPID(), annotateTargets(plan, block, projection.getTargets()));
+      EvalExprNode evalOnly = new EvalExprNode(context.plan.newPID(), annotateTargets(plan, block,
+          projection.getTargets()));
       evalOnly.setOutSchema(getProjectedSchema(plan, evalOnly.getExprs()));
       block.setProjectionNode(evalOnly);
-      for (int i = 0; i < evalOnly.getTargets().length; i++) {
-        //block.targetListManager.fill(i, evalOnly.getTargets()[i]);
-      }
       return evalOnly;
     }
 
-    // 2: Build Child Plans
+    // Build Child Plans
     stack.push(projection);
     LogicalNode child = visit(context, stack, projection.getChild());
+    // check if it is aggregation query without group-by clause. If so, it inserts group-by node to its child.
     child = insertGroupbyNodeIfUnresolved(plan, block, child, targetNames, stack);
     stack.pop();
-
-    ProjectionNode projectionNode;
-    if (projection.isAllProjected()) {
-      projectionNode = new ProjectionNode(context.plan.newPID(), PlannerUtil.schemaToTargets(child.getOutSchema()));
-    } else {
-      Target [] targets = new Target[projection.size()];
-      for (int i = 0; i < targetNames.length; i++) {
-        if (context.block.targetListManager.isResolved(targetNames[i])) {
-          targets[i] = context.block.targetListManager.getTarget(targetNames[i]);
-        } else {
-          EvalNode evalNode = createEvalTree(plan, block,
-              context.block.targetListManager.getRawTarget(targetNames[i]).getExpr());
-          targets[i] = new Target(evalNode, targetNames[i]);
-          context.block.targetListManager.switchTarget(targetNames[i], evalNode);
-        }
-      }
-      projectionNode = new ProjectionNode(context.plan.newPID(), targets);
-    }
-
-    block.setProjectionNode(projectionNode);
-    projectionNode.setOutSchema(getProjectedSchema(plan, projectionNode.getTargets()));
-    projectionNode.setInSchema(child.getOutSchema());
-    projectionNode.setChild(child);
 
     if (projection.isDistinct() && block.hasGrouping()) {
       throw new VerifyException("Cannot support grouping and distinct at the same time");
     } else {
       if (projection.isDistinct()) {
-        Schema outSchema = projectionNode.getOutSchema();
+        Schema outSchema = child.getOutSchema();
         GroupbyNode dupRemoval = new GroupbyNode(plan.newPID(), outSchema.toArray());
-        //dupRemoval.setTargets(block.getTargetListManager().getTargets());
-        dupRemoval.setInSchema(child.getOutSchema());
+        dupRemoval.setTargets(PlannerUtil.schemaToTargets(outSchema));
+        dupRemoval.setInSchema(outSchema);
         dupRemoval.setOutSchema(outSchema);
         dupRemoval.setChild(child);
-        projectionNode.setChild(dupRemoval);
+        child = dupRemoval;
       }
     }
 
+    ProjectionNode projectionNode;
+    Target [] targets;
+    if (projection.isAllProjected()) {
+      targets = PlannerUtil.schemaToTargets(child.getOutSchema());
+    } else {
+      targets = buildTargets(plan, block, targetNames);
+    }
+    projectionNode = new ProjectionNode(context.plan.newPID(), targets);
+    projectionNode.setOutSchema(getProjectedSchema(plan, projectionNode.getTargets()));
+    projectionNode.setInSchema(child.getOutSchema());
+    projectionNode.setChild(child);
+    block.setProjectionNode(projectionNode);
+
     return projectionNode;
+  }
+
+  private Target [] buildTargets(LogicalPlan plan, QueryBlock block, String[] referenceNames)
+      throws PlanningException {
+    Target [] targets = new Target[referenceNames.length];
+    for (int i = 0; i < referenceNames.length; i++) {
+      if (block.evalLists.isResolved(referenceNames[i])) {
+        targets[i] = block.evalLists.getTarget(referenceNames[i]);
+      } else {
+        EvalNode evalNode = createEvalTree(plan, block,
+            block.evalLists.getRawTarget(referenceNames[i]).getExpr());
+        targets[i] = new Target(evalNode, referenceNames[i]);
+        block.evalLists.switchTarget(referenceNames[i], evalNode);
+      }
+    }
+    return targets;
   }
 
   class DissectedExpr {
@@ -949,11 +922,11 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       GroupbyNode groupbyNode = new GroupbyNode(plan.newPID(), new Column[] {});
       Target [] targets = new Target[block.getProjection().size()];
       for (int i = 0; i < block.getProjection().size(); i++) {
-        targets[i] = block.targetListManager.getTarget(targetNames[i]);
+        targets[i] = block.evalLists.getTarget(targetNames[i]);
         if (targets[i] == null) {
-          EvalNode evalNode = createEvalTree(plan, block, block.targetListManager.getRawTarget(targetNames[i]).getExpr());
+          EvalNode evalNode = createEvalTree(plan, block, block.evalLists.getRawTarget(targetNames[i]).getExpr());
           targets[i] = new Target(evalNode, targetNames[i]);
-          block.targetListManager.switchTarget(targetNames[i], targets[i].getEvalTree());
+          block.evalLists.switchTarget(targetNames[i], targets[i].getEvalTree());
         }
       }
       groupbyNode.setTargets(targets);

@@ -26,12 +26,12 @@ public class SchemaUtil {
   public static Schema merge(Schema left, Schema right) {
     Schema merged = new Schema();
     for(Column col : left.getColumns()) {
-      if (!merged.contains(col.getQualifiedName())) {
+      if (!merged.containsByQualifiedName(col.getQualifiedName())) {
         merged.addColumn(col);
       }
     }
     for(Column col : right.getColumns()) {
-      if (!merged.contains(col.getQualifiedName())) {
+      if (!merged.containsByQualifiedName(col.getQualifiedName())) {
         merged.addColumn(col);
       }
     }

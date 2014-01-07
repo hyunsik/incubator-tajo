@@ -191,12 +191,12 @@ public class TargetListManager {
     for (int i = 0; i < resolvedFlags.length; i++) {
       if (resolvedFlags[i]) {
         Column col = getResolvedTargetToColumn(i);
-        if (!schema.contains(col.getQualifiedName()))
+        if (!schema.containsByQualifiedName(col.getQualifiedName()))
         schema.addColumn(col);
       } else {
         Collection<Column> cols = getColumnRefs(i);
         for (Column col : cols) {
-          if (!schema.contains(col.getQualifiedName())) {
+          if (!schema.containsByQualifiedName(col.getQualifiedName())) {
             schema.addColumn(col);
           }
         }
