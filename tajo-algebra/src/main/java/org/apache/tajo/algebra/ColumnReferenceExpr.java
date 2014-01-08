@@ -36,20 +36,30 @@ public class ColumnReferenceExpr extends Expr {
     this.name = columnName;
   }
 
+  public boolean hasQualifier() {
+    return this.qualifier != null;
+  }
+
   public void setQualifier(String qualifier) {
     this.qualifier = qualifier;
+  }
+
+  public String getQualifier() {
+    return this.qualifier;
   }
 
   public String getName() {
     return this.name;
   }
 
-  public boolean hasQualifier() {
-    return this.qualifier != null;
+  public void setName(String name) {
+    this.name = name;
   }
 
-  public String getQualifier() {
-    return this.qualifier;
+  public void setQualifiedName(String qualifiedName) {
+    String [] parts = qualifiedName.split("\\.");
+    setQualifier(parts[0]);
+    setName(parts[1]);
   }
 
   public String getCanonicalName() {

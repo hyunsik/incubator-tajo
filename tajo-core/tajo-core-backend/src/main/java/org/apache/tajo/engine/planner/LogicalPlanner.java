@@ -79,12 +79,24 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
   public class PlanContext {
     LogicalPlan plan;
-    QueryBlock block;
+    Map<Expr, String> blockMap;
 
-    public PlanContext(LogicalPlan plan, QueryBlock block) {
+    // transient data for each query block
+    QueryBlock currentBlock;
+    EvalExprManager evalList;
+
+    public PlanContext(LogicalPlan plan, Map<Expr, String> blockMap, QueryBlock block) {
       this.plan = plan;
-      this.block = block;
-      this.block.evalLists = new EvalExprManager(plan, LogicalPlanner.this, block);
+      this.blockMap = blockMap;
+      this.currentBlock = block;
+      this.evalList = new EvalExprManager(plan, LogicalPlanner.this, block);
+    }
+
+    public PlanContext(PlanContext context, QueryBlock block) {
+      this.plan = context.plan;
+      this.blockMap = context.blockMap;
+      this.currentBlock = block;
+      this.evalList = new EvalExprManager(plan, LogicalPlanner.this, block);
     }
   }
 
@@ -97,26 +109,88 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   public LogicalPlan createPlan(Expr expr) throws PlanningException {
 
     LogicalPlan plan = new LogicalPlan(this);
-    LogicalNode subroot;
 
-    Stack<Expr> stack = new Stack<Expr>();
+    PreprocessContext preProcessorCtx = new PreprocessContext(plan);
+    LogicalPlanPreprocessor preProcessor = new LogicalPlanPreprocessor();
+    preProcessor.visit(preProcessorCtx, new Stack<Expr>(), expr);
 
-    QueryBlock rootBlock = plan.newAndGetBlock(LogicalPlan.ROOT_BLOCK);
-    PlanContext context = new PlanContext(plan, rootBlock);
-    subroot = visit(context, stack, expr);
+    PlanContext context = new PlanContext(plan, preProcessorCtx.blockMap, plan.getRootBlock());
+    LogicalNode topMostNode = this.visit(context, new Stack<Expr>(), expr);
 
+    // Add Root Node
     LogicalRootNode root = new LogicalRootNode(plan.newPID());
-    root.setInSchema(subroot.getOutSchema());
-    root.setOutSchema(subroot.getOutSchema());
-    root.setChild(subroot);
+    root.setInSchema(topMostNode.getOutSchema());
+    root.setOutSchema(topMostNode.getOutSchema());
+    root.setChild(topMostNode);
     plan.getRootBlock().setRoot(root);
 
     return plan;
   }
 
+  class PreprocessContext {
+    LogicalPlan plan;
+    QueryBlock currentBlock;
+    Map<Expr, String> blockMap;
+
+    public PreprocessContext(LogicalPlan plan) {
+      this.plan = plan;
+      blockMap = TUtil.newHashMap();
+    }
+  }
+
+  class LogicalPlanPreprocessor extends SimpleAlgebraVisitor<PreprocessContext> {
+
+
+    public Expr visit(PreprocessContext ctx, Stack<Expr> stack, Expr expr) throws PlanningException {
+      ctx.currentBlock = ctx.plan.newAndGetBlock(LogicalPlan.ROOT_BLOCK);
+      return super.visit(ctx, stack, expr);
+    }
+
+    public void preHook(PreprocessContext ctx, Stack<Expr> stack, Expr expr) throws PlanningException {
+      ctx.blockMap.put(expr, ctx.currentBlock.getName());
+    }
+
+    @Override
+    public Expr visitTableSubQuery(PreprocessContext ctx, Stack<Expr> stack, TablePrimarySubQuery expr)
+        throws PlanningException {
+
+      if (expr.hasAlias()) {
+        ctx.currentBlock = ctx.plan.newAndGetBlock(expr.getAlias());
+      } else {
+        ctx.currentBlock = ctx.plan.newNoNameBlock();
+      }
+      super.visitTableSubQuery(ctx, stack, expr);
+
+      ctx.currentBlock.addRelation(new TableSubQueryNode(ctx.plan.newPID(), expr.getAlias(), null));
+      return expr;
+    }
+
+    @Override
+    public Expr visitRelation(PreprocessContext ctx, Stack<Expr> stack, Relation expr)
+        throws PlanningException {
+
+      Relation relation = expr;
+      TableDesc desc = catalog.getTableDesc(relation.getName());
+      if (!desc.hasStats()) {
+        updatePhysicalInfo(desc);
+      }
+
+      ScanNode scanNode;
+      if (relation.hasAlias()) {
+        scanNode = new ScanNode(ctx.plan.newPID(), desc, relation.getAlias());
+      } else {
+        scanNode = new ScanNode(ctx.plan.newPID(), desc);
+      }
+
+      ctx.currentBlock.addRelation(scanNode);
+
+      return expr;
+    }
+  }
+
   public void preHook(PlanContext context, Stack<Expr> stack, Expr expr) {
-    context.block = checkIfNewBlockOrGet(context.plan, context.block.getName());
-    context.block.setAlgebraicExpr(expr);
+    context.currentBlock = checkIfNewBlockOrGet(context.plan, context.currentBlock.getName());
+    context.currentBlock.setAlgebraicExpr(expr);
   }
 
   public LogicalNode postHook(PlanContext context, Stack<Expr> stack, Expr expr, LogicalNode current)
@@ -128,7 +202,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     }
 
     // mark the node as the visited node and do post work for each operator
-    context.block.postVisit(current, stack);
+    context.currentBlock.postVisit(current, stack);
 
     return current;
   }
@@ -148,63 +222,44 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
   public TableSubQueryNode visitTableSubQuery(PlanContext context, Stack<Expr> stack, TablePrimarySubQuery expr)
       throws PlanningException {
-    QueryBlock newBlock = context.plan.newAndGetBlock(expr.getName());
-    PlanContext newContext = new PlanContext(context.plan, newBlock);
-    Stack<Expr> newStack = new Stack<Expr>();
-    LogicalNode child = visit(newContext, newStack, expr.getSubQuery());
-    context.plan.connectBlocks(newContext.block, context.block, BlockType.TableSubQuery);
-    return new TableSubQueryNode(context.plan.newPID(), expr.getName(), child);
+    QueryBlock childBlock = context.plan.getBlock(context.blockMap.get(expr));
+    PlanContext newContext = new PlanContext(context, childBlock);
+    LogicalNode child = visit(newContext, new Stack<Expr>(), expr.getSubQuery());
+    TableSubQueryNode subQueryNode = (TableSubQueryNode) childBlock.getRelation(childBlock.getName());
+    context.plan.connectBlocks(childBlock, context.currentBlock, BlockType.TableSubQuery);
+    subQueryNode.setSubQuery(child);
+    return subQueryNode;
   }
 
 
   @Override
   public ScanNode visitRelation(PlanContext context, Stack<Expr> stack, Relation expr)
       throws PlanningException {
-    // 1. init phase
 
-    // 2. build child plans
-    // 3. build scan plan
-    Relation relation = expr;
-    TableDesc desc = catalog.getTableDesc(relation.getName());
-    if (!desc.hasStats()) {
-      updatePhysicalInfo(desc);
-    }
-
-    ScanNode scanNode;
-    if (relation.hasAlias()) {
-      scanNode = new ScanNode(context.plan.newPID(), desc, relation.getAlias());
-    } else {
-      scanNode = new ScanNode(context.plan.newPID(), desc);
-    }
-
-    context.block.addRelation(scanNode);
+    ScanNode scanNode = (ScanNode) context.currentBlock.getRelation(expr.getCanonicalName());
 
     // set targets
     Set<Target> evaluatedTargets = new LinkedHashSet<Target>();
-    for (TargetExpr rawTarget : context.block.evalLists.getRawTargets()) {
+    for (TargetExpr rawTarget : context.evalList.getRawTargets()) {
       try {
-        EvalNode evalNode = createEvalTree(context.plan, context.block, rawTarget.getExpr());
+        EvalNode evalNode = createEvalTree(context.plan, context.currentBlock, rawTarget.getExpr());
         if (PlannerUtil.canBeEvaluated(evalNode, scanNode) && EvalTreeUtil.findDistinctAggFunction(evalNode).size() == 0) {
-          context.block.evalLists.switchTarget(rawTarget.getAlias(), evalNode);
+          context.evalList.switchTarget(rawTarget.getAlias(), evalNode);
           evaluatedTargets.add(new Target(evalNode, rawTarget.getAlias()));
         }
       } catch (VerifyException ve) {
       }
     }
 
+    // Assume that each unique expr is evaluated once.
     List<Target> targets = new ArrayList<Target>();
     for (Column column : scanNode.getInSchema().getColumns()) {
-      outer:
-      for (String targetName : context.block.evalLists.getTargetNames()) {
-        if (column.getQualifiedName().equals(targetName)) {
-          continue outer;
-        }
+      ColumnReferenceExpr columnRef = new ColumnReferenceExpr(column.getQualifier(), column.getColumnName());
+      if (context.evalList.containsExpr(columnRef) == false) {
+        targets.add(new Target(new FieldEval(column)));
       }
-      targets.add(new Target(new FieldEval(column)));
     }
-
     targets.addAll(evaluatedTargets);
-
     scanNode.setTargets(targets.toArray(new Target[targets.size()]));
     scanNode.setOutSchema(PlannerUtil.targetToSchema(scanNode.getTargets()));
 
@@ -257,7 +312,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       throws PlanningException {
     // Phase 1: Init
     LogicalPlan plan = context.plan;
-    QueryBlock block = context.block;
+    QueryBlock block = context.currentBlock;
 
     // Phase 2: build child plans
     stack.push(join);
@@ -375,20 +430,20 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
     // 1. Init Phase
     LogicalPlan plan = context.plan;
-    QueryBlock block = context.block;
+    QueryBlock block = context.currentBlock;
 
     // 2. Build Child Plans
-    PlanContext leftContext = new PlanContext(plan, plan.newNoNameBlock());
+    PlanContext leftContext = new PlanContext(context, plan.newNoNameBlock());
     Stack<Expr> leftStack = new Stack<Expr>();
     LogicalNode left = visit(leftContext, leftStack, setOperation.getLeft());
-    TableSubQueryNode leftSubQuery = new TableSubQueryNode(plan.newPID(), leftContext.block.getName(), left);
-    context.plan.connectBlocks(leftContext.block, context.block, BlockType.TableSubQuery);
+    TableSubQueryNode leftSubQuery = new TableSubQueryNode(plan.newPID(), leftContext.currentBlock.getName(), left);
+    context.plan.connectBlocks(leftContext.currentBlock, context.currentBlock, BlockType.TableSubQuery);
 
-    PlanContext rightContext = new PlanContext(plan, plan.newNoNameBlock());
+    PlanContext rightContext = new PlanContext(context, plan.newNoNameBlock());
     Stack<Expr> rightStack = new Stack<Expr>();
     LogicalNode right = visit(rightContext, rightStack, setOperation.getRight());
-    TableSubQueryNode rightSubQuery = new TableSubQueryNode(plan.newPID(), rightContext.block.getName(), right);
-    context.plan.connectBlocks(rightContext.block, context.block, BlockType.TableSubQuery);
+    TableSubQueryNode rightSubQuery = new TableSubQueryNode(plan.newPID(), rightContext.currentBlock.getName(), right);
+    context.plan.connectBlocks(rightContext.currentBlock, context.currentBlock, BlockType.TableSubQuery);
 
     BinaryNode setOp;
     if (setOperation.getType() == OpType.Union) {
@@ -403,14 +458,14 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
     // Strip the table names from the targets of the both blocks
     // in order to check the equivalence the schemas of both blocks.
-    Target [] leftStrippedTargets = PlannerUtil.stripTarget(leftContext.block.getCurrentTargets());
+    Target [] leftStrippedTargets = PlannerUtil.stripTarget(leftContext.currentBlock.getCurrentTargets());
 
     Schema outSchema = PlannerUtil.targetToSchema(leftStrippedTargets);
     setOp.setInSchema(leftSubQuery.getOutSchema());
     setOp.setOutSchema(outSchema);
 
     if (isNoUpperProjection(stack)) {
-      block.evalLists = new EvalExprManager(plan, this, leftContext.block);
+      context.evalList = new EvalExprManager(plan, this, leftContext.currentBlock);
 //      block.targetListManager.resolveAll();
 //      block.setSchema(block.targetListManager.getUpdatedSchema());
     }
@@ -423,20 +478,20 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       throws PlanningException {
     // 1. init phase:
     LogicalPlan plan = context.plan;
-    QueryBlock block = context.block;
+    QueryBlock block = context.currentBlock;
 
-    String qualName = context.block.evalLists.addExpr(selection.getQual());
+    String qualName = context.evalList.addExpr(selection.getQual());
 
     // 2. build child plans:
     stack.push(selection);
     LogicalNode child = visit(context, stack, selection.getChild());
     stack.pop();
 
-    Target target = context.block.evalLists.getTarget(qualName);
+    Target target = context.evalList.getTarget(qualName);
     EvalNode evalNode;
     if (target == null) {
       evalNode = createEvalTree(plan, block, selection.getQual());
-      block.evalLists.switchTarget(qualName, evalNode);
+      context.evalList.switchTarget(qualName, evalNode);
     } else {
       evalNode = target.getEvalTree();
     }
@@ -466,9 +521,9 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
     // Initialization Phase:
     LogicalPlan plan = context.plan;
-    QueryBlock block = context.block;
+    QueryBlock block = context.currentBlock;
 
-    String [] groupingSets = block.evalLists.addExprArray(aggregation.getGroupSet()[0].getGroupingSets());
+    String [] groupingSets = context.evalList.addExprArray(aggregation.getGroupSet()[0].getGroupingSets());
 
     // 2. Build Child Plan Phase:
     stack.push(aggregation);
@@ -476,11 +531,11 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     stack.pop();
 
     Set<Target> evaluatedTargets = new LinkedHashSet<Target>();
-    for (TargetExpr rawTarget : context.block.evalLists.getRawTargets()) {
+    for (TargetExpr rawTarget : context.evalList.getRawTargets()) {
       try {
-        EvalNode evalNode = createEvalTree(context.plan, context.block, rawTarget.getExpr());
+        EvalNode evalNode = createEvalTree(context.plan, context.currentBlock, rawTarget.getExpr());
         if (EvalTreeUtil.findDistinctAggFunction(evalNode).size() > 0) {
-          context.block.evalLists.switchTarget(rawTarget.getAlias(), evalNode);
+          context.evalList.switchTarget(rawTarget.getAlias(), evalNode);
           evaluatedTargets.add(new Target(evalNode, rawTarget.getAlias()));
         }
       } catch (VerifyException ve) {
@@ -493,8 +548,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     if (groupElements[0].getType() == GroupType.OrdinaryGroup) { // for group-by
       Column [] groupingColumns = new Column[aggregation.getGroupSet()[0].getGroupingSets().length];
       for (int i = 0; i < groupingColumns.length; i++) {
-        if (block.evalLists.isResolved(groupingSets[i])) {
-          groupingColumns[i] = block.evalLists.getTarget(groupingSets[i]).getColumnSchema();
+        if (context.evalList.isResolved(groupingSets[i])) {
+          groupingColumns[i] = context.evalList.getTarget(groupingSets[i]).getColumnSchema();
         } else {
 
         }
@@ -564,7 +619,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     String [] sortKeyNames = new String[sortKeyNum];
 
     for (int i = 0; i < sortKeyNum; i++) {
-      sortKeyNames[i] = context.block.evalLists.addExpr(sortSpecs[i].getKey());
+      sortKeyNames[i] = context.evalList.addExpr(sortSpecs[i].getKey());
     }
 
     // 2. Build Child Plans:
@@ -577,8 +632,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     SortSpec[] annotatedSortSpecs = new SortSpec[sortKeyNum];
     Column column = null;
     for (int i = 0; i < sort.getSortSpecs().length; i++) {
-      if (context.block.evalLists.isResolved(sortKeyNames[i])) {
-        column = context.block.evalLists.getTarget(sortKeyNames[i]).getColumnSchema();
+      if (context.evalList.isResolved(sortKeyNames[i])) {
+        column = context.evalList.getTarget(sortKeyNames[i]).getColumnSchema();
       }
       annotatedSortSpecs[i] = new SortSpec(column, sortSpecs[i].isAscending(), sortSpecs[i].isNullFirst());
     }
@@ -596,7 +651,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   public LimitNode visitLimit(PlanContext context, Stack<Expr> stack, Limit limit) throws PlanningException {
     // 1. Init Phase:
     LogicalPlan plan = context.plan;
-    QueryBlock block = context.block;
+    QueryBlock block = context.currentBlock;
 
     // build child plans
     stack.push(limit);
@@ -652,12 +707,15 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
     //1: init Phase
     LogicalPlan plan = context.plan;
-    QueryBlock block = context.block;
+    QueryBlock block = context.currentBlock;
 
-    String [] targetNames = new String[projection.size()];
-    if (!projection.isAllProjected()) {
-      block.evalLists = new EvalExprManager(plan, this, context.block);
-      DissectedExpr dissectedExpr = null;
+    String [] targetNames;
+    if (projection.isAllProjected()) {
+      targetNames = null;
+    } else {
+      targetNames = new String[projection.size()];
+      context.evalList = new EvalExprManager(plan, this, context.currentBlock);
+      ExprNormalizedResult normalized;
       TargetExpr rawTarget;
       for (int i = 0; i < projection.getTargets().length; i++) {
         rawTarget = projection.getTargets()[i];
@@ -667,18 +725,18 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         }
 
         // dissect an expression into more parts (at most dissected into three parts)
-        dissectedExpr = dissectedExpr(plan, rawTarget.getExpr());
+        normalized = normalize(context, rawTarget.getExpr());
 
         // Get all projecting references
         if (rawTarget.hasAlias()) {
-          targetNames[i] = block.evalLists.addTargetExpr(new TargetExpr(dissectedExpr.outer, rawTarget.getAlias()));
+          targetNames[i] = context.evalList.addTargetExpr(new TargetExpr(normalized.outer, rawTarget.getAlias()));
         } else {
-          targetNames[i] = block.evalLists.addExpr(dissectedExpr.outer);
+          targetNames[i] = context.evalList.addExpr(normalized.outer);
         }
 
         // Add sub-expressions from dissected parts.
-        block.evalLists.addTargetExprArray(dissectedExpr.aggregation);
-        block.evalLists.addTargetExprArray(dissectedExpr.inner);
+        context.evalList.addTargetExprArray(normalized.aggregation);
+        context.evalList.addTargetExprArray(normalized.inner);
       }
     }
 
@@ -694,8 +752,11 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     // Build Child Plans
     stack.push(projection);
     LogicalNode child = visit(context, stack, projection.getChild());
+    if (projection.isAllProjected()) {
+      targetNames = PlannerUtil.schemaToReferenceNames(child.getOutSchema());
+    }
     // check if it is aggregation query without group-by clause. If so, it inserts group-by node to its child.
-    child = insertGroupbyNodeIfUnresolved(plan, block, child, targetNames, stack);
+    child = insertGroupbyNodeIfUnresolved(plan, block, context.evalList, child, targetNames, stack);
     stack.pop();
 
     if (projection.isDistinct() && block.hasGrouping()) {
@@ -717,7 +778,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     if (projection.isAllProjected()) {
       targets = PlannerUtil.schemaToTargets(child.getOutSchema());
     } else {
-      targets = buildTargets(plan, block, targetNames);
+      targets = buildTargets(plan, block, context.evalList, targetNames);
     }
     projectionNode = new ProjectionNode(context.plan.newPID(), targets);
     projectionNode.setOutSchema(getProjectedSchema(plan, projectionNode.getTargets()));
@@ -728,53 +789,57 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     return projectionNode;
   }
 
-  private Target [] buildTargets(LogicalPlan plan, QueryBlock block, String[] referenceNames)
+  private Target [] buildTargets(LogicalPlan plan, QueryBlock block, EvalExprManager evalLists, String[] referenceNames)
       throws PlanningException {
     Target [] targets = new Target[referenceNames.length];
     for (int i = 0; i < referenceNames.length; i++) {
-      if (block.evalLists.isResolved(referenceNames[i])) {
-        targets[i] = block.evalLists.getTarget(referenceNames[i]);
+      if (evalLists.isResolved(referenceNames[i])) {
+        targets[i] = evalLists.getTarget(referenceNames[i]);
       } else {
         EvalNode evalNode = createEvalTree(plan, block,
-            block.evalLists.getRawTarget(referenceNames[i]).getExpr());
+            evalLists.getRawTarget(referenceNames[i]).getExpr());
         targets[i] = new Target(evalNode, referenceNames[i]);
-        block.evalLists.switchTarget(referenceNames[i], evalNode);
+        evalLists.switchTarget(referenceNames[i], evalNode);
       }
     }
     return targets;
   }
 
-  class DissectedExpr {
-    LogicalPlan plan;
+  private class ExprNormalizedResult {
+    private final LogicalPlan plan;
+    private final QueryBlock block;
+    private final EvalExprManager evalList;
     Expr outer;
     List<TargetExpr> aggregation = new ArrayList<TargetExpr>();
     List<TargetExpr> inner = new ArrayList<TargetExpr>();
 
-    DissectedExpr(LogicalPlan plan) {
-      this.plan = plan;
+    ExprNormalizedResult(PlanContext context) {
+      this.plan = context.plan;
+      this.block = context.currentBlock;
+      this.evalList = context.evalList;
     }
   }
 
-  DissectedExpr dissectedExpr(LogicalPlan plan, Expr expr) throws PlanningException {
-    DissectedExprVisitor visitor = new DissectedExprVisitor();
-    DissectedExpr dissectedExpr = new DissectedExpr(plan);
+  ExprNormalizedResult normalize(PlanContext context, Expr expr) throws PlanningException {
+    ExprNormalizerVisitor visitor = new ExprNormalizerVisitor();
+    ExprNormalizedResult exprNormalizedResult = new ExprNormalizedResult(context);
 
     // early pruning
-    if (expr.getType() == OpType.Column || expr.getType() == OpType.Literal || expr.getType() == OpType.NullLiteral) {
-      dissectedExpr.outer = expr;
+    if (expr.getType() == OpType.Literal || expr.getType() == OpType.NullLiteral) {
+      exprNormalizedResult.outer = expr;
     } else {
-      visitor.visit(dissectedExpr, new Stack<Expr>(), expr);
+      visitor.visit(exprNormalizedResult, new Stack<Expr>(), expr);
     }
 
-    return dissectedExpr;
+    return exprNormalizedResult;
   }
 
-  private class DissectedExprVisitor extends SimpleAlgebraVisitor<DissectedExpr> {
+  private class ExprNormalizerVisitor extends SimpleAlgebraVisitor<ExprNormalizedResult> {
 
     /**
      * The posthook is called before each expression is visited.
      */
-    public Expr postHook(DissectedExpr ctx, Stack<Expr> stack, Expr expr, Expr current) throws PlanningException {
+    public Expr postHook(ExprNormalizedResult ctx, Stack<Expr> stack, Expr expr, Expr current) throws PlanningException {
       ctx.outer = expr;
       return current;
     }
@@ -784,23 +849,23 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     }
 
     @Override
-    public Expr visitCaseWhen(DissectedExpr ctx, Stack<Expr> stack, CaseWhenPredicate expr) throws PlanningException {
+    public Expr visitCaseWhen(ExprNormalizedResult ctx, Stack<Expr> stack, CaseWhenPredicate expr) throws PlanningException {
       stack.push(expr);
       for (CaseWhenPredicate.WhenExpr when : expr.getWhens()) {
         if (isAggregationFunction(when.getCondition())) {
-          String referenceName = ctx.plan.newGneratedColumnName(when.getCondition());
+          String referenceName = ctx.evalList.addExpr(when.getCondition());
           ctx.aggregation.add(new TargetExpr(when.getCondition(), referenceName));
           when.setCondition(new ColumnReferenceExpr(referenceName));
         }
         if (isAggregationFunction(when.getResult())) {
-          String referenceName = ctx.plan.newGneratedColumnName(when.getResult());
+          String referenceName = ctx.evalList.addExpr(when.getResult());
           ctx.aggregation.add(new TargetExpr(when.getResult(), referenceName));
           when.setResult(new ColumnReferenceExpr(referenceName));
         }
       }
       if (expr.hasElseResult()) {
         if (isAggregationFunction(expr.getElseResult())) {
-          String referenceName = ctx.plan.newGneratedColumnName(expr.getElseResult());
+          String referenceName = ctx.evalList.addExpr(expr.getElseResult());
           ctx.aggregation.add(new TargetExpr(expr.getElseResult(), referenceName));
           expr.setElseResult(new ColumnReferenceExpr(referenceName));
         }
@@ -810,11 +875,11 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     }
 
     @Override
-    public Expr visitUnaryOperator(DissectedExpr ctx, Stack<Expr> stack, UnaryOperator expr) throws PlanningException {
+    public Expr visitUnaryOperator(ExprNormalizedResult ctx, Stack<Expr> stack, UnaryOperator expr) throws PlanningException {
       super.visitUnaryOperator(ctx, stack, expr);
       if (isAggregationFunction(expr.getChild())) {
         // Get an anonymous column name and replace the aggregation function by the column name
-        String refName = ctx.plan.newGneratedColumnName(expr.getChild());
+        String refName = ctx.evalList.addExpr(expr.getChild());
         ctx.aggregation.add(new TargetExpr(expr.getChild(), refName));
         expr.setChild(new ColumnReferenceExpr(refName));
       }
@@ -823,7 +888,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     }
 
     @Override
-    public Expr visitBinaryOperator(DissectedExpr ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
+    public Expr visitBinaryOperator(ExprNormalizedResult ctx, Stack<Expr> stack, BinaryOperator expr) throws PlanningException {
       super.visitBinaryOperator(ctx, stack, expr);
 
       ////////////////////////
@@ -831,7 +896,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       ////////////////////////
 
       if (isAggregationFunction(expr.getLeft())) {
-        String leftRefName = ctx.plan.newGneratedColumnName(expr.getLeft());
+        String leftRefName = ctx.evalList.addExpr(expr.getLeft());
         ctx.aggregation.add(new TargetExpr(expr.getLeft(), leftRefName));
         expr.setLeft(new ColumnReferenceExpr(leftRefName));
       }
@@ -841,7 +906,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       // For Right Term
       ////////////////////////
       if (isAggregationFunction(expr.getRight())) {
-        String rightRefName = ctx.plan.newGneratedColumnName(expr.getRight());
+        String rightRefName = ctx.evalList.addExpr(expr.getRight());
         ctx.aggregation.add(new TargetExpr(expr.getRight(), rightRefName));
         expr.setRight(new ColumnReferenceExpr(rightRefName));
       }
@@ -854,7 +919,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     @Override
-    public Expr visitFunction(DissectedExpr ctx, Stack<Expr> stack, FunctionExpr expr) throws PlanningException {
+    public Expr visitFunction(ExprNormalizedResult ctx, Stack<Expr> stack, FunctionExpr expr) throws PlanningException {
       stack.push(expr);
 
       Expr param;
@@ -875,7 +940,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     }
 
     @Override
-    public Expr visitGeneralSetFunction(DissectedExpr ctx, Stack<Expr> stack, GeneralSetFunctionExpr expr)
+    public Expr visitGeneralSetFunction(ExprNormalizedResult ctx, Stack<Expr> stack, GeneralSetFunctionExpr expr)
         throws PlanningException {
       stack.push(expr);
 
@@ -884,7 +949,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         param = expr.getParams()[i];
         visit(ctx, stack, param);
 
-        String referenceName = ctx.plan.newGneratedColumnName(param);
+        String referenceName = ctx.evalList.addExpr(param);
         ctx.inner.add(new TargetExpr(param, referenceName));
         expr.getParams()[i] = new ColumnReferenceExpr(referenceName);
       }
@@ -897,13 +962,23 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     @Override
-    public Expr visitCastExpr(DissectedExpr ctx, Stack<Expr> stack, CastExpr expr) throws PlanningException {
+    public Expr visitCastExpr(ExprNormalizedResult ctx, Stack<Expr> stack, CastExpr expr) throws PlanningException {
       super.visitCastExpr(ctx, stack, expr);
       if (expr.getChild().getType() == OpType.GeneralSetFunction
           || expr.getChild().getType() == OpType.CountRowsFunction) {
-        String referenceName = ctx.plan.newGneratedColumnName(expr.getChild());
+        String referenceName = ctx.evalList.addExpr(expr.getChild());
         ctx.aggregation.add(new TargetExpr(expr.getChild(), referenceName));
         expr.setChild(new ColumnReferenceExpr(referenceName));
+      }
+      return expr;
+    }
+
+    @Override
+    public Expr visitColumnReference(ExprNormalizedResult ctx, Stack<Expr> stack, ColumnReferenceExpr expr)
+        throws PlanningException {
+      if (!expr.hasQualifier()) {
+        String normalized = ctx.plan.getNormalizedColumnName(ctx.block, expr);
+        expr.setQualifiedName(normalized);
       }
       return expr;
     }
@@ -914,7 +989,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
    * Insert a group-by operator before a sort or a projection operator.
    * It is used only when a group-by clause is not given.
    */
-  private LogicalNode insertGroupbyNodeIfUnresolved(LogicalPlan plan, QueryBlock block,
+  private LogicalNode insertGroupbyNodeIfUnresolved(LogicalPlan plan, QueryBlock block, EvalExprManager evalLists,
                                                     LogicalNode child, String [] targetNames,
                                                     Stack<Expr> stack) throws PlanningException {
 
@@ -922,11 +997,11 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       GroupbyNode groupbyNode = new GroupbyNode(plan.newPID(), new Column[] {});
       Target [] targets = new Target[block.getProjection().size()];
       for (int i = 0; i < block.getProjection().size(); i++) {
-        targets[i] = block.evalLists.getTarget(targetNames[i]);
+        targets[i] = evalLists.getTarget(targetNames[i]);
         if (targets[i] == null) {
-          EvalNode evalNode = createEvalTree(plan, block, block.evalLists.getRawTarget(targetNames[i]).getExpr());
+          EvalNode evalNode = createEvalTree(plan, block, evalLists.getRawTarget(targetNames[i]).getExpr());
           targets[i] = new Target(evalNode, targetNames[i]);
-          block.evalLists.switchTarget(targetNames[i], targets[i].getEvalTree());
+          evalLists.switchTarget(targetNames[i], targets[i].getEvalTree());
         }
       }
       groupbyNode.setTargets(targets);
@@ -1120,8 +1195,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
             Specifier specifier = new Specifier(eachSpec.getName());
             sb.delete(0, sb.length());
             for(Expr eachExpr : eachSpec.getValueList().getValues()) {
-              context.block.setSchema(schema);
-              EvalNode eval = createEvalTree(context.plan, context.block, eachExpr);
+              context.currentBlock.setSchema(schema);
+              EvalNode eval = createEvalTree(context.plan, context.currentBlock, eachExpr);
               if(sb.length() > 1)
                 sb.append(",");
 
@@ -1147,8 +1222,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
               specifier.setName(eachSpec.getName());
 
             if (eachSpec.getEnd() != null) {
-              context.block.setSchema(schema);
-              EvalNode eval = createEvalTree(context.plan, context.block, eachSpec.getEnd());
+              context.currentBlock.setSchema(schema);
+              EvalNode eval = createEvalTree(context.plan, context.currentBlock, eachSpec.getEnd());
               specifier.setExpressions(eval.toString());
             }
 
@@ -1231,23 +1306,24 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   public LogicalNode visitInsert(PlanContext context, Stack<Expr> stack, Insert expr) throws PlanningException {
     stack.push(expr);
     QueryBlock newQueryBlock = context.plan.newNoNameBlock();
-    PlanContext newContext = new PlanContext(context.plan, newQueryBlock);
+    PlanContext newContext = new PlanContext(context, newQueryBlock);
     Stack<Expr> subStack = new Stack<Expr>();
     LogicalNode subQuery = visit(newContext, subStack, expr.getSubQuery());
-    context.plan.connectBlocks(newQueryBlock, context.block, BlockType.TableSubQuery);
+    context.plan.connectBlocks(newQueryBlock, context.currentBlock, BlockType.TableSubQuery);
     stack.pop();
 
     InsertNode insertNode = null;
     if (expr.hasTableName()) {
       TableDesc desc = catalog.getTableDesc(expr.getTableName());
-      context.block.addRelation(new ScanNode(context.plan.newPID(), desc));
+      context.currentBlock.addRelation(new ScanNode(context.plan.newPID(), desc));
 
       Schema targetSchema = new Schema();
       if (expr.hasTargetColumns()) {
         // INSERT OVERWRITE INTO TABLE tbl(col1 type, col2 type) SELECT ...
         String [] targetColumnNames = expr.getTargetColumns();
         for (int i = 0; i < targetColumnNames.length; i++) {
-          Column targetColumn = context.plan.resolveColumn(context.block, null, new ColumnReferenceExpr(targetColumnNames[i]));
+          Column targetColumn = context.plan.resolveColumn(context.currentBlock,
+              new ColumnReferenceExpr(targetColumnNames[i]));
           targetSchema.addColumn(targetColumn);
         }
       } else {
@@ -1481,7 +1557,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       case InPredicate: {
         InPredicate inPredicate = (InPredicate) expr;
         FieldEval predicand =
-            new FieldEval(plan.resolveColumn(block, null, (ColumnReferenceExpr) inPredicate.getPredicand()));
+            new FieldEval(plan.resolveColumn(block, (ColumnReferenceExpr) inPredicate.getPredicand()));
         RowConstantEval rowConstantEval = (RowConstantEval) createEvalTree(plan, block, inPredicate.getInValue());
         return new InEval(predicand, rowConstantEval, inPredicate.isNot());
       }
@@ -1610,7 +1686,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
   private FieldEval createFieldEval(LogicalPlan plan, QueryBlock block,
                                     ColumnReferenceExpr columnRef) throws PlanningException {
-    Column column = plan.resolveColumn(block, null, columnRef);
+    Column column = plan.resolveColumn(block, columnRef);
     return new FieldEval(column);
   }
 

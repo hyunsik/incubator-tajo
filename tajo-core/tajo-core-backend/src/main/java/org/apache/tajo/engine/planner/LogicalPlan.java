@@ -167,10 +167,16 @@ public class LogicalPlan {
     return queryBlockGraph;
   }
 
+  public String getNormalizedColumnName(QueryBlock block, ColumnReferenceExpr columnRef)
+      throws PlanningException {
+    Column found = resolveColumn(block, columnRef);
+    return found.getQualifiedName();
+  }
+
   /**
    * It resolves a column.
    */
-  public Column resolveColumn(QueryBlock block, LogicalNode currentNode, ColumnReferenceExpr columnRef)
+  public Column resolveColumn(QueryBlock block, ColumnReferenceExpr columnRef)
       throws PlanningException {
 
     if (columnRef.hasQualifier()) { // if a column reference is qualified
@@ -238,14 +244,6 @@ public class LogicalPlan {
         return ensureUniqueColumn(candidates);
       }
 
-//      Target target = block.targetListManager.getTarget(columnRef.getName());
-//      if (target != null) {
-//        candidates.add(target.getColumnSchema());
-//      }
-//      if (!candidates.isEmpty()) {
-//        return ensureUniqueColumn(candidates);
-//      }
-
       // Trying to find columns from schema in current block.
       if (block.getSchema() != null) {
         Column found = block.getSchema().getColumnByName(columnRef.getName());
@@ -260,13 +258,6 @@ public class LogicalPlan {
 
       throw new VerifyException("ERROR: no such a column name "+ columnRef.getCanonicalName());
     }
-  }
-
-  /**
-   * replace the found column if the column is renamed to an alias name
-   */
-  public Column getColumnOrAliasedColumn(QueryBlock block, Column column) throws PlanningException {
-    return column;
   }
 
   private static Column ensureUniqueColumn(List<Column> candidates)
@@ -404,8 +395,6 @@ public class LogicalPlan {
     private StoreTableNode storeTableNode;
     private InsertNode insertNode;
     private Schema schema;
-
-    EvalExprManager evalLists;
 
     /** It contains a planning log for this block */
     private List<String> planingHistory = Lists.newArrayList();

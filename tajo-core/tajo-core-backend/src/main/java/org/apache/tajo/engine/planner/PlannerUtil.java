@@ -708,4 +708,12 @@ public class PlannerUtil {
     return schema;
   }
 
+  public static String [] schemaToReferenceNames(Schema schema) {
+    String [] names = new String[schema.getColumnNum()];
+    int i = 0;
+    for (Column column : schema.getColumns()) {
+      names[i++] = column.getQualifiedName();
+    }
+    return names;
+  }
 }

@@ -50,6 +50,10 @@ public class EvalExprManager {
     return resolvedFlags.containsKey(normalized) && resolvedFlags.get(normalized);
   }
 
+  public boolean containsExpr(Expr expr) {
+    return exprToNameMap.containsKey(expr);
+  }
+
   public String addExpr(String alias, Expr expr) {
     if (exprToNameMap.containsKey(expr)) {
       return exprToNameMap.get(expr);
