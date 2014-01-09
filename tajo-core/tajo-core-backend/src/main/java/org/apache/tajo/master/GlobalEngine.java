@@ -358,8 +358,8 @@ public class GlobalEngine extends AbstractService {
 
     @Override
     public boolean isEligible(QueryContext queryContext, LogicalPlan plan) {
-      if (plan.getRootBlock().hasStoreTableNode()) {
-        StoreTableNode storeTableNode = plan.getRootBlock().getStoreTableNode();
+      if (plan.getRootBlock().hasNode(NodeType.STORE)) {
+        StoreTableNode storeTableNode = plan.getRootBlock().getNode(NodeType.STORE);
         return storeTableNode.isCreatedTable();
       } else {
         return false;
@@ -368,7 +368,7 @@ public class GlobalEngine extends AbstractService {
 
     @Override
     public void hook(QueryContext queryContext, LogicalPlan plan) throws Exception {
-      StoreTableNode storeTableNode = plan.getRootBlock().getStoreTableNode();
+      StoreTableNode storeTableNode = plan.getRootBlock().getNode(NodeType.STORE);
       String tableName = storeTableNode.getTableName();
       queryContext.setOutputTable(tableName);
       queryContext.setOutputPath(new Path(TajoConf.getWarehouseDir(context.getConf()), tableName));
@@ -390,7 +390,7 @@ public class GlobalEngine extends AbstractService {
   public void hook(QueryContext queryContext, LogicalPlan plan) throws Exception {
       queryContext.setInsert();
 
-      InsertNode insertNode = plan.getRootBlock().getInsertNode();
+      InsertNode insertNode = plan.getRootBlock().getNode(NodeType.INSERT);
       StoreTableNode storeNode;
 
       // Set QueryContext settings, such as output table name and output path.
@@ -477,7 +477,8 @@ public class GlobalEngine extends AbstractService {
         }
 
 
-        ProjectionNode projectionNode = new ProjectionNode(plan.newPID(), targets);
+        ProjectionNode projectionNode = new ProjectionNode(plan.newPID());
+        projectionNode.setTargets(targets);
         projectionNode.setInSchema(insertNode.getSubQuery().getOutSchema());
         projectionNode.setOutSchema(PlannerUtil.targetToSchema(targets));
         List<LogicalPlan.QueryBlock> blocks = plan.getChildBlocks(plan.getRootBlock());

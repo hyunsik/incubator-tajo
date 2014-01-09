@@ -77,7 +77,7 @@ public class LogicalOptimizer {
   private void optimizeJoinOrder(LogicalPlan plan, String blockName) throws PlanningException {
     LogicalPlan.QueryBlock block = plan.getBlock(blockName);
 
-    if (block.hasJoinNode()) {
+    if (block.hasNode(NodeType.JOIN)) {
       String originalOrder = JoinOrderStringBuilder.buildJoinOrderString(plan, block);
       double nonOptimizedJoinCost = JoinCostComputer.computeCost(plan, block);
 
@@ -87,7 +87,8 @@ public class LogicalOptimizer {
       // finding join order and restore remain filter order
       FoundJoinOrder order = joinOrderAlgorithm.findBestOrder(plan, block,
           joinGraphContext.joinGraph, joinGraphContext.relationsForProduct);
-      block.setJoinNode(order.getOrderedJoin());
+      JoinNode old = block.getNode(NodeType.JOIN);
+      PlannerUtil.replaceNode(plan, block.getRoot(), old, order.getOrderedJoin());
 
       String optimizedOrder = JoinOrderStringBuilder.buildJoinOrderString(plan, block);
 

@@ -31,7 +31,7 @@ import java.util.*;
 /**
  * It manages a list of targets.
  */
-public class EvalExprManager {
+public class ExprListManager {
   private Map<String, EvalNode> nameToEvalMap = new LinkedHashMap<String, EvalNode>();
   private LinkedHashMap<String, Expr> nameToExprMap = new LinkedHashMap<String, Expr>();
   private LinkedHashMap<Expr, String> exprToNameMap = new LinkedHashMap<Expr, String>();
@@ -40,7 +40,7 @@ public class EvalExprManager {
   private LogicalPlan plan;
   private LogicalPlanner planner;
 
-  public EvalExprManager(LogicalPlan plan, LogicalPlanner planner, LogicalPlan.QueryBlock block) {
+  public ExprListManager(LogicalPlan plan, LogicalPlanner planner, LogicalPlan.QueryBlock block) {
     this.plan = plan;
     this.planner = planner;
   }
@@ -76,7 +76,7 @@ public class EvalExprManager {
         return name;
       }
     } else {
-      name = plan.newNonameColumnName(expr.getType().name());
+      name = plan.newQueryBlock(expr.getType().name());
     }
     return addExpr(name, expr);
   }

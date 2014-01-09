@@ -32,19 +32,17 @@ public class GroupbyNode extends UnaryNode implements Projectable, Cloneable {
 	@Expose private EvalNode havingCondition = null;
 	@Expose private Target [] targets;
   @Expose private boolean hasDistinct = false;
-	
-	public GroupbyNode(int pid, final Column [] columns) {
-		super(pid, NodeType.GROUP_BY);
-		this.columns = columns;
-	}
-	
-	public GroupbyNode(int pid, final Column [] columns, final EvalNode havingCondition) {
-    this(pid, columns);
-    this.havingCondition = havingCondition;
+
+  public GroupbyNode(int pid) {
+    super(pid, NodeType.GROUP_BY);
   }
 
   public final boolean isEmptyGrouping() {
     return columns == null || columns.length == 0;
+  }
+
+  public void setGroupingColumns(Column [] groupingColumns) {
+    this.columns = groupingColumns;
   }
 
 	public final Column [] getGroupingColumns() {

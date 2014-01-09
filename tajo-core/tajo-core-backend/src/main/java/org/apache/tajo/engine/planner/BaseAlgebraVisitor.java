@@ -231,8 +231,12 @@ public class BaseAlgebraVisitor<CONTEXT, RESULT> implements AlgebraVisitor<CONTE
       throw new PlanningException("Cannot support this type algebra \"" + expr.getType() + "\"");
     }
 
-    postHook(ctx, stack, expr, current);
+    // skip postHook against only one relation
+    if (expr.getType() == OpType.RelationList && ((RelationList)expr).size() == 1) {
+      return current;
+    }
 
+    postHook(ctx, stack, expr, current);
     return current;
   }
 
@@ -293,7 +297,19 @@ public class BaseAlgebraVisitor<CONTEXT, RESULT> implements AlgebraVisitor<CONTE
 
   @Override
   public RESULT visitGroupBy(CONTEXT ctx, Stack<Expr> stack, Aggregation expr) throws PlanningException {
-    return visitDefaultUnaryExpr(ctx, stack, expr);
+    stack.push(expr);
+
+    if (expr.hasHavingCondition()) {
+      visit(ctx, stack, expr.getHavingCondition());
+    }
+    for (org.apache.tajo.algebra.Aggregation.GroupElement groupElement : expr.getGroupSet()) {
+      for (Expr groupingSet : groupElement.getGroupingSets()) {
+        visit(ctx, stack, groupingSet);
+      }
+    }
+    RESULT result = visit(ctx, stack, expr.getChild());
+    stack.pop();
+    return result;
   }
 
   @Override

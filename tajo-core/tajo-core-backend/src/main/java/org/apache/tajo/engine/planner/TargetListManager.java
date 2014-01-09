@@ -215,7 +215,7 @@ public class TargetListManager {
     if (t.hasAlias() || t.getEvalTree().getType() == EvalType.FIELD) {
       name = t.getCanonicalName();
     } else { // if alias name is not given or target is an expression
-      t.setAlias(plan.newNonameColumnName(t.getEvalTree().getName()));
+      t.setAlias(plan.newQueryBlock(t.getEvalTree().getName()));
       name = t.getCanonicalName();
     }
     return new Column(name, t.getEvalTree().getValueType());

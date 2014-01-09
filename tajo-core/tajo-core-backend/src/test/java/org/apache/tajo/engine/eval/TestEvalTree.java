@@ -33,6 +33,8 @@ import org.apache.tajo.engine.planner.LogicalPlan;
 import org.apache.tajo.engine.planner.LogicalPlanner;
 import org.apache.tajo.engine.planner.PlanningException;
 import org.apache.tajo.engine.planner.Target;
+import org.apache.tajo.engine.planner.logical.NodeType;
+import org.apache.tajo.engine.planner.logical.SelectionNode;
 import org.apache.tajo.master.TajoMaster;
 import org.apache.tajo.storage.Tuple;
 import org.apache.tajo.storage.VTuple;
@@ -143,7 +145,7 @@ public class TestEvalTree {
     } catch (PlanningException e) {
       e.printStackTrace();
     }
-    EvalNode qual = plan.getRootBlock().getSelectionNode().getQual();
+    EvalNode qual = ((SelectionNode)plan.getRootBlock().getNode(NodeType.SELECTION)).getQual();
     assertJsonSerDer(qual);
     return qual;
   }

@@ -33,7 +33,9 @@ import org.apache.tajo.engine.planner.LogicalPlanner;
 import org.apache.tajo.engine.planner.PlanningException;
 import org.apache.tajo.engine.planner.Target;
 import org.apache.tajo.engine.planner.logical.EvalExprNode;
+import org.apache.tajo.engine.planner.logical.LogicalNode;
 import org.apache.tajo.engine.planner.logical.NodeType;
+import org.apache.tajo.engine.planner.logical.SelectionNode;
 import org.apache.tajo.exception.InternalException;
 import org.apache.tajo.master.TajoMaster;
 import org.apache.tajo.util.CommonTestingUtil;
@@ -119,7 +121,7 @@ public class TestEvalTreeUtil {
     } catch (PlanningException e) {
       e.printStackTrace();
     }
-    return plan.getRootBlock().getSelectionNode().getQual();
+    return ((SelectionNode)plan.getRootBlock().getNode(NodeType.SELECTION)).getQual();
   }
 
   @Test

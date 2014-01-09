@@ -33,6 +33,7 @@ import static org.junit.Assert.assertTrue;
 
 @Category(IntegrationTest.class)
 public class TestSelectQuery extends QueryTestCaseBase {
+
   @Test
   public final void testSelect() throws Exception {
     ResultSet res = executeQuery();

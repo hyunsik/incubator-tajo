@@ -37,8 +37,6 @@ import java.util.*;
  */
 @NotThreadSafe
 public class LogicalPlan {
-  private final LogicalPlanner planner;
-
   /** the prefix character for virtual tables */
   public static final char VIRTUAL_TABLE_PREFIX='@';
   /** it indicates the root block */
@@ -52,13 +50,13 @@ public class LogicalPlan {
   private Map<String, QueryBlock> queryBlocks = new LinkedHashMap<String, QueryBlock>();
   private Map<Integer, LogicalNode> nodeMap = new HashMap<Integer, LogicalNode>();
   private Map<Integer, QueryBlock> queryBlockByPID = new HashMap<Integer, QueryBlock>();
+  private Map<Expr, String> exprToBlockNameMap = TUtil.newHashMap();
   private SimpleDirectedGraph<String, BlockEdge> queryBlockGraph = new SimpleDirectedGraph<String, BlockEdge>();
 
   /** planning and optimization log */
   private List<String> planingHistory = Lists.newArrayList();
 
-  public LogicalPlan(LogicalPlanner planner) {
-    this.planner = planner;
+  public LogicalPlan() {
   }
 
   /**
@@ -77,17 +75,17 @@ public class LogicalPlan {
     return nextPid++;
   }
 
-  public QueryBlock newNoNameBlock() {
+  public QueryBlock newQueryBlock() {
     return newAndGetBlock(NONAME_BLOCK_PREFIX + (noNameBlockId++));
   }
 
-  public String newNonameColumnName(String prefix) {
+  public String newQueryBlock(String prefix) {
     String suffix = String.valueOf(noNameColumnId);
     noNameColumnId++;
     return "$" + prefix.toLowerCase() + "_" + suffix;
   }
 
-  public String newGneratedColumnName(Expr expr) {
+  public String newFieldReferenceName(Expr expr) {
     String prefix;
 
     switch (expr.getType()) {
@@ -116,7 +114,7 @@ public class LogicalPlan {
    * @param blockName the query block name to be checked
    * @return true if exists. Otherwise, false
    */
-  public boolean existBlock(String blockName) {
+  public boolean existsBlock(String blockName) {
     return queryBlocks.containsKey(blockName);
   }
 
@@ -157,6 +155,14 @@ public class LogicalPlan {
       childBlocks.add(queryBlocks.get(blockName));
     }
     return childBlocks;
+  }
+
+  public void mapExprToBlock(Expr expr, String blockName) {
+    exprToBlockNameMap.put(expr, blockName);
+  }
+
+  public String getBlockNameByExpr(Expr expr) {
+    return exprToBlockNameMap.get(expr);
   }
 
   public Collection<QueryBlock> getQueryBlocks() {
@@ -381,19 +387,16 @@ public class LogicalPlan {
     private String blockName;
     private LogicalNode rootNode;
     private NodeType rootType;
-    private Map<String, RelationNode> relations = new HashMap<String, RelationNode>();
-    private Map<OpType, List<Expr>> algebraicExprs = TUtil.newHashMap();
 
-    // changing states
+    // transient states
+    private Map<String, RelationNode> nameToRelationMap = new HashMap<String, RelationNode>();
+    private Map<OpType, List<Expr>> operatorToExprMap = TUtil.newHashMap();
+    private Map<NodeType, LogicalNode> nodeTypeToNodeMap = TUtil.newHashMap();
+    private Map<Expr, LogicalNode> exprToNodeMap = TUtil.newHashMap();
+
     private LogicalNode latestNode;
     private boolean resolvedGrouping = true;
-    private boolean hasGrouping;
     private Projectable projectionNode;
-    private GroupbyNode groupingNode;
-    private JoinNode joinNode;
-    private SelectionNode selectionNode;
-    private StoreTableNode storeTableNode;
-    private InsertNode insertNode;
     private Schema schema;
 
     /** It contains a planning log for this block */
@@ -438,19 +441,19 @@ public class LogicalPlan {
     }
 
     public boolean containRelation(String name) {
-      return relations.containsKey(PlannerUtil.normalizeTableName(name));
+      return nameToRelationMap.containsKey(PlannerUtil.normalizeTableName(name));
     }
 
     public void addRelation(RelationNode relation) {
-      relations.put(PlannerUtil.normalizeTableName(relation.getCanonicalName()), relation);
+      nameToRelationMap.put(PlannerUtil.normalizeTableName(relation.getCanonicalName()), relation);
     }
 
     public RelationNode getRelation(String name) {
-      return relations.get(PlannerUtil.normalizeTableName(name));
+      return nameToRelationMap.get(PlannerUtil.normalizeTableName(name));
     }
 
     public Collection<RelationNode> getRelations() {
-      return this.relations.values();
+      return this.nameToRelationMap.values();
     }
 
     public void setSchema(Schema schema) {
@@ -462,7 +465,7 @@ public class LogicalPlan {
     }
 
     public boolean hasTableExpression() {
-      return this.relations.size() > 0;
+      return this.nameToRelationMap.size() > 0;
     }
 
     public void updateLatestNode(LogicalNode node) {
@@ -474,20 +477,20 @@ public class LogicalPlan {
     }
 
     public void setAlgebraicExpr(Expr expr) {
-      TUtil.putToNestedList(algebraicExprs, expr.getType(), expr);
+      TUtil.putToNestedList(operatorToExprMap, expr.getType(), expr);
     }
 
     public boolean hasAlgebraicExpr(OpType opType) {
-      return algebraicExprs.containsKey(opType);
+      return operatorToExprMap.containsKey(opType);
     }
 
     public <T extends Expr> List<T> getAlgebraicExpr(OpType opType) {
-      return (List<T>) algebraicExprs.get(opType);
+      return (List<T>) operatorToExprMap.get(opType);
     }
 
     public <T extends Expr> T getSingletonExpr(OpType opType) {
       if (hasAlgebraicExpr(opType)) {
-        return (T) algebraicExprs.get(opType).get(0);
+        return (T) operatorToExprMap.get(opType).get(0);
       } else {
         return null;
       }
@@ -501,12 +504,31 @@ public class LogicalPlan {
       return getSingletonExpr(OpType.Projection);
     }
 
-    public boolean hasHaving() {
-      return hasAlgebraicExpr(OpType.Having);
+    public boolean hasNode(NodeType nodeType) {
+      return nodeTypeToNodeMap.containsKey(nodeType);
     }
 
-    public Having getHaving() {
-      return getSingletonExpr(OpType.Having);
+    public void setNode(LogicalNode node) {
+      // id -> node
+      nodeMap.put(node.getPID(), node);
+
+      // nodetype -> node
+      // node types can be duplicated. So, latest node type is only kept.
+      // So, this is only for filter, groupby, sort, limit, projection, which exists once at a query block.
+      nodeTypeToNodeMap.put(node.getType(), node);
+    }
+
+    public <T extends LogicalNode> T getNode(NodeType nodeType) {
+      return (T) nodeTypeToNodeMap.get(nodeType);
+    }
+
+    // expr -> node
+    public void mapExprToLogicalNode(Expr expr, LogicalNode node) {
+      exprToNodeMap.put(expr, node);
+    }
+
+    public <T extends LogicalNode> T getNodeFromExpr(Expr expr) {
+      return (T) exprToNodeMap.get(expr);
     }
 
     public void setProjectionNode(Projectable node) {
@@ -526,79 +548,7 @@ public class LogicalPlan {
     }
 
     public void setHasGrouping() {
-      hasGrouping = true;
       resolvedGrouping = false;
-    }
-
-    public boolean hasGrouping() {
-      return hasGrouping || hasGroupbyNode();
-    }
-
-    public boolean hasGroupbyNode() {
-      return this.groupingNode != null;
-    }
-
-    public void setGroupbyNode(GroupbyNode groupingNode) {
-      this.groupingNode = groupingNode;
-    }
-
-    public GroupbyNode getGroupbyNode() {
-      return this.groupingNode;
-    }
-
-    public boolean hasJoinNode() {
-      return joinNode != null;
-    }
-
-    /**
-     * @return the topmost JoinNode instance
-     */
-    public JoinNode getJoinNode() {
-      return joinNode;
-    }
-
-    public void setJoinNode(JoinNode node) {
-      if (joinNode == null || latestNode == node) {
-        this.joinNode = node;
-      } else {
-        PlannerUtil.replaceNode(LogicalPlan.this, latestNode, this.joinNode, node);
-      }
-    }
-
-    public boolean hasSelectionNode() {
-      return this.selectionNode != null;
-    }
-
-    public void setSelectionNode(SelectionNode selectionNode) {
-      this.selectionNode = selectionNode;
-    }
-
-    public SelectionNode getSelectionNode() {
-      return selectionNode;
-    }
-
-    public boolean hasStoreTableNode() {
-      return this.storeTableNode != null;
-    }
-
-    public void setStoreTableNode(StoreTableNode storeTableNode) {
-      this.storeTableNode = storeTableNode;
-    }
-
-    public StoreTableNode getStoreTableNode() {
-      return this.storeTableNode;
-    }
-
-    public boolean hasInsertNode() {
-      return this.insertNode != null;
-    }
-
-    public InsertNode getInsertNode() {
-      return this.insertNode;
-    }
-
-    public void setInsertNode(InsertNode insertNode) {
-      this.insertNode = insertNode;
     }
 
     public List<String> getPlaningHistory() {
@@ -609,51 +559,20 @@ public class LogicalPlan {
       this.planingHistory.add(history);
     }
 
-    public boolean postVisit(LogicalNode node, Stack<Expr> path) {
-      if (nodeMap.containsKey(node.getPID())) {
-        return false;
-      }
+    public boolean postVisit(LogicalNode currentNode, Expr currentExpr, Stack<Expr> path) {
 
-      nodeMap.put(node.getPID(), node);
-      updateLatestNode(node);
+      updateLatestNode(currentNode);
 
       // if an added operator is a relation, add it to relation set.
-      switch (node.getType()) {
-        case STORE:
-          setStoreTableNode((StoreTableNode) node);
-          break;
-
-        case SCAN:
-          ScanNode relationOp = (ScanNode) node;
-          addRelation(relationOp);
-          break;
-
+      switch (currentNode.getType()) {
         case GROUP_BY:
           resolveGroupingRequired();
-          setGroupbyNode((GroupbyNode) node);
-          break;
-
-        case JOIN:
-          setJoinNode((JoinNode) node);
-          break;
-
-        case SELECTION:
-          setSelectionNode((SelectionNode) node);
-          break;
-
-        case INSERT:
-          setInsertNode((InsertNode) node);
-          break;
-
-        case TABLE_SUBQUERY:
-          TableSubQueryNode tableSubQueryNode = (TableSubQueryNode) node;
-          addRelation(tableSubQueryNode);
           break;
       }
 
       // if this node is the topmost
       if (path.size() == 0) {
-        setRoot(node);
+        setRoot(currentNode);
       }
 
       return true;

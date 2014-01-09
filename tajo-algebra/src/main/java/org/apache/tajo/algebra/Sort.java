@@ -96,10 +96,12 @@ public class Sort extends UnaryOperator {
       return this.key;
     }
 
+    @Override
     public int hashCode() {
       return Objects.hashCode(asc, key, nullFirst);
     }
 
+    @Override
     public boolean equals(Object obj) {
       if (obj instanceof SortSpec) {
         SortSpec other = (SortSpec) obj;
@@ -108,6 +110,11 @@ public class Sort extends UnaryOperator {
             TUtil.checkEquals(nullFirst, other.nullFirst);
       }
       return false;
+    }
+
+    @Override
+    public String toString() {
+      return key + " " + (asc ? "asc" : "desc") + " " + (nullFirst ? "null first" :"");
     }
   }
 }

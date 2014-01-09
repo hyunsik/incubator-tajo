@@ -22,7 +22,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.ObjectArrays;
 import com.google.common.collect.Sets;
-import org.apache.tajo.algebra.JoinType;
+import org.apache.tajo.algebra.*;
 import org.apache.tajo.annotation.Nullable;
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Schema;
@@ -715,5 +715,31 @@ public class PlannerUtil {
       names[i++] = column.getQualifiedName();
     }
     return names;
+  }
+
+  public static boolean existsAggregationFunction(Expr expr) throws PlanningException {
+    AggregationFunctionFinder finder = new AggregationFunctionFinder();
+    AggFunctionFoundResult result = new AggFunctionFoundResult();
+    finder.visit(result, new Stack<Expr>(), expr);
+    return result.found;
+  }
+
+  static class AggFunctionFoundResult {
+    boolean found;
+  }
+  static class AggregationFunctionFinder extends SimpleAlgebraVisitor<AggFunctionFoundResult, Object> {
+    @Override
+    public Object visitCountRowsFunction(AggFunctionFoundResult ctx, Stack<Expr> stack, CountRowsFunctionExpr expr)
+        throws PlanningException {
+      ctx.found = true;
+      return super.visitCountRowsFunction(ctx, stack, expr);
+    }
+
+    @Override
+    public Object visitGeneralSetFunction(AggFunctionFoundResult ctx, Stack<Expr> stack, GeneralSetFunctionExpr expr)
+        throws PlanningException {
+      ctx.found = true;
+      return super.visitGeneralSetFunction(ctx, stack, expr);
+    }
   }
 }
