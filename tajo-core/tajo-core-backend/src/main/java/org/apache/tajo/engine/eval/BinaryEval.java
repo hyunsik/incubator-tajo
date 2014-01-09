@@ -52,6 +52,7 @@ public class BinaryEval extends EvalNode implements Cloneable {
         type == EvalType.AND ||
             type == EvalType.OR ||
             type == EvalType.EQUAL ||
+            type == EvalType.NOT_EQUAL ||
             type == EvalType.LTH ||
             type == EvalType.GTH ||
             type == EvalType.LEQ ||

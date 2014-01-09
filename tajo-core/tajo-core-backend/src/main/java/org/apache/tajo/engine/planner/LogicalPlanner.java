@@ -228,10 +228,11 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         GroupbyNode dupRemoval = new GroupbyNode(plan.newPID());
         dupRemoval.setGroupingColumns(outSchema.toArray());
         dupRemoval.setTargets(PlannerUtil.schemaToTargets(outSchema));
-        dupRemoval.setInSchema(outSchema);
+        dupRemoval.setInSchema(projectionNode.getInSchema());
         dupRemoval.setOutSchema(outSchema);
         dupRemoval.setChild(child);
         projectionNode.setChild(dupRemoval);
+        projectionNode.setInSchema(dupRemoval.getOutSchema());
       }
     }
 
@@ -672,14 +673,15 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       throws PlanningException {
     ScanNode scanNode = context.currentBlock.getNodeFromExpr(expr);
 
-    // set targets
-    Set<Target> evaluatedTargets = new LinkedHashSet<Target>();
+    // Add additional expressions required in upper nodes.
+    Set<Expr> newlyEvaluatedExprs = new LinkedHashSet<Expr>();
     for (TargetExpr rawTarget : context.evalList.getRawTargets()) {
       try {
         EvalNode evalNode = exprAnnotator.createEvalNode(context.plan, context.currentBlock, rawTarget.getExpr());
         if (PlannerUtil.canBeEvaluated(evalNode, scanNode) && EvalTreeUtil.findDistinctAggFunction(evalNode).size() == 0) {
           context.evalList.switchTarget(rawTarget.getAlias(), evalNode);
-          evaluatedTargets.add(new Target(evalNode, rawTarget.getAlias()));
+
+          newlyEvaluatedExprs.add(rawTarget.getExpr()); // newly added exr
         }
       } catch (VerifyException ve) {
       }
@@ -689,11 +691,20 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     List<Target> targets = new ArrayList<Target>();
     for (Column column : scanNode.getInSchema().getColumns()) {
       ColumnReferenceExpr columnRef = new ColumnReferenceExpr(column.getQualifier(), column.getColumnName());
-      if (context.evalList.containsExpr(columnRef) == false) {
+      if (context.evalList.containsExpr(columnRef)) {
+        String referenceName = context.evalList.getReferenceName(columnRef);
+        targets.add(new Target(new FieldEval(column), referenceName));
+
+        newlyEvaluatedExprs.remove(columnRef);
+      } else {
         targets.add(new Target(new FieldEval(column)));
       }
     }
-    targets.addAll(evaluatedTargets);
+
+    for (Expr newAddedExpr : newlyEvaluatedExprs) {
+      targets.add(context.evalList.getTarget(newAddedExpr, true));
+    }
+
     scanNode.setTargets(targets.toArray(new Target[targets.size()]));
     scanNode.setOutSchema(PlannerUtil.targetToSchema(scanNode.getTargets()));
 

@@ -66,6 +66,10 @@ public class ExprListManager {
     }
   }
 
+  public String getReferenceName(Expr expr) {
+    return exprToNameMap.get(expr);
+  }
+
   public String addExpr(Expr expr) {
     String name;
 
@@ -134,9 +138,18 @@ public class ExprListManager {
     resolvedFlags.put(normalized, true);
   }
 
+  public Target getTarget(Expr expr, boolean unresolved) {
+    String name = exprToNameMap.get(expr);
+    return getTarget(name, unresolved);
+  }
+
   public Target getTarget(String name) {
+    return getTarget(name, false);
+  }
+
+  public Target getTarget(String name, boolean unresolved) {
     String normalized = name;
-    if (resolvedFlags.containsKey(normalized) && resolvedFlags.get(normalized)) {
+    if (!unresolved && resolvedFlags.containsKey(normalized) && resolvedFlags.get(normalized)) {
       return new Target(new FieldEval(normalized, nameToEvalMap.get(normalized).getValueType()));
     } else {
       if (nameToEvalMap.containsKey(normalized)) {
@@ -145,19 +158,6 @@ public class ExprListManager {
         return null;
       }
     }
-  }
-
-  public Target getTarget(Expr expr) {
-    if (exprToNameMap.containsKey(expr)) {
-      String name = exprToNameMap.get(expr);
-      return getTarget(name);
-    } else {
-      return null;
-    }
-  }
-
-  public String [] getTargetNames() {
-    return nameToEvalMap.keySet().toArray(new String[nameToEvalMap.size()]);
   }
 
   public TargetExpr getRawTarget(String name) {
