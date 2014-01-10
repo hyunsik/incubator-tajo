@@ -19,6 +19,7 @@
 package org.apache.tajo.engine.planner;
 
 import com.google.common.collect.Lists;
+import org.apache.commons.lang.ObjectUtils;
 import org.apache.tajo.algebra.*;
 import org.apache.tajo.annotation.NotThreadSafe;
 import org.apache.tajo.catalog.Column;
@@ -50,7 +51,7 @@ public class LogicalPlan {
   private Map<String, QueryBlock> queryBlocks = new LinkedHashMap<String, QueryBlock>();
   private Map<Integer, LogicalNode> nodeMap = new HashMap<Integer, LogicalNode>();
   private Map<Integer, QueryBlock> queryBlockByPID = new HashMap<Integer, QueryBlock>();
-  private Map<Expr, String> exprToBlockNameMap = TUtil.newHashMap();
+  private Map<String, String> exprToBlockNameMap = TUtil.newHashMap();
   private SimpleDirectedGraph<String, BlockEdge> queryBlockGraph = new SimpleDirectedGraph<String, BlockEdge>();
 
   /** planning and optimization log */
@@ -160,15 +161,15 @@ public class LogicalPlan {
   }
 
   public void mapExprToBlock(Expr expr, String blockName) {
-    exprToBlockNameMap.put(expr, blockName);
+    exprToBlockNameMap.put(ObjectUtils.identityToString(expr), blockName);
   }
 
   public QueryBlock getBlockByExpr(Expr expr) {
-    return getBlock(exprToBlockNameMap.get(expr));
+    return getBlock(exprToBlockNameMap.get(ObjectUtils.identityToString(expr)));
   }
 
   public String getBlockNameByExpr(Expr expr) {
-    return exprToBlockNameMap.get(expr);
+    return exprToBlockNameMap.get(ObjectUtils.identityToString(expr));
   }
 
   public Collection<QueryBlock> getQueryBlocks() {
@@ -398,7 +399,7 @@ public class LogicalPlan {
     private Map<String, RelationNode> nameToRelationMap = new HashMap<String, RelationNode>();
     private Map<OpType, List<Expr>> operatorToExprMap = TUtil.newHashMap();
     private Map<NodeType, LogicalNode> nodeTypeToNodeMap = TUtil.newHashMap();
-    private Map<Integer, LogicalNode> exprToNodeMap = TUtil.newHashMap();
+    private Map<String, LogicalNode> exprToNodeMap = TUtil.newHashMap();
     NamedExprsManager namedExprsMgr;
 
     private LogicalNode latestNode;
@@ -532,11 +533,11 @@ public class LogicalPlan {
 
     // expr -> node
     public void mapExprToLogicalNode(Expr expr, LogicalNode node) {
-      exprToNodeMap.put(System.identityHashCode(expr), node);
+      exprToNodeMap.put(ObjectUtils.identityToString(expr), node);
     }
 
     public <T extends LogicalNode> T getNodeFromExpr(Expr expr) {
-      return (T) exprToNodeMap.get(System.identityHashCode(expr));
+      return (T) exprToNodeMap.get(ObjectUtils.identityToString(expr));
     }
 
     public void setProjectableNode(Projectable node) {

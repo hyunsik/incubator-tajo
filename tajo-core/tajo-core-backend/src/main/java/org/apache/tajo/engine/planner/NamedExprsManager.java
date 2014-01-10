@@ -72,6 +72,10 @@ public class NamedExprsManager {
     return exprToNameMap.get(expr);
   }
 
+  public Expr getExpr(String name) {
+    return nameToExprMap.get(name);
+  }
+
   public NamedExpr getNamedExpr(String name) {
     String normalized = name.toLowerCase();
     return new NamedExpr(nameToExprMap.get(normalized), normalized);

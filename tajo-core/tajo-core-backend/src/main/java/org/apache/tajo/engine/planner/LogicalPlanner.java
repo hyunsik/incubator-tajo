@@ -435,6 +435,30 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
    ===============================================================================================*/
 
   @Override
+  public LogicalNode visitHaving(PlanContext context, Stack<Expr> stack, Having expr) throws PlanningException {
+    LogicalPlan plan = context.plan;
+    QueryBlock block = context.queryBlock;
+
+    ExprNormalizedResult normalizedResult = normalizer.normalize(context, expr.getQual());
+    String referName = block.namedExprsMgr.addExpr(normalizedResult.baseExpr);
+    block.namedExprsMgr.addNamedExprArray(normalizedResult.aggExprs);
+    block.namedExprsMgr.addNamedExprArray(normalizedResult.scalarExprs);
+
+    stack.push(expr);
+    LogicalNode child = visit(context, stack, expr.getChild());
+    stack.pop();
+
+    Expr qualExpr = block.namedExprsMgr.getExpr(referName);
+    EvalNode evalNode = exprAnnotator.createEvalNode(context.plan, context.queryBlock, qualExpr);
+    HavingNode having = new HavingNode(context.plan.newPID());
+    having.setQual(evalNode);
+    having.setInSchema(child.getOutSchema());
+    having.setOutSchema(child.getOutSchema());
+    having.setChild(child);
+    return having;
+  }
+
+  @Override
   public LogicalNode visitGroupBy(PlanContext context, Stack<Expr> stack, Aggregation aggregation)
       throws PlanningException {
 

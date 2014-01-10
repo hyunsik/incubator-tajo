@@ -146,6 +146,11 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
         leftExec = createPlanRecursive(ctx, grpNode.getChild());
         return createGroupByPlan(ctx, grpNode, leftExec);
 
+      case HAVING:
+        HavingNode havingNode = (HavingNode) logicalNode;
+        leftExec = createPlanRecursive(ctx, havingNode.getChild());
+        return new HavingExec(ctx, havingNode, leftExec);
+
       case SORT:
         SortNode sortNode = (SortNode) logicalNode;
         leftExec = createPlanRecursive(ctx, sortNode.getChild());

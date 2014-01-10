@@ -68,7 +68,7 @@ class ExprNormalizer extends SimpleAlgebraVisitor<ExprNormalizer.ExprNormalizedR
     List<NamedExpr> aggExprs = new ArrayList<NamedExpr>();
     List<NamedExpr> scalarExprs = new ArrayList<NamedExpr>();
 
-    ExprNormalizedResult(LogicalPlanner.PlanContext context) {
+    private ExprNormalizedResult(LogicalPlanner.PlanContext context) {
       this.plan = context.plan;
       this.block = context.queryBlock;
     }

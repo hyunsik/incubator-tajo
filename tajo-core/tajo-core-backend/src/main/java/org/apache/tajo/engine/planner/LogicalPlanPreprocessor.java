@@ -125,6 +125,18 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
   }
 
   @Override
+  public LogicalNode visitHaving(PreprocessContext ctx, Stack<Expr> stack, Having expr) throws PlanningException {
+    stack.push(expr);
+    LogicalNode child = visit(ctx, stack, expr.getChild());
+    stack.pop();
+
+    HavingNode havingNode = new HavingNode(ctx.plan.newPID());
+    havingNode.setInSchema(child.getOutSchema());
+    havingNode.setOutSchema(child.getOutSchema());
+    return havingNode;
+  }
+
+  @Override
   public LogicalNode visitGroupBy(PreprocessContext ctx, Stack<Expr> stack, Aggregation expr) throws PlanningException {
     stack.push(expr); // <--- push
     LogicalNode child = visit(ctx, stack, expr.getChild());
@@ -168,6 +180,7 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
     unionNode.setRightChild(rightSubQuery);
     unionNode.setInSchema(leftSubQuery.getOutSchema());
     unionNode.setOutSchema(leftSubQuery.getOutSchema());
+
     return unionNode;
   }
 
