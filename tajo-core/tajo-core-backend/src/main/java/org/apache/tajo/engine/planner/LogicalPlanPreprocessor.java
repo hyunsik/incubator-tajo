@@ -63,13 +63,21 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
 
   @Override
   public LogicalNode postHook(PreprocessContext ctx, Stack<Expr> stack, Expr expr, LogicalNode result) throws PlanningException {
-    ctx.currentBlock.setNode(result);
-    ctx.currentBlock.mapExprToLogicalNode(expr, result);
+    // If non-from statement, result can be null.
+    if (result != null) {
+      ctx.currentBlock.setNode(result);
+      ctx.currentBlock.mapExprToLogicalNode(expr, result);
+    }
     return result;
   }
 
   @Override
   public LogicalNode visitProjection(PreprocessContext ctx, Stack<Expr> stack, Projection expr) throws PlanningException {
+    // If Non-from statement, it immediately returns.
+    if (!expr.hasChild()) {
+      return null;
+    }
+
     stack.push(expr); // <--- push
     LogicalNode child = visit(ctx, stack, expr.getChild());
 

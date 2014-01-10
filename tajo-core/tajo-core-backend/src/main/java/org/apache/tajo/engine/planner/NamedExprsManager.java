@@ -18,6 +18,8 @@
 
 package org.apache.tajo.engine.planner;
 
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
 import org.apache.tajo.algebra.ColumnReferenceExpr;
 import org.apache.tajo.algebra.Expr;
 import org.apache.tajo.algebra.NamedExpr;
@@ -40,6 +42,8 @@ public class NamedExprsManager {
   private LinkedHashMap<String, Expr> nameToExprMap = new LinkedHashMap<String, Expr>();
   /** Map; Expr -> Reference Name */
   private LinkedHashMap<Expr, String> exprToNameMap = new LinkedHashMap<Expr, String>();
+  /** Transitive Closer Map: Name -> Name */
+  private BiMap<String, String> nameToNameMap = HashBiMap.create();
   /** Map; Reference Name -> Boolean (if it is resolved or not) */
   private LinkedHashMap<String, Boolean> resolvedFlags = new LinkedHashMap<String, Boolean>();
 
@@ -79,6 +83,18 @@ public class NamedExprsManager {
   public NamedExpr getNamedExpr(String name) {
     String normalized = name.toLowerCase();
     return new NamedExpr(nameToExprMap.get(normalized), normalized);
+  }
+
+  public void transite(String from, String to) {
+    nameToNameMap.put(from, to);
+  }
+
+  public boolean hasTransition(String from) {
+    return nameToNameMap.containsKey(from);
+  }
+
+  public String getTransittedName(String from) {
+    return nameToNameMap.get(from);
   }
 
   public String addExpr(Expr expr, String alias) {

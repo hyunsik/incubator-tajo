@@ -269,6 +269,17 @@ public class LogicalPlan {
         return ensureUniqueColumn(candidates);
       }
 
+      if (block.namedExprsMgr.hasTransition(columnRef.getCanonicalName())) {
+        String originalName = block.namedExprsMgr.getTransittedName(columnRef.getCanonicalName());
+        Column found = resolveColumn(block, new ColumnReferenceExpr(originalName));
+        if (found != null) {
+          candidates.add(found);
+        }
+      }
+      if (!candidates.isEmpty()) {
+        return ensureUniqueColumn(candidates);
+      }
+
       throw new VerifyException("ERROR: no such a column name "+ columnRef.getCanonicalName());
     }
   }
@@ -409,6 +420,8 @@ public class LogicalPlan {
 
     /** It contains a planning log for this block */
     private List<String> planingHistory = Lists.newArrayList();
+    /** It is for debugging or unit tests */
+    private Target [] unresolvedTargets;
 
     public QueryBlock(String blockName) {
       this.blockName = blockName;
@@ -417,10 +430,6 @@ public class LogicalPlan {
 
     public String getName() {
       return blockName;
-    }
-
-    public boolean hasRoot() {
-      return rootNode != null;
     }
 
     public void refresh() {
@@ -436,17 +445,20 @@ public class LogicalPlan {
       queryBlockByPID.put(blockRoot.getPID(), this);
     }
 
-
-    public Target [] getCurrentTargets() {
-      return ((ProjectionNode)getNode(NodeType.PROJECTION)).getTargets();
-    }
-
     public <NODE extends LogicalNode> NODE getRoot() {
       return (NODE) rootNode;
     }
 
     public NodeType getRootType() {
       return rootType;
+    }
+
+    public Target [] getUnresolvedTargets() {
+      return unresolvedTargets;
+    }
+
+    public void setUnresolvedTargets(Target [] unresolvedTargets) {
+      this.unresolvedTargets = unresolvedTargets;
     }
 
     public boolean containRelation(String name) {
@@ -478,6 +490,9 @@ public class LogicalPlan {
     }
 
     public void updateLatestNode(LogicalNode node) {
+      if (node instanceof Projectable) {
+        projectionNode = (Projectable) node;
+      }
       this.latestNode = node;
     }
 
@@ -521,7 +536,7 @@ public class LogicalPlan {
       // id -> node
       nodeMap.put(node.getPID(), node);
 
-      // nodetype -> node
+      // map: nodetype -> node
       // node types can be duplicated. So, latest node type is only kept.
       // So, this is only for filter, groupby, sort, limit, projection, which exists once at a query block.
       nodeTypeToNodeMap.put(node.getType(), node);
@@ -538,10 +553,6 @@ public class LogicalPlan {
 
     public <T extends LogicalNode> T getNodeFromExpr(Expr expr) {
       return (T) exprToNodeMap.get(ObjectUtils.identityToString(expr));
-    }
-
-    public void setProjectableNode(Projectable node) {
-      this.projectionNode = node;
     }
 
     public Projectable getProjectableNode() {

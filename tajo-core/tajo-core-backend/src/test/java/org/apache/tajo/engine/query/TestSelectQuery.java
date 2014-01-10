@@ -196,6 +196,7 @@ public class TestSelectQuery extends QueryTestCaseBase {
   @Test
   public final void testDuplicateExprInWhere() throws Exception {
     ResultSet res = executeQuery();
+    //assertResultSet(res);
     System.out.println(resultSetToString(res));
     cleanupQuery(res);
   }

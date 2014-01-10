@@ -18,6 +18,7 @@
 
 package org.apache.tajo.engine.planner;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -95,6 +96,11 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     }
   }
 
+  @VisibleForTesting
+  public ExprAnnotator getExprAnnotator() {
+    return exprAnnotator;
+  }
+
   /**
    * This generates a logical plan.
    *
@@ -148,9 +154,30 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   public LogicalNode visitProjection(PlanContext context, Stack<Expr> stack, Projection projection)
       throws PlanningException {
 
-    //1: init Phase
+
     LogicalPlan plan = context.plan;
     QueryBlock block = context.queryBlock;
+
+    // If a non-from statement is given
+    if (!projection.hasChild()) {
+      int finalTargetNum = projection.getNamedExprs().length;
+      Target [] targets = new Target[finalTargetNum];
+
+      for (int i = 0; i < targets.length; i++) {
+        NamedExpr namedExpr = projection.getNamedExprs()[i];
+        EvalNode evalNode = exprAnnotator.createEvalNode(plan, block, namedExpr.getExpr());
+        if (namedExpr.hasAlias()) {
+          targets[i] = new Target(evalNode, namedExpr.getAlias());
+        } else {
+          targets[i] = new Target(evalNode, context.plan.newFieldReferenceName(namedExpr.getExpr()));
+        }
+      }
+      EvalExprNode evalExprNode = new EvalExprNode(context.plan.newPID(), targets);
+      evalExprNode.setOutSchema(PlannerUtil.targetToSchema(targets));
+      // it's for debugging or unit testing
+      block.setUnresolvedTargets(targets);
+      return evalExprNode;
+    }
 
     String [] referNames;
     if (projection.isAllProjected()) {
@@ -191,15 +218,6 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       }
     }
 
-    // When a select statement with from clause is given
-    if (!projection.hasChild()) {
-      EvalExprNode evalOnly = new EvalExprNode(context.plan.newPID(), annotateTargets(plan, block,
-          projection.getNamedExprs()));
-      evalOnly.setOutSchema(getProjectedSchema(plan, evalOnly.getExprs()));
-      block.setProjectableNode(evalOnly);
-      return evalOnly;
-    }
-
     // Build Child Plans
     stack.push(projection);
     LogicalNode child = visit(context, stack, projection.getChild());
@@ -219,7 +237,6 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     }
 
     projectionNode = context.queryBlock.getNodeFromExpr(projection);
-    block.setProjectableNode(projectionNode);
     projectionNode.setTargets(targets);
     projectionNode.setOutSchema(getProjectedSchema(plan, projectionNode.getTargets()));
     projectionNode.setInSchema(child.getOutSchema());
@@ -240,6 +257,16 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         projectionNode.setInSchema(dupRemoval.getOutSchema());
       }
     }
+
+    // It's for debugging or unit tests.
+    Target [] unresolvedTargets = new Target[projection.getNamedExprs().length];
+    for (int i = 0; i < targets.length; i++) {
+      NamedExpr namedExpr = projection.getNamedExprs()[i];
+      EvalNode evalNode = exprAnnotator.createEvalNode(plan, plan.getRootBlock(), namedExpr.getExpr());
+      unresolvedTargets[i] = new Target(evalNode, referNames[i]);
+    }
+    // it's for debugging or unit testing
+    block.setUnresolvedTargets(unresolvedTargets);
 
     return projectionNode;
   }
@@ -436,7 +463,6 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
   @Override
   public LogicalNode visitHaving(PlanContext context, Stack<Expr> stack, Having expr) throws PlanningException {
-    LogicalPlan plan = context.plan;
     QueryBlock block = context.queryBlock;
 
     ExprNormalizedResult normalizedResult = normalizer.normalize(context, expr.getQual());
@@ -571,32 +597,23 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   @Override
   public SelectionNode visitFilter(PlanContext context, Stack<Expr> stack, Selection selection)
       throws PlanningException {
-    // 1. init phase:
-    LogicalPlan plan = context.plan;
     QueryBlock block = context.queryBlock;
 
-    String qualName = block.namedExprsMgr.addExpr(selection.getQual());
+    ExprNormalizedResult normalizedResult = normalizer.normalize(context, selection.getQual());
+    String referName = block.namedExprsMgr.addExpr(normalizedResult.baseExpr);
+    block.namedExprsMgr.addNamedExprArray(normalizedResult.aggExprs);
+    block.namedExprsMgr.addNamedExprArray(normalizedResult.scalarExprs);
 
-    // 2. build child plans:
     stack.push(selection);
     LogicalNode child = visit(context, stack, selection.getChild());
     stack.pop();
 
-    Target target = block.namedExprsMgr.getTarget(qualName);
-    EvalNode evalNode;
-    if (target == null) {
-      evalNode = exprAnnotator.createEvalNode(plan, block, selection.getQual());
-      block.namedExprsMgr.resolveExpr(qualName, evalNode);
-    } else {
-      evalNode = target.getEvalTree();
-    }
-    // 3. build this plan:
-    EvalNode searchCondition = evalNode;
+    Expr qualExpr = block.namedExprsMgr.getExpr(referName);
+    EvalNode searchCondition = exprAnnotator.createEvalNode(context.plan, context.queryBlock, qualExpr);
     EvalNode simplified = AlgebraicUtil.eliminateConstantExprs(searchCondition);
+
     SelectionNode selectionNode = context.queryBlock.getNodeFromExpr(selection);
     selectionNode.setQual(simplified);
-
-    // 4. set child plan, update input/output schemas:
     selectionNode.setChild(child);
     selectionNode.setInSchema(child.getOutSchema());
     selectionNode.setOutSchema(child.getOutSchema());
@@ -888,7 +905,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
     // Strip the table names from the targets of the both blocks
     // in order to check the equivalence the schemas of both blocks.
-    Target [] leftStrippedTargets = PlannerUtil.stripTarget(leftBlock.getCurrentTargets());
+    Target [] leftStrippedTargets = PlannerUtil.stripTarget(leftBlock.getProjectableNode().getTargets());
 
     Schema outSchema = PlannerUtil.targetToSchema(leftStrippedTargets);
     setOp.setInSchema(leftSubQuery.getOutSchema());

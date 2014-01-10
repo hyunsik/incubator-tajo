@@ -119,6 +119,15 @@ public class Schema implements ProtoObject<SchemaProto>, Cloneable, GsonObject {
     }
   }
 
+  public Column getColumn(String name) {
+    String [] parts = name.split("\\.");
+    if (parts.length == 2) {
+      return getColumnByFQN(name);
+    } else {
+      return getColumnByName(name);
+    }
+  }
+
 	public Column getColumnByFQN(String qualifiedName) {
 		Integer cid = fieldsByQualifiedName.get(qualifiedName.toLowerCase());
 		return cid != null ? fields.get(cid) : null;

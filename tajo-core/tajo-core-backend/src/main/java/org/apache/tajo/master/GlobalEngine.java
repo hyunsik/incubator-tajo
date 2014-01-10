@@ -358,8 +358,9 @@ public class GlobalEngine extends AbstractService {
 
     @Override
     public boolean isEligible(QueryContext queryContext, LogicalPlan plan) {
-      if (plan.getRootBlock().hasNode(NodeType.STORE)) {
-        StoreTableNode storeTableNode = plan.getRootBlock().getNode(NodeType.STORE);
+      LogicalRootNode rootNode = plan.getRootBlock().getRoot();
+      if (rootNode.getChild().getType() == NodeType.STORE) {
+        StoreTableNode storeTableNode = rootNode.getChild();
         return storeTableNode.isCreatedTable();
       } else {
         return false;
@@ -368,7 +369,8 @@ public class GlobalEngine extends AbstractService {
 
     @Override
     public void hook(QueryContext queryContext, LogicalPlan plan) throws Exception {
-      StoreTableNode storeTableNode = plan.getRootBlock().getNode(NodeType.STORE);
+      LogicalRootNode rootNode = plan.getRootBlock().getRoot();
+      StoreTableNode storeTableNode = rootNode.getChild();
       String tableName = storeTableNode.getTableName();
       queryContext.setOutputTable(tableName);
       queryContext.setOutputPath(new Path(TajoConf.getWarehouseDir(context.getConf()), tableName));
