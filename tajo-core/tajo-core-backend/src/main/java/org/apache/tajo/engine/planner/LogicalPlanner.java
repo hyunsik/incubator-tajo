@@ -96,11 +96,6 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     }
   }
 
-  @VisibleForTesting
-  public ExprAnnotator getExprAnnotator() {
-    return exprAnnotator;
-  }
-
   /**
    * This generates a logical plan.
    *

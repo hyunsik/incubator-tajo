@@ -16,20 +16,36 @@
  * limitations under the License.
  */
 
-option java_package = "org.apache.tajo.ipc";
-option java_outer_classname = "QueryMasterClientProtocol";
-option java_generic_services = true;
-option java_generate_equals_and_hash = true;
+package org.apache.tajo.algebra;
 
-import "tajo_protos.proto";
-import "TajoIdProtos.proto";
-import "CatalogProtos.proto";
-import "PrimitiveProtos.proto";
-import "ClientProtos.proto";
+import com.google.common.base.Objects;
 
-service QueryMasterClientProtocolService {
-  rpc updateSessionVariables(UpdateSessionVariableRequest) returns (BoolProto);
-  rpc getQueryResult(GetQueryResultRequest) returns (GetQueryResultResponse);
-  rpc getQueryStatus(GetQueryStatusRequest) returns (GetQueryStatusResponse);
-  rpc closeQuery(QueryIdProto) returns (BoolProto);
+public class DateLiteral extends Expr {
+  private DateValue date;
+
+  public DateLiteral(DateValue date) {
+    super(OpType.DateLiteral);
+    this.date = date;
+  }
+
+  public DateValue getDate() {
+    return date;
+  }
+
+  public String toString() {
+    return date.toString();
+  }
+
+  public int hashCode() {
+    return Objects.hashCode(date);
+  }
+
+  @Override
+  boolean equalsTo(Expr expr) {
+    if (expr instanceof DateLiteral) {
+      DateLiteral another = (DateLiteral) expr;
+      return date.equals(another.date);
+    }
+    return false;
+  }
 }
