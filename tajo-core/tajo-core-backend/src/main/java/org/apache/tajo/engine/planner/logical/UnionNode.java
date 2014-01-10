@@ -25,12 +25,9 @@ import org.apache.tajo.engine.planner.PlanString;
 
 public class UnionNode extends BinaryNode {
 
-  public UnionNode(int pid, LogicalNode outer, LogicalNode inner) {
+  public UnionNode(int pid) {
     super(pid, NodeType.UNION);
-    setLeftChild(outer);
-    setRightChild(inner);
   }
-
 
   @Override
   public PlanString getPlanString() {

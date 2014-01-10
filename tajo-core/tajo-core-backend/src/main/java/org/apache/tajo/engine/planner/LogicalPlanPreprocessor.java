@@ -148,6 +148,28 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
     return groupByNode;
   }
 
+  @Override
+  public LogicalNode visitUnion(PreprocessContext ctx, Stack<Expr> stack, SetOperation expr) throws PlanningException {
+    LogicalPlan.QueryBlock leftBlock = ctx.plan.newQueryBlock();
+    PreprocessContext leftContext = new PreprocessContext(ctx, leftBlock);
+    LogicalNode leftChild = visit(leftContext, new Stack<Expr>(), expr.getLeft());
+    TableSubQueryNode leftSubQuery = new TableSubQueryNode(ctx.plan.newPID(), leftBlock.getName(), leftChild);
+    ctx.currentBlock.setNode(leftSubQuery);
+
+    LogicalPlan.QueryBlock rightBlock = ctx.plan.newQueryBlock();
+    PreprocessContext rightContext = new PreprocessContext(ctx, rightBlock);
+    LogicalNode rightChild = visit(rightContext, new Stack<Expr>(), expr.getRight());
+    TableSubQueryNode rightSubQuery = new TableSubQueryNode(ctx.plan.newPID(), rightBlock.getName(), rightChild);
+    ctx.currentBlock.setNode(rightSubQuery);
+
+    UnionNode unionNode = new UnionNode(ctx.plan.newPID());
+    unionNode.setLeftChild(leftSubQuery);
+    unionNode.setRightChild(rightSubQuery);
+    unionNode.setInSchema(leftSubQuery.getOutSchema());
+    unionNode.setOutSchema(leftSubQuery.getOutSchema());
+    return unionNode;
+  }
+
   public LogicalNode visitFilter(PreprocessContext ctx, Stack<Expr> stack, Selection expr) throws PlanningException {
     stack.push(expr);
     LogicalNode child = visit(ctx, stack, expr.getChild());

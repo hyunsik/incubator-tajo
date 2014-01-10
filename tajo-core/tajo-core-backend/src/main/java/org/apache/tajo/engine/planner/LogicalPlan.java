@@ -161,6 +161,10 @@ public class LogicalPlan {
     exprToBlockNameMap.put(expr, blockName);
   }
 
+  public QueryBlock getBlockByExpr(Expr expr) {
+    return getBlock(exprToBlockNameMap.get(expr));
+  }
+
   public String getBlockNameByExpr(Expr expr) {
     return exprToBlockNameMap.get(expr);
   }

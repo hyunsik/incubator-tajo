@@ -798,21 +798,22 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     QueryBlock block = context.currentBlock;
 
     // 2. Build Child Plans
-    PlanContext leftContext = new PlanContext(context, plan.newQueryBlock());
-    Stack<Expr> leftStack = new Stack<Expr>();
-    LogicalNode left = visit(leftContext, leftStack, setOperation.getLeft());
-    TableSubQueryNode leftSubQuery = new TableSubQueryNode(plan.newPID(), leftContext.currentBlock.getName(), left);
+    QueryBlock leftBlock = context.plan.getBlockByExpr(setOperation.getLeft());
+    PlanContext leftContext = new PlanContext(context, leftBlock);
+    LogicalNode left = visit(leftContext, new Stack<Expr>(), setOperation.getLeft());
+    TableSubQueryNode leftSubQuery = context.currentBlock.getNodeFromExpr(setOperation.getLeft());
     context.plan.connectBlocks(leftContext.currentBlock, context.currentBlock, BlockType.TableSubQuery);
 
-    PlanContext rightContext = new PlanContext(context, plan.newQueryBlock());
-    Stack<Expr> rightStack = new Stack<Expr>();
-    LogicalNode right = visit(rightContext, rightStack, setOperation.getRight());
+    QueryBlock rightBlock = context.plan.getBlockByExpr(setOperation.getRight());
+    PlanContext rightContext = new PlanContext(context, rightBlock);
+    LogicalNode right = visit(rightContext, new Stack<Expr>(), setOperation.getRight());
+
     TableSubQueryNode rightSubQuery = new TableSubQueryNode(plan.newPID(), rightContext.currentBlock.getName(), right);
     context.plan.connectBlocks(rightContext.currentBlock, context.currentBlock, BlockType.TableSubQuery);
 
     BinaryNode setOp;
     if (setOperation.getType() == OpType.Union) {
-      setOp = new UnionNode(plan.newPID(), leftSubQuery, rightSubQuery);
+      setOp = new UnionNode(plan.newPID());
     } else if (setOperation.getType() == OpType.Except) {
       setOp = new ExceptNode(plan.newPID(), leftSubQuery, rightSubQuery);
     } else if (setOperation.getType() == OpType.Intersect) {
@@ -820,6 +821,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     } else {
       throw new VerifyException("Invalid Type: " + setOperation.getType());
     }
+    setOp.setLeftChild(leftSubQuery);
+    setOp.setRightChild(rightSubQuery);
 
     // Strip the table names from the targets of the both blocks
     // in order to check the equivalence the schemas of both blocks.
