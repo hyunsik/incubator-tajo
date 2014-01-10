@@ -169,7 +169,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         if (namedExpr.hasAlias()) {
           targets[i] = new Target(evalNode, namedExpr.getAlias());
         } else {
-          targets[i] = new Target(evalNode, context.plan.newFieldReferenceName(namedExpr.getExpr()));
+          targets[i] = new Target(evalNode, context.plan.newGeneratedFieldName(namedExpr.getExpr()));
         }
       }
       EvalExprNode evalExprNode = new EvalExprNode(context.plan.newPID(), targets);
@@ -282,7 +282,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       if (t.hasAlias() || t.getEvalTree().getType() == EvalType.FIELD) {
         name = t.getCanonicalName();
       } else { // if an alias is not given or this target is an expression
-        t.setAlias(plan.newQueryBlock(t.getEvalTree().getName()));
+        t.setAlias(plan.newGeneratedFieldName(t.getEvalTree().getName()));
         name = t.getAlias();
       }
       projected.addColumn(name,type);

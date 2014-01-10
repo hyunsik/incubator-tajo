@@ -82,13 +82,13 @@ public class LogicalPlan {
     return newAndGetBlock(NONAME_BLOCK_PREFIX + (noNameBlockId++));
   }
 
-  public String newQueryBlock(String prefix) {
+  public String newGeneratedFieldName(String prefix) {
     String suffix = String.valueOf(noNameColumnId);
     noNameColumnId++;
     return "$" + prefix.toLowerCase() + "_" + suffix;
   }
 
-  public String newFieldReferenceName(Expr expr) {
+  public String newGeneratedFieldName(Expr expr) {
     String prefix;
 
     switch (expr.getType()) {

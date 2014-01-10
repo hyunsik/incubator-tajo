@@ -366,8 +366,10 @@ public class TestLogicalPlanner {
 
     assertEquals(NodeType.PROJECTION, root.getChild().getType());
     ProjectionNode projNode = root.getChild();
-    assertEquals(NodeType.GROUP_BY, projNode.getChild().getType());
-    GroupbyNode groupByNode =  projNode.getChild();
+    assertEquals(NodeType.HAVING, projNode.getChild().getType());
+    HavingNode havingNode = projNode.getChild();
+    assertEquals(NodeType.GROUP_BY, havingNode.getChild().getType());
+    GroupbyNode groupByNode =  havingNode.getChild();
 
     assertEquals(NodeType.JOIN, groupByNode.getChild().getType());
     JoinNode joinNode = groupByNode.getChild();
@@ -510,11 +512,14 @@ public class TestLogicalPlanner {
 	  String json = plan.toJson();
 	  LogicalNode fromJson = CoreGsonHelper.fromJson(json, LogicalNode.class);
 	  assertEquals(NodeType.ROOT, fromJson.getType());
-	  LogicalNode groupby = ((LogicalRootNode)fromJson).getChild();
-	  assertEquals(NodeType.PROJECTION, groupby.getType());
-	  LogicalNode projNode = ((ProjectionNode)groupby).getChild();
-	  assertEquals(NodeType.GROUP_BY, projNode.getType());
-	  LogicalNode scan = ((GroupbyNode)projNode).getChild();
+	  LogicalNode project = ((LogicalRootNode)fromJson).getChild();
+	  assertEquals(NodeType.PROJECTION, project.getType());
+	  assertEquals(NodeType.HAVING, ((ProjectionNode) project).getChild().getType());
+    HavingNode havingNode = ((ProjectionNode) project).getChild();
+    assertEquals(NodeType.GROUP_BY, havingNode.getChild().getType());
+    GroupbyNode groupbyNode = havingNode.getChild();
+    assertEquals(NodeType.SCAN, groupbyNode.getChild().getType());
+	  LogicalNode scan = groupbyNode.getChild();
 	  assertEquals(NodeType.SCAN, scan.getType());
   }
 
@@ -690,48 +695,6 @@ public class TestLogicalPlanner {
     }
 
     for (Set<Column> result : testGenerateCuboidsResult) {
-      assertTrue(cuboids.contains(result));
-    }
-  }
-
-  static final String CUBE_ROLLUP [] = {
-    "select name, empid, sum(score) from employee natural join score group by cube(name, empid)"
-  };
-
-  @Test
-  public final void testCubeBy() throws PlanningException {
-    Expr expr = sqlAnalyzer.parse(CUBE_ROLLUP[0]);
-    LogicalNode plan = planner.createPlan(expr).getRootBlock().getRoot();
-    testJsonSerDerObject(plan);
-
-    Set<Set<Column>> cuboids = Sets.newHashSet();
-
-    LogicalRootNode root = (LogicalRootNode) plan;
-    assertEquals(NodeType.PROJECTION, root.getChild().getType());
-    ProjectionNode projNode = root.getChild();
-    assertEquals(NodeType.UNION, projNode.getChild().getType());
-    UnionNode u0 = projNode.getChild();
-    assertEquals(NodeType.GROUP_BY, u0.getLeftChild().getType());
-    assertEquals(NodeType.UNION, u0.getRightChild().getType());
-    GroupbyNode grp = u0.getLeftChild();
-    cuboids.add(Sets.newHashSet(grp.getGroupingColumns()));
-
-    UnionNode u1 = u0.getRightChild();
-    assertEquals(NodeType.GROUP_BY, u1.getLeftChild().getType());
-    assertEquals(NodeType.UNION, u1.getRightChild().getType());
-    grp = u1.getLeftChild();
-    cuboids.add(Sets.newHashSet(grp.getGroupingColumns()));
-
-    UnionNode u2 = u1.getRightChild();
-    assertEquals(NodeType.GROUP_BY, u2.getLeftChild().getType());
-    grp = u2.getRightChild();
-    cuboids.add(Sets.newHashSet(grp.getGroupingColumns()));
-    assertEquals(NodeType.GROUP_BY, u2.getRightChild().getType());
-    grp = u2.getLeftChild();
-    cuboids.add(Sets.newHashSet(grp.getGroupingColumns()));
-
-    assertEquals((int)Math.pow(2, 2), cuboids.size());
-    for (Set<Column> result : testCubeByResult) {
       assertTrue(cuboids.contains(result));
     }
   }

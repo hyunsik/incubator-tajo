@@ -179,7 +179,7 @@ class ExprNormalizer extends SimpleAlgebraVisitor<ExprNormalizer.ExprNormalizedR
       visit(ctx, stack, param);
 
       if (isAggregationFunction(param)) {
-        String referenceName = ctx.plan.newFieldReferenceName(param);
+        String referenceName = ctx.plan.newGeneratedFieldName(param);
         ctx.aggExprs.add(new NamedExpr(param, referenceName));
         expr.getParams()[i] = new ColumnReferenceExpr(referenceName);
       }

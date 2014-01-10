@@ -119,7 +119,7 @@ public class NamedExprsManager {
         return name;
       }
     } else {
-      name = plan.newQueryBlock(expr.getType().name());
+      name = plan.newGeneratedFieldName(expr);
     }
     return addExpr(expr, name);
   }

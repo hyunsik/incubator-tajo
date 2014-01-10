@@ -86,7 +86,7 @@ public class ExprAnnotator extends BaseAlgebraVisitor<ExprAnnotator.Context, Eva
   @Override
   public EvalNode visitNot(Context ctx, Stack<Expr> stack, NotExpr expr) throws PlanningException {
     stack.push(expr);
-    EvalNode child = visit(ctx, stack, expr);
+    EvalNode child = visit(ctx, stack, expr.getChild());
     stack.pop();
     return new NotEval(child);
   }
