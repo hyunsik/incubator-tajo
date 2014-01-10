@@ -30,6 +30,8 @@ import org.apache.tajo.engine.eval.FieldEval;
 
 import java.util.*;
 
+import static java.util.Map.Entry;
+
 /**
  * NamedExprsManager manages an expressions to be evaluated in a query block.
  * NamedExprsManager uses a reference name to identify one expression or one
@@ -165,7 +167,7 @@ public class NamedExprsManager {
 
   public Collection<NamedExpr> getAllNamedExprs() {
     List<NamedExpr> namedExprList = new ArrayList<NamedExpr>();
-    for (Map.Entry<String, Expr> entry: nameToExprMap.entrySet()) {
+    for (Entry<String, Expr> entry: nameToExprMap.entrySet()) {
       namedExprList.add(new NamedExpr(entry.getValue(), entry.getKey()));
     }
     return namedExprList;
@@ -201,5 +203,39 @@ public class NamedExprsManager {
 
   public String toString() {
     return "raw=" + nameToExprMap.size() + ", resolved=" + nameToEvalMap.size();
+  }
+
+  public Iterator<NamedExpr> getUnresolvedExprs() {
+    return new UnresolvedIterator();
+  }
+
+  public class UnresolvedIterator implements Iterator<NamedExpr> {
+    Iterator<Entry<String,Expr>> it = nameToExprMap.entrySet().iterator();
+
+    @Override
+    public boolean hasNext() {
+      return it.hasNext();
+    }
+
+    @Override
+    public NamedExpr next() {
+      Entry<String, Expr> entry = null;
+      do {
+       entry = it.next();
+       if (isResolved(entry.getKey())) {
+         break;
+       }
+      } while (it.hasNext());
+
+      if (entry == null) {
+        throw new NoSuchElementException();
+      }
+
+      return new NamedExpr(entry.getValue(), entry.getKey());
+    }
+
+    @Override
+    public void remove() {
+    }
   }
 }

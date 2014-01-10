@@ -253,15 +253,19 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       }
     }
 
-    // It's for debugging or unit tests.
-    Target [] unresolvedTargets = new Target[projection.getNamedExprs().length];
-    for (int i = 0; i < targets.length; i++) {
-      NamedExpr namedExpr = projection.getNamedExprs()[i];
-      EvalNode evalNode = exprAnnotator.createEvalNode(plan, plan.getRootBlock(), namedExpr.getExpr());
-      unresolvedTargets[i] = new Target(evalNode, referNames[i]);
+    if (projection.isAllProjected()) {
+      block.setUnresolvedTargets(targets);
+    } else {
+      // It's for debugging or unit tests.
+      Target [] unresolvedTargets = new Target[projection.getNamedExprs().length];
+      for (int i = 0; i < targets.length; i++) {
+        NamedExpr namedExpr = projection.getNamedExprs()[i];
+        EvalNode evalNode = exprAnnotator.createEvalNode(plan, plan.getRootBlock(), namedExpr.getExpr());
+        unresolvedTargets[i] = new Target(evalNode, referNames[i]);
+      }
+      // it's for debugging or unit testing
+      block.setUnresolvedTargets(unresolvedTargets);
     }
-    // it's for debugging or unit testing
-    block.setUnresolvedTargets(unresolvedTargets);
 
     return projectionNode;
   }
@@ -469,10 +473,22 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     LogicalNode child = visit(context, stack, expr.getChild());
     stack.pop();
 
-    Expr qualExpr = block.namedExprsMgr.getExpr(referName);
-    EvalNode evalNode = exprAnnotator.createEvalNode(context.plan, context.queryBlock, qualExpr);
+    // Consider the following query:
+    //
+    // SELECT sum(avg) AS total ... FROM ... WHERE total > 2;
+    //
+    // "total" cannot be resolved in GroupByNode. "total" should be resolved in the upper nodes.
+    // So, we have to check if the reference is resolved. If not, it annotates the expression here.
+    EvalNode havingCondition;
+    if (block.namedExprsMgr.isResolved(referName)) {
+      havingCondition = block.namedExprsMgr.getTarget(referName).getEvalTree();
+    } else {
+      NamedExpr namedExpr = block.namedExprsMgr.getNamedExpr(referName);
+      havingCondition = exprAnnotator.createEvalNode(context.plan, block, namedExpr.getExpr());
+    }
+
     HavingNode having = new HavingNode(context.plan.newPID());
-    having.setQual(evalNode);
+    having.setQual(havingCondition);
     having.setInSchema(child.getOutSchema());
     having.setOutSchema(child.getOutSchema());
     having.setChild(child);
@@ -603,8 +619,19 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     LogicalNode child = visit(context, stack, selection.getChild());
     stack.pop();
 
-    Expr qualExpr = block.namedExprsMgr.getExpr(referName);
-    EvalNode searchCondition = exprAnnotator.createEvalNode(context.plan, context.queryBlock, qualExpr);
+    // Consider the following query:
+    //
+    // SELECT one + two AS total ... FROM ... WHERE total > 2;
+    //
+    // "total" cannot be resolved in ScanNode. "total" should be resolved in the upper nodes.
+    // So, we have to check if the reference is resolved. Otherwise, it annotates the expression here.
+    EvalNode searchCondition;
+    if (block.namedExprsMgr.isResolved(referName)) {
+      searchCondition = block.namedExprsMgr.getTarget(referName).getEvalTree();
+    } else {
+      NamedExpr namedExpr = block.namedExprsMgr.getNamedExpr(referName);
+      searchCondition = exprAnnotator.createEvalNode(context.plan, block, namedExpr.getExpr());
+    }
     EvalNode simplified = AlgebraicUtil.eliminateConstantExprs(searchCondition);
 
     SelectionNode selectionNode = context.queryBlock.getNodeFromExpr(selection);
