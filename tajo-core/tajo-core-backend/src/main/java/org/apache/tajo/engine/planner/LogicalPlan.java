@@ -55,8 +55,10 @@ public class LogicalPlan {
 
   /** planning and optimization log */
   private List<String> planingHistory = Lists.newArrayList();
+  LogicalPlanner planner;
 
-  public LogicalPlan() {
+  public LogicalPlan(LogicalPlanner planner) {
+    this.planner = planner;
   }
 
   /**
@@ -397,6 +399,7 @@ public class LogicalPlan {
     private Map<OpType, List<Expr>> operatorToExprMap = TUtil.newHashMap();
     private Map<NodeType, LogicalNode> nodeTypeToNodeMap = TUtil.newHashMap();
     private Map<Integer, LogicalNode> exprToNodeMap = TUtil.newHashMap();
+    NamedExprsManager namedExprsMgr;
 
     private LogicalNode latestNode;
     private boolean resolvedGrouping = true;
@@ -408,6 +411,7 @@ public class LogicalPlan {
 
     public QueryBlock(String blockName) {
       this.blockName = blockName;
+      this.namedExprsMgr = new NamedExprsManager(LogicalPlan.this);
     }
 
     public String getName() {

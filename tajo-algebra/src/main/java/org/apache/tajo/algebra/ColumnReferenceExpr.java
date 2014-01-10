@@ -25,9 +25,9 @@ public class ColumnReferenceExpr extends Expr {
   private String qualifier;
   private String name;
 
-  public ColumnReferenceExpr(String columnName) {
+  public ColumnReferenceExpr(String referenceName) {
     super(OpType.Column);
-    this.name = columnName;
+    setName(referenceName);
   }
 
   public ColumnReferenceExpr(String qualifier, String columnName) {
@@ -52,14 +52,14 @@ public class ColumnReferenceExpr extends Expr {
     return this.name;
   }
 
-  public void setName(String name) {
-    this.name = name;
-  }
-
-  public void setQualifiedName(String qualifiedName) {
+  public void setName(String qualifiedName) {
     String [] parts = qualifiedName.split("\\.");
-    setQualifier(parts[0]);
-    setName(parts[1]);
+    if (parts.length == 2) {
+      qualifier = parts[0];
+      name = parts[1];
+    } else {
+      name = parts[0];
+    }
   }
 
   public String getCanonicalName() {
@@ -75,9 +75,15 @@ public class ColumnReferenceExpr extends Expr {
     return Objects.hashCode(name, qualifier);
   }
 
+  @Override
   public boolean equalsTo(Expr expr) {
     ColumnReferenceExpr another = (ColumnReferenceExpr) expr;
     return name.equals(another.name) &&
         TUtil.checkEquals(qualifier, another.qualifier);
+  }
+
+  @Override
+  public String toString() {
+    return qualifier != null ? qualifier + "." + name : name;
   }
 }

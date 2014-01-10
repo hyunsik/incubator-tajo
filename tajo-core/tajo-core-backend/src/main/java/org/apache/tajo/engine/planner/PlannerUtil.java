@@ -721,24 +721,33 @@ public class PlannerUtil {
     AggregationFunctionFinder finder = new AggregationFunctionFinder();
     AggFunctionFoundResult result = new AggFunctionFoundResult();
     finder.visit(result, new Stack<Expr>(), expr);
-    return result.found;
+    return result.generalSetFunction;
+  }
+
+  public static boolean existsDistinctAggregationFunction(Expr expr) throws PlanningException {
+    AggregationFunctionFinder finder = new AggregationFunctionFinder();
+    AggFunctionFoundResult result = new AggFunctionFoundResult();
+    finder.visit(result, new Stack<Expr>(), expr);
+    return result.distinctSetFunction;
   }
 
   static class AggFunctionFoundResult {
-    boolean found;
+    boolean generalSetFunction;
+    boolean distinctSetFunction;
   }
   static class AggregationFunctionFinder extends SimpleAlgebraVisitor<AggFunctionFoundResult, Object> {
     @Override
     public Object visitCountRowsFunction(AggFunctionFoundResult ctx, Stack<Expr> stack, CountRowsFunctionExpr expr)
         throws PlanningException {
-      ctx.found = true;
+      ctx.generalSetFunction = true;
       return super.visitCountRowsFunction(ctx, stack, expr);
     }
 
     @Override
     public Object visitGeneralSetFunction(AggFunctionFoundResult ctx, Stack<Expr> stack, GeneralSetFunctionExpr expr)
         throws PlanningException {
-      ctx.found = true;
+      ctx.generalSetFunction = true;
+      ctx.distinctSetFunction = expr.isDistinct();
       return super.visitGeneralSetFunction(ctx, stack, expr);
     }
   }

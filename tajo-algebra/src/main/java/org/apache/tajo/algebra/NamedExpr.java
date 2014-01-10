@@ -21,15 +21,15 @@ package org.apache.tajo.algebra;
 import com.google.common.base.Objects;
 import org.apache.tajo.util.TUtil;
 
-public class TargetExpr extends UnaryOperator {
+public class NamedExpr extends UnaryOperator {
   private String alias;
 
-  public TargetExpr(Expr expr) {
+  public NamedExpr(Expr expr) {
     super(OpType.Target);
     setChild(expr);
   }
 
-  public TargetExpr(Expr expr, String alias) {
+  public NamedExpr(Expr expr, String alias) {
     this(expr);
     setAlias(alias);
   }
@@ -57,8 +57,8 @@ public class TargetExpr extends UnaryOperator {
 
   @Override
   public boolean equalsTo(Expr obj) {
-    if (obj instanceof TargetExpr) {
-      TargetExpr another = (TargetExpr) obj;
+    if (obj instanceof NamedExpr) {
+      NamedExpr another = (NamedExpr) obj;
       return TUtil.checkEquals(alias, another.alias);
     }
 

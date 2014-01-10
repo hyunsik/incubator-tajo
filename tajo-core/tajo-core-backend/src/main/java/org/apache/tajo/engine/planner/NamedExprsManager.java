@@ -20,8 +20,8 @@ package org.apache.tajo.engine.planner;
 
 import org.apache.tajo.algebra.ColumnReferenceExpr;
 import org.apache.tajo.algebra.Expr;
+import org.apache.tajo.algebra.NamedExpr;
 import org.apache.tajo.algebra.OpType;
-import org.apache.tajo.algebra.TargetExpr;
 import org.apache.tajo.annotation.Nullable;
 import org.apache.tajo.engine.eval.EvalNode;
 import org.apache.tajo.engine.eval.FieldEval;
@@ -29,32 +29,55 @@ import org.apache.tajo.engine.eval.FieldEval;
 import java.util.*;
 
 /**
- * It manages a list of targets.
+ * NamedExprsManager manages an expressions to be evaluated in a query block.
+ * NamedExprsManager uses a reference name to identify one expression or one
+ * EvalNode (annotated expression).
  */
-public class ExprListManager {
+public class NamedExprsManager {
+  /** Map; Reference name -> EvalNode */
   private Map<String, EvalNode> nameToEvalMap = new LinkedHashMap<String, EvalNode>();
+  /** Map; Reference name -> Expr */
   private LinkedHashMap<String, Expr> nameToExprMap = new LinkedHashMap<String, Expr>();
+  /** Map; Expr -> Reference Name */
   private LinkedHashMap<Expr, String> exprToNameMap = new LinkedHashMap<Expr, String>();
+  /** Map; Reference Name -> Boolean (if it is resolved or not) */
   private LinkedHashMap<String, Boolean> resolvedFlags = new LinkedHashMap<String, Boolean>();
 
   private LogicalPlan plan;
-  private LogicalPlanner planner;
 
-  public ExprListManager(LogicalPlan plan, LogicalPlanner planner, LogicalPlan.QueryBlock block) {
+  public NamedExprsManager(LogicalPlan plan) {
     this.plan = plan;
-    this.planner = planner;
   }
 
+  /**
+   * Check whether the expression corresponding to a given name was resolved.
+   *
+   * @param name The name of a certain expression to be checked
+   * @return true if resolved. Otherwise, false.
+   */
   public boolean isResolved(String name) {
     String normalized = name.toLowerCase();
     return resolvedFlags.containsKey(normalized) && resolvedFlags.get(normalized);
   }
 
-  public boolean containsExpr(Expr expr) {
+  public boolean contains(String name) {
+    return nameToExprMap.containsKey(name);
+  }
+
+  public boolean contains(Expr expr) {
     return exprToNameMap.containsKey(expr);
   }
 
-  public String addExpr(String alias, Expr expr) {
+  public String getName(Expr expr) {
+    return exprToNameMap.get(expr);
+  }
+
+  public NamedExpr getNamedExpr(String name) {
+    String normalized = name.toLowerCase();
+    return new NamedExpr(nameToExprMap.get(normalized), normalized);
+  }
+
+  public String addExpr(Expr expr, String alias) {
     if (exprToNameMap.containsKey(expr)) {
       return exprToNameMap.get(expr);
     } else {
@@ -64,10 +87,6 @@ public class ExprListManager {
       resolvedFlags.put(normalized, false);
       return normalized;
     }
-  }
-
-  public String getReferenceName(Expr expr) {
-    return exprToNameMap.get(expr);
   }
 
   public String addExpr(Expr expr) {
@@ -82,7 +101,7 @@ public class ExprListManager {
     } else {
       name = plan.newQueryBlock(expr.getType().name());
     }
-    return addExpr(name, expr);
+    return addExpr(expr, name);
   }
 
   public String [] addExprArray(Expr[] exprs) {
@@ -103,20 +122,20 @@ public class ExprListManager {
     return names;
   }
 
-  public String addTargetExpr(TargetExpr targetExpr) {
-    if (targetExpr.hasAlias()) {
-      return addExpr(targetExpr.getAlias(), targetExpr.getExpr());
+  public String addNamedExpr(NamedExpr namedExpr) {
+    if (namedExpr.hasAlias()) {
+      return addExpr(namedExpr.getExpr(), namedExpr.getAlias());
     } else {
-      return addExpr(targetExpr.getExpr());
+      return addExpr(namedExpr.getExpr());
     }
   }
 
-  public String [] addTargetExprArray(@Nullable Collection<TargetExpr> targets) {
+  public String [] addNamedExprArray(@Nullable Collection<NamedExpr> targets) {
     if (targets != null || targets.size() > 0) {
       String [] names = new String[targets.size()];
       int i = 0;
-      for (TargetExpr target : targets) {
-        names[i++] = addTargetExpr(target);
+      for (NamedExpr target : targets) {
+        names[i++] = addNamedExpr(target);
       }
       return names;
     } else {
@@ -124,15 +143,15 @@ public class ExprListManager {
     }
   }
 
-  public Collection<TargetExpr> getRawTargets() {
-    List<TargetExpr> targetExprList = new ArrayList<TargetExpr>();
+  public Collection<NamedExpr> getAllNamedExprs() {
+    List<NamedExpr> namedExprList = new ArrayList<NamedExpr>();
     for (Map.Entry<String, Expr> entry: nameToExprMap.entrySet()) {
-      targetExprList.add(new TargetExpr(entry.getValue(), entry.getKey()));
+      namedExprList.add(new NamedExpr(entry.getValue(), entry.getKey()));
     }
-    return targetExprList;
+    return namedExprList;
   }
 
-  public void switchTarget(String name, EvalNode evalNode) {
+  public void resolveExpr(String name, EvalNode evalNode) {
     String normalized = name.toLowerCase();
     nameToEvalMap.put(normalized, evalNode);
     resolvedFlags.put(normalized, true);
@@ -160,12 +179,7 @@ public class ExprListManager {
     }
   }
 
-  public TargetExpr getRawTarget(String name) {
-    String normalized = name.toLowerCase();
-    return new TargetExpr(nameToExprMap.get(normalized), normalized);
-  }
-
   public String toString() {
-    return "rawTargets=" + nameToExprMap.size() + ", targets=" + nameToEvalMap.size();
+    return "raw=" + nameToExprMap.size() + ", resolved=" + nameToEvalMap.size();
   }
 }

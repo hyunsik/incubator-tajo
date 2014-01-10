@@ -360,8 +360,8 @@ public class ExprAnnotator extends BaseAlgebraVisitor<ExprAnnotator.Context, Eva
   }
 
   @Override
-  public EvalNode visitTargetExpr(Context ctx, Stack<Expr> stack, TargetExpr expr) throws PlanningException {
-    throw new PlanningException("ExprAnnotator cannot take TargetExpr");
+  public EvalNode visitTargetExpr(Context ctx, Stack<Expr> stack, NamedExpr expr) throws PlanningException {
+    throw new PlanningException("ExprAnnotator cannot take NamedExpr");
   }
 
   @Override

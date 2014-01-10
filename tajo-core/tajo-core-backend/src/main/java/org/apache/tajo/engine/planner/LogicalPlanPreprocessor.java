@@ -77,14 +77,14 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
     if (expr.isAllProjected()) {
       targets = PlannerUtil.schemaToTargets(child.getOutSchema());
     } else {
-      targets = new Target[expr.getTargets().length];
+      targets = new Target[expr.getNamedExprs().length];
 
-      for (int i = 0; i < expr.getTargets().length; i++) {
-        TargetExpr targetExpr = expr.getTargets()[i];
-        EvalNode evalNode = annotator.createEvalNode(ctx.plan, ctx.currentBlock, targetExpr.getExpr());
+      for (int i = 0; i < expr.getNamedExprs().length; i++) {
+        NamedExpr namedExpr = expr.getNamedExprs()[i];
+        EvalNode evalNode = annotator.createEvalNode(ctx.plan, ctx.currentBlock, namedExpr.getExpr());
 
-        if (targetExpr.hasAlias()) {
-          targets[i] = new Target(evalNode, targetExpr.getAlias());
+        if (namedExpr.hasAlias()) {
+          targets[i] = new Target(evalNode, namedExpr.getAlias());
         } else if (evalNode.getType() == EvalType.FIELD) {
           targets[i] = new Target(evalNode, ((FieldEval)evalNode).getColumnRef().getQualifiedName());
         } else {
@@ -129,13 +129,16 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
     stack.push(expr); // <--- push
     LogicalNode child = visit(ctx, stack, expr.getChild());
 
-    Target [] targets = new Target[expr.getTargets().length];
-    int i = 0;
-    for (TargetExpr targetExpr : expr.getTargets()) {
-      EvalNode evalNode = annotator.createEvalNode(ctx.plan, ctx.currentBlock, targetExpr.getExpr());
+    Projection projection = ctx.currentBlock.getSingletonExpr(OpType.Projection);
+    int finalTargetNum = projection.getNamedExprs().length;
+    Target [] targets = new Target[finalTargetNum];
 
-      if (targetExpr.hasAlias()) {
-        targets[i] = new Target(evalNode, targetExpr.getAlias());
+    for (int i = 0; i < finalTargetNum; i++) {
+      NamedExpr namedExpr = projection.getNamedExprs()[i];
+      EvalNode evalNode = annotator.createEvalNode(ctx.plan, ctx.currentBlock, namedExpr.getExpr());
+
+      if (namedExpr.hasAlias()) {
+        targets[i] = new Target(evalNode, namedExpr.getAlias());
       } else {
         targets[i] = new Target(evalNode, "$name_" + i);
       }

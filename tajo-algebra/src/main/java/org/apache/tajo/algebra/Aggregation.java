@@ -22,7 +22,7 @@ import com.google.common.base.Objects;
 import org.apache.tajo.util.TUtil;
 
 public class Aggregation extends UnaryOperator {
-  private TargetExpr[] targets;
+  private NamedExpr[] targets;
   private GroupElement [] groups;
   private Expr havingCondition;
 
@@ -30,11 +30,11 @@ public class Aggregation extends UnaryOperator {
     super(OpType.Aggregation);
   }
 
-  public TargetExpr[] getTargets() {
+  public NamedExpr[] getTargets() {
     return this.targets;
   }
 
-  public void setTargets(TargetExpr[] targets) {
+  public void setTargets(NamedExpr[] targets) {
     this.targets = targets;
   }
 

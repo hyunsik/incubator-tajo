@@ -196,7 +196,7 @@ public class BaseAlgebraVisitor<CONTEXT, RESULT> implements AlgebraVisitor<CONTE
       current = visitColumnReference(ctx, stack, (ColumnReferenceExpr) expr);
       break;
     case Target:
-      current = visitTargetExpr(ctx, stack, (TargetExpr) expr);
+      current = visitTargetExpr(ctx, stack, (NamedExpr) expr);
       break;
     case Function:
       current = visitFunction(ctx, stack, (FunctionExpr) expr);
@@ -259,7 +259,7 @@ public class BaseAlgebraVisitor<CONTEXT, RESULT> implements AlgebraVisitor<CONTE
   @Override
   public RESULT visitProjection(CONTEXT ctx, Stack<Expr> stack, Projection expr) throws PlanningException {
     stack.push(expr);
-    for (TargetExpr target : expr.getTargets()) {
+    for (NamedExpr target : expr.getNamedExprs()) {
       visit(ctx, stack, target);
     }
     RESULT result = visit(ctx, stack, expr.getChild());
@@ -592,7 +592,7 @@ public class BaseAlgebraVisitor<CONTEXT, RESULT> implements AlgebraVisitor<CONTE
   }
 
   @Override
-  public RESULT visitTargetExpr(CONTEXT ctx, Stack<Expr> stack, TargetExpr expr) throws PlanningException {
+  public RESULT visitTargetExpr(CONTEXT ctx, Stack<Expr> stack, NamedExpr expr) throws PlanningException {
     return visitDefaultUnaryExpr(ctx, stack, expr);
   }
 

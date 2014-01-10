@@ -226,11 +226,11 @@ public class SQLAnalyzer extends SQLParserBaseVisitor<Expr> {
     if (ctx.MULTIPLY() != null) {
       projection.setAll();
     } else {
-      TargetExpr[] targets = new TargetExpr[ctx.select_sublist().size()];
+      NamedExpr[] targets = new NamedExpr[ctx.select_sublist().size()];
       for (int i = 0; i < targets.length; i++) {
         targets[i] = visitSelect_sublist(ctx.select_sublist(i));
       }
-      projection.setTargets(targets);
+      projection.setNamedExprs(targets);
     }
 
     return projection;
@@ -247,9 +247,9 @@ public class SQLAnalyzer extends SQLParserBaseVisitor<Expr> {
    * @return
    */
   @Override
-  public TargetExpr visitSelect_sublist(SQLParser.Select_sublistContext ctx) {
+  public NamedExpr visitSelect_sublist(SQLParser.Select_sublistContext ctx) {
     if (ctx.asterisked_qualifier != null) {
-      return new TargetExpr(new ColumnReferenceExpr(ctx.asterisked_qualifier.getText(), "*"));
+      return new NamedExpr(new ColumnReferenceExpr(ctx.asterisked_qualifier.getText(), "*"));
     } else {
       return visitDerived_column(ctx.derived_column());
     }
@@ -826,8 +826,8 @@ public class SQLAnalyzer extends SQLParserBaseVisitor<Expr> {
   }
 
   @Override
-  public TargetExpr visitDerived_column(SQLParser.Derived_columnContext ctx) {
-    TargetExpr target = new TargetExpr(visitValue_expression(ctx.value_expression()));
+  public NamedExpr visitDerived_column(SQLParser.Derived_columnContext ctx) {
+    NamedExpr target = new NamedExpr(visitValue_expression(ctx.value_expression()));
     if (ctx.as_clause() != null) {
       target.setAlias(ctx.as_clause().Identifier().getText());
     }
