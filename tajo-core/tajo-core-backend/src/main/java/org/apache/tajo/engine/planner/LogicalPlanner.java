@@ -388,22 +388,41 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   ===============================================================================================*/
   @Override
   public LimitNode visitLimit(PlanContext context, Stack<Expr> stack, Limit limit) throws PlanningException {
-    // 1. Init Phase:
-    LogicalPlan plan = context.plan;
     QueryBlock block = context.queryBlock;
 
-    // build child plans
-    stack.push(limit);
-    LogicalNode child = visit(context, stack, limit.getChild());
-    stack.pop();
+    EvalNode firstFetNum;
+    LogicalNode child;
+    if (limit.getFetchFirstNum().getType() == OpType.Literal) {
+      firstFetNum = exprAnnotator.createEvalNode(context.plan, block, limit.getFetchFirstNum());
+      stack.push(limit);
+      child = visit(context, stack, limit.getChild());
+      stack.pop();
+    } else {
+      ExprNormalizedResult normalizedResult = normalizer.normalize(context, limit.getFetchFirstNum());
+      String referName = block.namedExprsMgr.addExpr(normalizedResult.baseExpr);
+      block.namedExprsMgr.addNamedExprArray(normalizedResult.aggExprs);
+      block.namedExprsMgr.addNamedExprArray(normalizedResult.scalarExprs);
 
-    // build limit plan
-    EvalNode firstFetchNum = exprAnnotator.createEvalNode(plan, block, limit.getFetchFirstNum());
-    firstFetchNum.eval(null, null, null);
+      stack.push(limit);
+      child = visit(context, stack, limit.getChild());
+      stack.pop();
+
+      // Consider the following query:
+      //
+      // SELECT one + two AS total ... FROM ... LIMIT total + 10;
+      //
+      // "total + 10" cannot be resolved in ScanNode. "total + 10" should be resolved in some of the upper nodes.
+      // So, we have to check if the reference is resolved. If not, it annotates the expression here.
+      if (block.namedExprsMgr.isResolved(referName)) {
+        firstFetNum = block.namedExprsMgr.getTarget(referName).getEvalTree();
+      } else {
+        NamedExpr namedExpr = block.namedExprsMgr.getNamedExpr(referName);
+        firstFetNum = exprAnnotator.createEvalNode(context.plan, block, namedExpr.getExpr());
+      }
+    }
+
     LimitNode limitNode = new LimitNode(context.plan.newPID());
-    limitNode.setFetchFirst(firstFetchNum.terminate(null).asInt8());
-
-    // set child plan and update input/output schemas.
+    limitNode.setFetchFirst(firstFetNum.terminate(null).asInt8());
     limitNode.setChild(child);
     limitNode.setInSchema(child.getOutSchema());
     limitNode.setOutSchema(child.getOutSchema());
