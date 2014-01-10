@@ -75,7 +75,7 @@ public class ProjectionPushDownRule extends
     context.plan = plan;
 
     if (topmostBlock.getProjection() != null && topmostBlock.getProjection().isAllProjected()) {
-      context.targetListManager = new TargetListManager(plan, topmostBlock.getProjectionNode().getTargets());
+      context.targetListManager = new TargetListManager(plan, topmostBlock.getProjectableNode().getTargets());
     } else {
       context.targetListManager= new TargetListManager(plan, topmostBlock.getName());
     }
@@ -267,7 +267,7 @@ public class ProjectionPushDownRule extends
 
     if (subBlock.hasProjection() && subBlock.getProjection().isAllProjected()
         && context.upperRequired.size() == 0) {
-      newContext.targetListManager = new TargetListManager(plan, subBlock.getProjectionNode().getTargets());
+      newContext.targetListManager = new TargetListManager(plan, subBlock.getProjectableNode().getTargets());
     } else {
       if (!subBlock.hasNode(NodeType.GROUP_BY)) {
         List<Target> projectedTarget = new ArrayList<Target>();

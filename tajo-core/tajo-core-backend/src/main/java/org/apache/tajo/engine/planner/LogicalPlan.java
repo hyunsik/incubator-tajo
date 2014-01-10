@@ -396,7 +396,7 @@ public class LogicalPlan {
     private Map<String, RelationNode> nameToRelationMap = new HashMap<String, RelationNode>();
     private Map<OpType, List<Expr>> operatorToExprMap = TUtil.newHashMap();
     private Map<NodeType, LogicalNode> nodeTypeToNodeMap = TUtil.newHashMap();
-    private Map<Expr, LogicalNode> exprToNodeMap = TUtil.newHashMap();
+    private Map<Integer, LogicalNode> exprToNodeMap = TUtil.newHashMap();
 
     private LogicalNode latestNode;
     private boolean resolvedGrouping = true;
@@ -433,7 +433,7 @@ public class LogicalPlan {
 
 
     public Target [] getCurrentTargets() {
-      return null;
+      return ((ProjectionNode)getNode(NodeType.PROJECTION)).getTargets();
     }
 
     public <NODE extends LogicalNode> NODE getRoot() {
@@ -528,18 +528,18 @@ public class LogicalPlan {
 
     // expr -> node
     public void mapExprToLogicalNode(Expr expr, LogicalNode node) {
-      exprToNodeMap.put(expr, node);
+      exprToNodeMap.put(System.identityHashCode(expr), node);
     }
 
     public <T extends LogicalNode> T getNodeFromExpr(Expr expr) {
-      return (T) exprToNodeMap.get(expr);
+      return (T) exprToNodeMap.get(System.identityHashCode(expr));
     }
 
-    public void setProjectionNode(Projectable node) {
+    public void setProjectableNode(Projectable node) {
       this.projectionNode = node;
     }
 
-    public Projectable getProjectionNode() {
+    public Projectable getProjectableNode() {
       return this.projectionNode;
     }
 

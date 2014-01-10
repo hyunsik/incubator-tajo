@@ -154,13 +154,11 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
     PreprocessContext leftContext = new PreprocessContext(ctx, leftBlock);
     LogicalNode leftChild = visit(leftContext, new Stack<Expr>(), expr.getLeft());
     TableSubQueryNode leftSubQuery = new TableSubQueryNode(ctx.plan.newPID(), leftBlock.getName(), leftChild);
-    ctx.currentBlock.setNode(leftSubQuery);
 
     LogicalPlan.QueryBlock rightBlock = ctx.plan.newQueryBlock();
     PreprocessContext rightContext = new PreprocessContext(ctx, rightBlock);
     LogicalNode rightChild = visit(rightContext, new Stack<Expr>(), expr.getRight());
     TableSubQueryNode rightSubQuery = new TableSubQueryNode(ctx.plan.newPID(), rightBlock.getName(), rightChild);
-    ctx.currentBlock.setNode(rightSubQuery);
 
     UnionNode unionNode = new UnionNode(ctx.plan.newPID());
     unionNode.setLeftChild(leftSubQuery);

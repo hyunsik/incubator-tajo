@@ -37,7 +37,7 @@ class ExprNormalizer extends SimpleAlgebraVisitor<ExprNormalizer.ExprNormalizedR
 
     ExprNormalizedResult(LogicalPlanner.PlanContext context) {
       this.plan = context.plan;
-      this.block = context.currentBlock;
+      this.block = context.queryBlock;
       this.evalList = context.evalList;
     }
 

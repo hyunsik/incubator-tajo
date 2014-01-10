@@ -66,7 +66,7 @@ public class Projection extends UnaryOperator implements Cloneable {
   @Override
   boolean equalsTo(Expr expr) {
     Projection another = (Projection) expr;
-    return TUtil.checkEquals(all, another.all) &&
+    return TUtil.checkEquals(all, another.all) && distinct == another.distinct &&
         TUtil.checkEquals(targets, another.targets);
   }
 
