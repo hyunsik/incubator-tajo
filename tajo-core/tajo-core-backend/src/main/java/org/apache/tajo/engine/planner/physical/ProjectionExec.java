@@ -49,7 +49,7 @@ public class ProjectionExec extends UnaryPhysicalExec {
 
     this.outTuple = new VTuple(outSchema.getColumnNum());
     this.projector = new Projector(inSchema, outSchema, this.plan.getTargets());
-    this.evalContexts = projector.renew();
+    this.evalContexts = projector.newContexts();
   }
 
   @Override

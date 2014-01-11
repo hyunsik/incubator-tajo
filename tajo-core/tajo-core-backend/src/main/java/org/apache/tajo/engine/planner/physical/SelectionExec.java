@@ -55,7 +55,7 @@ public class SelectionExec extends UnaryPhysicalExec  {
     Tuple tuple;
     while ((tuple = child.next()) != null) {
       qual.eval(qualCtx, inSchema, tuple);
-      if (qual.terminate(qualCtx).asBool()) {
+      if (qual.terminate(qualCtx).isTrue()) {
         if (targetIds != null) {
           RowStoreUtil.project(tuple, outputTuple, targetIds);
           return outputTuple;

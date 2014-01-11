@@ -100,7 +100,7 @@ public class Projector {
     }
   }
 
-  public EvalContext [] renew() {
+  public EvalContext [] newContexts() {
     EvalContext [] evalContexts = new EvalContext[targetNum];
     for (int i = 0; i < targetNum; i++) {
       evalContexts[i] = evals[i].newContext();

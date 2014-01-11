@@ -124,16 +124,16 @@ public class EvalTreeUtil {
           + expr.getType().toString());
     }
   }
-  
+
   /**
    * Return all exprs to refer columns corresponding to the target.
-   * 
-   * @param expr 
+   *
+   * @param expr
    * @param target to be found
    * @return a list of exprs
    */
   public static Collection<EvalNode> getContainExpr(EvalNode expr, Column target) {
-    Set<EvalNode> exprSet = Sets.newHashSet();    
+    Set<EvalNode> exprSet = Sets.newHashSet();
     getContainExpr(expr, target, exprSet);
     return exprSet;
   }

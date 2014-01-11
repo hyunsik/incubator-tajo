@@ -495,9 +495,9 @@ public class SQLAnalyzer extends SQLParserBaseVisitor<Expr> {
 
     Expr left;
     Expr right;
-    for (int i = 0; i < ctx.boolean_value_expression().size(); i++) {
+    for (int i = 0; i < ctx.or_predicate().size(); i++) {
       left = current;
-      right = visitBoolean_value_expression(ctx.boolean_value_expression(i));
+      right = visitOr_predicate(ctx.or_predicate(i));
       current = new BinaryOperator(OpType.Or, left, right);
     }
 
@@ -510,9 +510,9 @@ public class SQLAnalyzer extends SQLParserBaseVisitor<Expr> {
 
     Expr left;
     Expr right;
-    for (int i = 0; i < ctx.boolean_value_expression().size(); i++) {
+    for (int i = 0; i < ctx.and_predicate().size(); i++) {
       left = current;
-      right = visitBoolean_value_expression(ctx.boolean_value_expression(i));
+      right = visitAnd_predicate(ctx.and_predicate(i));
       current = new BinaryOperator(OpType.And, left, right);
     }
 

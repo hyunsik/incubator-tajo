@@ -222,9 +222,16 @@ public class BaseAlgebraVisitor<CONTEXT, RESULT> implements AlgebraVisitor<CONTE
     case NullLiteral:
       current = visitNullLiteral(ctx, stack, (NullLiteral) expr);
       break;
+    case DateLiteral:
+      current = visitDateLiteral(ctx, stack, (DateLiteral) expr);
+      break;
+    case TimeLiteral:
+      current = visitTimeLiteral(ctx, stack, (TimeLiteral) expr);
+      break;
     case TimestampLiteral:
       current = visitTimestampLiteral(ctx, stack, (TimestampLiteral) expr);
       break;
+
 
 
     default:

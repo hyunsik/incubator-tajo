@@ -925,7 +925,7 @@ public class TestPhysicalPlanner {
     exec.next();
     exec.close();
 
-    assertTrue(exec instanceof HashAggregateExec);
+    assertNotNull(PhysicalPlanUtil.findExecutor(exec, HashAggregateExec.class));
 
     context = analyzer.parse(QUERIES[7]);
     plan = planner.createPlan(context);

@@ -155,7 +155,7 @@ public class Column implements ProtoObject<ColumnProto>, Cloneable, GsonObject {
 	
 	public String toString() {
     StringBuilder sb = new StringBuilder(getQualifiedName());
-    sb.append("(").append(getDataType().getType());
+    sb.append(" (").append(getDataType().getType());
     if (getDataType().getLength()  > 0) {
       sb.append("(" + getDataType().getLength() + ")");
     }

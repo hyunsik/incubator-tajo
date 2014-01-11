@@ -21,6 +21,8 @@ package org.apache.tajo.engine.eval;
 import com.google.common.collect.Sets;
 import org.apache.tajo.TajoTestingCluster;
 import org.apache.tajo.algebra.Expr;
+import org.apache.tajo.algebra.OpType;
+import org.apache.tajo.algebra.Selection;
 import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.proto.CatalogProtos.FunctionType;
 import org.apache.tajo.catalog.proto.CatalogProtos.StoreType;
@@ -32,10 +34,8 @@ import org.apache.tajo.engine.planner.LogicalPlan;
 import org.apache.tajo.engine.planner.LogicalPlanner;
 import org.apache.tajo.engine.planner.PlanningException;
 import org.apache.tajo.engine.planner.Target;
-import org.apache.tajo.engine.planner.logical.EvalExprNode;
-import org.apache.tajo.engine.planner.logical.LogicalNode;
+import org.apache.tajo.engine.planner.logical.GroupbyNode;
 import org.apache.tajo.engine.planner.logical.NodeType;
-import org.apache.tajo.engine.planner.logical.SelectionNode;
 import org.apache.tajo.exception.InternalException;
 import org.apache.tajo.master.TajoMaster;
 import org.apache.tajo.util.CommonTestingUtil;
@@ -43,6 +43,7 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -105,15 +106,11 @@ public class TestEvalTreeUtil {
     } catch (PlanningException e) {
       e.printStackTrace();
     }
-    if (plan.getRootBlock().getRoot().getType() == NodeType.EXPRS) {
-      return ((EvalExprNode)plan.getRootBlock().getRoot()).getExprs();
-    } else {
-//      return plan.getRootBlock().getTargetListManager().getUnresolvedTargets();
-      return null;
-    }
+
+    return plan.getRootBlock().getUnresolvedTargets();
   }
 
-  public static EvalNode getRootSelection(String query) {
+  public static EvalNode getRootSelection(String query) throws PlanningException {
     Expr block = analyzer.parse(query);
     LogicalPlan plan = null;
     try {
@@ -121,7 +118,9 @@ public class TestEvalTreeUtil {
     } catch (PlanningException e) {
       e.printStackTrace();
     }
-    return ((SelectionNode)plan.getRootBlock().getNode(NodeType.SELECTION)).getQual();
+
+    Selection selection = plan.getRootBlock().getSingletonExpr(OpType.Filter);
+    return planner.getExprAnnotator().createEvalNode(plan, plan.getRootBlock(), selection.getQual());
   }
 
   @Test
@@ -131,14 +130,14 @@ public class TestEvalTreeUtil {
     Set<Column> set = EvalTreeUtil.findDistinctRefColumns(copy);
     assertEquals(1, set.size());
     assertTrue(set.contains(new Column("newscore", TajoDataTypes.Type.INT4)));
-    
+
     copy = (EvalNode)expr2.clone();
     EvalTreeUtil.changeColumnRef(copy, "people.age", "sum_age");
     set = EvalTreeUtil.findDistinctRefColumns(copy);
     assertEquals(2, set.size());
     assertTrue(set.contains(new Column("people.score", TajoDataTypes.Type.INT4)));
     assertTrue(set.contains(new Column("sum_age", TajoDataTypes.Type.INT4)));
-    
+
     copy = (EvalNode)expr3.clone();
     EvalTreeUtil.changeColumnRef(copy, "people.age", "sum_age");
     set = EvalTreeUtil.findDistinctRefColumns(copy);
@@ -186,12 +185,12 @@ public class TestEvalTreeUtil {
     assertEquals("mul", col2.getColumnName());
     assertEquals(TajoDataTypes.Type.FLOAT8, col2.getDataType().getType());
   }
-  
+
   @Test
   public final void testGetContainExprs() throws CloneNotSupportedException, PlanningException {
     Expr expr = analyzer.parse(QUERIES[1]);
     LogicalPlan plan = planner.createPlan(expr);
-    Target [] targets = null; //plan.getRootBlock().getTargetListManager().getUnresolvedTargets();
+    Target [] targets = plan.getRootBlock().getUnresolvedTargets();
     Column col1 = new Column("people.score", TajoDataTypes.Type.INT4);
     Collection<EvalNode> exprs =
         EvalTreeUtil.getContainExpr(targets[0].getEvalTree(), col1);
@@ -199,7 +198,7 @@ public class TestEvalTreeUtil {
     assertEquals(EvalType.LTH, node.getType());
     assertEquals(EvalType.PLUS, node.getLeftExpr().getType());
     assertEquals(new ConstEval(DatumFactory.createInt4(4)), node.getRightExpr());
-    
+
     Column col2 = new Column("people.age", TajoDataTypes.Type.INT4);
     exprs = EvalTreeUtil.getContainExpr(targets[1].getEvalTree(), col2);
     node = exprs.iterator().next();
@@ -209,7 +208,7 @@ public class TestEvalTreeUtil {
   }
   
   @Test
-  public final void testGetCNF() {
+  public final void testGetCNF() throws PlanningException {
     // "select score from people where score < 10 and 4 < score "
     EvalNode node = getRootSelection(QUERIES[5]);
     EvalNode [] cnf = AlgebraicUtil.toConjunctiveNormalFormArray(node);
@@ -236,7 +235,7 @@ public class TestEvalTreeUtil {
   }
   
   @Test
-  public final void testTransformCNF2Singleton() {
+  public final void testTransformCNF2Singleton() throws PlanningException {
     // "select score from people where score < 10 and 4 < score "
     EvalNode node = getRootSelection(QUERIES[6]);
     EvalNode [] cnf1 = AlgebraicUtil.toConjunctiveNormalFormArray(node);
@@ -251,14 +250,14 @@ public class TestEvalTreeUtil {
   }
 
   @Test
-  public final void testGetDNF() {
+  public final void testGetDNF() throws PlanningException {
     // "select score from people where score > 1 and score < 3 or score > 7 and score < 10", // 7
     EvalNode node = getRootSelection(QUERIES[7]);
     EvalNode [] cnf = AlgebraicUtil.toDisjunctiveNormalFormArray(node);
     assertEquals(2, cnf.length);
 
-    assertEquals("people.score (INT4(0)) > 1 AND people.score (INT4(0)) < 3", cnf[0].toString());
-    assertEquals("7 < people.score (INT4(0)) AND people.score (INT4(0)) < 10", cnf[1].toString());
+    assertEquals("people.score (INT4) > 1 AND people.score (INT4) < 3", cnf[0].toString());
+    assertEquals("7 < people.score (INT4) AND people.score (INT4) < 10", cnf[1].toString());
   }
   
   @Test
@@ -277,7 +276,7 @@ public class TestEvalTreeUtil {
 
     Expr expr = analyzer.parse(QUERIES[1]);
     LogicalPlan plan = planner.createPlan(expr);
-    targets = null; //plan.getRootBlock().getTargetListManager().getUnresolvedTargets();
+    targets = plan.getRootBlock().getUnresolvedTargets();
     Column col1 = new Column("people.score", TajoDataTypes.Type.INT4);
     Collection<EvalNode> exprs =
         EvalTreeUtil.getContainExpr(targets[0].getEvalTree(), col1);
@@ -285,7 +284,7 @@ public class TestEvalTreeUtil {
   }
   
   @Test
-  public final void testConatainSingleVar() {
+  public final void testConatainSingleVar() throws PlanningException {
     EvalNode node = getRootSelection(QUERIES[2]);
     assertEquals(true, AlgebraicUtil.containSingleVar(node));
     node = getRootSelection(QUERIES[3]);
@@ -293,16 +292,13 @@ public class TestEvalTreeUtil {
   }
   
   @Test
-  public final void testTranspose() {
-    //EvalNode node = getRootSelection(QUERIES[2]);
-    //assertEquals(true, AlgebraicUtil.containSingleVar(node));
-    
+  public final void testTranspose() throws PlanningException {
     Column col1 = new Column("people.score", TajoDataTypes.Type.INT4);
     EvalNode node = getRootSelection(QUERIES[3]);
     // we expect that score < 3
     EvalNode transposed = AlgebraicUtil.transpose(node, col1);
     assertEquals(EvalType.GTH, transposed.getType());
-    FieldEval field = (FieldEval) transposed.getLeftExpr(); 
+    FieldEval field = transposed.getLeftExpr();
     assertEquals(col1, field.getColumnRef());
     EvalContext evalCtx = transposed.getRightExpr().newContext();
     transposed.getRightExpr().eval(evalCtx, null, null);
@@ -312,7 +308,7 @@ public class TestEvalTreeUtil {
     // we expect that score < 3
     transposed = AlgebraicUtil.transpose(node, col1);
     assertEquals(EvalType.LTH, transposed.getType());
-    field = (FieldEval) transposed.getLeftExpr(); 
+    field = transposed.getLeftExpr();
     assertEquals(col1, field.getColumnRef());
     evalCtx = transposed.getRightExpr().newContext();
     transposed.getRightExpr().eval(evalCtx, null, null);
@@ -320,12 +316,19 @@ public class TestEvalTreeUtil {
   }
 
   @Test
-  public final void testFindDistinctAggFunctions() {
+  public final void testFindDistinctAggFunctions() throws PlanningException {
     String query = "select sum(score) + max(age) from people";
-    Target [] targets = getRawTargets(query);
-    List<AggregationFunctionCallEval> list = EvalTreeUtil.
-        findDistinctAggFunction(targets[0].getEvalTree());
+    Expr expr = analyzer.parse(query);
+    LogicalPlan plan = planner.createPlan(expr);
+    GroupbyNode groupByNode = plan.getRootBlock().getNode(NodeType.GROUP_BY);
+    Target [] targets = groupByNode.getTargets();
+
+    List<AggregationFunctionCallEval> list = new ArrayList<AggregationFunctionCallEval>();
+    for (int i = 0; i < targets.length; i++) {
+      list.addAll(EvalTreeUtil.findDistinctAggFunction(targets[i].getEvalTree()));
+    }
     assertEquals(2, list.size());
+
     Set<String> result = Sets.newHashSet("max", "sum");
     for (AggregationFunctionCallEval eval : list) {
       assertTrue(result.contains(eval.getName()));

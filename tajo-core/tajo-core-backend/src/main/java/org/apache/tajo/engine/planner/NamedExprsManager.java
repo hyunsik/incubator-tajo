@@ -27,6 +27,7 @@ import org.apache.tajo.algebra.OpType;
 import org.apache.tajo.annotation.Nullable;
 import org.apache.tajo.engine.eval.EvalNode;
 import org.apache.tajo.engine.eval.FieldEval;
+import org.apache.tajo.util.TUtil;
 
 import java.util.*;
 
@@ -210,28 +211,27 @@ public class NamedExprsManager {
   }
 
   public class UnresolvedIterator implements Iterator<NamedExpr> {
-    Iterator<Entry<String,Expr>> it = nameToExprMap.entrySet().iterator();
+    private final Iterator<NamedExpr> iterator;
+
+    public UnresolvedIterator() {
+      List<NamedExpr> unresolvedList = TUtil.newList();
+      for (Entry<String,Expr> entry : nameToExprMap.entrySet()) {
+        if (!isResolved(entry.getKey())) {
+          unresolvedList.add(new NamedExpr(entry.getValue(), entry.getKey()));
+        }
+      }
+      iterator = unresolvedList.iterator();
+    }
+
 
     @Override
     public boolean hasNext() {
-      return it.hasNext();
+      return iterator.hasNext();
     }
 
     @Override
     public NamedExpr next() {
-      Entry<String, Expr> entry = null;
-      do {
-       entry = it.next();
-       if (isResolved(entry.getKey())) {
-         break;
-       }
-      } while (it.hasNext());
-
-      if (entry == null) {
-        throw new NoSuchElementException();
-      }
-
-      return new NamedExpr(entry.getValue(), entry.getKey());
+      return iterator.next();
     }
 
     @Override

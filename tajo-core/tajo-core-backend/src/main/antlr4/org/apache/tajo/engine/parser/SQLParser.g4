@@ -574,11 +574,11 @@ boolean_value_expression
   ;
 
 or_predicate
-  : and_predicate (OR boolean_value_expression)*
+  : and_predicate (OR or_predicate)*
   ;
 
 and_predicate
-  : boolean_factor (AND boolean_value_expression)*
+  : boolean_factor (AND and_predicate)*
   ;
 
 boolean_factor
