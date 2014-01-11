@@ -108,14 +108,8 @@ public class JoinNode extends BinaryNode implements Projectable, Cloneable {
       JoinNode other = (JoinNode) obj;
       boolean eq = this.joinType.equals(other.joinType);
       eq &= TUtil.checkEquals(this.targets, other.targets);
-      if (this.joinQual != null && other.joinQual != null) {
-        eq &= this.joinQual.equals(other.joinQual);
-      } else if (this.joinQual == null && other.joinQual == null) {
-
-      } else {
-        eq = false;
-      }
-      return eq;
+      eq &= TUtil.checkEquals(joinQual, other.joinQual);
+      return eq && leftChild.equals(other.leftChild) && rightChild.equals(other.rightChild);
     } else {
       return false;
     }
@@ -126,6 +120,12 @@ public class JoinNode extends BinaryNode implements Projectable, Cloneable {
     JoinNode join = (JoinNode) super.clone();
     join.joinType = this.joinType;
     join.joinQual = this.joinQual == null ? null : (EvalNode) this.joinQual.clone();
+    if (hasTargets()) {
+      join.targets = new Target[targets.length];
+      for (int i = 0; i < targets.length; i++) {
+        join.targets[i] = (Target) targets[i].clone();
+      }
+    }
     return join;
   }
 
