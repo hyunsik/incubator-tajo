@@ -93,6 +93,11 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       this.plan = context.plan;
       this.queryBlock = block;
     }
+
+    public String toString() {
+      return "block=" + queryBlock.getName() + ", relNum=" + queryBlock.getRelations().size() + ", "+
+          queryBlock.namedExprsMgr.toString();
+    }
   }
 
   /**
@@ -263,7 +268,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       Target [] unresolvedTargets = new Target[projection.getNamedExprs().length];
       for (int i = 0; i < targets.length; i++) {
         NamedExpr namedExpr = projection.getNamedExprs()[i];
-        EvalNode evalNode = exprAnnotator.createEvalNode(plan, plan.getRootBlock(), namedExpr.getExpr());
+        EvalNode evalNode = exprAnnotator.createEvalNode(plan, block, namedExpr.getExpr());
         unresolvedTargets[i] = new Target(evalNode, referNames[i]);
       }
       // it's for debugging or unit testing
@@ -929,16 +934,15 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     context.plan.connectBlocks(childBlock, context.queryBlock, BlockType.TableSubQuery);
     subQueryNode.setSubQuery(child);
 
-
-    // set targets
-    Set<Target> evaluatedTargets = new LinkedHashSet<Target>();
+    // Add additional expressions required in upper nodes.
+    Set<Expr> newlyEvaluatedExprs = new LinkedHashSet<Expr>();
     for (NamedExpr rawTarget : block.namedExprsMgr.getAllNamedExprs()) {
       try {
         EvalNode evalNode = exprAnnotator.createEvalNode(context.plan, context.queryBlock, rawTarget.getExpr());
-        if (PlannerUtil.canBeEvaluated(evalNode, subQueryNode)
-            && EvalTreeUtil.findDistinctAggFunction(evalNode).size() == 0) {
+        if (PlannerUtil.canBeEvaluated(evalNode, subQueryNode) && EvalTreeUtil.findDistinctAggFunction(evalNode).size() == 0) {
           block.namedExprsMgr.resolveExpr(rawTarget.getAlias(), evalNode);
-          evaluatedTargets.add(new Target(evalNode, rawTarget.getAlias()));
+
+          newlyEvaluatedExprs.add(rawTarget.getExpr()); // newly added exr
         }
       } catch (VerifyException ve) {
       }
@@ -946,13 +950,22 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
     // Assume that each unique expr is evaluated once.
     List<Target> targets = new ArrayList<Target>();
-    for (Column column : subQueryNode.getOutSchema().getColumns()) {
+    for (Column column : subQueryNode.getInSchema().getColumns()) {
       ColumnReferenceExpr columnRef = new ColumnReferenceExpr(column.getQualifier(), column.getColumnName());
-      if (block.namedExprsMgr.contains(columnRef) == false) {
+      if (block.namedExprsMgr.contains(columnRef)) {
+        String referenceName = block.namedExprsMgr.getName(columnRef);
+        targets.add(new Target(new FieldEval(column), referenceName));
+
+        newlyEvaluatedExprs.remove(columnRef);
+      } else {
         targets.add(new Target(new FieldEval(column)));
       }
     }
-    targets.addAll(evaluatedTargets);
+
+    for (Expr newAddedExpr : newlyEvaluatedExprs) {
+      targets.add(block.namedExprsMgr.getTarget(newAddedExpr, true));
+    }
+
     subQueryNode.setTargets(targets.toArray(new Target[targets.size()]));
     subQueryNode.setOutSchema(PlannerUtil.targetToSchema(subQueryNode.getTargets()));
 
@@ -1037,7 +1050,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
   public LogicalNode visitInsert(PlanContext context, Stack<Expr> stack, Insert expr) throws PlanningException {
     stack.push(expr);
-    QueryBlock newQueryBlock = context.plan.newQueryBlock();
+    QueryBlock newQueryBlock = context.plan.getBlockByExpr(expr.getSubQuery());
     PlanContext newContext = new PlanContext(context, newQueryBlock);
     Stack<Expr> subStack = new Stack<Expr>();
     LogicalNode subQuery = visit(newContext, subStack, expr.getSubQuery());
@@ -1068,13 +1081,17 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         }
       }
 
-      insertNode = new InsertNode(context.plan.newPID(), desc, subQuery);
+      insertNode = context.queryBlock.getNodeFromExpr(expr);
+      insertNode.setTargetTableDesc(desc);
+      insertNode.setSubQuery(subQuery);
       insertNode.setTargetSchema(targetSchema);
       insertNode.setOutSchema(targetSchema);
     }
 
     if (expr.hasLocation()) {
-      insertNode = new InsertNode(context.plan.newPID(), new Path(expr.getLocation()), subQuery);
+      insertNode = context.queryBlock.getNodeFromExpr(expr);
+      insertNode.setTargetLocation(new Path(expr.getLocation()));
+      insertNode.setSubQuery(subQuery);
       if (expr.hasStorageType()) {
         insertNode.setStorageType(CatalogUtil.getStoreType(expr.getStorageType()));
       }

@@ -239,16 +239,28 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
       throws PlanningException {
 
     PreprocessContext newContext;
-    if (expr.hasAlias()) {
-      newContext = new PreprocessContext(ctx, ctx.plan.newAndGetBlock(expr.getAlias()));
-    } else {
-      newContext = new PreprocessContext(ctx, ctx.plan.newQueryBlock());
-    }
+    // Note: TableSubQuery always has a table name.
+    // SELECT .... FROM (SELECT ...) TB_NAME <-
+    newContext = new PreprocessContext(ctx, ctx.plan.newAndGetBlock(expr.getName()));
     LogicalNode child = super.visitTableSubQuery(newContext, stack, expr);
 
-    // a table subquery is regarded as a relation.
-    TableSubQueryNode node = new TableSubQueryNode(ctx.plan.newPID(), newContext.currentBlock.getName(), child);
+    // a table subquery should be dealt as a relation.
+    TableSubQueryNode node = new TableSubQueryNode(ctx.plan.newPID(), expr.getName(), child);
     ctx.currentBlock.addRelation(node);
     return node;
+  }
+
+  ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+  // Insert or Update Section
+  ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  public LogicalNode visitInsert(PreprocessContext ctx, Stack<Expr> stack, Insert expr) throws PlanningException {
+    PreprocessContext newContext = new PreprocessContext(ctx, ctx.plan.newQueryBlock());
+    LogicalNode child = super.visitInsert(newContext, stack, expr);
+
+    InsertNode insertNode = new InsertNode(ctx.plan.newPID());
+    insertNode.setInSchema(child.getOutSchema());
+    insertNode.setOutSchema(child.getOutSchema());
+    return insertNode;
   }
 }

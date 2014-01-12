@@ -609,6 +609,23 @@ public class GlobalPlanner {
                                           TableSubQueryNode node, Stack<LogicalNode> stack) throws PlanningException {
       LogicalNode child = super.visitTableSubQuery(context, plan, queryBlock, node, stack);
       return handleUnaryNode(context, child, node);
+      /*
+      ExecutionBlock currentBlock = context.execBlockMap.remove(child.getPID());
+
+      if (child.getType() == NodeType.UNION) {
+        for (ExecutionBlock childBlock : context.plan.getChilds(currentBlock.getId())) {
+          TableSubQueryNode copy = PlannerUtil.clone(plan, node);
+          copy.setSubQuery(childBlock.getPlan());
+          childBlock.setPlan(copy);
+        }
+        context.execBlockMap.put(node.getPID(), currentBlock);
+      } else {
+        node.setSubQuery(currentBlock.getPlan());
+        currentBlock.setPlan(node);
+        context.execBlockMap.put(node.getPID(), currentBlock);
+      }
+      return node;
+      */
     }
 
     @Override

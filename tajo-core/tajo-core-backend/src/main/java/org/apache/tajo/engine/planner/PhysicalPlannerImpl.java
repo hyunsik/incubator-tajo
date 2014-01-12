@@ -26,6 +26,7 @@ import com.google.common.collect.ObjectArrays;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
+import org.apache.tajo.algebra.Projection;
 import org.apache.tajo.engine.planner.global.DataChannel;
 import org.apache.tajo.storage.fragment.FileFragment;
 import org.apache.tajo.storage.fragment.FragmentConvertor;
@@ -133,7 +134,8 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
       case TABLE_SUBQUERY: {
         TableSubQueryNode subQueryNode = (TableSubQueryNode) logicalNode;
         leftExec = createPlanRecursive(ctx, subQueryNode.getSubQuery());
-        return leftExec;
+        ProjectionExec projectionExec = new ProjectionExec(ctx, subQueryNode, leftExec);
+        return projectionExec;
 
       }
       case PARTITIONS_SCAN:

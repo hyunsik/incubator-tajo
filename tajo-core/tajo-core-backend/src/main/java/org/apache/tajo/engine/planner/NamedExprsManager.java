@@ -203,7 +203,7 @@ public class NamedExprsManager {
   }
 
   public String toString() {
-    return "raw=" + nameToExprMap.size() + ", resolved=" + nameToEvalMap.size();
+    return "unresolved=" + nameToExprMap.size() + ", resolved=" + nameToEvalMap.size();
   }
 
   public Iterator<NamedExpr> getUnresolvedExprs() {

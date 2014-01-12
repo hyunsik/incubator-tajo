@@ -144,22 +144,42 @@ public class Schema implements ProtoObject<SchemaProto>, Cloneable, GsonObject {
     if (list.size() == 1) {
       return fields.get(list.get(0));
     } else {
-      StringBuilder sb = new StringBuilder();
-      boolean first = true;
-      for (Integer id : list) {
-        if (first) {
-          first = false;
-        } else {
-          sb.append(", ");
-        }
-        sb.append(fields.get(id));
-      }
-      throw new RuntimeException("Ambiguous Column Name: " + sb.toString());
+      throw throwAmbiguousFieldException(list);
     }
 	}
+
+  private RuntimeException throwAmbiguousFieldException(Collection<Integer> idList) {
+    StringBuilder sb = new StringBuilder();
+    boolean first = true;
+    for (Integer id : idList) {
+      if (first) {
+        first = false;
+      } else {
+        sb.append(", ");
+      }
+      sb.append(fields.get(id));
+    }
+    throw new RuntimeException("Ambiguous Column Name Access: " + sb.toString());
+  }
 	
-	public int getColumnId(String qualifiedName) {
-	  return fieldsByQualifiedName.get(qualifiedName.toLowerCase());
+	public int getColumnId(String name) {
+    String [] parts = name.split("\\.");
+    if (parts.length == 2) {
+      if (fieldsByQualifiedName.containsKey(name)) {
+        return fieldsByQualifiedName.get(name);
+      } else {
+        return -1;
+      }
+    } else {
+      List<Integer> list = fieldsByName.get(name);
+      if (list.size() == 1) {
+        return fieldsByName.get(name).get(0);
+      } else if (list.size() == 0) {
+        return -1;
+      } else { // more than 1
+        throw throwAmbiguousFieldException(list);
+      }
+    }
 	}
 
   public int getColumnIdByName(String colName) {

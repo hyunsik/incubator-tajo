@@ -506,6 +506,13 @@ public class ExprAnnotator extends BaseAlgebraVisitor<ExprAnnotator.Context, Eva
   }
 
   @Override
+  public EvalNode visitDateLiteral(Context context, Stack<Expr> stack, DateLiteral expr) throws PlanningException {
+    DateValue dateValue = expr.getDate();
+    int [] dates = dateToIntArray(dateValue.getYears(), dateValue.getMonths(), dateValue.getDays());
+    return new ConstEval(new DateDatum(dates[0], dates[1], dates[2]));
+  }
+
+  @Override
   public EvalNode visitTimestampLiteral(Context ctx, Stack<Expr> stack, TimestampLiteral expr)
       throws PlanningException {
     DateValue dateValue = expr.getDate();
