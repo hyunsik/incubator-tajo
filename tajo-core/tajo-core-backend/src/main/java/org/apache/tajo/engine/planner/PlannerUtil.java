@@ -33,6 +33,7 @@ import org.apache.tajo.engine.eval.*;
 import org.apache.tajo.engine.planner.logical.*;
 import org.apache.tajo.engine.exception.InvalidQueryException;
 import org.apache.tajo.storage.TupleComparator;
+import org.apache.tajo.util.TUtil;
 
 import java.util.*;
 
@@ -506,6 +507,21 @@ public class PlannerUtil {
     return targets;
   }
 
+  public static Target[] schemaToTargetsWithGeneratedFields(Schema schema) {
+    List<Target> targets = TUtil.newList();
+
+    FieldEval eval;
+    Column column;
+    for (int i = 0; i < schema.getColumnNum(); i++) {
+      column = schema.getColumn(i);
+      if (column.getColumnName().charAt(0) != '$') {
+        eval = new FieldEval(schema.getColumn(i));
+        targets.add(new Target(eval));
+      }
+    }
+    return targets.toArray(new Target[targets.size()]);
+  }
+
   public static SortSpec[] schemaToSortSpecs(Schema schema) {
     return schemaToSortSpecs(schema.toArray());
   }
@@ -706,15 +722,6 @@ public class PlannerUtil {
       }
     }
     return schema;
-  }
-
-  public static String [] schemaToReferenceNames(Schema schema) {
-    String [] names = new String[schema.getColumnNum()];
-    int i = 0;
-    for (Column column : schema.getColumns()) {
-      names[i++] = column.getQualifiedName();
-    }
-    return names;
   }
 
   public static boolean existsAggregationFunction(Expr expr) throws PlanningException {

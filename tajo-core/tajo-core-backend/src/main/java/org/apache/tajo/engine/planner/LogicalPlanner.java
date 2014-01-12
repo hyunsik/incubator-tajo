@@ -224,9 +224,6 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     // Build Child Plans
     stack.push(projection);
     LogicalNode child = visit(context, stack, projection.getChild());
-    if (projection.isAllProjected()) {
-      referNames = PlannerUtil.schemaToReferenceNames(child.getOutSchema());
-    }
     // check if it is aggregation query without group-by clause. If so, it inserts group-by node to its child.
     child = insertGroupbyNodeIfUnresolved(context, child, stack);
     stack.pop();
@@ -234,7 +231,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     ProjectionNode projectionNode;
     Target [] targets;
     if (projection.isAllProjected()) {
-      targets = PlannerUtil.schemaToTargets(child.getOutSchema());
+      // should takes all columns except for generated columns whose names are prefixed with '$'.
+      targets = PlannerUtil.schemaToTargetsWithGeneratedFields(child.getOutSchema());
     } else {
       targets = buildTargets(plan, block, referNames);
     }
