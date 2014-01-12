@@ -88,10 +88,6 @@ public class NamedExprsManager {
     return new NamedExpr(nameToExprMap.get(normalized), normalized);
   }
 
-  public void transite(String from, String to) {
-    nameToNameMap.put(from, to);
-  }
-
   public boolean hasTransition(String from) {
     return nameToNameMap.containsKey(from);
   }
@@ -236,6 +232,12 @@ public class NamedExprsManager {
 
     @Override
     public void remove() {
+    }
+  }
+
+  public void reset() {
+    for (String name : resolvedFlags.keySet()) {
+      resolvedFlags.put(name, false);
     }
   }
 }

@@ -365,31 +365,6 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     return true;
   }
 
-
-
-
-
-
-  Target[] annotateTargets(LogicalPlan plan, QueryBlock block, NamedExpr[] targets)
-      throws PlanningException {
-    Target annotatedTargets [] = new Target[targets.length];
-
-    for (int i = 0; i < targets.length; i++) {
-      annotatedTargets[i] = createTarget(plan, block, targets[i]);
-    }
-    return annotatedTargets;
-  }
-
-  Target createTarget(LogicalPlan plan, QueryBlock block,
-                      NamedExpr target) throws PlanningException {
-    if (target.hasAlias()) {
-      return new Target(exprAnnotator.createEvalNode(plan, block, target.getExpr()),
-          target.getAlias());
-    } else {
-      return new Target(exprAnnotator.createEvalNode(plan, block, target.getExpr()));
-    }
-  }
-
   /*===============================================================================================
     SORT SECTION
   ===============================================================================================*/
@@ -466,7 +441,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     SortSpec [] annotatedSortSpecs = new SortSpec[sortKeyNum];
     for (int i = 0; i < sortKeyNum; i++) {
       if (block.namedExprsMgr.isResolved(referNames[i])) {
-        column = block.namedExprsMgr.getTarget(referNames[i]).getColumnSchema();
+        column = block.namedExprsMgr.getTarget(referNames[i]).getNamedColumn();
       } else {
         throw new IllegalStateException("Unexpected State: " + TUtil.arrayToString(sortSpecs));
       }
@@ -572,7 +547,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       Column [] groupingColumns = new Column[aggregation.getGroupSet()[0].getGroupingSets().length];
       for (int i = 0; i < groupingColumns.length; i++) {
         if (block.namedExprsMgr.isResolved(groupingKeyRefNames[i])) {
-          groupingColumns[i] = block.namedExprsMgr.getTarget(groupingKeyRefNames[i]).getColumnSchema();
+          groupingColumns[i] = block.namedExprsMgr.getTarget(groupingKeyRefNames[i]).getNamedColumn();
         } else {
           throw new PlanningException("AAAAAAAAAAAAAAAAAAA");
         }
@@ -701,16 +676,18 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     LogicalNode right = visit(context, stack, join.getRight());
     stack.pop();
 
-    EvalNode joinCondition;
-    if (block.namedExprsMgr.isResolved(joinQualRefName)) {
-      joinCondition = block.namedExprsMgr.getTarget(joinQualRefName).getEvalTree();
-    } else {
-      NamedExpr namedExpr = block.namedExprsMgr.getNamedExpr(joinQualRefName);
-      try {
-        joinCondition = exprAnnotator.createEvalNode(plan, block, namedExpr.getExpr());
-        block.namedExprsMgr.resolveExpr(joinQualRefName, joinCondition);
-      } catch (VerifyException ve) {
-        throw new PlanningException(ve);
+    EvalNode joinCondition = null;
+    if (join.hasQual()) {
+      if (block.namedExprsMgr.isResolved(joinQualRefName)) {
+        joinCondition = block.namedExprsMgr.getTarget(joinQualRefName).getEvalTree();
+      } else {
+        NamedExpr namedExpr = block.namedExprsMgr.getNamedExpr(joinQualRefName);
+        try {
+          joinCondition = exprAnnotator.createEvalNode(plan, block, namedExpr.getExpr());
+          block.namedExprsMgr.resolveExpr(joinQualRefName, joinCondition);
+        } catch (VerifyException ve) {
+          throw new PlanningException(ve);
+        }
       }
     }
 
@@ -734,7 +711,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     // Set A merged input schema
     Schema merged;
     if (join.isNatural()) {
-      merged = getNaturalJoin(left, right);
+      merged = getNaturalJoinSchema(left, right);
     } else {
       merged = SchemaUtil.merge(left.getOutSchema(), right.getOutSchema());
     }
@@ -752,7 +729,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     if (join.isNatural()) { // if natural join, it should have the equi-join conditions by common column names
       Schema leftSchema = joinNode.getLeftChild().getInSchema();
       Schema rightSchema = joinNode.getRightChild().getInSchema();
-      Schema commons = SchemaUtil.getCommons(leftSchema, rightSchema);
+      Schema commons = SchemaUtil.getNaturalJoinColumns(leftSchema, rightSchema);
       EvalNode njCond = getNaturalJoinCondition(leftSchema, rightSchema, commons);
       joinNode.setJoinQual(njCond);
     } else if (join.hasQual()) { // otherwise, the given join conditions are set
@@ -762,24 +739,19 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     return joinNode;
   }
 
-  private static Schema getNaturalJoin(LogicalNode outer, LogicalNode inner) {
+  private static Schema getNaturalJoinSchema(LogicalNode left, LogicalNode right) {
     Schema joinSchema = new Schema();
-    Schema commons = SchemaUtil.getCommons(outer.getOutSchema(),
-        inner.getOutSchema());
+    Schema commons = SchemaUtil.getNaturalJoinColumns(left.getOutSchema(), right.getOutSchema());
     joinSchema.addColumns(commons);
-    for (Column c : outer.getOutSchema().getColumns()) {
-      for (Column common : commons.getColumns()) {
-        if (!common.getColumnName().equals(c.getColumnName())) {
-          joinSchema.addColumn(c);
-        }
+    for (Column c : left.getOutSchema().getColumns()) {
+      if (!joinSchema.contains(c.getQualifiedName())) {
+        joinSchema.addColumn(c);
       }
     }
 
-    for (Column c : inner.getOutSchema().getColumns()) {
-      for (Column common : commons.getColumns()) {
-        if (!common.getColumnName().equals(c.getColumnName())) {
-          joinSchema.addColumn(c);
-        }
+    for (Column c : right.getOutSchema().getColumns()) {
+      if (!joinSchema.contains(c.getQualifiedName())) {
+        joinSchema.addColumn(c);
       }
     }
     return joinSchema;
