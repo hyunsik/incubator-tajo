@@ -278,7 +278,7 @@ public class QueryMasterTask extends CompositeService {
     LogicalPlan plan = null;
     try {
       plan = planner.createPlan(expr);
-      //optimizer.optimize(plan);
+      optimizer.optimize(plan);
     } catch (PlanningException e) {
       e.printStackTrace();
     }

@@ -97,8 +97,9 @@ public class JoinNode extends BinaryNode implements Projectable, Cloneable {
       planStr.addExplan("Join Cond: " + joinQual.toString());
     }
 
-    planStr.addDetail("in schema: " + getInSchema());
     planStr.addDetail("out schema: " + getOutSchema());
+    planStr.addDetail("in schema: " + getInSchema());
+
     return planStr;
   }
 

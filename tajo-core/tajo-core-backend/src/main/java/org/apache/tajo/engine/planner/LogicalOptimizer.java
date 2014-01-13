@@ -56,7 +56,7 @@ public class LogicalOptimizer {
     rulesBeforeJoinOpt.addRewriteRule(new FilterPushDownRule());
 
     rulesAfterToJoinOpt = new BasicQueryRewriteEngine();
-    //rulesAfterToJoinOpt.addRewriteRule(new ProjectionPushDownRule());
+    rulesAfterToJoinOpt.addRewriteRule(new ProjectionPushDownRule());
     rulesAfterToJoinOpt.addRewriteRule(new PartitionedTableRewriter(systemConf));
   }
 
@@ -77,7 +77,7 @@ public class LogicalOptimizer {
   private void optimizeJoinOrder(LogicalPlan plan, String blockName) throws PlanningException {
     LogicalPlan.QueryBlock block = plan.getBlock(blockName);
 
-    if (block.hasNode(NodeType.JOIN)) {
+    if (block.getRelations().size() > 1) {
       String originalOrder = JoinOrderStringBuilder.buildJoinOrderString(plan, block);
       double nonOptimizedJoinCost = JoinCostComputer.computeCost(plan, block);
 

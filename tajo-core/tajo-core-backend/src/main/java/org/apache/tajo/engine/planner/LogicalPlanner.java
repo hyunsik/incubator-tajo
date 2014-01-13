@@ -640,28 +640,17 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     QueryBlock block = context.queryBlock;
 
     ExprNormalizedResult normalizedResult = normalizer.normalize(context, selection.getQual());
-    String referName = block.namedExprsMgr.addExpr(normalizedResult.baseExpr);
-    block.namedExprsMgr.addNamedExprArray(normalizedResult.aggExprs);
-    block.namedExprsMgr.addNamedExprArray(normalizedResult.scalarExprs);
+    block.namedExprsMgr.addReferences(normalizedResult.baseExpr);
+    if (normalizedResult.aggExprs.size() > 0 || normalizedResult.scalarExprs.size() > 0) {
+      throw new VerifyException("Filter condition cannot include aggregation function");
+    }
 
     stack.push(selection);
     LogicalNode child = visit(context, stack, selection.getChild());
     stack.pop();
 
-    // Consider the following query:
-    //
-    // SELECT one + two AS total ... FROM ... WHERE total > 2;
-    //
-    // "total" cannot be resolved in ScanNode. "total" should be resolved in the upper nodes.
-    // So, we have to check if the reference is resolved. Otherwise, it annotates the expression here.
-    EvalNode searchCondition;
-    if (block.namedExprsMgr.isResolved(referName)) {
-      searchCondition = block.namedExprsMgr.getTarget(referName).getEvalTree();
-    } else {
-      NamedExpr namedExpr = block.namedExprsMgr.getNamedExpr(referName);
-      searchCondition = exprAnnotator.createEvalNode(context.plan, block, namedExpr.getExpr());
-      block.namedExprsMgr.resolveExpr(referName, searchCondition);
-    }
+    // Create EvalNode for a search condition.
+    EvalNode searchCondition = exprAnnotator.createEvalNode(context.plan, block, selection.getQual());
     EvalNode simplified = AlgebraicUtil.eliminateConstantExprs(searchCondition);
 
     SelectionNode selectionNode = context.queryBlock.getNodeFromExpr(selection);
@@ -687,12 +676,12 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     LogicalPlan plan = context.plan;
     QueryBlock block = context.queryBlock;
 
-    String joinQualRefName = null;
     if (join.hasQual()) {
       ExprNormalizedResult normalizedResult = normalizer.normalize(context, join.getQual());
-      joinQualRefName = block.namedExprsMgr.addExpr(normalizedResult.baseExpr);
-      block.namedExprsMgr.addNamedExprArray(normalizedResult.aggExprs);
-      block.namedExprsMgr.addNamedExprArray(normalizedResult.scalarExprs);
+      block.namedExprsMgr.addReferences(normalizedResult.baseExpr);
+      if (normalizedResult.aggExprs.size() > 0 || normalizedResult.scalarExprs.size() > 0) {
+        throw new VerifyException("Filter condition cannot include aggregation function");
+      }
     }
 
     // Phase 2: build child plans
@@ -701,17 +690,11 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     LogicalNode right = visit(context, stack, join.getRight());
     stack.pop();
 
-    EvalNode joinCondition;
-    if (block.namedExprsMgr.isResolved(joinQualRefName)) {
-      joinCondition = block.namedExprsMgr.getTarget(joinQualRefName).getEvalTree();
-    } else {
-      NamedExpr namedExpr = block.namedExprsMgr.getNamedExpr(joinQualRefName);
-      try {
-        joinCondition = exprAnnotator.createEvalNode(plan, block, namedExpr.getExpr());
-        block.namedExprsMgr.resolveExpr(joinQualRefName, joinCondition);
-      } catch (VerifyException ve) {
-        throw new PlanningException(ve);
-      }
+    // Create EvalNode for a search condition.
+    EvalNode simplified = null;
+    if (join.hasQual()) {
+      EvalNode qual = exprAnnotator.createEvalNode(context.plan, block, join.getQual());
+      simplified = AlgebraicUtil.eliminateConstantExprs(qual);
     }
 
     EvalNode evalNode;
@@ -756,7 +739,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       EvalNode njCond = getNaturalJoinCondition(leftSchema, rightSchema, commons);
       joinNode.setJoinQual(njCond);
     } else if (join.hasQual()) { // otherwise, the given join conditions are set
-      joinNode.setJoinQual(joinCondition);
+      joinNode.setJoinQual(simplified);
     }
 
     return joinNode;
@@ -864,6 +847,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     QueryBlock block = context.queryBlock;
 
     ScanNode scanNode = block.getNodeFromExpr(expr);
+    updatePhysicalInfo(scanNode.getTableDesc());
 
     // Add additional expressions required in upper nodes.
     Set<Expr> newlyEvaluatedExprs = new LinkedHashSet<Expr>();

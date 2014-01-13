@@ -112,6 +112,17 @@ public class NamedExprsManager {
     }
   }
 
+  public String [] addReferences(Expr expr) throws PlanningException {
+    Set<ColumnReferenceExpr> foundSet = ExprFinder.finds(expr, OpType.Column);
+    String [] names = new String[foundSet.size()];
+    int i = 0;
+    for (ColumnReferenceExpr column : foundSet) {
+      addExpr(column);
+      names[i++] = column.getCanonicalName();
+    }
+    return names;
+  }
+
   public String addExpr(Expr expr) {
     String name;
 
