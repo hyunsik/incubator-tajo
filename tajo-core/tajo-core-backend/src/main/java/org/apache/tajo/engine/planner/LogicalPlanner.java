@@ -631,7 +631,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     // So, we have to check if the reference is resolved. Otherwise, it annotates the expression here.
     EvalNode searchCondition;
     if (block.namedExprsMgr.isResolved(referName)) {
-      searchCondition = block.namedExprsMgr.getTarget(referName).getEvalTree();
+      searchCondition = block.namedExprsMgr.getTransitiveTarget(referName).getEvalTree();
     } else {
       NamedExpr namedExpr = block.namedExprsMgr.getNamedExpr(referName);
       searchCondition = exprAnnotator.createEvalNode(context.plan, block, namedExpr.getExpr());
@@ -826,6 +826,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         current = createCartesianProduct(context, left, right);
       }
     }
+    context.queryBlock.setNode(current);
 
     return current;
   }

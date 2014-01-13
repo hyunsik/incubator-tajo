@@ -71,11 +71,6 @@ public class ProjectionPushDownRule extends
 
     Stack<LogicalNode> stack = new Stack<LogicalNode>();
     Context context = new Context();
-    context.plan = plan;
-
-    context.targetListMgr = new TargetListManager();
-
-
     visit(context, plan, topmostBlock, topmostBlock.getRoot(), stack);
 
     return plan;
@@ -98,14 +93,10 @@ public class ProjectionPushDownRule extends
   }
 
   static class Context {
-    LogicalPlan plan;
     TargetListManager targetListMgr;
 
-    public Context() {}
-
-    public Context(Context context) {
-      this.plan = context.plan;
-      this.targetListMgr = context.targetListMgr;
+    public Context() {
+      targetListMgr = new TargetListManager();
     }
   }
 
@@ -167,19 +158,27 @@ public class ProjectionPushDownRule extends
   public LogicalNode visitJoin(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, JoinNode node,
                           Stack<LogicalNode> stack) throws PlanningException {
 
+    Context newContext = new Context();
     if (node.hasJoinQual()) {
-      context.targetListMgr.addEvalNode(node.getJoinQual());
+      newContext.targetListMgr.addEvalNode(node.getJoinQual());
     }
 
     if (node.hasTargets()) {
+      List<Target> requiredTargets = TUtil.newList();
       for (Target target : node.getTargets()) {
-        context.targetListMgr.addEvalNode(target);
+        if (context.targetListMgr.isRequired(target.getNamedColumn())) {
+          requiredTargets.add(target);
+        }
+      }
+
+      for (Target target : requiredTargets) {
+        newContext.targetListMgr.addEvalNode(target);
       }
     }
 
     stack.push(node);
-    LogicalNode left = visit(context, plan, block, node.getLeftChild(), stack);
-    LogicalNode right = visit(context, plan, block, node.getRightChild(), stack);
+    LogicalNode left = visit(newContext, plan, block, node.getLeftChild(), stack);
+    LogicalNode right = visit(newContext, plan, block, node.getRightChild(), stack);
     stack.pop();
 
     Schema schema = SchemaUtil.merge(left.getOutSchema(), right.getOutSchema());

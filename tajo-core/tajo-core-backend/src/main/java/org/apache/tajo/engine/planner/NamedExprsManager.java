@@ -185,6 +185,19 @@ public class NamedExprsManager {
     return getTarget(name, false);
   }
 
+  public Target getTransitiveTarget(String name) {
+    String normalized = name;
+    if (resolvedFlags.containsKey(normalized) && resolvedFlags.get(normalized)) {
+      return new Target(nameToEvalMap.get(normalized), name);
+    } else {
+      if (nameToEvalMap.containsKey(normalized)) {
+        return new Target(nameToEvalMap.get(normalized), name);
+      } else {
+        return null;
+      }
+    }
+  }
+
   public Target getTarget(String name, boolean unresolved) {
     String normalized = name;
     if (!unresolved && resolvedFlags.containsKey(normalized) && resolvedFlags.get(normalized)) {
@@ -232,12 +245,6 @@ public class NamedExprsManager {
 
     @Override
     public void remove() {
-    }
-  }
-
-  public void reset() {
-    for (String name : resolvedFlags.keySet()) {
-      resolvedFlags.put(name, false);
     }
   }
 }
