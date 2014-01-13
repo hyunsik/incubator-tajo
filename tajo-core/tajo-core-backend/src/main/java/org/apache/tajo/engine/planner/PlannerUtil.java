@@ -242,10 +242,8 @@ public class PlannerUtil {
                 new Column(targetName, newTarget.getEvalTree().getValueType()))});
           } else {
             func.setFirstPhase();
-            newTarget = new Target(func);
             String targetName = "column_" + (targetId++);
-            newTarget.setAlias(targetName);
-
+            newTarget = new Target(func, targetName);
             AggregationFunctionCallEval secondFunc = null;
             for (AggregationFunctionCallEval sf : secondStepFunctions) {
               if (func.equals(sf)) {

@@ -88,14 +88,11 @@ public class LogicalOptimizer {
       FoundJoinOrder order = joinOrderAlgorithm.findBestOrder(plan, block,
           joinGraphContext.joinGraph, joinGraphContext.relationsForProduct);
       JoinNode old = block.getNode(NodeType.JOIN);
-      if (nonOptimizedJoinCost > order.getCost()) {
-        PlannerUtil.replaceNode(plan, block.getRoot(), old, order.getOrderedJoin());
-        String optimizedOrder = JoinOrderStringBuilder.buildJoinOrderString(plan, block);
-        block.addHistory("Non-optimized join order: " + originalOrder + " (cost: " + nonOptimizedJoinCost + ")");
-        block.addHistory("Optimized join order    : " + optimizedOrder + " (cost: " + order.getCost() + ")");
-      } else {
-        block.addHistory("Optimized join order    : " + originalOrder + " (cost: " + nonOptimizedJoinCost + ")");
-      }
+
+      PlannerUtil.replaceNode(plan, block.getRoot(), old, order.getOrderedJoin());
+      String optimizedOrder = JoinOrderStringBuilder.buildJoinOrderString(plan, block);
+      block.addHistory("Non-optimized join order: " + originalOrder + " (cost: " + nonOptimizedJoinCost + ")");
+      block.addHistory("Optimized join order    : " + optimizedOrder + " (cost: " + order.getCost() + ")");
     }
   }
 

@@ -701,8 +701,6 @@ public class TestLogicalPlanner {
 
   static final String setStatements [] = {
     "select deptName from employee where deptName like 'data%' union select deptName from score where deptName like 'data%'",
-    "select deptName from employee union select deptName from score as s1 intersect select deptName from score as s2",
-    "select deptName from employee union select deptName from score as s1 except select deptName from score as s2 intersect select deptName from score as s3"
   };
 
   @Test
@@ -720,41 +718,6 @@ public class TestLogicalPlanner {
     assertEquals(NodeType.TABLE_SUBQUERY, union.getRightChild().getType());
     TableSubQueryNode rightSub = union.getRightChild();
     assertEquals(NodeType.PROJECTION, rightSub.getSubQuery().getType());
-  }
-
-  @Test
-  public final void testSetPlan2() throws PlanningException {
-    // for testing multiple set statements
-    Expr expr = sqlAnalyzer.parse(setStatements[1]);
-    LogicalPlan plan = planner.createPlan(expr);
-    System.out.println(plan);
-    LogicalRootNode root = plan.getRootBlock().getRoot();
-    testJsonSerDerObject(root);
-    assertEquals(NodeType.ROOT, root.getType());
-    assertEquals(NodeType.UNION, root.getChild().getType());
-    UnionNode union = root.getChild();
-    assertEquals(NodeType.TABLE_SUBQUERY, union.getLeftChild().getType());
-    assertEquals(NodeType.TABLE_SUBQUERY, union.getRightChild().getType());
-    TableSubQueryNode subQuery = union.getRightChild();
-    assertEquals(NodeType.INTERSECT, subQuery.getSubQuery().getType());
-  }
-
-  @Test
-  public final void testSetPlan3() throws PlanningException {
-    // for testing multiple set statements
-    Expr expr = sqlAnalyzer.parse(setStatements[2]);
-    LogicalPlan plan = planner.createPlan(expr);
-    LogicalRootNode root = plan.getRootBlock().getRoot();
-    testJsonSerDerObject(root);
-    assertEquals(NodeType.ROOT, root.getType());
-    assertEquals(NodeType.EXCEPT, root.getChild().getType());
-    ExceptNode except = root.getChild();
-    assertEquals(NodeType.TABLE_SUBQUERY, except.getLeftChild().getType());
-    assertEquals(NodeType.TABLE_SUBQUERY, except.getRightChild().getType());
-    TableSubQueryNode leftSubQuery = except.getLeftChild();
-    TableSubQueryNode rightSubQuery = except.getRightChild();
-    assertEquals(NodeType.UNION, leftSubQuery.getSubQuery().getType());
-    assertEquals(NodeType.INTERSECT, rightSubQuery.getSubQuery().getType());
   }
 
   static final String [] setQualifiers = {

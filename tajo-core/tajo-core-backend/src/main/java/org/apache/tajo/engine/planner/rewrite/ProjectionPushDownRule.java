@@ -18,8 +18,6 @@
 
 package org.apache.tajo.engine.planner.rewrite;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Sets;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.tajo.catalog.Column;
@@ -27,15 +25,16 @@ import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.catalog.SortSpec;
 import org.apache.tajo.engine.eval.EvalNode;
 import org.apache.tajo.engine.eval.EvalTreeUtil;
-import org.apache.tajo.engine.eval.EvalType;
+import org.apache.tajo.engine.eval.FieldEval;
 import org.apache.tajo.engine.planner.*;
 import org.apache.tajo.engine.planner.logical.*;
 import org.apache.tajo.engine.utils.SchemaUtil;
+import org.apache.tajo.util.TUtil;
 
 import java.util.*;
 
 public class ProjectionPushDownRule extends
-    BasicLogicalPlanVisitor<ProjectionPushDownRule.PushDownContext, LogicalNode> implements RewriteRule {
+    BasicLogicalPlanVisitor<ProjectionPushDownRule.Context, LogicalNode> implements RewriteRule {
   /** Class Logger */
   private final Log LOG = LogFactory.getLog(ProjectionPushDownRule.class);
   private static final String name = "ProjectionPushDown";
@@ -65,404 +64,155 @@ public class ProjectionPushDownRule extends
 
     // skip a non-table-expression block.
     if (plan.getRootBlock().getRootType() == NodeType.INSERT) {
-      topmostBlock = plan.getChildBlocks(rootBlock).iterator().next();
+      topmostBlock = plan.getChildBlocks(rootBlock).get(0);
     } else {
       topmostBlock = rootBlock;
     }
 
     Stack<LogicalNode> stack = new Stack<LogicalNode>();
-    PushDownContext context = new PushDownContext();
-    context.plan = plan;
-
-    if (topmostBlock.getProjection() != null && topmostBlock.getProjection().isAllProjected()) {
-      context.targetListManager = new TargetListManager(plan, topmostBlock.getProjectableNode().getTargets());
-    } else {
-      context.targetListManager= new TargetListManager(plan, topmostBlock.getName());
-    }
-
+    Context context = new Context();
     visit(context, plan, topmostBlock, topmostBlock.getRoot(), stack);
 
     return plan;
   }
 
-  public static class PushDownContext {
-    LogicalPlan plan;
-    TargetListManager targetListManager;
-    Set<Column> upperRequired;
+  public static class TargetListManager {
+    private LinkedHashSet<Column> referenceSet = new LinkedHashSet<Column>();
 
-    public PushDownContext() {}
+    public boolean isRequired(Column column) {
+      return referenceSet.contains(column);
+    }
 
-    public PushDownContext(ProjectionPushDownRule.PushDownContext context) {
-      this.plan = context.plan;
-      this.targetListManager = context.targetListManager;
-      this.upperRequired = context.upperRequired;
+    public void addEvalNode(EvalNode evalNode) {
+      referenceSet.addAll(EvalTreeUtil.findDistinctRefColumns(evalNode));
+    }
+
+    public void addEvalNode(Target target) {
+      addEvalNode(target.getEvalTree());
+    }
+  }
+
+  static class Context {
+    TargetListManager targetListMgr;
+
+    public Context() {
+      targetListMgr = new TargetListManager();
     }
   }
 
   @Override
-  public LogicalNode visitRoot(PushDownContext context, LogicalPlan plan, LogicalPlan.QueryBlock block,
-                               LogicalRootNode node, Stack<LogicalNode> stack) throws PlanningException {
-    return pushDownCommonPost(context, block, node, stack);
-  }
-
-  @Override
-  public LogicalNode visitProjection(PushDownContext context, LogicalPlan plan, LogicalPlan.QueryBlock block,
+  public LogicalNode visitProjection(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block,
                                      ProjectionNode node, Stack<LogicalNode> stack) throws PlanningException {
-    if (context.upperRequired == null) { // all projected
-      context.upperRequired = new HashSet<Column>();
-      for (Target target : node.getTargets()) {
-        context.upperRequired.add(target.getColumnSchema());
-      }
-    } else {
-      List<Target> projectedTarget = new ArrayList<Target>();
-      for (Target target : node.getTargets()) {
-        if (context.upperRequired.contains(target.getColumnSchema())) {
-          projectedTarget.add(target);
-        }
-      }
-      node.setTargets(projectedTarget.toArray(new Target[projectedTarget.size()]));
-
-      context.upperRequired = new HashSet<Column>();
-      for (Target target : node.getTargets()) {
-        context.upperRequired.add(target.getColumnSchema());
-      }
-    }
-
-    stack.push(node);
-    LogicalNode child = visit(context, plan, block, node.getChild(), stack);
-    stack.pop();
-
-    LogicalNode childNode = node.getChild();
-
-    // If all expressions are evaluated in the child operators and the last operator is projectable,
-    // ProjectionNode will not be necessary. It eliminates ProjectionNode.
-    if (context.targetListManager.isAllResolved() && (childNode instanceof Projectable)) {
-      child.setOutSchema(context.targetListManager.getUpdatedSchema());
-      if (stack.isEmpty()) {
-        // update the child node's output schemas
-        block.setRoot(child);
-      } else if (stack.peek().getType() == NodeType.TABLE_SUBQUERY) {
-        ((TableSubQueryNode)stack.peek()).setSubQuery(childNode);
-      } else {
-        LogicalNode parent = stack.peek();
-        PlannerUtil.deleteNode(parent, node);
-      }
-      return child;
-    } else {
-      node.setInSchema(child.getOutSchema());
-      node.setTargets(context.targetListManager.getUpdatedTarget());
-      return node;
-    }
-  }
-
-  @Override
-  public LogicalNode visitLimit(PushDownContext context, LogicalPlan plan, LogicalPlan.QueryBlock block,
-                                LimitNode node, Stack<LogicalNode> stack) throws PlanningException {
-    return pushDownCommonPost(context, block, node, stack);
-  }
-
-  @Override
-  public LogicalNode visitSort(PushDownContext context, LogicalPlan plan, LogicalPlan.QueryBlock block,
-                               SortNode node, Stack<LogicalNode> stack) throws PlanningException {
-    for (SortSpec spec : node.getSortKeys()) {
-      context.upperRequired.add(spec.getSortKey());
-    }
-
-    return pushDownCommonPost(context, block, node, stack);
-  }
-
-  @Override
-  public LogicalNode visitGroupBy(PushDownContext context, LogicalPlan plan, LogicalPlan.QueryBlock block,
-                                  GroupbyNode node, Stack<LogicalNode> stack) throws PlanningException {
-    Set<Column> currentRequired = new HashSet<Column>(context.upperRequired);
-
     for (Target target : node.getTargets()) {
-      currentRequired.addAll(EvalTreeUtil.findDistinctRefColumns(target.getEvalTree()));
+      context.targetListMgr.addEvalNode(target);
     }
 
-    for (Column column : node.getGroupingColumns()) {
-      currentRequired.add(column);
-    }
-
-    PushDownContext groupByContext = new PushDownContext(context);
-    groupByContext.upperRequired = currentRequired;
-    return pushDownCommonPost(groupByContext, block, node, stack);
+    LogicalNode child = super.visitProjection(context, plan, block, node, stack);
+    node.setInSchema(child.getOutSchema());
+    return node;
   }
 
   @Override
-  public LogicalNode visitFilter(PushDownContext context, LogicalPlan plan, LogicalPlan.QueryBlock block,
+  public LogicalNode visitSort(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block,
+                               SortNode node, Stack<LogicalNode> stack) throws PlanningException {
+
+    for (SortSpec sortSpec : node.getSortKeys()) {
+      context.targetListMgr.addEvalNode(new FieldEval(sortSpec.getSortKey()));
+    }
+
+    super.visitSort(context, plan, block, node, stack);
+
+    return node;
+  }
+
+  @Override
+  public LogicalNode visitHaving(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, HavingNode node,
+                            Stack<LogicalNode> stack) throws PlanningException {
+    context.targetListMgr.addEvalNode(node.getQual());
+
+    super.visitHaving(context, plan, block, node, stack);
+
+    return node;
+  }
+
+  public LogicalNode visitGroupBy(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, GroupbyNode node,
+                             Stack<LogicalNode> stack) throws PlanningException {
+    for (Target target : node.getTargets()) {
+      context.targetListMgr.addEvalNode(target);
+    }
+
+    super.visitGroupBy(context, plan, block, node, stack);
+
+    return node;
+  }
+
+  public LogicalNode visitFilter(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block,
                                  SelectionNode node, Stack<LogicalNode> stack) throws PlanningException {
-    if (node.getQual() != null) {
-      context.upperRequired.addAll(EvalTreeUtil.findDistinctRefColumns(node.getQual()));
-    }
+    context.targetListMgr.addEvalNode(node.getQual());
 
-    return pushDownCommonPost(context, block, node, stack);
+    super.visitFilter(context, plan, block, node, stack);
+
+    return node;
   }
 
-  @Override
-  public LogicalNode visitJoin(PushDownContext context, LogicalPlan plan, LogicalPlan.QueryBlock block, JoinNode node,
-                               Stack<LogicalNode> stack) throws PlanningException {
-    Set<Column> currentRequired = Sets.newHashSet(context.upperRequired);
+  public LogicalNode visitJoin(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, JoinNode node,
+                          Stack<LogicalNode> stack) throws PlanningException {
+
+    Context newContext = new Context();
+    if (node.hasJoinQual()) {
+      newContext.targetListMgr.addEvalNode(node.getJoinQual());
+    }
 
     if (node.hasTargets()) {
-      EvalNode expr;
+      List<Target> requiredTargets = TUtil.newList();
       for (Target target : node.getTargets()) {
-        expr = target.getEvalTree();
-        if (expr.getType() != EvalType.FIELD) {
-          currentRequired.addAll(EvalTreeUtil.findDistinctRefColumns(target.getEvalTree()));
+        if (context.targetListMgr.isRequired(target.getNamedColumn())) {
+          requiredTargets.add(target);
         }
       }
-    }
 
-    if (node.hasJoinQual()) {
-      currentRequired.addAll(EvalTreeUtil.findDistinctRefColumns(node.getJoinQual()));
+      for (Target target : requiredTargets) {
+        newContext.targetListMgr.addEvalNode(target);
+      }
     }
-
-    PushDownContext leftContext = new PushDownContext(context);
-    PushDownContext rightContext = new PushDownContext(context);
-    leftContext.upperRequired = currentRequired;
-    rightContext.upperRequired = currentRequired;
 
     stack.push(node);
-    LogicalNode outer = visit(leftContext, plan, block, node.getLeftChild(), stack);
-    LogicalNode inner = visit(rightContext, plan, block, node.getRightChild(), stack);
+    LogicalNode left = visit(newContext, plan, block, node.getLeftChild(), stack);
+    LogicalNode right = visit(newContext, plan, block, node.getRightChild(), stack);
     stack.pop();
 
-    Schema merged = SchemaUtil.merge(outer.getOutSchema(), inner.getOutSchema());
-    node.setInSchema(merged);
-    pushDownProjectablePost(context, node, isTopmostProjectable(stack));
+    Schema schema = SchemaUtil.merge(left.getOutSchema(), right.getOutSchema());
+    node.setInSchema(schema);
 
-    return node;
-  }
+    if (node.hasTargets()) {
+      List<Target> requiredTargets = TUtil.newList();
+      for (Target target : node.getTargets()) {
+        if (context.targetListMgr.isRequired(target.getNamedColumn())) {
+          requiredTargets.add(target);
+        }
+      }
 
-  @Override
-  public LogicalNode visitUnion(PushDownContext context, LogicalPlan plan, LogicalPlan.QueryBlock block,
-                                UnionNode node, Stack<LogicalNode> stack) throws PlanningException {
-    return pushDownSetNode(plan, block, node, stack, context);
-  }
-
-  @Override
-  public LogicalNode visitExcept(PushDownContext context, LogicalPlan plan, LogicalPlan.QueryBlock block,
-                                 ExceptNode node, Stack<LogicalNode> stack) throws PlanningException {
-    return pushDownSetNode(plan, block, node, stack, context);
-  }
-
-  @Override
-  public LogicalNode visitIntersect(PushDownContext context, LogicalPlan plan, LogicalPlan.QueryBlock block,
-                                    IntersectNode node, Stack<LogicalNode> stack) throws PlanningException {
-    return pushDownSetNode(plan, block, node, stack, context);
-  }
-
-  @Override
-  public LogicalNode visitTableSubQuery(PushDownContext context, LogicalPlan plan, LogicalPlan.QueryBlock block,
-                                        TableSubQueryNode node, Stack<LogicalNode> stack) throws PlanningException {
-    LogicalPlan.QueryBlock subBlock = plan.getBlock(node.getSubQuery());
-    LogicalNode subRoot = subBlock.getRoot();
-
-    Stack<LogicalNode> newStack = new Stack<LogicalNode>();
-    newStack.push(node);
-    PushDownContext newContext = new PushDownContext();
-
-    newContext.upperRequired = new HashSet<Column>();
-
-    if (subBlock.hasProjection() && subBlock.getProjection().isAllProjected()
-        && context.upperRequired.size() == 0) {
-      newContext.targetListManager = new TargetListManager(plan, subBlock.getProjectableNode().getTargets());
+      node.setTargets(requiredTargets.toArray(new Target[requiredTargets.size()]));
+      node.setOutSchema(PlannerUtil.targetToSchema(node.getTargets()));
     } else {
-      if (!subBlock.hasNode(NodeType.GROUP_BY)) {
-        List<Target> projectedTarget = new ArrayList<Target>();
-//        for (Target target : subBlock.getTargetListManager().getUnresolvedTargets()) {
-//          for (Column column : context.upperRequired) {
-//            if (column.hasQualifier() && !node.getTableName().equals(column.getQualifier())) {
-//              continue;
-//            }
-//            if (target.getColumnSchema().getColumnName().equalsIgnoreCase(column.getColumnName())) {
-//              projectedTarget.add(target);
-//            }
-//          }
-//        }
-        newContext.targetListManager = new TargetListManager(plan,
-            projectedTarget.toArray(new Target[projectedTarget.size()]));
-
-      } else {
-//        newContext.targetListManager = new TargetListManager(plan,
-//            subBlock.getTargetListManager().getUnresolvedTargets());
-      }
-    }
-
-    newContext.upperRequired.addAll(PlannerUtil.targetToSchema(newContext.targetListManager.getTargets()).getColumns());
-
-    LogicalNode child = visit(newContext, plan, subBlock, subRoot, newStack);
-    newStack.pop();
-    Schema inSchema = (Schema) child.getOutSchema().clone();
-    inSchema.setQualifier(node.getCanonicalName());
-    node.setInSchema(inSchema);
-    return pushDownProjectablePost(context, node, isTopmostProjectable(stack));
-  }
-
-  @Override
-  public LogicalNode visitScan(PushDownContext context, LogicalPlan plan, LogicalPlan.QueryBlock block,
-                               ScanNode node, Stack<LogicalNode> stack) throws PlanningException {
-    return pushDownProjectablePost(context, node, isTopmostProjectable(stack));
-  }
-
-  @Override
-  public LogicalNode visitStoreTable(PushDownContext context, LogicalPlan plan, LogicalPlan.QueryBlock block,
-                                     StoreTableNode node, Stack<LogicalNode> stack) throws PlanningException {
-    return pushDownCommonPost(context, block, node, stack);
-  }
-
-  private LogicalNode pushDownCommonPost(PushDownContext context, LogicalPlan.QueryBlock block,
-                                         UnaryNode node, Stack<LogicalNode> stack) throws PlanningException {
-
-    stack.push(node);
-    LogicalNode child = visit(context, context.plan, block, node.getChild(), stack);
-    stack.pop();
-    node.setInSchema(child.getOutSchema());
-    node.setOutSchema(child.getOutSchema());
-
-    if (node instanceof Projectable) {
-      pushDownProjectablePost(context, node, isTopmostProjectable(stack));
-    }
-    return node;
-  }
-
-  private static LogicalNode pushDownProjectablePost(PushDownContext context, LogicalNode node, boolean last)
-      throws PlanningException {
-    TargetListManager targetListManager = context.targetListManager;
-    EvalNode expr;
-
-    List<Integer> newEvaluatedTargetIds = new ArrayList<Integer>();
-
-    for (int i = 0; i < targetListManager.size(); i++) {
-      expr = targetListManager.getTarget(i).getEvalTree();
-
-      if (!targetListManager.isResolved(i) && PlannerUtil.canBeEvaluated(expr, node)) {
-
-        if (node instanceof RelationNode) { // For ScanNode
-
-          if (expr.getType() == EvalType.FIELD && !targetListManager.getTarget(i).hasAlias()) {
-            targetListManager.resolve(i);
-          } else if (EvalTreeUtil.findDistinctAggFunction(expr).size() == 0) {
-            targetListManager.resolve(i);
-            newEvaluatedTargetIds.add(i);
-          }
-
-        } else if (node instanceof GroupbyNode) { // For GroupBy
-          if (EvalTreeUtil.findDistinctAggFunction(expr).size() > 0 && expr.getType() != EvalType.FIELD) {
-            targetListManager.resolve(i);
-            newEvaluatedTargetIds.add(i);
-          }
-
-        } else if (node instanceof JoinNode) {
-          if (expr.getType() != EvalType.FIELD && EvalTreeUtil.findDistinctAggFunction(expr).size() == 0) {
-            targetListManager.resolve(i);
-            newEvaluatedTargetIds.add(i);
-          }
-        }
-      }
-    }
-
-    Projectable projectable = (Projectable) node;
-    if (last) {
-      Preconditions.checkState(targetListManager.isAllResolved(), "Not all targets are evaluated");
-      if (node.getType() != NodeType.GROUP_BY) {
-        projectable.setTargets(targetListManager.getTargets());
-      }
-      node.setOutSchema(targetListManager.getUpdatedSchema());
-    } else {
-      // Preparing targets regardless of that the node has targets or not.
-      // This part is required because some node does not have any targets,
-      // if the node has the same input and output schemas.
-
-      Target[] checkingTargets;
-      if (!projectable.hasTargets()) {
-        Schema outSchema = node.getOutSchema();
-        checkingTargets = new Target[outSchema.getColumnNum() + newEvaluatedTargetIds.size()];
-        PlannerUtil.schemaToTargets(outSchema, checkingTargets);
-        int baseIdx = outSchema.getColumnNum();
-        for (int i = 0; i < newEvaluatedTargetIds.size(); i++) {
-          checkingTargets[baseIdx + i] = targetListManager.getTarget(newEvaluatedTargetIds.get(i));
-        }
-      } else {
-        checkingTargets = projectable.getTargets();
-      }
-
-      List<Target> projectedTargets = new ArrayList<Target>();
-      for (Target target : checkingTargets) {
-        for (Column column : context.upperRequired) {
-          if (target.hasAlias() && target.getAlias().equalsIgnoreCase(column.getQualifiedName())) {
-            projectedTargets.add(target);
-          } else {
-
-            if (target.getColumnSchema().equals(column)) {
-              projectedTargets.add(target);
-            }
-          }
-        }
-      }
-
-      projectable.setTargets(projectedTargets.toArray(new Target[projectedTargets.size()]));
-      targetListManager.getUpdatedTarget();
-      node.setOutSchema(PlannerUtil.targetToSchema(projectable.getTargets()));
+      node.setOutSchema(schema);
     }
 
     return node;
   }
 
-  private static boolean isTopmostProjectable(Stack<LogicalNode> stack) {
-    for (LogicalNode node : stack) {
-      if (node.getType() == NodeType.JOIN || node.getType() == NodeType.GROUP_BY) {
-        return false;
+  public LogicalNode visitScan(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, ScanNode node,
+                          Stack<LogicalNode> stack) throws PlanningException {
+
+    List<Target> requiredTargets = TUtil.newList();
+    for (Target target : node.getTargets()) {
+      if (context.targetListMgr.isRequired(target.getNamedColumn())) {
+        requiredTargets.add(target);
       }
     }
 
-    return true;
-  }
-
-  private TargetListManager buildSubBlockTargetList(LogicalPlan plan,
-      LogicalPlan.QueryBlock subQueryBlock, TableSubQueryNode subQueryNode, Set<Column> upperRequired) {
-    TargetListManager subBlockTargetList;
-    List<Target> projectedTarget = new ArrayList<Target>();
-//    for (Target target : subQueryBlock.getTargetListManager().getUnresolvedTargets()) {
-//      for (Column column : upperRequired) {
-//        if (!subQueryNode.getTableName().equals(column.getQualifier())) {
-//          continue;
-//        }
-//        if (target.getColumnSchema().getColumnName().equalsIgnoreCase(column.getColumnName())) {
-//          projectedTarget.add(target);
-//        }
-//      }
-//    }
-    subBlockTargetList = new TargetListManager(plan, projectedTarget.toArray(new Target[projectedTarget.size()]));
-    return subBlockTargetList;
-  }
-
-  private BinaryNode pushDownSetNode(LogicalPlan plan, LogicalPlan.QueryBlock block, BinaryNode setNode,
-                                     Stack<LogicalNode> stack, PushDownContext context) throws PlanningException {
-
-    LogicalPlan.QueryBlock leftBlock = plan.getChildBlocks(block).get(0);
-    LogicalPlan.QueryBlock rightBlock = plan.getChildBlocks(block).get(1);
-
-    PushDownContext leftContext = new PushDownContext(context);
-    leftContext.targetListManager = buildSubBlockTargetList(plan, leftBlock,
-        (TableSubQueryNode) setNode.getLeftChild(), context.upperRequired);
-
-    PushDownContext rightContext = new PushDownContext(context);
-    rightContext.targetListManager = buildSubBlockTargetList(plan, rightBlock,
-        (TableSubQueryNode) setNode.getRightChild(), context.upperRequired);
-
-    stack.push(setNode);
-    visit(leftContext, plan, leftBlock, setNode.getLeftChild(), stack);
-    visit(rightContext, plan, rightBlock, setNode.getRightChild(), stack);
-    stack.pop();
-
-    // if this is the final union, we assume that all targets are evalauted.
-    // TODO - is it always correct?
-    if (stack.peek().getType() != NodeType.UNION) {
-      context.targetListManager.resolveAll();
-    }
-
-    return setNode;
+    node.setTargets(requiredTargets.toArray(new Target[requiredTargets.size()]));
+    node.setOutSchema(PlannerUtil.targetToSchema(node.getTargets()));
+    return node;
   }
 }

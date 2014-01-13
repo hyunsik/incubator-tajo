@@ -43,7 +43,7 @@ public class ExprAnnotator extends BaseAlgebraVisitor<ExprAnnotator.Context, Eva
     this.catalog = catalog;
   }
 
-  public static class Context {
+  static class Context {
     LogicalPlan plan;
     LogicalPlan.QueryBlock currentBlock;
 

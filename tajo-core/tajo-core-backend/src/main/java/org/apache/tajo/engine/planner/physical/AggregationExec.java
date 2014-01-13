@@ -78,7 +78,7 @@ public abstract class AggregationExec extends UnaryPhysicalExec {
     if (measureList.length > 0) {
       search: for (int inputIdx = 0; inputIdx < plan.getTargets().length; inputIdx++) {
         for (int key : keylist) { // eliminate key field
-          if (plan.getTargets()[inputIdx].getColumnSchema().getColumnName()
+          if (plan.getTargets()[inputIdx].getNamedColumn().getColumnName()
               .equals(inSchema.getColumn(key).getColumnName())) {
             continue search;
           }
@@ -92,7 +92,7 @@ public abstract class AggregationExec extends UnaryPhysicalExec {
     evalContexts = new EvalContext[plan.getTargets().length];
     for (int i = 0; i < plan.getTargets().length; i++) {
       Target t = plan.getTargets()[i];
-      if (t.getEvalTree().getType() == EvalType.FIELD && !nonNullGroupingFields.contains(t.getColumnSchema())) {
+      if (t.getEvalTree().getType() == EvalType.FIELD && !nonNullGroupingFields.contains(t.getNamedColumn())) {
         evals[i] = new ConstEval(DatumFactory.createNullDatum());
         evalContexts[i] = evals[i].newContext();
       } else {
