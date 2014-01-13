@@ -25,6 +25,7 @@ import com.google.gson.annotations.Expose;
 import org.apache.tajo.algebra.JoinType;
 import org.apache.tajo.engine.eval.EvalNode;
 import org.apache.tajo.engine.planner.PlanString;
+import org.apache.tajo.engine.planner.PlannerUtil;
 import org.apache.tajo.engine.planner.Target;
 import org.apache.tajo.util.TUtil;
 
@@ -87,6 +88,7 @@ public class JoinNode extends BinaryNode implements Projectable, Cloneable {
   @Override
   public void setTargets(Target[] targets) {
     this.targets = targets;
+    this.setOutSchema(PlannerUtil.targetToSchema(targets));
   }
 
   @Override

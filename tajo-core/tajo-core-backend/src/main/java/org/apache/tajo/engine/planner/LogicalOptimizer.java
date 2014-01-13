@@ -100,10 +100,9 @@ public class LogicalOptimizer {
         newJoinNode.setTargets(PlannerUtil.schemaToTargets(old.getOutSchema()));
       } else {
         newJoinNode.setTargets(targets.toArray(new Target[targets.size()]));
-        newJoinNode.setOutSchema(PlannerUtil.targetToSchema(newJoinNode.getTargets()));
       }
 
-      PlannerUtil.replaceNode(plan, block.getRoot(), old, order.getOrderedJoin());
+      PlannerUtil.replaceNode(plan, block.getRoot(), old, newJoinNode);
       String optimizedOrder = JoinOrderStringBuilder.buildJoinOrderString(plan, block);
       block.addHistory("Non-optimized join order: " + originalOrder + " (cost: " + nonOptimizedJoinCost + ")");
       block.addHistory("Optimized join order    : " + optimizedOrder + " (cost: " + order.getCost() + ")");

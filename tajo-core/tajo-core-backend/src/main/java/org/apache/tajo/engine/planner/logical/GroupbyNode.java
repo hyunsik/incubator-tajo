@@ -23,6 +23,7 @@ import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.engine.eval.EvalNode;
 import org.apache.tajo.engine.planner.PlanString;
+import org.apache.tajo.engine.planner.PlannerUtil;
 import org.apache.tajo.engine.planner.Target;
 import org.apache.tajo.util.TUtil;
 
@@ -85,6 +86,7 @@ public class GroupbyNode extends UnaryNode implements Projectable, Cloneable {
   @Override
   public void setTargets(Target[] targets) {
     this.targets = targets;
+    setOutSchema(PlannerUtil.targetToSchema(targets));
   }
 
   @Override

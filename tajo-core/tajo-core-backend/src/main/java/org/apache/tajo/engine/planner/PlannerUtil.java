@@ -140,12 +140,17 @@ public class PlannerUtil {
   public static void replaceNode(LogicalPlan plan, LogicalNode startNode, LogicalNode oldNode, LogicalNode newNode) {
     LogicalNodeReplaceVisitor replacer = new LogicalNodeReplaceVisitor(oldNode, newNode);
     try {
-      replacer.visit(null, plan, null, startNode, new Stack<LogicalNode>());
+      replacer.visit(new ReplacerContext(), plan, null, startNode, new Stack<LogicalNode>());
     } catch (PlanningException e) {
       e.printStackTrace();
     }
   }
-  public static class LogicalNodeReplaceVisitor extends BasicLogicalPlanVisitor<Object, LogicalNode> {
+
+  static class ReplacerContext {
+    boolean updateSchemaFlag = false;
+  }
+
+  public static class LogicalNodeReplaceVisitor extends BasicLogicalPlanVisitor<ReplacerContext, LogicalNode> {
     private LogicalNode target;
     private LogicalNode tobeReplaced;
 
@@ -155,9 +160,9 @@ public class PlannerUtil {
     }
 
     @Override
-    public LogicalNode visit(Object context, LogicalPlan plan, @Nullable LogicalPlan.QueryBlock block, LogicalNode node,
-                                  Stack<LogicalNode> stack) throws PlanningException {
-      super.visit(context, plan, null, node, stack);
+    public LogicalNode visit(ReplacerContext context, LogicalPlan plan, @Nullable LogicalPlan.QueryBlock block,
+                             LogicalNode node, Stack<LogicalNode> stack) throws PlanningException {
+      LogicalNode child = super.visit(context, plan, null, node, stack);
 
       if (node.deepEquals(target)) {
         LogicalNode parent = stack.peek();
@@ -173,6 +178,18 @@ public class PlannerUtil {
         } else if (parent instanceof UnaryNode) {
           UnaryNode unaryParent = (UnaryNode) parent;
           unaryParent.setChild(tobeReplaced);
+        }
+
+        context.updateSchemaFlag = true;
+      }
+
+      if (context.updateSchemaFlag && !node.deepEquals(target)) {
+        if (node instanceof Projectable) {
+          node.setInSchema(child.getOutSchema());
+          context.updateSchemaFlag = false;
+        } else {
+          node.setInSchema(child.getOutSchema());
+          node.setOutSchema(child.getOutSchema());
         }
       }
       return node;
@@ -270,7 +287,6 @@ public class PlannerUtil {
       targetArray = ObjectArrays.concat(targetArray, newTarget.toArray(new Target[newTarget.size()]), Target.class);
 
       child.setTargets(targetArray);
-      child.setOutSchema(PlannerUtil.targetToSchema(targetArray));
       // set the groupby chaining
       groupBy.setChild(child);
       groupBy.setInSchema(child.getOutSchema());

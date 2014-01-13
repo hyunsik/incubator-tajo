@@ -94,7 +94,7 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
         if (namedExpr.hasAlias()) {
           targets[i] = new Target(evalNode, namedExpr.getAlias());
         } else if (evalNode.getType() == EvalType.FIELD) {
-          targets[i] = new Target(evalNode, ((FieldEval)evalNode).getColumnRef().getQualifiedName());
+          targets[i] = new Target((FieldEval) evalNode);
         } else {
           targets[i] = new Target(evalNode, "$name_" + i);
         }

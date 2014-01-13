@@ -304,7 +304,7 @@ public class Schema implements ProtoObject<SchemaProto>, Cloneable, GsonObject {
 
 	public String toString() {
 	  StringBuilder sb = new StringBuilder();
-	  sb.append("{");
+	  sb.append("{(").append(getColumnNum()).append(")");
 	  int i = 0;
 	  for(Column col : fields) {
 	    sb.append(col);

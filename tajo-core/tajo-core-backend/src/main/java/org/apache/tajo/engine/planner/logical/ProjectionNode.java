@@ -20,6 +20,7 @@ package org.apache.tajo.engine.planner.logical;
 
 import com.google.gson.annotations.Expose;
 import org.apache.tajo.engine.planner.PlanString;
+import org.apache.tajo.engine.planner.PlannerUtil;
 import org.apache.tajo.engine.planner.Target;
 import org.apache.tajo.util.TUtil;
 
@@ -43,6 +44,7 @@ public class ProjectionNode extends UnaryNode implements Projectable {
   @Override
   public void setTargets(Target[] targets) {
     this.targets = targets;
+    this.setOutSchema(PlannerUtil.targetToSchema(targets));
   }
 
   @Override

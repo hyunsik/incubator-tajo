@@ -482,7 +482,6 @@ public class GlobalEngine extends AbstractService {
         ProjectionNode projectionNode = new ProjectionNode(plan.newPID());
         projectionNode.setTargets(targets);
         projectionNode.setInSchema(insertNode.getSubQuery().getOutSchema());
-        projectionNode.setOutSchema(PlannerUtil.targetToSchema(targets));
         List<LogicalPlan.QueryBlock> blocks = plan.getChildBlocks(plan.getRootBlock());
         projectionNode.setChild(blocks.get(0).getRoot());
 

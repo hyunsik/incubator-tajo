@@ -70,6 +70,13 @@ public class TestJoinQuery extends QueryTestCaseBase {
   }
 
   @Test
+  public final void testWhereClauseJoin6() throws Exception {
+    ResultSet res = executeQuery();
+    System.out.println(resultSetToString(res));
+    cleanupQuery(res);
+  }
+
+  @Test
   public final void testTPCHQ2Join() throws Exception {
     ResultSet res = executeQuery();
     assertResultSet(res);

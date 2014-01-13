@@ -344,7 +344,6 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       groupbyNode.setTargets(evaluatedTargets.toArray(new Target[evaluatedTargets.size()]));
       groupbyNode.setChild(child);
       groupbyNode.setInSchema(child.getOutSchema());
-      groupbyNode.setOutSchema(PlannerUtil.targetToSchema(groupbyNode.getTargets()));
 
       block.setNode(groupbyNode); // this inserted group-by node doesn't pass through preprocessor. So manually added.
       block.postVisit(groupbyNode, null, stack);
@@ -575,7 +574,6 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       groupingNode.setChild(child);
       block.setNode(groupingNode);
       groupingNode.setInSchema(child.getOutSchema());
-      groupingNode.setOutSchema(PlannerUtil.targetToSchema(groupingNode.getTargets()));
 
       // 5. Update Output Schema and Targets for Upper Plan
 
@@ -787,7 +785,6 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     JoinNode join = new JoinNode(plan.newPID(), JoinType.CROSS, left, right);
     join.setTargets(targets.toArray(new Target[targets.size()]));
     join.setInSchema(merged);
-    join.setOutSchema(PlannerUtil.targetToSchema(targets.toArray(new Target[targets.size()])));
     return join;
   }
 
@@ -853,7 +850,6 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     }
 
     scanNode.setTargets(targets.toArray(new Target[targets.size()]));
-    scanNode.setOutSchema(PlannerUtil.targetToSchema(scanNode.getTargets()));
 
     return scanNode;
   }
@@ -920,7 +916,6 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     }
 
     subQueryNode.setTargets(targets.toArray(new Target[targets.size()]));
-    subQueryNode.setOutSchema(PlannerUtil.targetToSchema(subQueryNode.getTargets()));
 
     return subQueryNode;
   }
