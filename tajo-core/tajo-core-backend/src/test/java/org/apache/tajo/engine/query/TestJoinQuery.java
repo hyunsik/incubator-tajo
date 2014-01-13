@@ -35,9 +35,37 @@ public class TestJoinQuery extends QueryTestCaseBase {
   }
 
   @Test
-  public final void testCrossJoinWithExplicitJoinQual() throws Exception {
+  public final void testWhereClauseJoin1() throws Exception {
     ResultSet res = executeQuery();
     assertResultSet(res);
+    cleanupQuery(res);
+  }
+
+  @Test
+  public final void testWhereClauseJoin2() throws Exception {
+    ResultSet res = executeQuery();
+    assertResultSet(res);
+    cleanupQuery(res);
+  }
+
+  @Test
+  public final void testWhereClauseJoin3() throws Exception {
+    ResultSet res = executeQuery();
+    assertResultSet(res);
+    cleanupQuery(res);
+  }
+
+  @Test
+  public final void testWhereClauseJoin4() throws Exception {
+    ResultSet res = executeQuery();
+    assertResultSet(res);
+    cleanupQuery(res);
+  }
+
+  @Test
+  public final void testWhereClauseJoin5() throws Exception {
+    ResultSet res = executeQuery();
+    System.out.println(resultSetToString(res));
     cleanupQuery(res);
   }
 

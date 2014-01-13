@@ -624,25 +624,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     LogicalNode child = visit(context, stack, selection.getChild());
     stack.pop();
 
-<<<<<<< HEAD
     // Create EvalNode for a search condition.
     EvalNode searchCondition = exprAnnotator.createEvalNode(context.plan, block, selection.getQual());
-=======
-    // Consider the following query:
-    //
-    // SELECT one + two AS total ... FROM ... WHERE total > 2;
-    //
-    // "total" cannot be resolved in ScanNode. "total" should be resolved in the upper nodes.
-    // So, we have to check if the reference is resolved. Otherwise, it annotates the expression here.
-    EvalNode searchCondition;
-    if (block.namedExprsMgr.isResolved(referName)) {
-      searchCondition = block.namedExprsMgr.getTransitiveTarget(referName).getEvalTree();
-    } else {
-      NamedExpr namedExpr = block.namedExprsMgr.getNamedExpr(referName);
-      searchCondition = exprAnnotator.createEvalNode(context.plan, block, namedExpr.getExpr());
-      block.namedExprsMgr.resolveExpr(referName, searchCondition);
-    }
->>>>>>> 2a0a35ca8c1ca1b842c7c65d4b95b7fddd7cebe7
     EvalNode simplified = AlgebraicUtil.eliminateConstantExprs(searchCondition);
 
     SelectionNode selectionNode = context.queryBlock.getNodeFromExpr(selection);
@@ -682,27 +665,11 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     LogicalNode right = visit(context, stack, join.getRight());
     stack.pop();
 
-<<<<<<< HEAD
     // Create EvalNode for a search condition.
-    EvalNode simplified = null;
-    if (join.hasQual()) {
-      EvalNode qual = exprAnnotator.createEvalNode(context.plan, block, join.getQual());
-      simplified = AlgebraicUtil.eliminateConstantExprs(qual);
-=======
     EvalNode joinCondition = null;
     if (join.hasQual()) {
-      if (block.namedExprsMgr.isResolved(joinQualRefName)) {
-        joinCondition = block.namedExprsMgr.getTarget(joinQualRefName).getEvalTree();
-      } else {
-        NamedExpr namedExpr = block.namedExprsMgr.getNamedExpr(joinQualRefName);
-        try {
-          joinCondition = exprAnnotator.createEvalNode(plan, block, namedExpr.getExpr());
-          block.namedExprsMgr.resolveExpr(joinQualRefName, joinCondition);
-        } catch (VerifyException ve) {
-          throw new PlanningException(ve);
-        }
-      }
->>>>>>> 2a0a35ca8c1ca1b842c7c65d4b95b7fddd7cebe7
+      EvalNode evalNode = exprAnnotator.createEvalNode(context.plan, block, join.getQual());
+      joinCondition = AlgebraicUtil.eliminateConstantExprs(evalNode);
     }
 
     EvalNode evalNode;
@@ -747,7 +714,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       EvalNode njCond = getNaturalJoinCondition(leftSchema, rightSchema, commons);
       joinNode.setJoinQual(njCond);
     } else if (join.hasQual()) { // otherwise, the given join conditions are set
-      joinNode.setJoinQual(simplified);
+      joinNode.setJoinQual(joinCondition);
     }
 
     return joinNode;
@@ -1015,7 +982,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
     // Strip the table names from the targets of the both blocks
     // in order to check the equivalence the schemas of both blocks.
-    Target [] leftStrippedTargets = PlannerUtil.stripTarget(leftBlock.getProjectableNode().getTargets());
+    Target [] leftStrippedTargets = PlannerUtil.stripTarget(
+        PlannerUtil.schemaToTargets(leftBlock.getRoot().getOutSchema()));
 
     Schema outSchema = PlannerUtil.targetToSchema(leftStrippedTargets);
     setOp.setInSchema(leftSubQuery.getOutSchema());

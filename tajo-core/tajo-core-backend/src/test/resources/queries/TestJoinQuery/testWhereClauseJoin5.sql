@@ -1,8 +1,15 @@
 select
-  n_name,
-  r_name,
-  n_nationkey + r_regionkey
+	s_acctbal,
+	s_name,
+	p_partkey
 from
-  nation, region
+	part,
+	supplier,
+	partsupp
 where
-  n_regionkey = r_regionkey;
+	p_partkey = ps_partkey and
+	s_suppkey = ps_suppkey
+order by
+  s_acctbal,
+  s_name,
+  p_partkey;

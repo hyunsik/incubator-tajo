@@ -41,6 +41,8 @@ import static java.util.Map.Entry;
 public class NamedExprsManager {
   /** Map; Reference name -> EvalNode */
   private Map<String, EvalNode> nameToEvalMap = new LinkedHashMap<String, EvalNode>();
+  /** Map: EvalNode -> String */
+  private Map<EvalNode, String> evalToNameMap = new LinkedHashMap<EvalNode, String>();
   /** Map; Reference name -> Expr */
   private LinkedHashMap<String, Expr> nameToExprMap = new LinkedHashMap<String, Expr>();
   /** Map; Expr -> Reference Name */
@@ -184,7 +186,17 @@ public class NamedExprsManager {
   public void resolveExpr(String name, EvalNode evalNode) {
     String normalized = name.toLowerCase();
     nameToEvalMap.put(normalized, evalNode);
+    evalToNameMap.put(evalNode, normalized);
     resolvedFlags.put(normalized, true);
+  }
+
+  public boolean contains(EvalNode evalNode) {
+    return evalToNameMap.containsKey(evalNode);
+  }
+
+  public Target getTarget(EvalNode evalNode) {
+    String name = evalToNameMap.get(evalNode);
+    return new Target(evalNode, name);
   }
 
   public Target getTarget(Expr expr, boolean unresolved) {
@@ -194,19 +206,6 @@ public class NamedExprsManager {
 
   public Target getTarget(String name) {
     return getTarget(name, false);
-  }
-
-  public Target getTransitiveTarget(String name) {
-    String normalized = name;
-    if (resolvedFlags.containsKey(normalized) && resolvedFlags.get(normalized)) {
-      return new Target(nameToEvalMap.get(normalized), name);
-    } else {
-      if (nameToEvalMap.containsKey(normalized)) {
-        return new Target(nameToEvalMap.get(normalized), name);
-      } else {
-        return null;
-      }
-    }
   }
 
   public Target getTarget(String name, boolean unresolved) {
@@ -220,6 +219,14 @@ public class NamedExprsManager {
         return null;
       }
     }
+  }
+
+  public Collection<Target> getAllTargets() {
+    List<Target> targets = TUtil.newList();
+    for (Entry<String, EvalNode> entry : nameToEvalMap.entrySet()) {
+      targets.add(new Target(entry.getValue(), entry.getKey()));
+    }
+    return targets;
   }
 
   public String toString() {
@@ -256,6 +263,12 @@ public class NamedExprsManager {
 
     @Override
     public void remove() {
+    }
+  }
+
+  public void reset() {
+    for (String name : resolvedFlags.keySet()) {
+      resolvedFlags.put(name, false);
     }
   }
 }

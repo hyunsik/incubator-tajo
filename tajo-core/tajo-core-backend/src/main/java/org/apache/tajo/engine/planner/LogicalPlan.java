@@ -453,6 +453,10 @@ public class LogicalPlan {
       return rootType;
     }
 
+    public NamedExprsManager getNamedExprsManager() {
+      return namedExprsMgr;
+    }
+
     public Target [] getUnresolvedTargets() {
       return unresolvedTargets;
     }

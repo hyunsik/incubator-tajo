@@ -20,7 +20,6 @@ package org.apache.tajo.engine.utils;
 
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Schema;
-import org.apache.tajo.common.TajoDataTypes.DataType;
 
 public class SchemaUtil {
   public static Schema merge(Schema left, Schema right) {
@@ -40,7 +39,7 @@ public class SchemaUtil {
   }
 
   /**
-   * Get common columns
+   * Get common columns to be used as join keys of natural joins.
    */
   public static Schema getNaturalJoinColumns(Schema left, Schema right) {
     Schema common = new Schema();

@@ -21,6 +21,8 @@ package org.apache.tajo.engine.planner;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.tajo.algebra.Expr;
+import org.apache.tajo.algebra.Join;
 import org.apache.tajo.algebra.JoinType;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.engine.eval.AlgebraicUtil;
@@ -36,6 +38,7 @@ import org.apache.tajo.engine.planner.rewrite.FilterPushDownRule;
 import org.apache.tajo.engine.planner.rewrite.PartitionedTableRewriter;
 import org.apache.tajo.engine.planner.rewrite.ProjectionPushDownRule;
 
+import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.Stack;
 
@@ -56,7 +59,7 @@ public class LogicalOptimizer {
     rulesBeforeJoinOpt.addRewriteRule(new FilterPushDownRule());
 
     rulesAfterToJoinOpt = new BasicQueryRewriteEngine();
-    rulesAfterToJoinOpt.addRewriteRule(new ProjectionPushDownRule());
+    //rulesAfterToJoinOpt.addRewriteRule(new ProjectionPushDownRule());
     rulesAfterToJoinOpt.addRewriteRule(new PartitionedTableRewriter(systemConf));
   }
 
@@ -77,7 +80,7 @@ public class LogicalOptimizer {
   private void optimizeJoinOrder(LogicalPlan plan, String blockName) throws PlanningException {
     LogicalPlan.QueryBlock block = plan.getBlock(blockName);
 
-    if (block.getRelations().size() > 1) {
+    if (block.hasNode(NodeType.JOIN)) {
       String originalOrder = JoinOrderStringBuilder.buildJoinOrderString(plan, block);
       double nonOptimizedJoinCost = JoinCostComputer.computeCost(plan, block);
 
@@ -87,12 +90,39 @@ public class LogicalOptimizer {
       // finding join order and restore remain filter order
       FoundJoinOrder order = joinOrderAlgorithm.findBestOrder(plan, block,
           joinGraphContext.joinGraph, joinGraphContext.relationsForProduct);
+
       JoinNode old = block.getNode(NodeType.JOIN);
+      JoinTargetCollector collector = new JoinTargetCollector();
+      Set<Target> targets = new LinkedHashSet<Target>();
+      collector.visitJoin(targets, plan, block, old, new Stack<LogicalNode>());
+      JoinNode newJoinNode = order.getOrderedJoin();
+      if (targets.size() == 0) {
+        newJoinNode.setTargets(PlannerUtil.schemaToTargets(old.getOutSchema()));
+      } else {
+        newJoinNode.setTargets(targets.toArray(new Target[targets.size()]));
+        newJoinNode.setOutSchema(PlannerUtil.targetToSchema(newJoinNode.getTargets()));
+      }
 
       PlannerUtil.replaceNode(plan, block.getRoot(), old, order.getOrderedJoin());
       String optimizedOrder = JoinOrderStringBuilder.buildJoinOrderString(plan, block);
       block.addHistory("Non-optimized join order: " + originalOrder + " (cost: " + nonOptimizedJoinCost + ")");
       block.addHistory("Optimized join order    : " + optimizedOrder + " (cost: " + order.getCost() + ")");
+    }
+  }
+
+  private static class JoinTargetCollector extends BasicLogicalPlanVisitor<Set<Target>, LogicalNode> {
+    @Override
+    public LogicalNode visitJoin(Set<Target> ctx, LogicalPlan plan, LogicalPlan.QueryBlock block, JoinNode node,
+                                 Stack<LogicalNode> stack)
+        throws PlanningException {
+      super.visitJoin(ctx, plan, block, node, stack);
+
+      if (node.hasTargets()) {
+        for (Target target : node.getTargets()) {
+          ctx.add(target);
+        }
+      }
+      return node;
     }
   }
 

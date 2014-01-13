@@ -18,6 +18,7 @@
 
 package org.apache.tajo.engine.planner.rewrite;
 
+import com.google.common.collect.Sets;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.tajo.catalog.Column;
@@ -26,6 +27,7 @@ import org.apache.tajo.catalog.SortSpec;
 import org.apache.tajo.engine.eval.EvalNode;
 import org.apache.tajo.engine.eval.EvalTreeUtil;
 import org.apache.tajo.engine.eval.FieldEval;
+import org.apache.tajo.engine.exception.InvalidQueryException;
 import org.apache.tajo.engine.planner.*;
 import org.apache.tajo.engine.planner.logical.*;
 import org.apache.tajo.engine.utils.SchemaUtil;
@@ -70,40 +72,63 @@ public class ProjectionPushDownRule extends
     }
 
     Stack<LogicalNode> stack = new Stack<LogicalNode>();
-    Context context = new Context();
+    Context context = new Context(plan);
     visit(context, plan, topmostBlock, topmostBlock.getRoot(), stack);
 
     return plan;
   }
 
   public static class TargetListManager {
-    private LinkedHashSet<Column> referenceSet = new LinkedHashSet<Column>();
+    private Map<String, Target> requiredEvals;
+    private LinkedHashSet<Column> requiredRerences;
 
-    public boolean isRequired(Column column) {
-      return referenceSet.contains(column);
+    public TargetListManager(LogicalPlan plan) {
+      requiredEvals = new LinkedHashMap<String, Target>();
+      requiredRerences = new LinkedHashSet<Column>();
     }
 
-    public void addEvalNode(EvalNode evalNode) {
-      referenceSet.addAll(EvalTreeUtil.findDistinctRefColumns(evalNode));
+    public TargetListManager(TargetListManager targetListMgr) {
+      requiredEvals = new LinkedHashMap<String, Target>(targetListMgr.requiredEvals);
+      requiredRerences = new LinkedHashSet<Column>(targetListMgr.requiredRerences);
+    }
+
+    public boolean isRequired(Column column) {
+      return requiredRerences.contains(column);
+    }
+
+    public void addReferences(EvalNode evalNode) {
+      Set<Column> columns = EvalTreeUtil.findDistinctRefColumns(evalNode);
+      requiredRerences.addAll(columns);
+      for (Column column : columns) {
+        Target target = new Target(new FieldEval(column));
+        addEvalNode(target);
+      }
     }
 
     public void addEvalNode(Target target) {
-      addEvalNode(target.getEvalTree());
+      requiredEvals.put(target.getCanonicalName(), target);
+      requiredRerences.addAll(EvalTreeUtil.findDistinctRefColumns(target.getEvalTree()));
     }
   }
 
   static class Context {
     TargetListManager targetListMgr;
 
-    public Context() {
-      targetListMgr = new TargetListManager();
+    public Context(LogicalPlan plan) {
+      targetListMgr = new TargetListManager(plan);
+    }
+
+    public Context(Context upperContext) {
+      targetListMgr = new TargetListManager(upperContext.targetListMgr);
     }
   }
 
   @Override
   public LogicalNode visitProjection(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block,
                                      ProjectionNode node, Stack<LogicalNode> stack) throws PlanningException {
-    for (Target target : node.getTargets()) {
+    block.getNamedExprsManager().reset();
+    NamedExprsManager namedExprsMgr = block.getNamedExprsManager();
+    for (Target target : namedExprsMgr.getAllTargets()) {
       context.targetListMgr.addEvalNode(target);
     }
 
@@ -112,15 +137,22 @@ public class ProjectionPushDownRule extends
     return node;
   }
 
+  public LogicalNode visitLimit(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, LimitNode node,
+                           Stack<LogicalNode> stack) throws PlanningException {
+    LogicalNode child = super.visitLimit(context, plan, block, node, stack);
+    node.setInSchema(child.getOutSchema());
+    node.setOutSchema(child.getOutSchema());
+
+    return node;
+  }
+
   @Override
   public LogicalNode visitSort(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block,
                                SortNode node, Stack<LogicalNode> stack) throws PlanningException {
+    LogicalNode child = super.visitSort(context, plan, block, node, stack);
 
-    for (SortSpec sortSpec : node.getSortKeys()) {
-      context.targetListMgr.addEvalNode(new FieldEval(sortSpec.getSortKey()));
-    }
-
-    super.visitSort(context, plan, block, node, stack);
+    node.setInSchema(child.getOutSchema());
+    node.setOutSchema(child.getOutSchema());
 
     return node;
   }
@@ -128,29 +160,27 @@ public class ProjectionPushDownRule extends
   @Override
   public LogicalNode visitHaving(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, HavingNode node,
                             Stack<LogicalNode> stack) throws PlanningException {
-    context.targetListMgr.addEvalNode(node.getQual());
-
-    super.visitHaving(context, plan, block, node, stack);
+    LogicalNode child = super.visitHaving(context, plan, block, node, stack);
+    node.setInSchema(child.getOutSchema());
+    node.setOutSchema(child.getOutSchema());
 
     return node;
   }
 
   public LogicalNode visitGroupBy(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, GroupbyNode node,
                              Stack<LogicalNode> stack) throws PlanningException {
-    for (Target target : node.getTargets()) {
-      context.targetListMgr.addEvalNode(target);
-    }
-
-    super.visitGroupBy(context, plan, block, node, stack);
+    LogicalNode child = super.visitGroupBy(context, plan, block, node, stack);
+    node.setInSchema(child.getOutSchema());
+    node.setOutSchema(PlannerUtil.targetToSchema(node.getTargets()));
 
     return node;
   }
 
   public LogicalNode visitFilter(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block,
                                  SelectionNode node, Stack<LogicalNode> stack) throws PlanningException {
-    context.targetListMgr.addEvalNode(node.getQual());
-
-    super.visitFilter(context, plan, block, node, stack);
+    LogicalNode child = super.visitFilter(context, plan, block, node, stack);
+    node.setInSchema(child.getOutSchema());
+    node.setOutSchema(child.getOutSchema());
 
     return node;
   }
@@ -158,23 +188,7 @@ public class ProjectionPushDownRule extends
   public LogicalNode visitJoin(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, JoinNode node,
                           Stack<LogicalNode> stack) throws PlanningException {
 
-    Context newContext = new Context();
-    if (node.hasJoinQual()) {
-      newContext.targetListMgr.addEvalNode(node.getJoinQual());
-    }
-
-    if (node.hasTargets()) {
-      List<Target> requiredTargets = TUtil.newList();
-      for (Target target : node.getTargets()) {
-        if (context.targetListMgr.isRequired(target.getNamedColumn())) {
-          requiredTargets.add(target);
-        }
-      }
-
-      for (Target target : requiredTargets) {
-        newContext.targetListMgr.addEvalNode(target);
-      }
-    }
+    Context newContext = new Context(context);
 
     stack.push(node);
     LogicalNode left = visit(newContext, plan, block, node.getLeftChild(), stack);
@@ -185,29 +199,96 @@ public class ProjectionPushDownRule extends
     node.setInSchema(schema);
 
     if (node.hasTargets()) {
-      List<Target> requiredTargets = TUtil.newList();
-      for (Target target : node.getTargets()) {
-        if (context.targetListMgr.isRequired(target.getNamedColumn())) {
-          requiredTargets.add(target);
+      List<Target> newTargets = TUtil.newList();
+      for (Target target : context.targetListMgr.requiredEvals.values()) {
+        if (checkIfBeEvaluatedForJoin(target, node)) {
+          newTargets.add(target);
         }
       }
 
-      node.setTargets(requiredTargets.toArray(new Target[requiredTargets.size()]));
+      node.setTargets(newTargets.toArray(new Target[newTargets.size()]));
       node.setOutSchema(PlannerUtil.targetToSchema(node.getTargets()));
     } else {
-      node.setOutSchema(schema);
+      List<Target> newTargets = TUtil.newList();
+      for (Target target : context.targetListMgr.requiredEvals.values()) {
+        if (checkIfBeEvaluatedForJoin(target, node)) {
+          newTargets.add(target);
+        }
+      }
+      node.setTargets(newTargets.toArray(new Target[newTargets.size()]));
+      node.setOutSchema(PlannerUtil.targetToSchema(node.getTargets()));
     }
 
     return node;
+  }
+
+  public static boolean checkIfBeEvaluatedForScan(Target target, ScanNode node) {
+    Set<Column> columnRefs = EvalTreeUtil.findDistinctRefColumns(target.getEvalTree());
+
+    if (EvalTreeUtil.findDistinctAggFunction(target.getEvalTree()).size() > 0) {
+      return false;
+    }
+
+    if (node.getInSchema().containsAll(columnRefs)) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  public static boolean checkIfBeEvaluatedForJoin(Target target, JoinNode joinNode) {
+    Set<Column> columnRefs = EvalTreeUtil.findDistinctRefColumns(target.getEvalTree());
+
+    if (EvalTreeUtil.findDistinctAggFunction(target.getEvalTree()).size() > 0) {
+      return false;
+    }
+
+    Schema merged = SchemaUtil.merge(joinNode.getLeftChild().getOutSchema(), joinNode.getRightChild().getOutSchema());
+    if (!merged.containsAll(columnRefs)) {
+      return false;
+    }
+
+    if (columnRefs.size() == 1) {
+      return true;
+    }
+
+    Set<String> tableIds = Sets.newHashSet();
+    // getting distinct table references
+    for (Column col : columnRefs) {
+      if (!tableIds.contains(col.getQualifier())) {
+        tableIds.add(col.getQualifier());
+      }
+    }
+
+    if (tableIds.size() > 0) {
+      return true;
+    }
+
+    String [] outer = PlannerUtil.getRelationLineage(joinNode.getLeftChild());
+    String [] inner = PlannerUtil.getRelationLineage(joinNode.getRightChild());
+
+    Set<String> o = Sets.newHashSet(outer);
+    Set<String> i = Sets.newHashSet(inner);
+    if (outer == null || inner == null) {
+      throw new InvalidQueryException("ERROR: Unexpected logical plan");
+    }
+    Iterator<String> it = tableIds.iterator();
+    if (o.contains(it.next()) && i.contains(it.next())) {
+      return true;
+    }
+
+    it = tableIds.iterator();
+
+    return i.contains(it.next()) && o.contains(it.next());
   }
 
   public LogicalNode visitScan(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, ScanNode node,
                           Stack<LogicalNode> stack) throws PlanningException {
 
     List<Target> requiredTargets = TUtil.newList();
-    for (Target target : node.getTargets()) {
-      if (context.targetListMgr.isRequired(target.getNamedColumn())) {
-        requiredTargets.add(target);
+    for (Map.Entry<String,Target> entry: context.targetListMgr.requiredEvals.entrySet()) {
+      if (checkIfBeEvaluatedForScan(entry.getValue(), node)) {
+        requiredTargets.add(entry.getValue());
       }
     }
 
