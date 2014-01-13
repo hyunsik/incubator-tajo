@@ -131,8 +131,6 @@ public class ProjectionPushDownRule extends
   public LogicalNode visitLimit(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, LimitNode node,
                            Stack<LogicalNode> stack) throws PlanningException {
     LogicalNode child = super.visitLimit(context, plan, block, node, stack);
-    node.setInSchema(child.getOutSchema());
-    node.setOutSchema(child.getOutSchema());
     return node;
   }
 
@@ -149,9 +147,6 @@ public class ProjectionPushDownRule extends
 
     LogicalNode child = super.visitSort(context, plan, block, node, stack);
 
-    node.setInSchema(child.getOutSchema());
-    node.setOutSchema(child.getOutSchema());
-
     return node;
   }
 
@@ -161,40 +156,46 @@ public class ProjectionPushDownRule extends
     context.targetListMgr.add(node.getQual());
 
     LogicalNode child = super.visitHaving(context, plan, block, node, stack);
-    node.setInSchema(child.getOutSchema());
-    node.setOutSchema(child.getOutSchema());
-
     return node;
   }
 
   public LogicalNode visitGroupBy(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, GroupbyNode node,
                              Stack<LogicalNode> stack) throws PlanningException {
-    final int groupingKeyNum = node.getGroupingColumns().length;
-    EvalNode [] groupingKeyEvals = new EvalNode[groupingKeyNum];
-    for (int i = 0; i < groupingKeyNum; i++) {
-      groupingKeyEvals[i] = new FieldEval(node.getGroupingColumns()[i]);
-      context.targetListMgr.add(groupingKeyEvals[i]);
-
+    final int targetNum = node.getTargets().length;
+    final EvalNode [] evalNodes = new EvalNode[targetNum];
+    for (int i = 0; i < targetNum; i++) {
+      evalNodes[i] = node.getTargets()[i].getEvalTree();
+      context.targetListMgr.add(evalNodes[i]);
     }
 
     LogicalNode child = super.visitGroupBy(context, plan, block, node, stack);
-    node.setInSchema(child.getOutSchema());
-    node.setOutSchema(PlannerUtil.targetToSchema(node.getTargets()));
 
     return node;
   }
 
   public LogicalNode visitFilter(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block,
                                  SelectionNode node, Stack<LogicalNode> stack) throws PlanningException {
-    LogicalNode child = super.visitFilter(context, plan, block, node, stack);
-    node.setInSchema(child.getOutSchema());
-    node.setOutSchema(child.getOutSchema());
+    context.targetListMgr.add(node.getQual());
 
+    LogicalNode child = super.visitFilter(context, plan, block, node, stack);
     return node;
   }
 
   public LogicalNode visitJoin(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, JoinNode node,
                           Stack<LogicalNode> stack) throws PlanningException {
+
+    if (node.hasJoinQual()) {
+      context.targetListMgr.add(node.getJoinQual());
+    }
+
+    final EvalNode [] evalNodes;
+    if (node.hasTargets()) {
+      evalNodes = new EvalNode[node.getTargets().length];
+      for (int i = 0; i < node.getTargets().length; i++) {
+        evalNodes[i] = node.getTargets()[i].getEvalTree();
+        context.targetListMgr.add(evalNodes[i]);
+      }
+    }
 
     Context newContext = new Context(context);
 
@@ -202,29 +203,6 @@ public class ProjectionPushDownRule extends
     LogicalNode left = visit(newContext, plan, block, node.getLeftChild(), stack);
     LogicalNode right = visit(newContext, plan, block, node.getRightChild(), stack);
     stack.pop();
-
-    Schema schema = SchemaUtil.merge(left.getOutSchema(), right.getOutSchema());
-    node.setInSchema(schema);
-
-    if (node.hasTargets()) {
-      List<Target> newTargets = TUtil.newList();
-      for (Target target : context.targetListMgr.requiredEvals.values()) {
-        if (checkIfBeEvaluatedForJoin(target, node)) {
-          newTargets.add(target);
-        }
-      }
-
-      node.setTargets(newTargets.toArray(new Target[newTargets.size()]));
-    } else {
-      List<Target> newTargets = TUtil.newList();
-      for (Target target : context.targetListMgr.requiredEvals.values()) {
-        if (checkIfBeEvaluatedForJoin(target, node)) {
-          newTargets.add(target);
-        }
-      }
-      node.setTargets(newTargets.toArray(new Target[newTargets.size()]));
-      node.setOutSchema(PlannerUtil.targetToSchema(node.getTargets()));
-    }
 
     return node;
   }
@@ -292,14 +270,12 @@ public class ProjectionPushDownRule extends
   public LogicalNode visitScan(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, ScanNode node,
                           Stack<LogicalNode> stack) throws PlanningException {
 
-    List<Target> requiredTargets = TUtil.newList();
-    for (Map.Entry<String,Target> entry: context.targetListMgr.requiredEvals.entrySet()) {
-      if (checkIfBeEvaluatedForScan(entry.getValue(), node)) {
-        requiredTargets.add(entry.getValue());
+    if (node.hasTargets()) {
+      for (Target target : node.getTargets()) {
+        context.targetListMgr.add(target.getEvalTree());
       }
     }
 
-    node.setTargets(requiredTargets.toArray(new Target[requiredTargets.size()]));
     return node;
   }
 }
