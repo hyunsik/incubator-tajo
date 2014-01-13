@@ -79,35 +79,28 @@ public class ProjectionPushDownRule extends
   }
 
   public static class TargetListManager {
-    private Map<String, Target> requiredEvals;
-    private LinkedHashSet<Column> requiredRerences;
+    private LinkedHashMap<EvalNode, Boolean> requiredEvals;
 
-    public TargetListManager(LogicalPlan plan) {
-      requiredEvals = new LinkedHashMap<String, Target>();
-      requiredRerences = new LinkedHashSet<Column>();
+    public TargetListManager() {
+      requiredEvals = new LinkedHashMap<EvalNode, Boolean>();
     }
 
     public TargetListManager(TargetListManager targetListMgr) {
-      requiredEvals = new LinkedHashMap<String, Target>(targetListMgr.requiredEvals);
-      requiredRerences = new LinkedHashSet<Column>(targetListMgr.requiredRerences);
+      requiredEvals = new LinkedHashMap<EvalNode, Boolean>(targetListMgr.requiredEvals);
     }
 
-    public boolean isRequired(Column column) {
-      return requiredRerences.contains(column);
+    public boolean isResolved(EvalNode evalNode) {
+      return requiredEvals.get(evalNode);
     }
 
-    public void addReferences(EvalNode evalNode) {
-      Set<Column> columns = EvalTreeUtil.findDistinctRefColumns(evalNode);
-      requiredRerences.addAll(columns);
-      for (Column column : columns) {
-        Target target = new Target(new FieldEval(column));
-        addEvalNode(target);
+    public void add(EvalNode evalNode) {
+      if (!requiredEvals.containsKey(evalNode)) {
+        requiredEvals.put(evalNode, false);
       }
     }
 
-    public void addEvalNode(Target target) {
-      requiredEvals.put(target.getCanonicalName(), target);
-      requiredRerences.addAll(EvalTreeUtil.findDistinctRefColumns(target.getEvalTree()));
+    public void resolve(EvalNode evalNode) {
+      requiredEvals.put(evalNode, true);
     }
   }
 
@@ -115,7 +108,7 @@ public class ProjectionPushDownRule extends
     TargetListManager targetListMgr;
 
     public Context(LogicalPlan plan) {
-      targetListMgr = new TargetListManager(plan);
+      targetListMgr = new TargetListManager();
     }
 
     public Context(Context upperContext) {
@@ -126,14 +119,12 @@ public class ProjectionPushDownRule extends
   @Override
   public LogicalNode visitProjection(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block,
                                      ProjectionNode node, Stack<LogicalNode> stack) throws PlanningException {
-    block.getNamedExprsManager().reset();
-    NamedExprsManager namedExprsMgr = block.getNamedExprsManager();
-    for (Target target : namedExprsMgr.getAllTargets()) {
-      context.targetListMgr.addEvalNode(target);
+    for (Target target : node.getTargets()) {
+      context.targetListMgr.add(target.getEvalTree());
     }
 
     LogicalNode child = super.visitProjection(context, plan, block, node, stack);
-    node.setInSchema(child.getOutSchema());
+    //node.setInSchema(child.getOutSchema());
     return node;
   }
 
@@ -142,13 +133,20 @@ public class ProjectionPushDownRule extends
     LogicalNode child = super.visitLimit(context, plan, block, node, stack);
     node.setInSchema(child.getOutSchema());
     node.setOutSchema(child.getOutSchema());
-
     return node;
   }
 
   @Override
   public LogicalNode visitSort(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block,
                                SortNode node, Stack<LogicalNode> stack) throws PlanningException {
+    final int sortKeyNum = node.getSortKeys().length;
+    EvalNode [] evalNodes = new EvalNode[sortKeyNum];
+    for (int i = 0; i < sortKeyNum; i++) {
+      SortSpec sortSpec = node.getSortKeys()[i];
+      evalNodes[i] = new FieldEval(sortSpec.getSortKey());
+      context.targetListMgr.add(evalNodes[i]);
+    }
+
     LogicalNode child = super.visitSort(context, plan, block, node, stack);
 
     node.setInSchema(child.getOutSchema());
@@ -160,6 +158,8 @@ public class ProjectionPushDownRule extends
   @Override
   public LogicalNode visitHaving(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, HavingNode node,
                             Stack<LogicalNode> stack) throws PlanningException {
+    context.targetListMgr.add(node.getQual());
+
     LogicalNode child = super.visitHaving(context, plan, block, node, stack);
     node.setInSchema(child.getOutSchema());
     node.setOutSchema(child.getOutSchema());
@@ -169,6 +169,14 @@ public class ProjectionPushDownRule extends
 
   public LogicalNode visitGroupBy(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, GroupbyNode node,
                              Stack<LogicalNode> stack) throws PlanningException {
+    final int groupingKeyNum = node.getGroupingColumns().length;
+    EvalNode [] groupingKeyEvals = new EvalNode[groupingKeyNum];
+    for (int i = 0; i < groupingKeyNum; i++) {
+      groupingKeyEvals[i] = new FieldEval(node.getGroupingColumns()[i]);
+      context.targetListMgr.add(groupingKeyEvals[i]);
+
+    }
+
     LogicalNode child = super.visitGroupBy(context, plan, block, node, stack);
     node.setInSchema(child.getOutSchema());
     node.setOutSchema(PlannerUtil.targetToSchema(node.getTargets()));
@@ -207,7 +215,6 @@ public class ProjectionPushDownRule extends
       }
 
       node.setTargets(newTargets.toArray(new Target[newTargets.size()]));
-      node.setOutSchema(PlannerUtil.targetToSchema(node.getTargets()));
     } else {
       List<Target> newTargets = TUtil.newList();
       for (Target target : context.targetListMgr.requiredEvals.values()) {
@@ -293,7 +300,6 @@ public class ProjectionPushDownRule extends
     }
 
     node.setTargets(requiredTargets.toArray(new Target[requiredTargets.size()]));
-    node.setOutSchema(PlannerUtil.targetToSchema(node.getTargets()));
     return node;
   }
 }
