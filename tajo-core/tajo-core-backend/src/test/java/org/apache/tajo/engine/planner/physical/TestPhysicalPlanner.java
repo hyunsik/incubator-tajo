@@ -176,8 +176,8 @@ public class TestPhysicalPlanner {
       "select deptName, nullable from score group by deptName, nullable", // 11
       "select 3 < 4 as ineq, 3.5 * 2 as score", // 12
       "select (1 > 0) and 3 > 1", // 13
-      "select deptName, class, sum(score), max(score), min(score) from score", // 14
-      "select deptname, class, sum(score), max(score), min(score) from score group by deptname", // 15
+      "select sum(score), max(score), min(score) from score", // 14
+      "select deptname, sum(score), max(score), min(score) from score group by deptname", // 15
       "select name from employee where empid >= 0", // 16
   };
 
@@ -287,10 +287,9 @@ public class TestPhysicalPlanner {
     Tuple tuple;
     exec.init();
     while ((tuple = exec.next()) != null) {
-      assertEquals(DatumFactory.createNullDatum(), tuple.get(1));
-      assertEquals(12, tuple.get(2).asInt4()); // sum
-      assertEquals(3, tuple.get(3).asInt4()); // max
-      assertEquals(1, tuple.get(4).asInt4()); // min
+      assertEquals(12, tuple.get(1).asInt4()); // sum
+      assertEquals(3, tuple.get(2).asInt4()); // max
+      assertEquals(1, tuple.get(3).asInt4()); // min
       i++;
     }
     exec.close();
@@ -538,9 +537,9 @@ public class TestPhysicalPlanner {
     Tuple tuple;
     i = 0;
     while ((tuple = scanner.next()) != null) {
-      assertEquals(60, tuple.get(2).asInt4()); // sum
-      assertEquals(3, tuple.get(3).asInt4()); // max
-      assertEquals(1, tuple.get(4).asInt4()); // min
+      assertEquals(60, tuple.get(1).asInt4()); // sum
+      assertEquals(3, tuple.get(2).asInt4()); // max
+      assertEquals(1, tuple.get(3).asInt4()); // min
       i++;
     }
     assertEquals(1, i);
