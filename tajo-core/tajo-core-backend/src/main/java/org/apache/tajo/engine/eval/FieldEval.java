@@ -43,6 +43,9 @@ public class FieldEval extends EvalNode implements Cloneable {
 	public void eval(EvalContext ctx, Schema schema, Tuple tuple) {
 	  if (fieldId == -1) {
 	    fieldId = schema.getColumnId(column.getQualifiedName());
+      if (fieldId == -1) {
+        throw new IllegalStateException("No Such Column Reference: " + column + ", schema: " + schema);
+      }
 	  }
     FieldEvalContext fieldCtx = (FieldEvalContext) ctx;
 	  fieldCtx.datum = tuple.get(fieldId);

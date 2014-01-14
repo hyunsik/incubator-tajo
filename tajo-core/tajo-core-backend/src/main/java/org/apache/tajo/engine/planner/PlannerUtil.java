@@ -667,6 +667,10 @@ public class PlannerUtil {
     }
   }
 
+  public static Schema targetToSchema(Collection<Target> targets) {
+    return targetToSchema(targets.toArray(new Target[targets.size()]));
+  }
+
   public static Schema targetToSchema(Target[] targets) {
     Schema schema = new Schema();
     for(Target t : targets) {

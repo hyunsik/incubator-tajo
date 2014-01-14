@@ -359,7 +359,8 @@ public class PartitionedTableRewriter implements RewriteRule {
       try {
         Path [] filteredPaths = findFilteredPartitionPaths(scanNode);
         plan.addHistory("PartitionTableRewriter chooses " + filteredPaths.length + " of partitions");
-        PartitionedTableScanNode rewrittenScanNode = new PartitionedTableScanNode(plan.newPID(), scanNode, filteredPaths);
+        PartitionedTableScanNode rewrittenScanNode =
+            new PartitionedTableScanNode(plan.newPID(), scanNode, filteredPaths);
         updateTableStat(rewrittenScanNode);
         PlannerUtil.replaceNode(plan, stack.peek(), scanNode, rewrittenScanNode);
       } catch (IOException e) {

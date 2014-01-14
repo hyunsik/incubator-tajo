@@ -36,9 +36,23 @@ public class TestSortQuery extends QueryTestCaseBase {
   }
 
   @Test
-  public final void testSortWithAliasKey() throws Exception {
+  public final void testSortWithAlias1() throws Exception {
     ResultSet res = executeQuery();
     assertResultSet(res);
+    cleanupQuery(res);
+  }
+
+  @Test
+  public final void testSortWithExpr1() throws Exception {
+    ResultSet res = executeQuery();
+    assertResultSet(res);
+    cleanupQuery(res);
+  }
+
+  @Test
+  public final void testSortWithExpr2() throws Exception {
+    ResultSet res = executeQuery();
+    System.out.println(resultSetToString(res));
     cleanupQuery(res);
   }
 

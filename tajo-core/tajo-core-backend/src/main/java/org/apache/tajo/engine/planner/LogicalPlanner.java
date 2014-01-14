@@ -702,7 +702,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     }
 
     joinNode.setInSchema(merged);
-    joinNode.setOutSchema(PlannerUtil.targetToSchema(targets.toArray(new Target[targets.size()])));
+    joinNode.setOutSchema(PlannerUtil.targetToSchema(targets));
 
     // Determine join conditions
     if (join.isNatural()) { // if natural join, it should have the equi-join conditions by common column names

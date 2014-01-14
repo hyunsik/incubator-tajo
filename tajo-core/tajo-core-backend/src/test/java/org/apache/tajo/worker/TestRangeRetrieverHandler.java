@@ -143,8 +143,7 @@ public class TestRangeRetrieverHandler {
     PhysicalPlanner phyPlanner = new PhysicalPlannerImpl(conf,sm);
     PhysicalExec exec = phyPlanner.createPlan(ctx, rootNode);
 
-    ProjectionExec proj = (ProjectionExec) exec;
-    MemSortExec sort = (MemSortExec) proj.getChild();
+    MemSortExec sort = (MemSortExec) exec;
 
     SortSpec[] sortSpecs = sort.getPlan().getSortKeys();
     RangeShuffleFileWriteExec idxStoreExec = new RangeShuffleFileWriteExec(ctx, sm, sort, sort.getSchema(),
@@ -257,8 +256,7 @@ public class TestRangeRetrieverHandler {
     PhysicalPlanner phyPlanner = new PhysicalPlannerImpl(conf,sm);
     PhysicalExec exec = phyPlanner.createPlan(ctx, rootNode);
 
-    ProjectionExec proj = (ProjectionExec) exec;
-    MemSortExec sort = (MemSortExec) proj.getChild();
+    MemSortExec sort = (MemSortExec) exec;
     SortSpec[] sortSpecs = sort.getPlan().getSortKeys();
     RangeShuffleFileWriteExec idxStoreExec = new RangeShuffleFileWriteExec(ctx, sm, sort,
         sort.getSchema(), sort.getSchema(), sortSpecs);
