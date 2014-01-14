@@ -323,6 +323,7 @@ public class ProjectionPushDownRule extends
         break;
       case STORE:
         StoreTableNode storeTableNode = (StoreTableNode) parentNode;
+        storeTableNode.setChild(child);
         storeTableNode.setInSchema(child.getOutSchema());
         break;
       case INSERT:
