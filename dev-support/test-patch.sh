@@ -331,7 +331,7 @@ checkAuthor () {
   if [[ $authorTags != 0 ]] ; then
     JIRA_COMMENT="$JIRA_COMMENT
 
-    -1 @author.  The patch appears to contain $authorTags @author tags which the Hadoop community has agreed to not allow in code contributions."
+    -1 @author.  The patch appears to contain $authorTags @author tags which the Tajo community has agreed to not allow in code contributions."
     return 1
   fi
   JIRA_COMMENT="$JIRA_COMMENT
