@@ -537,9 +537,9 @@ public class TestPhysicalPlanner {
     Tuple tuple;
     i = 0;
     while ((tuple = scanner.next()) != null) {
-      assertEquals(60, tuple.get(1).asInt4()); // sum
-      assertEquals(3, tuple.get(2).asInt4()); // max
-      assertEquals(1, tuple.get(3).asInt4()); // min
+      assertEquals(60, tuple.get(0).asInt4()); // sum
+      assertEquals(3, tuple.get(1).asInt4()); // max
+      assertEquals(1, tuple.get(2).asInt4()); // min
       i++;
     }
     assertEquals(1, i);
