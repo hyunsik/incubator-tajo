@@ -72,7 +72,7 @@ public class ProjectionPushDownRule extends
     }
 
     Stack<LogicalNode> stack = new Stack<LogicalNode>();
-    Context context = new Context(plan);
+    Context context = new Context();
     visit(context, plan, topmostBlock, topmostBlock.getRoot(), stack);
 
     return plan;
@@ -102,13 +102,25 @@ public class ProjectionPushDownRule extends
     public void resolve(EvalNode evalNode) {
       requiredEvals.put(evalNode, true);
     }
+
+    public String toString() {
+      int resolved = 0;
+      for (Boolean flag: requiredEvals.values()) {
+        if (flag) {
+          resolved++;
+        }
+      }
+      return "eval=" + requiredEvals.size() + ", resolved=" + resolved;
+    }
   }
 
   static class Context {
     TargetListManager targetListMgr;
+    Set<String> requiredSet;
 
-    public Context(LogicalPlan plan) {
+    public Context() {
       targetListMgr = new TargetListManager();
+      requiredSet = new HashSet<String>();
     }
 
     public Context(Context upperContext) {
@@ -188,12 +200,14 @@ public class ProjectionPushDownRule extends
       context.targetListMgr.add(node.getJoinQual());
     }
 
+    Map<String, EvalNode> map = new LinkedHashMap<String, EvalNode>();
     final EvalNode [] evalNodes;
     if (node.hasTargets()) {
       evalNodes = new EvalNode[node.getTargets().length];
       for (int i = 0; i < node.getTargets().length; i++) {
         evalNodes[i] = node.getTargets()[i].getEvalTree();
         context.targetListMgr.add(evalNodes[i]);
+        map.put(node.getTargets()[i].getCanonicalName(), evalNodes[i]);
       }
     }
 
@@ -265,6 +279,20 @@ public class ProjectionPushDownRule extends
     it = tableIds.iterator();
 
     return i.contains(it.next()) && o.contains(it.next());
+  }
+
+  @Override
+  public LogicalNode visitUnion(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, UnionNode node,
+                           Stack<LogicalNode> stack) throws PlanningException {
+    LogicalPlan.QueryBlock leftBlock = plan.getBlock(node.getLeftChild());
+    LogicalPlan.QueryBlock rightBlock = plan.getBlock(node.getRightChild());
+    Context leftContext = new Context();
+    Context rightContext = new Context();
+    stack.push(node);
+    LogicalNode leftChild = visit(leftContext, plan, leftBlock, node.getLeftChild(), stack);
+    LogicalNode rightChild = visit(rightContext, plan, rightBlock, node.getRightChild(), stack);
+    stack.pop();
+    return node;
   }
 
   public LogicalNode visitScan(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, ScanNode node,
