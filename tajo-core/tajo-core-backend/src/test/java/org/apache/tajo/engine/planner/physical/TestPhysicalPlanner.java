@@ -877,7 +877,7 @@ public class TestPhysicalPlanner {
     exec.next();
     exec.close();
 
-    assertTrue(((ProjectionExec)exec).getChild() instanceof MemSortExec);
+    assertTrue(exec instanceof MemSortExec);
 
     context = analyzer.parse(SORT_QUERY[0]);
     plan = planner.createPlan(context);
@@ -898,7 +898,7 @@ public class TestPhysicalPlanner {
     exec.next();
     exec.close();
 
-    assertTrue(((ProjectionExec)exec).getChild() instanceof ExternalSortExec);
+    assertTrue(exec instanceof ExternalSortExec);
   }
 
   @Test

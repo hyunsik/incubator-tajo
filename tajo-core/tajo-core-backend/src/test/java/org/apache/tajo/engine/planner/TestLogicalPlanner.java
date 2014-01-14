@@ -712,12 +712,8 @@ public class TestLogicalPlanner {
     LogicalRootNode root = (LogicalRootNode) plan;
     assertEquals(NodeType.UNION, root.getChild().getType());
     UnionNode union = root.getChild();
-    assertEquals(NodeType.TABLE_SUBQUERY, union.getLeftChild().getType());
-    TableSubQueryNode leftSub = union.getLeftChild();
-    assertEquals(NodeType.PROJECTION, leftSub.getSubQuery().getType());
-    assertEquals(NodeType.TABLE_SUBQUERY, union.getRightChild().getType());
-    TableSubQueryNode rightSub = union.getRightChild();
-    assertEquals(NodeType.PROJECTION, rightSub.getSubQuery().getType());
+    assertEquals(NodeType.PROJECTION, union.getLeftChild().getType());
+    assertEquals(NodeType.PROJECTION, union.getRightChild().getType());
   }
 
   static final String [] setQualifiers = {

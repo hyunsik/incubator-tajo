@@ -451,7 +451,6 @@ public class LogicalPlan {
         LogicalRootNode rootNode = (LogicalRootNode) blockRoot;
         rootType = rootNode.getChild().getType();
       }
-      queryBlockByPID.put(blockRoot.getPID(), this);
     }
 
     public <NODE extends LogicalNode> NODE getRoot() {
@@ -553,6 +552,8 @@ public class LogicalPlan {
       // node types can be duplicated. So, latest node type is only kept.
       // So, this is only for filter, groupby, sort, limit, projection, which exists once at a query block.
       nodeTypeToNodeMap.put(node.getType(), node);
+
+      queryBlockByPID.put(node.getPID(), this);
     }
 
     public <T extends LogicalNode> T getNode(NodeType nodeType) {

@@ -20,8 +20,8 @@ package org.apache.tajo.engine.planner.rewrite;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import com.sun.org.apache.commons.logging.Log;
-import com.sun.org.apache.commons.logging.LogFactory;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.*;
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Schema;

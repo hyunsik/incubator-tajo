@@ -952,28 +952,26 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     // 2. Build Child Plans
     QueryBlock leftBlock = context.plan.getBlockByExpr(setOperation.getLeft());
     PlanContext leftContext = new PlanContext(context, leftBlock);
-    LogicalNode left = visit(leftContext, new Stack<Expr>(), setOperation.getLeft());
-    TableSubQueryNode leftSubQuery = new TableSubQueryNode(context.plan.newPID(), leftBlock.getName(), left);
+    LogicalNode leftChild = visit(leftContext, new Stack<Expr>(), setOperation.getLeft());
     context.plan.connectBlocks(leftContext.queryBlock, context.queryBlock, BlockType.TableSubQuery);
 
     QueryBlock rightBlock = context.plan.getBlockByExpr(setOperation.getRight());
     PlanContext rightContext = new PlanContext(context, rightBlock);
-    LogicalNode right = visit(rightContext, new Stack<Expr>(), setOperation.getRight());
-    TableSubQueryNode rightSubQuery = new TableSubQueryNode(plan.newPID(), rightContext.queryBlock.getName(), right);
+    LogicalNode rightChild = visit(rightContext, new Stack<Expr>(), setOperation.getRight());
     context.plan.connectBlocks(rightContext.queryBlock, context.queryBlock, BlockType.TableSubQuery);
 
     BinaryNode setOp;
     if (setOperation.getType() == OpType.Union) {
       setOp = new UnionNode(plan.newPID());
     } else if (setOperation.getType() == OpType.Except) {
-      setOp = new ExceptNode(plan.newPID(), leftSubQuery, rightSubQuery);
+      setOp = new ExceptNode(plan.newPID(), leftChild, rightChild);
     } else if (setOperation.getType() == OpType.Intersect) {
-      setOp = new IntersectNode(plan.newPID(), leftSubQuery, rightSubQuery);
+      setOp = new IntersectNode(plan.newPID(), leftChild, rightChild);
     } else {
       throw new VerifyException("Invalid Type: " + setOperation.getType());
     }
-    setOp.setLeftChild(leftSubQuery);
-    setOp.setRightChild(rightSubQuery);
+    setOp.setLeftChild(leftChild);
+    setOp.setRightChild(rightChild);
 
     // Strip the table names from the targets of the both blocks
     // in order to check the equivalence the schemas of both blocks.
@@ -981,14 +979,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         PlannerUtil.schemaToTargets(leftBlock.getRoot().getOutSchema()));
 
     Schema outSchema = PlannerUtil.targetToSchema(leftStrippedTargets);
-    setOp.setInSchema(leftSubQuery.getOutSchema());
+    setOp.setInSchema(leftChild.getOutSchema());
     setOp.setOutSchema(outSchema);
-
-    if (isNoUpperProjection(stack)) {
-      block.namedExprsMgr = new NamedExprsManager(plan);
-//      block.targetListManager.resolveAll();
-//      block.setSchema(block.targetListManager.getUpdatedSchema());
-    }
 
     return setOp;
   }

@@ -776,4 +776,17 @@ public class PlannerUtil {
       return super.visitGeneralSetFunction(ctx, stack, expr);
     }
   }
+
+  public static Collection<String> toQualifiedFieldNames(Collection<String> fieldNames, String qualifier) {
+    List<String> names = TUtil.newList();
+    for (String n : fieldNames) {
+      String [] parts = n.split("\\.");
+      if (parts.length == 1) {
+        names.add(qualifier + "." + parts[0]);
+      } else {
+        names.add(qualifier + "." + parts[1]);
+      }
+    }
+    return names;
+  }
 }
