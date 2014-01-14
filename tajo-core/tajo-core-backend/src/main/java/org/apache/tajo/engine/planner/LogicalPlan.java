@@ -24,6 +24,7 @@ import org.apache.tajo.algebra.*;
 import org.apache.tajo.annotation.NotThreadSafe;
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Schema;
+import org.apache.tajo.engine.eval.EvalNode;
 import org.apache.tajo.engine.exception.NoSuchColumnException;
 import org.apache.tajo.engine.exception.VerifyException;
 import org.apache.tajo.engine.planner.graph.DirectedGraphCursor;
@@ -83,6 +84,14 @@ public class LogicalPlan {
   }
 
   public String newGeneratedFieldName(String prefix) {
+    String suffix = String.valueOf(noNameColumnId);
+    noNameColumnId++;
+    return "$" + prefix.toLowerCase() + "_" + suffix;
+  }
+
+  public String newGeneratedFieldName(EvalNode evalNode) {
+    String prefix = evalNode.getName();
+
     String suffix = String.valueOf(noNameColumnId);
     noNameColumnId++;
     return "$" + prefix.toLowerCase() + "_" + suffix;

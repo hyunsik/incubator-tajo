@@ -26,6 +26,7 @@ import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.catalog.SortSpec;
 import org.apache.tajo.engine.eval.EvalNode;
 import org.apache.tajo.engine.eval.EvalTreeUtil;
+import org.apache.tajo.engine.eval.EvalType;
 import org.apache.tajo.engine.eval.FieldEval;
 import org.apache.tajo.engine.exception.InvalidQueryException;
 import org.apache.tajo.engine.planner.*;
@@ -72,45 +73,164 @@ public class ProjectionPushDownRule extends
     }
 
     Stack<LogicalNode> stack = new Stack<LogicalNode>();
-    Context context = new Context();
+    Context context = new Context(plan);
     visit(context, plan, topmostBlock, topmostBlock.getRoot(), stack);
 
     return plan;
   }
 
   public static class TargetListManager {
-    private LinkedHashMap<EvalNode, Boolean> requiredEvals;
+    private LinkedHashMap<String, EvalNode> nameToEvalMap;
+    private LinkedHashMap<EvalNode, String> evalToNameMap;
+    private LinkedHashMap<String, Boolean> resolvedFlags;
+    private LogicalPlan plan;
 
-    public TargetListManager() {
-      requiredEvals = new LinkedHashMap<EvalNode, Boolean>();
+    public TargetListManager(LogicalPlan plan) {
+      this.plan = plan;
+      nameToEvalMap = new LinkedHashMap<String, EvalNode>();
+      evalToNameMap = new LinkedHashMap<EvalNode, String>();
+      resolvedFlags = new LinkedHashMap<String, Boolean>();
     }
 
     public TargetListManager(TargetListManager targetListMgr) {
-      requiredEvals = new LinkedHashMap<EvalNode, Boolean>(targetListMgr.requiredEvals);
+      this.plan = targetListMgr.plan;
+      nameToEvalMap = new LinkedHashMap<String, EvalNode>(targetListMgr.nameToEvalMap);
+      evalToNameMap = new LinkedHashMap<EvalNode, String>(targetListMgr.evalToNameMap);
+      resolvedFlags = new LinkedHashMap<String, Boolean>(targetListMgr.resolvedFlags);
     }
 
-    public boolean isResolved(EvalNode evalNode) {
-      return requiredEvals.get(evalNode);
+    private String add(String name, EvalNode evalNode) throws PlanningException {
+      if (evalToNameMap.containsKey(evalNode)) {
+        name = evalToNameMap.get(evalNode);
+      } else {
+
+        // Name can be conflicts between a column reference and an aliased EvalNode.
+        // Example, a SQL statement 'select l_orderkey + l_partkey as total ...' leads to
+        // two EvalNodes: a column reference total and an EvalNode (+, l_orderkey, l_partkey)
+        // If they are inserted into here, their names are conflict to each other, and one of them is removed.
+        // In this case, we just keep an original eval node instead of a column reference.
+        // This is because a column reference that points to an aliased EvalNode can be restored from the given alias.
+        if (nameToEvalMap.containsKey(name)) {
+          EvalNode storedEvalNode = nameToEvalMap.get(name);
+          if (!storedEvalNode.equals(evalNode)) {
+            if (storedEvalNode.getType() != EvalType.FIELD && evalNode.getType() != EvalType.FIELD) {
+              throw new PlanningException("Duplicate alias: " + evalNode);
+            }
+            if (storedEvalNode.getType() == EvalType.FIELD) {
+              nameToEvalMap.put(name, evalNode);
+            }
+          }
+        } else {
+          nameToEvalMap.put(name, evalNode);
+        }
+
+        evalToNameMap.put(evalNode, name);
+        resolvedFlags.put(name, false);
+
+        for (Column column : EvalTreeUtil.findDistinctRefColumns(evalNode)) {
+          add(new FieldEval(column));
+        }
+      }
+      return name;
     }
 
-    public void add(EvalNode evalNode) {
-      if (!requiredEvals.containsKey(evalNode)) {
-        requiredEvals.put(evalNode, false);
+    public String add(Target target) throws PlanningException {
+      return add(target.getCanonicalName(), target.getEvalTree());
+    }
+
+    public String add(EvalNode evalNode) throws PlanningException {
+      String name;
+      if (evalToNameMap.containsKey(evalNode)) {
+        name = evalToNameMap.get(evalNode);
+      } else {
+        if (evalNode.getType() == EvalType.FIELD) {
+          FieldEval fieldEval = (FieldEval) evalNode;
+          name = fieldEval.getName();
+        } else {
+          name = plan.newGeneratedFieldName(evalNode);
+        }
+        add(name, evalNode);
+      }
+      return name;
+    }
+
+    public Target getTarget(String name) {
+      if (!nameToEvalMap.containsKey(name)) {
+        throw new RuntimeException("No Such target name: " + name);
+      }
+      EvalNode evalNode = nameToEvalMap.get(name);
+      if (evalNode.getType() == EvalType.FIELD) {
+        return new Target((FieldEval)evalNode);
+      } else {
+        return new Target(evalNode, name);
       }
     }
 
+    public boolean isResolved(EvalNode evalNode) {
+      if (!evalToNameMap.containsKey(evalNode)) {
+        throw new RuntimeException("No such eval: " + evalNode);
+      }
+      return resolvedFlags.get(name);
+    }
+
+    public boolean isResolved(String name) {
+      if (!nameToEvalMap.containsKey(name)) {
+        throw new RuntimeException("No Such target name: " + name);
+      }
+
+      return resolvedFlags.get(name);
+    }
+
+    public void resolve(Target target) {
+      resolve(target.getEvalTree());
+    }
+
     public void resolve(EvalNode evalNode) {
-      requiredEvals.put(evalNode, true);
+      if (!evalToNameMap.containsKey(evalNode)) {
+        throw new RuntimeException("No such eval: " + evalNode);
+      }
+      String name = evalToNameMap.get(evalNode);
+      resolvedFlags.put(name, true);
+    }
+
+    public Iterator<Target> getFilteredTarget(Set<String> required) {
+      return new FilteredTargetIterator(required);
+    }
+
+    class FilteredTargetIterator implements Iterator<Target> {
+      List<Target> filtered = TUtil.newList();
+
+      public FilteredTargetIterator(Set<String> required) {
+        for (Map.Entry<String,EvalNode> entry : nameToEvalMap.entrySet()) {
+          if (required.contains(entry.getKey())) {
+            filtered.add(getTarget(entry.getKey()));
+          }
+        }
+      }
+
+      @Override
+      public boolean hasNext() {
+        return false;
+      }
+
+      @Override
+      public Target next() {
+        return null;
+      }
+
+      @Override
+      public void remove() {
+      }
     }
 
     public String toString() {
       int resolved = 0;
-      for (Boolean flag: requiredEvals.values()) {
+      for (Boolean flag: resolvedFlags.values()) {
         if (flag) {
           resolved++;
         }
       }
-      return "eval=" + requiredEvals.size() + ", resolved=" + resolved;
+      return "eval=" + resolvedFlags.size() + ", resolved=" + resolved;
     }
   }
 
@@ -118,25 +238,65 @@ public class ProjectionPushDownRule extends
     TargetListManager targetListMgr;
     Set<String> requiredSet;
 
-    public Context() {
-      targetListMgr = new TargetListManager();
+    public Context(LogicalPlan plan) {
+      targetListMgr = new TargetListManager(plan);
       requiredSet = new HashSet<String>();
     }
 
     public Context(Context upperContext) {
-      targetListMgr = new TargetListManager(upperContext.targetListMgr);
+      requiredSet = new HashSet<String>(upperContext.requiredSet);
+      targetListMgr = upperContext.targetListMgr;
+    }
+
+    public String addExpr(Target target) throws PlanningException {
+      String reference = targetListMgr.add(target);
+      addNecessaryReferences(target.getEvalTree());
+      return reference;
+    }
+
+    public String addExpr(EvalNode evalNode) throws PlanningException {
+      String reference = targetListMgr.add(evalNode);
+      addNecessaryReferences(evalNode);
+      return reference;
+    }
+
+    private void addNecessaryReferences(EvalNode evalNode) {
+      for (Column column : EvalTreeUtil.findDistinctRefColumns(evalNode)) {
+        requiredSet.add(column.getQualifiedName());
+      }
+    }
+
+    @Override
+    public String toString() {
+      return "required=" + requiredSet.size() + "," + targetListMgr.toString();
     }
   }
 
   @Override
   public LogicalNode visitProjection(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block,
                                      ProjectionNode node, Stack<LogicalNode> stack) throws PlanningException {
-    for (Target target : node.getTargets()) {
-      context.targetListMgr.add(target.getEvalTree());
+    Context newContext = new Context(context);
+    String [] referenceNames = new String[node.getTargets().length];
+    for (int i = 0; i < node.getTargets().length; i++) {
+      referenceNames[i] = newContext.addExpr(node.getTargets()[i]);
     }
 
-    LogicalNode child = super.visitProjection(context, plan, block, node, stack);
-    //node.setInSchema(child.getOutSchema());
+    LogicalNode child = super.visitProjection(newContext, plan, block, node, stack);
+
+    List<Target> finalTargets = TUtil.newList();
+    for (String referenceName : referenceNames) {
+      Target target = context.targetListMgr.getTarget(referenceName);
+
+      if (context.targetListMgr.isResolved(referenceName)) {
+        finalTargets.add(new Target(new FieldEval(target.getNamedColumn())));
+      } else if (checkIfBeEvaluate(target, node)) {
+        finalTargets.add(target);
+        context.targetListMgr.resolve(target);
+      }
+    }
+    node.setInSchema(child.getOutSchema());
+    node.setTargets(finalTargets.toArray(new Target[finalTargets.size()]));
+
     return node;
   }
 
@@ -149,76 +309,178 @@ public class ProjectionPushDownRule extends
   @Override
   public LogicalNode visitSort(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block,
                                SortNode node, Stack<LogicalNode> stack) throws PlanningException {
+    Context newContext = new Context(context);
+
     final int sortKeyNum = node.getSortKeys().length;
-    EvalNode [] evalNodes = new EvalNode[sortKeyNum];
+    String [] keyNames = new String[sortKeyNum];
     for (int i = 0; i < sortKeyNum; i++) {
       SortSpec sortSpec = node.getSortKeys()[i];
-      evalNodes[i] = new FieldEval(sortSpec.getSortKey());
-      context.targetListMgr.add(evalNodes[i]);
+      keyNames[i] = context.addExpr(new FieldEval(sortSpec.getSortKey()));
     }
 
-    LogicalNode child = super.visitSort(context, plan, block, node, stack);
-
+    LogicalNode child = super.visitSort(newContext, plan, block, node, stack);
     return node;
   }
 
   @Override
   public LogicalNode visitHaving(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, HavingNode node,
                             Stack<LogicalNode> stack) throws PlanningException {
-    context.targetListMgr.add(node.getQual());
+    Context newContext = new Context(context);
+    String referenceName = newContext.targetListMgr.add(node.getQual());
+    newContext.addNecessaryReferences(node.getQual());
 
-    LogicalNode child = super.visitHaving(context, plan, block, node, stack);
+    LogicalNode child = super.visitHaving(newContext, plan, block, node, stack);
     return node;
   }
 
   public LogicalNode visitGroupBy(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, GroupbyNode node,
                              Stack<LogicalNode> stack) throws PlanningException {
+    Context newContext = new Context(context);
+
     final int targetNum = node.getTargets().length;
-    final EvalNode [] evalNodes = new EvalNode[targetNum];
+    final String [] referenceNames = new String[targetNum];
     for (int i = 0; i < targetNum; i++) {
-      evalNodes[i] = node.getTargets()[i].getEvalTree();
-      context.targetListMgr.add(evalNodes[i]);
+      Target target = node.getTargets()[i];
+      referenceNames[i] = newContext.addExpr(target);
     }
 
-    LogicalNode child = super.visitGroupBy(context, plan, block, node, stack);
+    LogicalNode child = super.visitGroupBy(newContext, plan, block, node, stack);
 
+    List<Target> projectedTargets = TUtil.newList();
+    for (Iterator<String> it = getFilteredReferences(referenceNames, context.requiredSet); it.hasNext();) {
+      String referenceName = it.next();
+      Target target = context.targetListMgr.getTarget(referenceName);
+
+      if (context.targetListMgr.isResolved(referenceName)) {
+        projectedTargets.add(new Target(new FieldEval(target.getNamedColumn())));
+      } else if (checkIfBeEvaluatedForGroupBy(target, node)) {
+        projectedTargets.add(target);
+        context.targetListMgr.resolve(target);
+      }
+    }
+    node.setInSchema(child.getOutSchema());
+    node.setTargets(projectedTargets.toArray(new Target[projectedTargets.size()]));
+
+    node.setInSchema(child.getOutSchema());
     return node;
   }
 
   public LogicalNode visitFilter(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block,
                                  SelectionNode node, Stack<LogicalNode> stack) throws PlanningException {
-    context.targetListMgr.add(node.getQual());
+    Context newContext = new Context(context);
+    newContext.addExpr(node.getQual());
 
-    LogicalNode child = super.visitFilter(context, plan, block, node, stack);
+    LogicalNode child = super.visitFilter(newContext, plan, block, node, stack);
     return node;
   }
 
   public LogicalNode visitJoin(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, JoinNode node,
                           Stack<LogicalNode> stack) throws PlanningException {
+    Context newContext = new Context(context);
 
+    String joinQualReference = null;
     if (node.hasJoinQual()) {
-      context.targetListMgr.add(node.getJoinQual());
+      joinQualReference = newContext.addExpr(node.getJoinQual());
     }
 
-    Map<String, EvalNode> map = new LinkedHashMap<String, EvalNode>();
-    final EvalNode [] evalNodes;
+    String [] referenceNames = null;
     if (node.hasTargets()) {
-      evalNodes = new EvalNode[node.getTargets().length];
-      for (int i = 0; i < node.getTargets().length; i++) {
-        evalNodes[i] = node.getTargets()[i].getEvalTree();
-        context.targetListMgr.add(evalNodes[i]);
-        map.put(node.getTargets()[i].getCanonicalName(), evalNodes[i]);
+      referenceNames = new String[node.getTargets().length];
+      int i = 0;
+      for (Iterator<Target> it = getFilteredTarget(node.getTargets(), context.requiredSet);
+           it.hasNext();) {
+        referenceNames[i++] = newContext.addExpr(it.next());
       }
     }
-
-    Context newContext = new Context(context);
 
     stack.push(node);
     LogicalNode left = visit(newContext, plan, block, node.getLeftChild(), stack);
     LogicalNode right = visit(newContext, plan, block, node.getRightChild(), stack);
     stack.pop();
 
+    Schema merged = SchemaUtil.merge(left.getOutSchema(), right.getOutSchema());
+    List<Target> projectedTargets = TUtil.newList();
+    for (Iterator<String> it = getFilteredReferences(referenceNames, context.requiredSet); it.hasNext();) {
+      String referenceName = it.next();
+      Target target = context.targetListMgr.getTarget(referenceName);
+
+      if (context.targetListMgr.isResolved(referenceName)) {
+        projectedTargets.add(new Target(new FieldEval(target.getNamedColumn())));
+      } else if (checkIfBeEvaluatedForJoin(target, node)) {
+        projectedTargets.add(target);
+        context.targetListMgr.resolve(target);
+      }
+    }
+    node.setInSchema(merged);
+    node.setTargets(projectedTargets.toArray(new Target[projectedTargets.size()]));
     return node;
+  }
+
+  static Iterator<String> getFilteredReferences(String [] referenceNames, Set<String> required) {
+    return new FilteredStringsIterator(referenceNames, required);
+  }
+
+  static class FilteredStringsIterator implements Iterator<String> {
+    Iterator<String> iterator;
+
+    FilteredStringsIterator(String [] referenceNames, Set<String> required) {
+      List<String> filtered = TUtil.newList();
+      for (String name : referenceNames) {
+        if (required.contains(name)) {
+          filtered.add(name);
+        }
+      }
+
+      iterator = filtered.iterator();
+    }
+    @Override
+    public boolean hasNext() {
+      return iterator.hasNext();
+    }
+
+    @Override
+    public String next() {
+      return iterator.next();
+    }
+
+    @Override
+    public void remove() {
+    }
+  }
+
+  static Iterator<Target> getFilteredTarget(Target[] targets, Set<String> required) {
+    return new FilteredIterator(targets, required);
+  }
+
+  static class FilteredIterator implements Iterator<Target> {
+    Iterator<Target> iterator;
+
+    FilteredIterator(Target [] targets, Set<String> required) {
+      List<Target> filtered = TUtil.newList();
+      for (Target target : targets) {
+        String name = target.getCanonicalName();
+        EvalNode evalNode = target.getEvalTree();
+
+        if (required.contains(name)) {
+          filtered.add(target);
+        }
+      }
+
+      iterator = filtered.iterator();
+    }
+    @Override
+    public boolean hasNext() {
+      return iterator.hasNext();
+    }
+
+    @Override
+    public Target next() {
+      return iterator.next();
+    }
+
+    @Override
+    public void remove() {
+    }
   }
 
   public static boolean checkIfBeEvaluatedForScan(Target target, ScanNode node) {
@@ -233,6 +495,36 @@ public class ProjectionPushDownRule extends
     } else {
       return false;
     }
+  }
+
+  public static boolean checkIfBeEvaluate(Target target, LogicalNode node) {
+    Set<Column> columnRefs = EvalTreeUtil.findDistinctRefColumns(target.getEvalTree());
+    if (!node.getInSchema().containsAll(columnRefs)) {
+      return false;
+    }
+    return true;
+  }
+
+  public static boolean checkIfBeEvaluatedForGroupBy(Target target, GroupbyNode groupbyNode) {
+    Set<Column> columnRefs = EvalTreeUtil.findDistinctRefColumns(target.getEvalTree());
+
+    if (!groupbyNode.getInSchema().containsAll(columnRefs)) {
+      return false;
+    }
+
+    Set<String> tableIds = Sets.newHashSet();
+    // getting distinct table references
+    for (Column col : columnRefs) {
+      if (!tableIds.contains(col.getQualifier())) {
+        tableIds.add(col.getQualifier());
+      }
+    }
+
+    if (tableIds.size() > 1) {
+      return false;
+    }
+
+    return true;
   }
 
   public static boolean checkIfBeEvaluatedForJoin(Target target, JoinNode joinNode) {
@@ -284,10 +576,12 @@ public class ProjectionPushDownRule extends
   @Override
   public LogicalNode visitUnion(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, UnionNode node,
                            Stack<LogicalNode> stack) throws PlanningException {
+    Context leftContext = new Context(context);
+    Context rightContext = new Context(context);
+
     LogicalPlan.QueryBlock leftBlock = plan.getBlock(node.getLeftChild());
     LogicalPlan.QueryBlock rightBlock = plan.getBlock(node.getRightChild());
-    Context leftContext = new Context();
-    Context rightContext = new Context();
+
     stack.push(node);
     LogicalNode leftChild = visit(leftContext, plan, leftBlock, node.getLeftChild(), stack);
     LogicalNode rightChild = visit(rightContext, plan, rightBlock, node.getRightChild(), stack);
@@ -298,12 +592,31 @@ public class ProjectionPushDownRule extends
   public LogicalNode visitScan(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, ScanNode node,
                           Stack<LogicalNode> stack) throws PlanningException {
 
+    Context newContext = new Context(context);
+
+    Target [] targets;
     if (node.hasTargets()) {
-      for (Target target : node.getTargets()) {
-        context.targetListMgr.add(target.getEvalTree());
+      targets = node.getTargets();
+    } else {
+      targets = PlannerUtil.schemaToTargets(node.getOutSchema());
+    }
+
+    List<Target> projectedTargets = TUtil.newList();
+    for (Iterator<Target> it = getFilteredTarget(targets, newContext.requiredSet); it.hasNext();) {
+      Target target = it.next();
+      newContext.addExpr(target);
+    }
+
+    for (Iterator<Target> it = getFilteredTarget(targets, context.requiredSet); it.hasNext();) {
+      Target target = it.next();
+
+      if (checkIfBeEvaluatedForScan(target, node)) {
+        projectedTargets.add(target);
+        newContext.targetListMgr.resolve(target);
       }
     }
 
+    node.setTargets(projectedTargets.toArray(new Target[projectedTargets.size()]));
     return node;
   }
 }
