@@ -52,7 +52,7 @@ public class TestSortQuery extends QueryTestCaseBase {
   @Test
   public final void testSortWithExpr2() throws Exception {
     ResultSet res = executeQuery();
-    System.out.println(resultSetToString(res));
+    assertResultSet(res);
     cleanupQuery(res);
   }
 
