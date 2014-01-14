@@ -66,8 +66,10 @@ index_statement
 create_table_statement
   : CREATE EXTERNAL TABLE table_name table_elements USING file_type=Identifier
     (param_clause)? (table_partitioning_clauses)? (LOCATION path=Character_String_Literal)
-  | CREATE TABLE table_name (table_elements)? (USING file_type=Identifier)?
+  | CREATE TABLE table_name table_elements (USING file_type=Identifier)?
     (param_clause)? (table_partitioning_clauses)? (AS query_expression)?
+  | CREATE TABLE table_name (USING file_type=Identifier)?
+    (param_clause)? (table_partitioning_clauses)? AS query_expression
   ;
 
 table_elements
@@ -189,6 +191,7 @@ general_literal
 datetime_literal
   : timestamp_literal
   | time_literal
+  | date_literal
   ;
 
 time_literal
@@ -197,6 +200,10 @@ time_literal
 
 timestamp_literal
   : TIMESTAMP timestamp_string=Character_String_Literal
+  ;
+
+date_literal
+  : DATE date_string=Character_String_Literal
   ;
 
 boolean_literal

@@ -185,7 +185,7 @@ public class Task {
     LOG.info("==================================");
     LOG.info("* Subquery " + request.getId() + " is initialized");
     LOG.info("* InterQuery: " + interQuery
-        + (interQuery ? ", Use " + this.shuffleType + " partitioning":""));
+        + (interQuery ? ", Use " + this.shuffleType + " shuffle":""));
 
     LOG.info("* Fragments (num: " + request.getFragments().size() + ")");
     LOG.info("* Fetches (total:" + request.getFetches().size() + ") :");
@@ -463,6 +463,7 @@ public class Task {
           fetcherHistory.setStatus(eachFetcher.getStatus());
           fetcherHistory.setUri(eachFetcher.getURI().toString());
           fetcherHistory.setFileLen(eachFetcher.getFileLen());
+          fetcherHistory.setMessageReceiveCount(eachFetcher.getMessageReceiveCount());
 
           fetcherHistories.put(eachFetcher.getURI(), fetcherHistory);
         }

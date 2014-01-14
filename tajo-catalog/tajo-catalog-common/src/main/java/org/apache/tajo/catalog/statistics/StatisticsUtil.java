@@ -22,8 +22,6 @@ import com.google.common.collect.Lists;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import java.util.Collection;
-import java.util.Iterator;
 import java.util.List;
 
 public class StatisticsUtil {
@@ -92,7 +90,7 @@ public class StatisticsUtil {
       aggregated.setNumRows(aggregated.getNumRows() + ts.getNumRows());
       aggregated.setNumBytes(aggregated.getNumBytes() + ts.getNumBytes());
       aggregated.setNumBlocks(aggregated.getNumBlocks() + ts.getNumBlocks());
-      aggregated.setNumPartitions(aggregated.getNumPartitions() + ts.getNumPartitions());
+      aggregated.setNumShuffleOutputs(aggregated.getNumShuffleOutputs() + ts.getNumShuffleOutputs());
     }
 
     //aggregated.setAvgRows(aggregated.getNumRows() / tableStats.size());
@@ -101,32 +99,5 @@ public class StatisticsUtil {
     }
 
     return aggregated;
-  }
-
-  public static TableStats computeStatFromUnionBlock(Collection<TableStats> stats) {
-    TableStats stat = new TableStats();
-    TableStats childStat;
-    long avgRows = 0, numBytes = 0, numRows = 0;
-    int numBlocks = 0, numPartitions = 0;
-    List<ColumnStats> columnStatses = Lists.newArrayList();
-
-    Iterator<TableStats> it = stats.iterator();
-    while (it.hasNext()) {
-      childStat = it.next();
-      avgRows += childStat.getAvgRows();
-      columnStatses.addAll(childStat.getColumnStats());
-      numBlocks += childStat.getNumBlocks();
-      numBytes += childStat.getNumBytes();
-      numPartitions += childStat.getNumPartitions();
-      numRows += childStat.getNumRows();
-    }
-
-    stat.setColumnStats(columnStatses);
-    stat.setNumBlocks(numBlocks);
-    stat.setNumBytes(numBytes);
-    stat.setNumPartitions(numPartitions);
-    stat.setNumRows(numRows);
-    stat.setAvgRows(avgRows);
-    return stat;
   }
 }

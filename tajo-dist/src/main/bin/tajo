@@ -68,6 +68,7 @@ if [ $# = 0 ]; then
   echo "  catalog              run the Catalog server"
   echo "  catutil              catalog utility"
   echo "  cli                  run the tajo cli"
+  echo "  admin                run the tajo admin util"
   echo "  jar <jar>            run a jar file"
   echo "  benchmark            run the benchmark driver"
   echo " or"
@@ -217,7 +218,7 @@ TAJO_JAR_DIRS="$TAJO_HOME
 ${TAJO_HOME}/lib"
 
 for d in $TAJO_JAR_DIRS; do
-  for j in $d/*.jar; do
+  for j in `find $d/*.jar ! -name "*test*"`; do
     TAJO_BASE_CLASSPATH=$TAJO_BASE_CLASSPATH:$j
   done
 done
@@ -235,24 +236,47 @@ CLASSPATH="${CLASSPATH}:${TAJO_BASE_CLASSPATH}"
 # Find and Set Hive CLASSPATH
 ##############################################################################
 
+HIVE_CONF=$HIVE_HOME/conf
+
+if [ -d ${HIVE_CONF} ]; then
+  CLASSPATH=${CLASSPATH}:${HIVE_CONF}
+
+  for f in ${HIVE_CONF}/hive-site.xml; do
+    CLASSPATH=${CLASSPATH}:$f;
+  done
+fi
+
 HIVE_LIB=$HIVE_HOME/lib
 
 if [ -d ${HIVE_LIB} ]; then
-  for f in ${HIVE_LIB}/*.jar; do
+
+  for f in ${HIVE_LIB}/hive-*.jar; do
     CLASSPATH=${CLASSPATH}:$f;
   done
 
-  for f in $HIVE_HOME/hcatalog/share/hcatalog/*.jar; do
+  for f in ${HIVE_LIB}/libfb303-*.jar; do
+    CLASSPATH=${CLASSPATH}:$f;
+  done
+
+  for f in ${HIVE_LIB}/jdo-api-*.jar; do
+    CLASSPATH=${CLASSPATH}:$f;
+  done
+
+  for f in ${HIVE_LIB}/datanucleus-*.jar; do
+    CLASSPATH=${CLASSPATH}:$f;
+  done
+
+  for f in $HIVE_HOME/hcatalog/share/hcatalog/hcatalog-core-*.jar; do
     CLASSPATH=${CLASSPATH}:$f;
   done
 
   for f in $HADOOP_HOME/share/hadoop/mapreduce/hadoop-mapreduce-client-core-*.jar; do
     CLASSPATH=${CLASSPATH}:$f;
   done
+fi
 
-  for f in $HADOOP_HOME/hadoop-core-*.jar; do
-    CLASSPATH=${CLASSPATH}:$f;
-  done
+if [ "${HIVE_JDBC_DRIVER_DIR}" != "" ]; then
+  CLASSPATH=${CLASSPATH}:$HIVE_JDBC_DRIVER_DIR;
 fi
 
 ##############################################################################
@@ -273,7 +297,7 @@ for f in $HADOOP_CONF_DIR/*.xml; do
 done;
 
 for d in $HADOOP_MODULE_DIRS; do
-  for j in $d/*.jar; do
+  for j in `find $d/*.jar ! -name "*test*"`; do
     CLASSPATH=${CLASSPATH}:$j
   done;
 done;
@@ -331,6 +355,9 @@ elif [ "$COMMAND" = "catalog" ] ; then
   TAJO_OPTS="$TAJO_OPTS $TAJO_CATALOG_OPTS"
 elif [ "$COMMAND" = "cli" ] ; then
   CLASS='org.apache.tajo.cli.TajoCli'
+  TAJO_OPTS="$TAJO_OPTS $TAJO_CLI_OPTS"
+elif [ "$COMMAND" = "admin" ] ; then
+  CLASS='org.apache.tajo.client.TajoAdmin'
   TAJO_OPTS="$TAJO_OPTS $TAJO_CLI_OPTS"
 elif [ "$COMMAND" = "dump" ] ; then
   CLASS='org.apache.tajo.client.TajoDump'
