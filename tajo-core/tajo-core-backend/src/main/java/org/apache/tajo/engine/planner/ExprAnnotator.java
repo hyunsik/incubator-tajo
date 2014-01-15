@@ -36,6 +36,11 @@ import org.joda.time.DateTime;
 
 import java.util.Stack;
 
+/**
+ * <code>ExprAnnotator</code> makes an annotated expression called <code>EvalNode</code> from an
+ * {@link org.apache.tajo.algebra.Expr}. It visits descendants recursively from a given expression, and finally
+ * it returns an EvalNode.
+ */
 public class ExprAnnotator extends BaseAlgebraVisitor<ExprAnnotator.Context, EvalNode> {
   private CatalogService catalog;
 
