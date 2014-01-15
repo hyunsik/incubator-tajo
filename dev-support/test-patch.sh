@@ -404,7 +404,7 @@ applyPatch () {
   echo ""
   echo ""
   export PATCH
-  ${GIT} -p${1} < $PATCH_DIR/patch
+  ${GIT} apply -p$1 $PATCH_DIR/patch
   if [[ $? != 0 ]] ; then
   if [[ $? != 0 ]] ; then
     echo "PATCH APPLICATION FAILED"
