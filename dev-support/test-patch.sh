@@ -851,7 +851,7 @@ if [[ $JENKINS == "true" ]] ; then
 fi
 downloadPatch
 verifyPatch
-PLEVEL = $?
+PLEVEL=$?
 if [[ $PLEVEL == -1  ]] ; then
   submitJiraComment 1
   cleanupAndExit 1
@@ -864,7 +864,7 @@ if [[ $JENKINS == "true" ]] ; then
 fi
 checkTests
 (( RESULT = RESULT + $? ))
-applyPatch $P_LEVEL
+applyPatch $PLEVEL
 APPLY_PATCH_RET=$?
 (( RESULT = RESULT + $APPLY_PATCH_RET ))
 if [[ $APPLY_PATCH_RET != 0 ]] ; then
