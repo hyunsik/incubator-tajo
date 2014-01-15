@@ -210,6 +210,8 @@ Release 0.8.0 - unreleased
 
   BUG FIXES
 
+    TAJO-503: HCatalogStore can't scan several hive databases. (jaehwa)
+
     TAJO-502: Jenkins build is failing. (jinho)
 
     TAJO-485: 'CREATE TABLE AS' does not work properly with partition. (jinho)
@@ -331,6 +333,10 @@ Release 0.8.0 - unreleased
     TAJO-293: querymasters directory not found in single node setup. (hyunsik)
 
   TASKS
+
+    TAJO-457: Update committer list and contributor list. (hyunsik)
+
+    TAJO-166: Automatic precommit test using Jenkins. (hyunsik)
 
     TAJO-322: Documentation by version. (hyunsik)
 
