@@ -406,7 +406,6 @@ applyPatch () {
   export PATCH
   ${GIT} apply -p$1 $PATCH_DIR/patch
   if [[ $? != 0 ]] ; then
-  if [[ $? != 0 ]] ; then
     echo "PATCH APPLICATION FAILED"
     JIRA_COMMENT="$JIRA_COMMENT
 
