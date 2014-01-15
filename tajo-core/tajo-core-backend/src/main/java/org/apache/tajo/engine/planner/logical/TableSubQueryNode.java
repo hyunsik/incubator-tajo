@@ -155,7 +155,7 @@ public class TableSubQueryNode extends RelationNode implements Projectable {
     StringBuilder sb = new StringBuilder();
     sb.append("(").append(getPID()).append(") Table Subquery (alias=").append(tableName).append(")\n");
     if (hasTargets()) {
-      sb.append("  targets").append(TUtil.arrayToString(targets)).append("\n");
+      sb.append("  targets: ").append(TUtil.arrayToString(targets)).append("\n");
     }
     sb.append("  out schema:").append(getOutSchema()).append("\n");
     sb.append("  input schema:").append(getInSchema()).append("\n");

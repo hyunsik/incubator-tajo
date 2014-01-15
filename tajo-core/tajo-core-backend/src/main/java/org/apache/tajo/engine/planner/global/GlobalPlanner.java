@@ -363,10 +363,20 @@ public class GlobalPlanner {
 
     // if result table is not a partitioned table, directly store it
     if(partitionDesc == null) {
-      currentNode.setChild(childBlock.getPlan());
-      currentNode.setInSchema(childBlock.getPlan().getOutSchema());
-      childBlock.setPlan(currentNode);
-      return childBlock;
+
+      if (childBlock.getPlan() == null) { // when the below is union
+        for (ExecutionBlock grandChildBlock : context.plan.getChilds(childBlock)) {
+          StoreTableNode copy = PlannerUtil.clone(context.plan.getLogicalPlan(), currentNode);
+          copy.setChild(grandChildBlock.getPlan());
+          grandChildBlock.setPlan(copy);
+        }
+        return childBlock;
+      } else {
+        currentNode.setChild(childBlock.getPlan());
+        currentNode.setInSchema(childBlock.getPlan().getOutSchema());
+        childBlock.setPlan(currentNode);
+        return childBlock;
+      }
     }
 
     // if result table is a partitioned table
@@ -632,7 +642,6 @@ public class GlobalPlanner {
           childBlock.setPlan(copy);
         }
       } else {
-        node.setSubQuery(currentBlock.getPlan());
         currentBlock.setPlan(node);
       }
       context.execBlockMap.put(node.getPID(), currentBlock);
