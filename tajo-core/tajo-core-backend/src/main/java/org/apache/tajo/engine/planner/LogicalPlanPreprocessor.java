@@ -30,6 +30,9 @@ import org.apache.tajo.engine.utils.SchemaUtil;
 
 import java.util.Stack;
 
+/**
+ * It finds all relations for each block and builds base schema information.
+ */
 class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor.PreprocessContext, LogicalNode> {
   private ExprAnnotator annotator;
 
@@ -48,6 +51,7 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
     }
   }
 
+  /** Catalog service */
   private CatalogService catalog;
 
   LogicalPlanPreprocessor(CatalogService catalog, ExprAnnotator annotator) {
@@ -63,9 +67,11 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
 
   @Override
   public LogicalNode postHook(PreprocessContext ctx, Stack<Expr> stack, Expr expr, LogicalNode result) throws PlanningException {
-    // If non-from statement, result can be null.
+    // If non-from statement, result can be null. It avoids that case.
     if (result != null) {
+      // setNode method registers each node to corresponding block and plan.
       ctx.currentBlock.setNode(result);
+      // It makes a map between an expr and a logical node.
       ctx.currentBlock.mapExprToLogicalNode(expr, result);
     }
     return result;
@@ -96,7 +102,7 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
         } else if (evalNode.getType() == EvalType.FIELD) {
           targets[i] = new Target((FieldEval) evalNode);
         } else {
-          targets[i] = new Target(evalNode, "$name_" + i);
+          targets[i] = new Target(evalNode, "?name_" + i);
         }
       }
     }
@@ -160,7 +166,7 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
       if (namedExpr.hasAlias()) {
         targets[i] = new Target(evalNode, namedExpr.getAlias());
       } else {
-        targets[i] = new Target(evalNode, "$name_" + i);
+        targets[i] = new Target(evalNode, "?name_" + i);
       }
     }
     stack.pop();

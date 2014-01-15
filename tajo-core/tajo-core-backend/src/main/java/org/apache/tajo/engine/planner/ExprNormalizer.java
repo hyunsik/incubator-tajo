@@ -27,7 +27,7 @@ import java.util.Stack;
 /**
  * ExprNormalizer performs two kinds of works:
  *
- * <h3>1. Duplicate Removal.</h3>
+ * <h3>1. Duplication Removal.</h3>
  *
  * For example, assume a simple query as follows:
  * <pre>
@@ -57,6 +57,22 @@ import java.util.Stack;
  *
  * It mainly two advantages. Firstly, it makes complex expression evaluations easier across multiple physical executors.
  * Second, it gives move opportunities to remove duplicated expressions.
+ *
+ * <h3>3. Name Normalization</h3>
+ *
+ * Users can use qualified column names, unqualified column names or aliased column references.
+ *
+ * Consider the following example:
+ *
+ * <pre>
+ *   select rate_a as total_rate, rate_a * 100, table1.rate_a, ... WHERE total_rate * 100
+ * </pre>
+ *
+ * <code>total_rate</code>, <code>rate_a</code>, and <code>table1.rate_a</code> are all the same references. But,
+ * they have different forms. Due to their different forms, duplication removal can be hard.
+ *
+ * In order to solve this problem, ExprNormalizer normalizes all column references as qualified names while it keeps
+ * its points..
  */
 class ExprNormalizer extends SimpleAlgebraVisitor<ExprNormalizer.ExprNormalizedResult, Object> {
 
@@ -64,9 +80,10 @@ class ExprNormalizer extends SimpleAlgebraVisitor<ExprNormalizer.ExprNormalizedR
     private final LogicalPlan plan;
     private final LogicalPlan.QueryBlock block;
 
-    Expr baseExpr;
-    List<NamedExpr> aggExprs = new ArrayList<NamedExpr>();
-    List<NamedExpr> scalarExprs = new ArrayList<NamedExpr>();
+    Expr baseExpr; // outmost expressions, which can includes one or more references of the results of aggregation
+                   // function.
+    List<NamedExpr> aggExprs = new ArrayList<NamedExpr>(); // aggregation functions
+    List<NamedExpr> scalarExprs = new ArrayList<NamedExpr>(); // scalar expressions which can be referred
 
     private ExprNormalizedResult(LogicalPlanner.PlanContext context) {
       this.plan = context.plan;
@@ -227,6 +244,7 @@ class ExprNormalizer extends SimpleAlgebraVisitor<ExprNormalizer.ExprNormalizedR
   @Override
   public Expr visitColumnReference(ExprNormalizedResult ctx, Stack<Expr> stack, ColumnReferenceExpr expr)
       throws PlanningException {
+    // normalize column references.
     if (!expr.hasQualifier()) {
       if (ctx.block.namedExprsMgr.contains(expr.getCanonicalName())) {
         NamedExpr namedExpr = ctx.block.namedExprsMgr.getNamedExpr(expr.getCanonicalName());

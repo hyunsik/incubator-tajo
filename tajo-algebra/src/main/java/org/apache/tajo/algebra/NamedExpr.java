@@ -21,6 +21,19 @@ package org.apache.tajo.algebra;
 import com.google.common.base.Objects;
 import org.apache.tajo.util.TUtil;
 
+/**
+ * <code>NamedExpr</code> is an expression which can be aliased in a target list.
+ *
+ * <pre>
+ *   SELECT col1 + col2 as a, sum(col2) as b, col3 as c, col4, ... FROM ...
+ *          ^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^  ^^^^
+ *               expr1             expr2        expr3    expr4
+ * </pre>
+ *
+ * We define each expression in expr1 - expr4 as a named expression.
+ * In database community, each of them is called target or an expression in a select list,
+ * Each expression can be explicitly aliased as an given name.
+ */
 public class NamedExpr extends UnaryOperator {
   private String alias;
 
