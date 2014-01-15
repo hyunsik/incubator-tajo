@@ -13,7 +13,6 @@
 
 
 #set -x
-ulimit -n 1024
 
 ### Setup some variables.  
 ### GIT_REVISION and BUILD_URL are set by Hudson if it is run by patch process
@@ -279,11 +278,16 @@ verifyPatch () {
   # Before building, check to make sure that the patch is valid
   ${GIT} apply --check -p0 $PATCH_DIR/patch
   if [[ $? != 0 ]] ; then
-    echo "PATCH APPLICATION FAILED"
-    JIRA_COMMENT="$JIRA_COMMENT
+    ${GIT} apply --check -p1 $PATCH_DIR/patch
+    if [[ $? != 0 ]] ; then
+      echo "PATCH APPLICATION FAILED"
+      JIRA_COMMENT="$JIRA_COMMENT
 
-    -1 patch.  The patch command could not apply the patch."
-    return 1
+      -1 patch.  The patch command could not apply the patch."
+      return -1
+    else
+      return 1
+    fi
   else
     return 0
   fi
@@ -400,7 +404,8 @@ applyPatch () {
   echo ""
   echo ""
   export PATCH
-  ${PATCH} -p0 < $PATCH_DIR/patch
+  ${GIT} -p${1} < $PATCH_DIR/patch
+  if [[ $? != 0 ]] ; then
   if [[ $? != 0 ]] ; then
     echo "PATCH APPLICATION FAILED"
     JIRA_COMMENT="$JIRA_COMMENT
@@ -847,8 +852,8 @@ if [[ $JENKINS == "true" ]] ; then
 fi
 downloadPatch
 verifyPatch
-(( RESULT = RESULT + $? ))
-if [[ $RESULT != 0 ]] ; then
+PLEVEL = $?
+if [[ $PLEVEL == -1  ]] ; then
   submitJiraComment 1
   cleanupAndExit 1
 fi
@@ -860,7 +865,7 @@ if [[ $JENKINS == "true" ]] ; then
 fi
 checkTests
 (( RESULT = RESULT + $? ))
-applyPatch
+applyPatch $P_LEVEL
 APPLY_PATCH_RET=$?
 (( RESULT = RESULT + $APPLY_PATCH_RET ))
 if [[ $APPLY_PATCH_RET != 0 ]] ; then
