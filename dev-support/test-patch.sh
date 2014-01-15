@@ -45,6 +45,7 @@ FORREST_HOME=${FORREST_HOME}
 ECLIPSE_HOME=${ECLIPSE_HOME}
 REMOTE_NAME=${REMOTE_NAME:-origin}
 BRANCH_NAME=${BRANCH_NAME:-master}
+TAJO_MVN_OPTS=${TAJO_MVN_OPTS}
 
 ###############################################################################
 printUsage() {
@@ -58,6 +59,7 @@ printUsage() {
   echo "--patch-dir=<dir>      The directory for working and output files (default '/tmp')"
   echo "--basedir=<dir>        The directory to apply the patch to (default current directory)"
   echo "--mvn-cmd=<cmd>        The 'mvn' command to use (default \$MAVEN_HOME/bin/mvn, or 'mvn')"
+  echo "--mvn-opts=<opt>       The maven options to use"
   echo "--ps-cmd=<cmd>         The 'ps' command to use (default 'ps')"
   echo "--awk-cmd=<cmd>        The 'awk' command to use (default 'awk')"
   echo "--git-cmd=<cmd>        The 'git' command to use (default 'git')"
@@ -145,6 +147,9 @@ parseArgs() {
       ;;
     --remote-name=*)
       REMOTE_NAME=${i#*=}
+      ;;
+    --mvn-opts=*)
+      TAJO_MVN_OPTS=${i#*=}
       ;;
     --dirty-workspace)
       DIRTY_WORKSPACE=true
@@ -305,8 +310,8 @@ buildTrunk () {
   echo ""
   echo ""
   echo "Compiling $(pwd)"
-  echo "$MVN clean test -DskipTests > $PATCH_DIR/trunkJavacWarnings.txt 2>&1"
-  $MVN clean test -DskipTests > $PATCH_DIR/trunkJavacWarnings.txt 2>&1
+  echo "$MVN clean test -DskipTests $TAJO_MVN_OPTS > $PATCH_DIR/trunkJavacWarnings.txt 2>&1"
+  $MVN clean test -DskipTests $TAJO_MVN_OPTS > $PATCH_DIR/trunkJavacWarnings.txt 2>&1
   if [[ $? != 0 ]] ; then
     echo "Trunk compilation is broken?"
     cleanupAndExit 1
@@ -314,8 +319,8 @@ buildTrunk () {
 
   echo ""
   echo "Generating Javadocs"
-  echo "$MVN test javadoc:javadoc -DskipTests > $PATCH_DIR/trunkJavadocsWarnings.txt 2>&1"
-  $MVN test javadoc:javadoc -DskipTests > $PATCH_DIR/trunkJavadocWarnings.txt 2>&1
+  echo "$MVN test javadoc:javadoc -DskipTests $TAJO_MVN_OPTS > $PATCH_DIR/trunkJavadocsWarnings.txt 2>&1"
+  $MVN test javadoc:javadoc -DskipTests $TAJO_MVN_OPTS > $PATCH_DIR/trunkJavadocWarnings.txt 2>&1
 }
 
 ###############################################################################
@@ -427,8 +432,8 @@ checkJavadocWarnings () {
   echo "======================================================================"
   echo ""
   echo ""
-  echo "$MVN test javadoc:javadoc -DskipTests > $PATCH_DIR/patchJavadocWarnings.txt 2>&1"
-  $MVN test javadoc:javadoc -DskipTests > $PATCH_DIR/patchJavadocWarnings.txt 2>&1
+  echo "$MVN test javadoc:javadoc -DskipTests $TAJO_MVN_OPTS > $PATCH_DIR/patchJavadocWarnings.txt 2>&1"
+  $MVN test javadoc:javadoc -DskipTests $TAJO_MVN_OPTS > $PATCH_DIR/patchJavadocWarnings.txt 2>&1
 
   $GREP '\[WARNING\]' $PATCH_DIR/trunkJavadocWarnings.txt | $AWK '/Javadoc Warnings/,EOF' | $GREP warning > $PATCH_DIR/filteredTrunkJavadocWarnings.txt
   $GREP '\[WARNING\]' $PATCH_DIR/patchJavadocWarnings.txt | $AWK '/Javadoc Warnings/,EOF' | $GREP warning > $PATCH_DIR/filteredPatchJavadocWarnings.txt
@@ -466,8 +471,8 @@ checkJavacWarnings () {
   echo "======================================================================"
   echo ""
   echo ""
-  echo "$MVN clean test -DskipTests > $PATCH_DIR/patchJavacWarnings.txt 2>&1"
-  $MVN clean test -DskipTests > $PATCH_DIR/patchJavacWarnings.txt 2>&1
+  echo "$MVN clean test -DskipTests $TAJO_MVN_OPTS > $PATCH_DIR/patchJavacWarnings.txt 2>&1"
+  $MVN clean test -DskipTests $TAJO_MVN_OPTS > $PATCH_DIR/patchJavacWarnings.txt 2>&1
   if [[ $? != 0 ]] ; then
     JIRA_COMMENT="$JIRA_COMMENT
 
@@ -556,8 +561,8 @@ checkStyle () {
   echo "======================================================================"
   echo ""
   echo ""
-  echo "$MVN test checkstyle:checkstyle -DskipTests > $PATCH_DIR/patchStyleErrors.txt 2>&1"
-  $MVN test checkstyle:checkstyle -DskipTests > $PATCH_DIR/patchStyleErrors.txt 2>&1
+  echo "$MVN test checkstyle:checkstyle -DskipTests $TAJO_MVN_OPTS > $PATCH_DIR/patchStyleErrors.txt 2>&1"
+  $MVN test checkstyle:checkstyle -DskipTests $TAJO_MVN_OPTS > $PATCH_DIR/patchStyleErrors.txt 2>&1
 
 # JIRA_COMMENT_FOOTER="Checkstyle results: $BUILD_URL/artifact/incubator-tajo/build/test/checkstyle-errors.html
 # $JIRA_COMMENT_FOOTER"
@@ -596,8 +601,8 @@ buildAndInstall () {
   echo "======================================================================"
   echo ""
   echo ""
-  echo "$MVN install -Dmaven.javadoc.skip=true -DskipTests"
-  $MVN install -Dmaven.javadoc.skip=true -DskipTests
+  echo "$MVN install -Dmaven.javadoc.skip=true -DskipTests $TAJO_MVN_OPTS"
+  $MVN install -Dmaven.javadoc.skip=true -DskipTests $TAJO_MVN_OPTS
   return $?
 }
 
@@ -623,8 +628,8 @@ checkFindbugsWarnings () {
     cd $module
     echo "  Running findbugs in $module"
     module_suffix=`basename ${module}`
-    echo "$MVN test findbugs:findbugs -DskipTests < /dev/null > $PATCH_DIR/patchFindBugsOutput${module_suffix}.txt 2>&1" 
-    $MVN test findbugs:findbugs -DskipTests < /dev/null > $PATCH_DIR/patchFindBugsOutput${module_suffix}.txt 2>&1
+    echo "$MVN test findbugs:findbugs -DskipTests $TAJO_MVN_OPTS < /dev/null > $PATCH_DIR/patchFindBugsOutput${module_suffix}.txt 2>&1" 
+    $MVN test findbugs:findbugs -DskipTests $TAJO_MVN_OPTS < /dev/null > $PATCH_DIR/patchFindBugsOutput${module_suffix}.txt 2>&1
     (( rc = rc + $? ))
     cd -
   done
@@ -696,8 +701,8 @@ runTests () {
   do
     cd $module
     echo "  Running tests in $module"
-    echo "  $MVN test -fn"
-    $MVN test -fn
+    echo "  $MVN test -fn $TAJO_MVN_OPTS"
+    $MVN test -fn $TAJO_MVN_OPTS
     module_failed_tests=`find . -name 'TEST*.xml' | xargs $GREP  -l -E "<failure|<error" | sed -e "s|.*target/surefire-reports/TEST-|                  |g" | sed -e "s|\.xml||g"`
     # With -fn mvn always exits with a 0 exit code.  Because of this we need to
     # find the errors instead of using the exit code.  We assume that if the build
