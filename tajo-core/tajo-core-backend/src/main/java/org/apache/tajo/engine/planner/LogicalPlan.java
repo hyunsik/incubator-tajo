@@ -353,7 +353,7 @@ public class LogicalPlan {
             ExplainLogicalPlanVisitor.printDepthString(explainContext.getMaxDepth(), explainContext.explains.pop()));
       }
     } catch (PlanningException e) {
-      e.printStackTrace();
+      throw new RuntimeException(e);
     }
 
     return explains.toString();

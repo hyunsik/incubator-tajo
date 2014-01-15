@@ -417,9 +417,23 @@ public class GlobalPlanner {
 
       ExecutionBlock execBlock = context.execBlockMap.remove(child.getPID());
 
-      node.setChild(execBlock.getPlan());
-      node.setInSchema(execBlock.getPlan().getOutSchema());
-      execBlock.setPlan(node);
+      if (child.getType() == NodeType.TABLE_SUBQUERY &&
+          ((TableSubQueryNode)child).getSubQuery().getType() == NodeType.UNION) {
+        MasterPlan masterPlan = context.plan;
+        for (DataChannel dataChannel : masterPlan.getIncomingChannels(execBlock.getId())) {
+          ExecutionBlock subBlock = masterPlan.getExecBlock(dataChannel.getSrcId());
+
+          ProjectionNode copy = PlannerUtil.clone(plan, node);
+          copy.setChild(subBlock.getPlan());
+          subBlock.setPlan(copy);
+        }
+        execBlock.setPlan(null);
+      } else {
+        node.setChild(execBlock.getPlan());
+        node.setInSchema(execBlock.getPlan().getOutSchema());
+        execBlock.setPlan(node);
+      }
+
       context.execBlockMap.put(node.getPID(), execBlock);
       return node;
     }
@@ -565,9 +579,9 @@ public class GlobalPlanner {
       }
 
       for (ExecutionBlock childBlocks : unionBlocks) {
-        UnionNode union = (UnionNode) childBlocks.getPlan();
-        queryBlockBlocks.add(context.execBlockMap.get(union.getLeftChild().getPID()));
-        queryBlockBlocks.add(context.execBlockMap.get(union.getRightChild().getPID()));
+        for (ExecutionBlock grandChildBlock : context.plan.getChilds(childBlocks)) {
+          queryBlockBlocks.add(grandChildBlock);
+        }
       }
 
       for (ExecutionBlock childBlocks : queryBlockBlocks) {
@@ -608,8 +622,7 @@ public class GlobalPlanner {
                                           LogicalPlan.QueryBlock queryBlock,
                                           TableSubQueryNode node, Stack<LogicalNode> stack) throws PlanningException {
       LogicalNode child = super.visitTableSubQuery(context, plan, queryBlock, node, stack);
-      return handleUnaryNode(context, child, node);
-      /*
+
       ExecutionBlock currentBlock = context.execBlockMap.remove(child.getPID());
 
       if (child.getType() == NodeType.UNION) {
@@ -618,14 +631,12 @@ public class GlobalPlanner {
           copy.setSubQuery(childBlock.getPlan());
           childBlock.setPlan(copy);
         }
-        context.execBlockMap.put(node.getPID(), currentBlock);
       } else {
         node.setSubQuery(currentBlock.getPlan());
         currentBlock.setPlan(node);
-        context.execBlockMap.put(node.getPID(), currentBlock);
       }
+      context.execBlockMap.put(node.getPID(), currentBlock);
       return node;
-      */
     }
 
     @Override

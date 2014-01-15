@@ -161,20 +161,6 @@ public class TestSelectQuery extends QueryTestCaseBase {
   }
 
   @Test
-  public final void testUnion1() throws Exception {
-    ResultSet res = executeQuery();
-    assertResultSet(res);
-    cleanupQuery(res);
-  }
-
-  @Test
-  public final void testUnion2() throws Exception {
-    ResultSet res = executeQuery();
-    assertResultSet(res);
-    cleanupQuery(res);
-  }
-
-  @Test
   public final void testCreateAfterSelect() throws Exception {
     ResultSet res = testingCluster.execute(
         "create table orderkeys as select l_orderkey from lineitem");
