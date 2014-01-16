@@ -343,17 +343,6 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     }
   }
 
-  private boolean isNoUpperProjection(Stack<Expr> stack) {
-    for (Expr expr : stack) {
-      OpType type = expr.getType();
-      if (!( (type == OpType.Projection) || (type == OpType.Aggregation) || (type == OpType.Join) )) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
   /*===============================================================================================
     SORT SECTION
   ===============================================================================================*/
@@ -939,15 +928,18 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     LogicalPlan plan = context.plan;
     QueryBlock block = context.queryBlock;
 
-    // 2. Build Child Plans
+    // Build a left child plan
     QueryBlock leftBlock = context.plan.getBlockByExpr(setOperation.getLeft());
     PlanContext leftContext = new PlanContext(context, leftBlock);
     LogicalNode leftChild = visit(leftContext, new Stack<Expr>(), setOperation.getLeft());
+    // Connect left child and current blocks
     context.plan.connectBlocks(leftContext.queryBlock, context.queryBlock, BlockType.TableSubQuery);
 
+    // Build a right child plan
     QueryBlock rightBlock = context.plan.getBlockByExpr(setOperation.getRight());
     PlanContext rightContext = new PlanContext(context, rightBlock);
     LogicalNode rightChild = visit(rightContext, new Stack<Expr>(), setOperation.getRight());
+    // Connect right child and current blocks
     context.plan.connectBlocks(rightContext.queryBlock, context.queryBlock, BlockType.TableSubQuery);
 
     BinaryNode setOp;
@@ -963,8 +955,9 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     setOp.setLeftChild(leftChild);
     setOp.setRightChild(rightChild);
 
-    // Strip the table names from the targets of the both blocks
-    // in order to check the equivalence the schemas of both blocks.
+    // An union statement can be derived from two query blocks.
+    // For one union statement between both relations, we can ensure that each corresponding data domain of both
+    // relations are the same. However, if necessary, the schema of left query block will be used as a base schema.
     Target [] leftStrippedTargets = PlannerUtil.stripTarget(
         PlannerUtil.schemaToTargets(leftBlock.getRoot().getOutSchema()));
 

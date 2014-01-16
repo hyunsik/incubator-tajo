@@ -704,7 +704,7 @@ public class PlannerUtil {
         throw new InternalError(e.getMessage());
       }
       if (copy[i].getEvalTree().getType() == EvalType.FIELD) {
-        FieldEval fieldEval = (FieldEval) copy[i].getEvalTree();
+        FieldEval fieldEval = copy[i].getEvalTree();
         if (fieldEval.getColumnRef().hasQualifier()) {
           fieldEval.getColumnRef().setName(fieldEval.getColumnName());
         }
