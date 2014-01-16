@@ -69,13 +69,16 @@ public class TestGroupByQuery extends QueryTestCaseBase {
 
   @Test
   public final void testGroupByNested2() throws Exception {
+    // select sum(l_orderkey) + sum(l_partkey) as total from lineitem group by l_orderkey + l_partkey;
     ResultSet res = executeQuery();
-    System.out.println(resultSetToString(res));
+    assertResultSet(res);
     cleanupQuery(res);
   }
 
   @Test
   public final void testCountDistinct() throws Exception {
+    // select l_orderkey, max(l_orderkey) as maximum, count(distinct l_linenumber) as unique_key from lineitem
+    // group by l_orderkey;
     ResultSet res = executeQuery();
     assertResultSet(res);
     cleanupQuery(res);
@@ -86,6 +89,7 @@ public class TestGroupByQuery extends QueryTestCaseBase {
    * This is an unit test for a combination of aggregation and distinct aggregation functions.
    */
   public final void testCountDistinct2() throws Exception {
+    // select l_orderkey, count(*) as cnt, count(distinct l_linenumber) as unique_key from lineitem group by l_orderkey;
     ResultSet res = executeQuery();
     assertResultSet(res);
     cleanupQuery(res);
@@ -93,6 +97,7 @@ public class TestGroupByQuery extends QueryTestCaseBase {
 
   @Test
   public final void testComplexParameter() throws Exception {
+    // select sum(l_extendedprice*l_discount) as revenue from lineitem;
     ResultSet res = executeQuery();
     assertResultSet(res);
     cleanupQuery(res);
@@ -107,6 +112,7 @@ public class TestGroupByQuery extends QueryTestCaseBase {
 
   @Test
   public final void testComplexParameter2() throws Exception {
+    // select count(*) + max(l_orderkey) as merged from lineitem;
     ResultSet res = executeQuery();
     assertResultSet(res);
     cleanupQuery(res);
@@ -114,6 +120,8 @@ public class TestGroupByQuery extends QueryTestCaseBase {
 
   @Test
   public final void testHavingWithNamedTarget() throws Exception {
+    // select l_orderkey, avg(l_partkey) total, sum(l_linenumber) as num from lineitem group by l_orderkey
+    // having total >= 2 or num = 3;
     ResultSet res = executeQuery();
     assertResultSet(res);
     cleanupQuery(res);
@@ -122,6 +130,8 @@ public class TestGroupByQuery extends QueryTestCaseBase {
 
   @Test
   public final void testHavingWithAggFunction() throws Exception {
+    // select l_orderkey, avg(l_partkey) total, sum(l_linenumber) as num from lineitem group by l_orderkey
+    // having avg(l_partkey) = 2.5 or num = 1;
     ResultSet res = executeQuery();
     assertResultSet(res);
     cleanupQuery(res);
