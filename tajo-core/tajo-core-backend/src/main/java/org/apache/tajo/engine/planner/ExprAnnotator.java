@@ -404,7 +404,7 @@ public class ExprAnnotator extends BaseAlgebraVisitor<ExprAnnotator.Context, Eva
     } else if (functionType == CatalogProtos.FunctionType.AGGREGATION
         || functionType == CatalogProtos.FunctionType.UDA) {
       if (!ctx.currentBlock.hasNode(NodeType.GROUP_BY)) {
-        ctx.currentBlock.setHasGrouping();
+        ctx.currentBlock.setAggregationRequire();
       }
       return new AggregationFunctionCallEval(funcDesc, (AggFunction) funcDesc.newInstance(), givenArgs);
     } else if (functionType == CatalogProtos.FunctionType.DISTINCT_AGGREGATION
@@ -429,7 +429,7 @@ public class ExprAnnotator extends BaseAlgebraVisitor<ExprAnnotator.Context, Eva
         new TajoDataTypes.DataType[] {});
 
     try {
-      ctx.currentBlock.setHasGrouping();
+      ctx.currentBlock.setAggregationRequire();
 
       return new AggregationFunctionCallEval(countRows, (AggFunction) countRows.newInstance(),
           new EvalNode[] {});
@@ -462,7 +462,7 @@ public class ExprAnnotator extends BaseAlgebraVisitor<ExprAnnotator.Context, Eva
 
     FunctionDesc funcDesc = catalog.getFunction(setFunction.getSignature(), functionType, paramTypes);
     if (!ctx.currentBlock.hasNode(NodeType.GROUP_BY)) {
-      ctx.currentBlock.setHasGrouping();
+      ctx.currentBlock.setAggregationRequire();
     }
 
     try {

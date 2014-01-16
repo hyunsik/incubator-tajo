@@ -56,6 +56,14 @@ public class TestSelectQuery extends QueryTestCaseBase {
   }
 
   @Test
+  public final void testSelectColumnAlias1() throws Exception {
+    ResultSet res = executeQuery();
+//    assertResultSet(res);
+    System.out.println(resultSetToString(res));
+    cleanupQuery(res);
+  }
+
+  @Test
   public final void testWhereCond1() throws Exception {
     ResultSet res = executeQuery();
     assertResultSet(res);

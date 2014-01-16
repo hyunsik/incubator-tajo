@@ -21,8 +21,6 @@ package org.apache.tajo.engine.planner;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import org.apache.hadoop.classification.InterfaceStability;
-import org.apache.tajo.algebra.Expr;
-import org.apache.tajo.algebra.Join;
 import org.apache.tajo.algebra.JoinType;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.engine.eval.AlgebraicUtil;
@@ -104,8 +102,8 @@ public class LogicalOptimizer {
 
       PlannerUtil.replaceNode(plan, block.getRoot(), old, newJoinNode);
       String optimizedOrder = JoinOrderStringBuilder.buildJoinOrderString(plan, block);
-      block.addHistory("Non-optimized join order: " + originalOrder + " (cost: " + nonOptimizedJoinCost + ")");
-      block.addHistory("Optimized join order    : " + optimizedOrder + " (cost: " + order.getCost() + ")");
+      block.addPlanHistory("Non-optimized join order: " + originalOrder + " (cost: " + nonOptimizedJoinCost + ")");
+      block.addPlanHistory("Optimized join order    : " + optimizedOrder + " (cost: " + order.getCost() + ")");
     }
   }
 

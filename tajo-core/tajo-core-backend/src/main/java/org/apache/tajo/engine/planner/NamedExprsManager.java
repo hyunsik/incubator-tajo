@@ -188,6 +188,10 @@ public class NamedExprsManager {
     nameToEvalMap.put(normalized, evalNode);
     evalToNameMap.put(evalNode, normalized);
     resolvedFlags.put(normalized, true);
+
+    for (Iterator<NamedExpr> it = getUnresolvedExprs(); it.hasNext();) {
+
+    }
   }
 
   public boolean contains(EvalNode evalNode) {

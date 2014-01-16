@@ -70,7 +70,7 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
     // If non-from statement, result can be null. It avoids that case.
     if (result != null) {
       // setNode method registers each node to corresponding block and plan.
-      ctx.currentBlock.setNode(result);
+      ctx.currentBlock.registerNode(result);
       // It makes a map between an expr and a logical node.
       ctx.currentBlock.mapExprToLogicalNode(expr, result);
     }

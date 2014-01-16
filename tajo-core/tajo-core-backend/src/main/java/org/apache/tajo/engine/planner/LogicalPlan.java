@@ -327,9 +327,9 @@ public class LogicalPlan {
         new DirectedGraphCursor<String, BlockEdge>(queryBlockGraph, getRootBlock().getName());
     while(cursor.hasNext()) {
       QueryBlock block = getBlock(cursor.nextBlock());
-      if (block.getPlaningHistory().size() > 0) {
+      if (block.getPlanHistory().size() > 0) {
         sb.append("\n[").append(block.getName()).append("]\n");
-        for (String log : block.getPlaningHistory()) {
+        for (String log : block.getPlanHistory()) {
           sb.append("> ").append(log).append("\n");
         }
       }
@@ -418,13 +418,18 @@ public class LogicalPlan {
     // transient states
     private Map<String, RelationNode> nameToRelationMap = new HashMap<String, RelationNode>();
     private Map<OpType, List<Expr>> operatorToExprMap = TUtil.newHashMap();
+    /**
+     * It's a map between nodetype and node. node types can be duplicated. So, latest node type is only kept.
+     */
     private Map<NodeType, LogicalNode> nodeTypeToNodeMap = TUtil.newHashMap();
     private Map<String, LogicalNode> exprToNodeMap = TUtil.newHashMap();
     NamedExprsManager namedExprsMgr;
 
     private LogicalNode latestNode;
-    private boolean resolvedGrouping = true;
-    private Projectable projectionNode;
+    /**
+     * Set true value if this query block has either implicit or explicit aggregation.
+     */
+    private boolean aggregationRequired = true;
     private Schema schema;
 
     /** It contains a planning log for this block */
@@ -459,10 +464,6 @@ public class LogicalPlan {
 
     public NodeType getRootType() {
       return rootType;
-    }
-
-    public NamedExprsManager getNamedExprsManager() {
-      return namedExprsMgr;
     }
 
     public Target [] getUnresolvedTargets() {
@@ -502,9 +503,6 @@ public class LogicalPlan {
     }
 
     public void updateLatestNode(LogicalNode node) {
-      if (node instanceof Projectable) {
-        projectionNode = (Projectable) node;
-      }
       this.latestNode = node;
     }
 
@@ -532,24 +530,14 @@ public class LogicalPlan {
       }
     }
 
-    public boolean hasProjection() {
-      return hasAlgebraicExpr(OpType.Projection);
-    }
-
-    public Projection getProjection() {
-      return getSingletonExpr(OpType.Projection);
-    }
-
     public boolean hasNode(NodeType nodeType) {
       return nodeTypeToNodeMap.containsKey(nodeType);
     }
 
-    public void setNode(LogicalNode node) {
+    public void registerNode(LogicalNode node) {
       // id -> node
       nodeMap.put(node.getPID(), node);
 
-      // map: nodetype -> node
-      // node types can be duplicated. So, latest node type is only kept.
       // So, this is only for filter, groupby, sort, limit, projection, which exists once at a query block.
       nodeTypeToNodeMap.put(node.getType(), node);
 
@@ -569,63 +557,40 @@ public class LogicalPlan {
       return (T) exprToNodeMap.get(ObjectUtils.identityToString(expr));
     }
 
-    public Projectable getProjectableNode() {
-      return this.projectionNode;
+    /**
+     * This flag can be changed as a plan is generated.
+     *
+     * True value means that this query should have aggregation phase. If aggregation plan is added to this block,
+     * it becomes false because it doesn't need aggregation phase anymore. It is usually used to add aggregation
+     * phase from SELECT statement without group-by clause.
+     *
+     * @return True if aggregation is needed but this query hasn't had aggregation phase.
+     */
+    public boolean isAggregationRequired() {
+      return this.aggregationRequired;
     }
 
-    public boolean isGroupingResolved() {
-      return this.resolvedGrouping;
+    /**
+     * Unset aggregation required flag. It has to be called after an aggregation phase is added to this block.
+     */
+    public void unsetAggregationRequire() {
+      this.aggregationRequired = true;
     }
 
-    public void resolveGroupingRequired() {
-      this.resolvedGrouping = true;
+    public void setAggregationRequire() {
+      aggregationRequired = false;
     }
 
-    public void setHasGrouping() {
-      resolvedGrouping = false;
-    }
-
-    public List<String> getPlaningHistory() {
+    public List<String> getPlanHistory() {
       return planingHistory;
     }
 
-    public void addHistory(String history) {
+    public void addPlanHistory(String history) {
       this.planingHistory.add(history);
-    }
-
-    public boolean postVisit(LogicalNode currentNode, Expr currentExpr, Stack<Expr> path) {
-
-      updateLatestNode(currentNode);
-
-      // if an added operator is a relation, add it to relation set.
-      switch (currentNode.getType()) {
-        case GROUP_BY:
-          resolveGroupingRequired();
-          break;
-      }
-
-      // if this node is the topmost
-      if (path.size() == 0) {
-        setRoot(currentNode);
-      }
-
-      return true;
     }
 
     public String toString() {
       return blockName;
     }
-
-    ///////////////////////////////////////////////////////////////////////////
-    //                 Target List Management Methods
-    ///////////////////////////////////////////////////////////////////////////
-    //
-    // A target list means a list of expressions after SELECT keyword in SQL.
-    //
-    // SELECT rel1.col1, sum(rel1.col2), res1.col3 + res2.col2, ... FROM ...
-    //        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    //                        TARGET LIST
-    //
-    ///////////////////////////////////////////////////////////////////////////
   }
 }

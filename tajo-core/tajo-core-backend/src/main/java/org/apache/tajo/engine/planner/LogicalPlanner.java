@@ -123,14 +123,29 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
   public LogicalNode postHook(PlanContext context, Stack<Expr> stack, Expr expr, LogicalNode current)
       throws PlanningException {
-    // Post work
-    if ((expr.getType() == OpType.RelationList && ((RelationList) expr).size() == 1)
-        || expr.getType() == OpType.Having) {
-      return current;
+
+
+    // This checking determines whether current logical node is already visited or not.
+    // generated logical nodes (e.g., implicit aggregation) without exprs will pass NULL as a expr parameter.
+    // We should skip them.
+    if (expr != null) {
+      // A relation list including a single ScanNode will return a ScanNode instance that already passed postHook.
+      // So, it skips the already-visited ScanNode instance.
+      if (expr.getType() == OpType.RelationList && current.getType() == NodeType.SCAN) {
+        return current;
+      }
     }
 
-    // mark the node as the visited node and do post work for each operator
-    context.queryBlock.postVisit(current, expr, stack);
+    QueryBlock queryBlock = context.queryBlock;
+    queryBlock.updateLatestNode(current);
+    if (current.getType() == NodeType.GROUP_BY) {
+      queryBlock.unsetAggregationRequire();
+    }
+
+    // if this node is the topmost
+    if (stack.size() == 0) {
+      queryBlock.setRoot(current);
+    }
 
     return current;
   }
@@ -184,7 +199,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         namedExpr = projection.getNamedExprs()[i];
 
         if (PlannerUtil.existsAggregationFunction(namedExpr)) {
-          block.setHasGrouping();
+          block.setAggregationRequire();
         }
         // dissect an expression into multiple parts (at most dissected into three parts)
         normalizedExprList[i] = normalizer.normalize(context, namedExpr.getExpr());
@@ -312,7 +327,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     LogicalPlan plan = context.plan;
     QueryBlock block = context.queryBlock;
 
-    if (!block.isGroupingResolved()) {
+    if (!block.isAggregationRequired()) {
       GroupbyNode groupbyNode = new GroupbyNode(plan.newPID());
       groupbyNode.setGroupingColumns(new Column[] {});
 
@@ -335,8 +350,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       groupbyNode.setChild(child);
       groupbyNode.setInSchema(child.getOutSchema());
 
-      block.setNode(groupbyNode); // this inserted group-by node doesn't pass through preprocessor. So manually added.
-      block.postVisit(groupbyNode, null, stack);
+      block.registerNode(groupbyNode); // this inserted group-by node doesn't pass through preprocessor. So manually added.
+      postHook(context, stack, null, groupbyNode);
       return groupbyNode;
     } else {
       return child;
@@ -551,7 +566,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       groupingNode.setTargets(targets.toArray(new Target[targets.size()]));
       // 4. Set Child Plan and Update Input Schemes Phase
       groupingNode.setChild(child);
-      block.setNode(groupingNode);
+      block.registerNode(groupingNode);
       groupingNode.setInSchema(child.getOutSchema());
 
       // 5. Update Output Schema and Targets for Upper Plan
@@ -612,7 +627,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     selectionNode.setOutSchema(child.getOutSchema());
 
     // 5. update block information:
-    block.setNode(selectionNode);
+    block.registerNode(selectionNode);
 
     return selectionNode;
   }
@@ -783,7 +798,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         current = createCartesianProduct(context, left, right);
       }
     }
-    context.queryBlock.setNode(current);
+    context.queryBlock.registerNode(current);
 
     return current;
   }
