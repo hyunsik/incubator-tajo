@@ -88,12 +88,13 @@ public class LogicalOptimizer {
       // finding join order and restore remain filter order
       FoundJoinOrder order = joinOrderAlgorithm.findBestOrder(plan, block,
           joinGraphContext.joinGraph, joinGraphContext.relationsForProduct);
+      JoinNode newJoinNode = order.getOrderedJoin();
 
       JoinNode old = block.getNode(NodeType.JOIN);
       JoinTargetCollector collector = new JoinTargetCollector();
       Set<Target> targets = new LinkedHashSet<Target>();
       collector.visitJoin(targets, plan, block, old, new Stack<LogicalNode>());
-      JoinNode newJoinNode = order.getOrderedJoin();
+
       if (targets.size() == 0) {
         newJoinNode.setTargets(PlannerUtil.schemaToTargets(old.getOutSchema()));
       } else {

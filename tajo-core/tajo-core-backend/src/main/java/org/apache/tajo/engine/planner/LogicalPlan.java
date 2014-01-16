@@ -226,8 +226,22 @@ public class LogicalPlan {
         throw new VerifyException("ERROR: no such a column '"+ columnRef.getCanonicalName() + "'");
       }
 
-      return column;
+      // Try to check if column reference is already aliased.
+      // The original column name may not be used.
+      // If so, it replaces the column references by aliased name.
+      List<Column> candidates = TUtil.newList();
+      if (block.namedExprsMgr.isAliased(column.getQualifiedName())) {
+        String alias = block.namedExprsMgr.getAlias(columnRef.getCanonicalName());
+        Column found = resolveColumn(block, new ColumnReferenceExpr(alias));
+        if (found != null) {
+          candidates.add(found);
+        }
+      }
+      if (!candidates.isEmpty()) {
+        return ensureUniqueColumn(candidates);
+      }
 
+      return column;
     } else { // if a column reference is not qualified
 
       // Trying to find the column within the current block
@@ -239,8 +253,20 @@ public class LogicalPlan {
         }
       }
 
-      // Trying to find columns from other relations in the current block
       List<Column> candidates = TUtil.newList();
+      // Trying to find columns from aliased references.
+      if (block.namedExprsMgr.isAliased(columnRef.getCanonicalName())) {
+        String originalName = block.namedExprsMgr.getAlias(columnRef.getCanonicalName());
+        Column found = resolveColumn(block, new ColumnReferenceExpr(originalName));
+        if (found != null) {
+          candidates.add(found);
+        }
+      }
+      if (!candidates.isEmpty()) {
+        return ensureUniqueColumn(candidates);
+      }
+
+      // Trying to find columns from other relations in the current block
       for (RelationNode rel : block.getRelations()) {
         Column found = rel.getOutSchema().getColumnByName(columnRef.getName());
         if (found != null) {
@@ -274,17 +300,6 @@ public class LogicalPlan {
         }
       }
 
-      if (!candidates.isEmpty()) {
-        return ensureUniqueColumn(candidates);
-      }
-
-      if (block.namedExprsMgr.hasTransition(columnRef.getCanonicalName())) {
-        String originalName = block.namedExprsMgr.getTransittedName(columnRef.getCanonicalName());
-        Column found = resolveColumn(block, new ColumnReferenceExpr(originalName));
-        if (found != null) {
-          candidates.add(found);
-        }
-      }
       if (!candidates.isEmpty()) {
         return ensureUniqueColumn(candidates);
       }
@@ -496,6 +511,10 @@ public class LogicalPlan {
 
     public Schema getSchema() {
       return schema;
+    }
+
+    public NamedExprsManager getNamedExprsManager() {
+      return namedExprsMgr;
     }
 
     public boolean hasTableExpression() {

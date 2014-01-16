@@ -47,12 +47,10 @@ public class NamedExprsManager {
   private LinkedHashMap<String, Expr> nameToExprMap = new LinkedHashMap<String, Expr>();
   /** Map; Expr -> Reference Name */
   private LinkedHashMap<Expr, String> exprToNameMap = new LinkedHashMap<Expr, String>();
-  /** Transitive Closer Map: Name -> Name */
-  private BiMap<String, String> nameToNameMap = HashBiMap.create();
   /** Map; Reference Name -> Boolean (if it is resolved or not) */
   private LinkedHashMap<String, Boolean> resolvedFlags = new LinkedHashMap<String, Boolean>();
 
-  private Map<String, String> renamedColumns = new HashMap<String, String>();
+  private BiMap<String, String> aliasedColumnMap = HashBiMap.create();
 
   private LogicalPlan plan;
 
@@ -83,21 +81,25 @@ public class NamedExprsManager {
     return exprToNameMap.get(expr);
   }
 
-  public Expr getExpr(String name) {
-    return nameToExprMap.get(name);
-  }
-
   public NamedExpr getNamedExpr(String name) {
     String normalized = name.toLowerCase();
     return new NamedExpr(nameToExprMap.get(normalized), normalized);
   }
 
-  public boolean hasTransition(String from) {
-    return nameToNameMap.containsKey(from);
+  public boolean isAliased(String name) {
+    return aliasedColumnMap.containsKey(name);
   }
 
-  public String getTransittedName(String from) {
-    return nameToNameMap.get(from);
+  public String getAlias(String originalName) {
+    return aliasedColumnMap.get(originalName);
+  }
+
+  public boolean isAliasedName(String aliasName) {
+    return aliasedColumnMap.inverse().containsKey(aliasName);
+  }
+
+  public String getOriginalName(String aliasName) {
+    return aliasedColumnMap.inverse().get(aliasName);
   }
 
   public String addExpr(Expr expr, String alias) {
@@ -138,24 +140,6 @@ public class NamedExprsManager {
     return addExpr(expr, name);
   }
 
-  public String [] addExprArray(Expr[] exprs) {
-    String [] names = new String[exprs.length];
-    for (int i = 0; i < exprs.length; i++) {
-      Expr expr = exprs[i];
-      if (expr.getType() == OpType.Column) {
-        String referenceName = ((ColumnReferenceExpr)expr).getCanonicalName();
-        if (nameToExprMap.containsKey(referenceName)) {
-          names[i] = referenceName;
-        } else {
-          names[i] = addExpr(exprs[i]);
-        }
-      } else {
-        names[i] = addExpr(exprs[i]);
-      }
-    }
-    return names;
-  }
-
   public String addNamedExpr(NamedExpr namedExpr) {
     if (namedExpr.hasAlias()) {
       return addExpr(namedExpr.getExpr(), namedExpr.getAlias());
@@ -190,6 +174,26 @@ public class NamedExprsManager {
     nameToEvalMap.put(normalized, evalNode);
     evalToNameMap.put(evalNode, normalized);
     resolvedFlags.put(normalized, true);
+
+    String originalName = checkAndGetIfAliasedColumn(normalized);
+    if (originalName != null) {
+      aliasedColumnMap.put(originalName, normalized);
+    }
+  }
+
+  /**
+   * It returns an original column name if it is aliased column reference.
+   * Otherwise, it will return NULL.
+   */
+  private String checkAndGetIfAliasedColumn(String name) {
+    Expr expr = nameToExprMap.get(name);
+    if (expr.getType() == OpType.Column) {
+      ColumnReferenceExpr column = (ColumnReferenceExpr) expr;
+      if (!column.getCanonicalName().equals(name)) {
+        return column.getCanonicalName();
+      }
+    }
+    return null;
   }
 
 //  public void refreshResolvedExpr() throws PlanningException {
@@ -204,10 +208,6 @@ public class NamedExprsManager {
 //      }
 //    }
 //  }
-
-  public boolean contains(EvalNode evalNode) {
-    return evalToNameMap.containsKey(evalNode);
-  }
 
   public Target getTarget(Expr expr, boolean unresolved) {
     String name = exprToNameMap.get(expr);
@@ -231,16 +231,9 @@ public class NamedExprsManager {
     }
   }
 
-  public Collection<Target> getAllTargets() {
-    List<Target> targets = TUtil.newList();
-    for (Entry<String, EvalNode> entry : nameToEvalMap.entrySet()) {
-      targets.add(new Target(entry.getValue(), entry.getKey()));
-    }
-    return targets;
-  }
-
   public String toString() {
-    return "unresolved=" + nameToExprMap.size() + ", resolved=" + nameToEvalMap.size();
+    return "unresolved=" + nameToExprMap.size() + ", resolved=" + nameToEvalMap.size()
+        + ", renamed=" + aliasedColumnMap.size();
   }
 
   public Iterator<NamedExpr> getUnresolvedExprs() {

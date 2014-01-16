@@ -20,7 +20,6 @@ package org.apache.tajo.engine.planner.logical;
 
 import com.google.common.base.Preconditions;
 import com.google.gson.annotations.Expose;
-import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.catalog.SortSpec;
 import org.apache.tajo.engine.planner.PlanString;
 import org.apache.tajo.util.TUtil;
