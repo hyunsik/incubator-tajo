@@ -1,7 +1,6 @@
 SELECT
   n_nationkey,
-  n_name,
-  n_regionkey
+  n_name
 
 FROM (
   SELECT
@@ -24,4 +23,7 @@ FROM (
 ) T
 GROUP BY
   n_nationkey,
-	n_name;
+	n_name
+ORDER BY
+  n_nationkey desc,
+  n_name desc;

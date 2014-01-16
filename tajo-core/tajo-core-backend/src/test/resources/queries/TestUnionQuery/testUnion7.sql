@@ -12,4 +12,7 @@ FROM (
     l_orderkey as orderkey
   FROM
     lineitem
-) T;
+) T
+
+order by
+  orderkey;

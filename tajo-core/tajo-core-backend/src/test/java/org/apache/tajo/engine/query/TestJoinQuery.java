@@ -118,7 +118,7 @@ public class TestJoinQuery extends QueryTestCaseBase {
     cleanupQuery(res);
   }
 
-  //@Test
+  @Test
   public void testOuterJoinAndCaseWhen() throws Exception {
     executeDDL("oj_table1_ddl.sql", "table1.tbl");
     executeDDL("oj_table2_ddl.sql", "table2.tbl");

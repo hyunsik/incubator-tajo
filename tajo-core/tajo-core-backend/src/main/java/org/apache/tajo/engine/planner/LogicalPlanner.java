@@ -168,23 +168,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
     // If a non-from statement is given
     if (!projection.hasChild()) {
-      int finalTargetNum = projection.getNamedExprs().length;
-      Target [] targets = new Target[finalTargetNum];
-
-      for (int i = 0; i < targets.length; i++) {
-        NamedExpr namedExpr = projection.getNamedExprs()[i];
-        EvalNode evalNode = exprAnnotator.createEvalNode(plan, block, namedExpr.getExpr());
-        if (namedExpr.hasAlias()) {
-          targets[i] = new Target(evalNode, namedExpr.getAlias());
-        } else {
-          targets[i] = new Target(evalNode, context.plan.newGeneratedFieldName(namedExpr.getExpr()));
-        }
-      }
-      EvalExprNode evalExprNode = new EvalExprNode(context.plan.newPID(), targets);
-      evalExprNode.setOutSchema(PlannerUtil.targetToSchema(targets));
-      // it's for debugging or unit testing
-      block.setUnresolvedTargets(targets);
-      return evalExprNode;
+      return buildNoneFromStatement(context, stack, projection);
     }
 
     String [] referNames;
@@ -279,6 +263,33 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     }
 
     return projectionNode;
+  }
+
+  /**
+   * It builds non-from statement (only expressions) like '<code>SELECT 1+3 as plus</code>'.
+   */
+  private EvalExprNode buildNoneFromStatement(PlanContext context, Stack<Expr> stack, Projection projection)
+      throws PlanningException {
+    LogicalPlan plan = context.plan;
+    QueryBlock block = context.queryBlock;
+
+    int finalTargetNum = projection.getNamedExprs().length;
+    Target [] targets = new Target[finalTargetNum];
+
+    for (int i = 0; i < targets.length; i++) {
+      NamedExpr namedExpr = projection.getNamedExprs()[i];
+      EvalNode evalNode = exprAnnotator.createEvalNode(plan, block, namedExpr.getExpr());
+      if (namedExpr.hasAlias()) {
+        targets[i] = new Target(evalNode, namedExpr.getAlias());
+      } else {
+        targets[i] = new Target(evalNode, context.plan.newGeneratedFieldName(namedExpr.getExpr()));
+      }
+    }
+    EvalExprNode evalExprNode = new EvalExprNode(context.plan.newPID(), targets);
+    evalExprNode.setOutSchema(PlannerUtil.targetToSchema(targets));
+    // it's for debugging or unit testing
+    block.setUnresolvedTargets(targets);
+    return evalExprNode;
   }
 
   /**
@@ -542,7 +553,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         if (block.namedExprsMgr.isResolved(groupingKeyRefNames[i])) {
           groupingColumns[i] = block.namedExprsMgr.getTarget(groupingKeyRefNames[i]).getNamedColumn();
         } else {
-          throw new PlanningException("AAAAAAAAAAAAAAAAAAA");
+          throw new PlanningException("Each grouping column expression must be a scalar expression.");
         }
       }
 

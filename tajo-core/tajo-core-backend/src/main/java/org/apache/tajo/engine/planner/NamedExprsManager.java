@@ -52,6 +52,8 @@ public class NamedExprsManager {
   /** Map; Reference Name -> Boolean (if it is resolved or not) */
   private LinkedHashMap<String, Boolean> resolvedFlags = new LinkedHashMap<String, Boolean>();
 
+  private Map<String, String> renamedColumns = new HashMap<String, String>();
+
   private LogicalPlan plan;
 
   public NamedExprsManager(LogicalPlan plan) {
@@ -183,24 +185,28 @@ public class NamedExprsManager {
     return namedExprList;
   }
 
-  public void resolveExpr(String name, EvalNode evalNode) {
+  public void resolveExpr(String name, EvalNode evalNode) throws PlanningException {
     String normalized = name.toLowerCase();
     nameToEvalMap.put(normalized, evalNode);
     evalToNameMap.put(evalNode, normalized);
     resolvedFlags.put(normalized, true);
-
-    for (Iterator<NamedExpr> it = getUnresolvedExprs(); it.hasNext();) {
-
-    }
   }
+
+//  public void refreshResolvedExpr() throws PlanningException {
+//    for (Iterator<NamedExpr> it = getUnresolvedExprs(); it.hasNext();) {
+//      NamedExpr namedExpr = it.next();
+//      if (namedExpr.getExpr().getType() == OpType.Column) {
+//        ColumnReferenceExpr columnRef = (ColumnReferenceExpr) namedExpr.getExpr();
+//        if (!columnRef.getCanonicalName().equals(namedExpr.getAlias())) {
+//          PlannerUtil.replaceColumnReference(namedExpr, (ColumnReferenceExpr) namedExpr.getExpr(),
+//              new ColumnReferenceExpr(namedExpr.getAlias()));
+//        }
+//      }
+//    }
+//  }
 
   public boolean contains(EvalNode evalNode) {
     return evalToNameMap.containsKey(evalNode);
-  }
-
-  public Target getTarget(EvalNode evalNode) {
-    String name = evalToNameMap.get(evalNode);
-    return new Target(evalNode, name);
   }
 
   public Target getTarget(Expr expr, boolean unresolved) {
@@ -251,13 +257,17 @@ public class NamedExprsManager {
           unresolvedList.add(new NamedExpr(entry.getValue(), entry.getKey()));
         }
       }
-      iterator = unresolvedList.iterator();
+      if (unresolvedList.size() == 0) {
+        iterator = null;
+      } else {
+        iterator = unresolvedList.iterator();
+      }
     }
 
 
     @Override
     public boolean hasNext() {
-      return iterator.hasNext();
+      return iterator != null && iterator.hasNext();
     }
 
     @Override

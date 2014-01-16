@@ -48,8 +48,7 @@ public class TestUnionQuery extends QueryTestCaseBase {
    */
   public final void testUnion1() throws Exception {
     ResultSet res = executeQuery();
-    //assertResultSet(res);
-    System.out.println(resultSetToString(res));
+    assertResultSet(res);
     cleanupQuery(res);
   }
 
@@ -59,7 +58,7 @@ public class TestUnionQuery extends QueryTestCaseBase {
    */
   public final void testUnion2() throws Exception {
     ResultSet res = executeQuery();
-    System.out.println(resultSetToString(res));
+    assertResultSet(res);
     cleanupQuery(res);
   }
 
@@ -69,7 +68,7 @@ public class TestUnionQuery extends QueryTestCaseBase {
    */
   public final void testUnion3() throws Exception {
     ResultSet res = executeQuery();
-    System.out.println(resultSetToString(res));
+    assertResultSet(res);
     cleanupQuery(res);
   }
 
@@ -79,7 +78,7 @@ public class TestUnionQuery extends QueryTestCaseBase {
    */
   public final void testUnion4() throws Exception {
     ResultSet res = executeQuery();
-    System.out.println(resultSetToString(res));
+    assertResultSet(res);
     cleanupQuery(res);
   }
 
@@ -89,7 +88,7 @@ public class TestUnionQuery extends QueryTestCaseBase {
    */
   public final void testUnion5() throws Exception {
     ResultSet res = executeQuery();
-    System.out.println(resultSetToString(res));
+    assertResultSet(res);
     cleanupQuery(res);
   }
 
@@ -99,7 +98,7 @@ public class TestUnionQuery extends QueryTestCaseBase {
    */
   public final void testUnion6() throws Exception {
     ResultSet res = executeQuery();
-    System.out.println(resultSetToString(res));
+    assertResultSet(res);
     cleanupQuery(res);
   }
 
@@ -109,20 +108,28 @@ public class TestUnionQuery extends QueryTestCaseBase {
    */
   public final void testUnion7() throws Exception {
     ResultSet res = executeQuery();
-    System.out.println(resultSetToString(res));
+    assertResultSet(res);
     cleanupQuery(res);
   }
 
   @Test
   public final void testUnion8() throws Exception {
     ResultSet res = executeQuery();
-    System.out.println(resultSetToString(res));
+    assertResultSet(res);
     cleanupQuery(res);
   }
 
   @Test
   public final void testUnion9() throws Exception {
     ResultSet res = executeQuery();
+    assertResultSet(res);
+    cleanupQuery(res);
+  }
+
+  @Test
+  public final void testUnion10() throws Exception {
+    ResultSet res = executeQuery();
+    //assertResultSet(res);
     System.out.println(resultSetToString(res));
     cleanupQuery(res);
   }
