@@ -20,8 +20,6 @@ package org.apache.tajo.engine.planner.logical;
 
 import com.google.gson.annotations.Expose;
 import org.apache.tajo.catalog.Column;
-import org.apache.tajo.catalog.Schema;
-import org.apache.tajo.engine.eval.EvalNode;
 import org.apache.tajo.engine.planner.PlanString;
 import org.apache.tajo.engine.planner.PlannerUtil;
 import org.apache.tajo.engine.planner.Target;
@@ -29,8 +27,6 @@ import org.apache.tajo.util.TUtil;
 
 public class GroupbyNode extends UnaryNode implements Projectable, Cloneable {
 	@Expose private Column [] columns;
-  @Expose private Schema havingSchema;
-	@Expose private EvalNode havingCondition = null;
 	@Expose private Target [] targets;
   @Expose private boolean hasDistinct = false;
 
@@ -56,26 +52,6 @@ public class GroupbyNode extends UnaryNode implements Projectable, Cloneable {
 
   public void setDistinct(boolean distinct) {
     hasDistinct = distinct;
-  }
-	
-	public final boolean hasHavingCondition() {
-	  return this.havingCondition != null;
-	}
-	
-	public final EvalNode getHavingCondition() {
-	  return this.havingCondition;
-	}
-	
-	public final void setHavingCondition(final EvalNode evalTree) {
-	  this.havingCondition = evalTree;
-	}
-
-  public final void setHavingSchema(Schema schema) {
-    this.havingSchema = schema;
-  }
-
-  public Schema getHavingSchema() {
-    return this.havingSchema;
   }
 
   @Override
@@ -105,10 +81,7 @@ public class GroupbyNode extends UnaryNode implements Projectable, Cloneable {
       if(i < columns.length - 1)
         sb.append(",");
     }
-    
-    if(hasHavingCondition()) {
-      sb.append("], \"having qual\": \"").append(havingCondition).append("\"");
-    }
+
     if(hasTargets()) {
       sb.append(", \"target\": [");
       for (int i = 0; i < targets.length; i++) {
@@ -132,7 +105,6 @@ public class GroupbyNode extends UnaryNode implements Projectable, Cloneable {
       GroupbyNode other = (GroupbyNode) obj;
       boolean eq = super.equals(other);
       eq = eq && TUtil.checkEquals(columns, other.columns);
-      eq = eq && TUtil.checkEquals(havingCondition, other.havingCondition);
       eq = eq && TUtil.checkEquals(targets, other.targets);
       return eq;
     } else {
@@ -149,8 +121,7 @@ public class GroupbyNode extends UnaryNode implements Projectable, Cloneable {
         grp.columns[i] = (Column) columns[i].clone();
       }
     }
-    grp.havingCondition = (EvalNode) (havingCondition != null 
-        ? havingCondition.clone() : null);    
+
     if (targets != null) {
       grp.targets = new Target[targets.length];
       for (int i = 0; i < targets.length; i++) {

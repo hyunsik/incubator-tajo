@@ -101,7 +101,7 @@ FROM (
     WHERE
       n_regionkey = 0
 
-  ) T1
+  ) T3
   GROUP BY
     n_nationkey,
     n_name
@@ -133,7 +133,7 @@ FROM (
       nation
     WHERE
       n_regionkey = 0
- ) T2
+ ) T4
 
  GROUP BY
    n_nationkey,

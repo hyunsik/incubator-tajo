@@ -129,8 +129,7 @@ public class TestUnionQuery extends QueryTestCaseBase {
   @Test
   public final void testUnion10() throws Exception {
     ResultSet res = executeQuery();
-    //assertResultSet(res);
-    System.out.println(resultSetToString(res));
+    assertResultSet(res);
     cleanupQuery(res);
   }
 }

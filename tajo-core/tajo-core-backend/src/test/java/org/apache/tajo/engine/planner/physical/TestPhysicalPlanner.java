@@ -594,7 +594,6 @@ public class TestPhysicalPlanner {
     Expr context = analyzer.parse(QUERIES[9]);
     LogicalPlan plan = planner.createPlan(context);
     LogicalNode rootNode = optimizer.optimize(plan);
-    System.out.println(rootNode.toString());
 
     // Set all aggregation functions to the first phase mode
     GroupbyNode groupbyNode = PlannerUtil.findTopNode(rootNode, NodeType.GROUP_BY);

@@ -84,7 +84,7 @@ public class HCatalogUtil {
     try {
       return Enum.valueOf(TajoDataTypes.Type.class, typeStr);
     } catch (IllegalArgumentException iae) {
-      System.out.println("Cannot find a matched type aginst from '" + typeStr + "'");
+      throw new InternalException("Cannot find a matched type aginst from '" + typeStr + "'");
       return null;
     }
   }

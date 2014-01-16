@@ -257,7 +257,6 @@ public class GlobalPlanner {
       return buildDistinctGroupBy(context, childBlock, groupbyNode);
     } else {
       GroupbyNode firstPhaseGroupBy = PlannerUtil.transformGroupbyTo2P(groupbyNode);
-      firstPhaseGroupBy.setHavingCondition(null);
 
       if (firstPhaseGroupBy.getChild().getType() == NodeType.TABLE_SUBQUERY &&
           ((TableSubQueryNode)firstPhaseGroupBy.getChild()).getSubQuery().getType() == NodeType.UNION) {

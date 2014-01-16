@@ -568,10 +568,6 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       GroupbyNode groupingNode = context.queryBlock.getNodeFromExpr(aggregation);
       groupingNode.setGroupingColumns(groupingColumns);
       groupingNode.setDistinct(includeDistinctFunction);
-      if (aggregation.hasHavingCondition()) {
-        groupingNode.setHavingCondition(
-            exprAnnotator.createEvalNode(plan, block, aggregation.getHavingCondition()));
-      }
 
       List<Target> targets = new ArrayList<Target>();
 

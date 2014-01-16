@@ -1,1 +1,0 @@
-select l_orderkey + l_partkey = 4 as value from lineitem where l_orderkey + l_partkey = 4;

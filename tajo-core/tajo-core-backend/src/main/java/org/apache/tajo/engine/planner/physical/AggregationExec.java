@@ -19,8 +19,6 @@
 package org.apache.tajo.engine.planner.physical;
 
 import com.google.common.collect.Sets;
-import org.apache.tajo.util.TUtil;
-import org.apache.tajo.worker.TaskAttemptContext;
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.datum.DatumFactory;
@@ -30,6 +28,8 @@ import org.apache.tajo.engine.eval.EvalNode;
 import org.apache.tajo.engine.eval.EvalType;
 import org.apache.tajo.engine.planner.Target;
 import org.apache.tajo.engine.planner.logical.GroupbyNode;
+import org.apache.tajo.util.TUtil;
+import org.apache.tajo.worker.TaskAttemptContext;
 
 import java.io.IOException;
 import java.util.List;
@@ -45,24 +45,12 @@ public abstract class AggregationExec extends UnaryPhysicalExec {
   protected EvalContext evalContexts [];
   protected Schema evalSchema;
 
-  protected EvalNode havingQual;
-  protected EvalContext havingContext;
-
   public AggregationExec(final TaskAttemptContext context, GroupbyNode plan,
                          PhysicalExec child) throws IOException {
     super(context, plan.getInSchema(), plan.getOutSchema(), child);
     this.plan = plan;
 
-    if (plan.hasHavingCondition()) {
-      this.havingQual = plan.getHavingCondition();
-      this.havingContext = plan.getHavingCondition().newContext();
-    }
-
-    if (plan.getHavingSchema() != null) {
-      this.evalSchema = plan.getHavingSchema();
-    } else {
-      this.evalSchema = plan.getOutSchema();
-    }
+    evalSchema = plan.getOutSchema();
 
     nonNullGroupingFields = Sets.newHashSet();
     // keylist will contain a list of IDs of grouping column
