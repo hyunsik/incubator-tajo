@@ -29,6 +29,7 @@ import java.sql.ResultSet;
 public class TestGroupByQuery extends QueryTestCaseBase {
   @Test
   public final void testGroupBy() throws Exception {
+    // select count(1) as unique_key from lineitem;
     ResultSet res = executeQuery();
     assertResultSet(res);
     cleanupQuery(res);
@@ -36,6 +37,7 @@ public class TestGroupByQuery extends QueryTestCaseBase {
 
   @Test
   public final void testGroupBy2() throws Exception {
+    // select count(1) as unique_key from lineitem group by l_linenumber;
     ResultSet res = executeQuery();
     assertResultSet(res);
     cleanupQuery(res);
@@ -43,6 +45,7 @@ public class TestGroupByQuery extends QueryTestCaseBase {
 
   @Test
   public final void testGroupBy3() throws Exception {
+    // select l_orderkey as gkey from lineitem group by gkey order by gkey;
     ResultSet res = executeQuery();
     assertResultSet(res);
     cleanupQuery(res);
@@ -50,6 +53,7 @@ public class TestGroupByQuery extends QueryTestCaseBase {
 
   @Test
   public final void testGroupBy4() throws Exception {
+    // select l_orderkey as gkey, count(1) as unique_key from lineitem group by lineitem.l_orderkey;
     ResultSet res = executeQuery();
     assertResultSet(res);
     cleanupQuery(res);

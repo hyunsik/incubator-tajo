@@ -30,7 +30,6 @@ import org.apache.tajo.engine.exception.VerifyException;
 import org.apache.tajo.engine.planner.graph.DirectedGraphCursor;
 import org.apache.tajo.engine.planner.graph.SimpleDirectedGraph;
 import org.apache.tajo.engine.planner.logical.*;
-import org.apache.tajo.engine.planner.rewrite.ProjectionPushDownRule;
 import org.apache.tajo.util.TUtil;
 
 import java.util.*;
@@ -41,10 +40,11 @@ import java.util.*;
 @NotThreadSafe
 public class LogicalPlan {
   /** the prefix character for virtual tables */
-  public static final char VIRTUAL_TABLE_PREFIX='@';
+  public static final char VIRTUAL_TABLE_PREFIX='#';
+  public static final char NONAMED_COLUMN_PREFIX='?';
   /** it indicates the root block */
   public static final String ROOT_BLOCK = VIRTUAL_TABLE_PREFIX + "ROOT";
-  public static final String NONAME_BLOCK_PREFIX = VIRTUAL_TABLE_PREFIX + "NONAME_";
+  public static final String NONAME_BLOCK_PREFIX = VIRTUAL_TABLE_PREFIX + "QB_";
   private int nextPid = 0;
   private Integer noNameBlockId = 0;
   private Integer noNameColumnId = 0;
@@ -84,18 +84,14 @@ public class LogicalPlan {
     return newAndGetBlock(NONAME_BLOCK_PREFIX + (noNameBlockId++));
   }
 
-  public String newGeneratedFieldName(String prefix) {
-    String suffix = String.valueOf(noNameColumnId);
-    noNameColumnId++;
-    return "$" + prefix.toLowerCase() + "_" + suffix;
+  private String generateFieldName(String prefix) {
+    int sequence = noNameColumnId++;
+    return NONAMED_COLUMN_PREFIX + prefix.toLowerCase() + (sequence > 0 ? "_" + sequence : "");
   }
 
   public String newGeneratedFieldName(EvalNode evalNode) {
     String prefix = evalNode.getName();
-
-    String suffix = String.valueOf(noNameColumnId);
-    noNameColumnId++;
-    return "$" + prefix.toLowerCase() + "_" + suffix;
+    return generateFieldName(prefix);
   }
 
   public String newGeneratedFieldName(Expr expr) {
@@ -116,19 +112,7 @@ public class LogicalPlan {
     default:
       prefix = expr.getType().name();
     }
-
-    String suffix = String.valueOf(noNameColumnId);
-    noNameColumnId++;
-    return "$" + prefix.toLowerCase() + "_" + suffix;
-  }
-
-  /**
-   * Check if a query block exists
-   * @param blockName the query block name to be checked
-   * @return true if exists. Otherwise, false
-   */
-  public boolean existsBlock(String blockName) {
-    return queryBlocks.containsKey(blockName);
+    return generateFieldName(prefix);
   }
 
   public QueryBlock getRootBlock() {
@@ -435,7 +419,7 @@ public class LogicalPlan {
     private NodeType rootType;
 
     // transient states
-    private Map<String, RelationNode> nameToRelationMap = new HashMap<String, RelationNode>();
+    private Map<String, RelationNode> nameToRelationMap = TUtil.newHashMap();
     private Map<OpType, List<Expr>> operatorToExprMap = TUtil.newHashMap();
     /**
      * It's a map between nodetype and node. node types can be duplicated. So, latest node type is only kept.

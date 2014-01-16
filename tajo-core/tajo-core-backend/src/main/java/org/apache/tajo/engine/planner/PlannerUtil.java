@@ -789,32 +789,4 @@ public class PlannerUtil {
     }
     return names;
   }
-
-  public static int replaceColumnReference(Expr expr, ColumnReferenceExpr targetColumn, ColumnReferenceExpr newColumn)
-      throws PlanningException {
-    ColumnReferenceReplacer replacer = new ColumnReferenceReplacer(targetColumn, newColumn);
-    replacer.visit(null, new Stack<Expr>(), expr);
-    return replacer.count;
-  }
-
-  static class ColumnReferenceReplacer extends SimpleAlgebraVisitor<Object, Object> {
-    private ColumnReferenceExpr targetColumn;
-    private ColumnReferenceExpr newColumn;
-    int count = 0;
-
-    ColumnReferenceReplacer(ColumnReferenceExpr targetColumn, ColumnReferenceExpr newColumn) {
-      this.targetColumn = targetColumn;
-      this.newColumn = newColumn;
-    }
-
-    @Override
-    public Object visitColumnReference(Object ctx, Stack<Expr> stack, ColumnReferenceExpr expr)
-        throws PlanningException {
-      if (expr.equalsTo(targetColumn)) {
-        expr.setName(newColumn.getCanonicalName());
-        count++;
-      }
-      return null;
-    }
-  }
 }

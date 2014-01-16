@@ -323,10 +323,9 @@ public class TajoClient {
           return true;
         } else {
           if (response.hasErrorMessage()) {
-            throw new ServiceException(response.getErrorMessage());
-          } else {
-            throw new ServiceException("Internal Error!");
+            LOG.error(response.getErrorMessage());
           }
+          return false;
         }
       }
     }.withRetries();

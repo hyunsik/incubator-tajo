@@ -235,7 +235,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
     projectionNode = context.queryBlock.getNodeFromExpr(projection);
     projectionNode.setTargets(targets);
-    projectionNode.setOutSchema(getProjectedSchema(plan, projectionNode.getTargets()));
+    projectionNode.setOutSchema(PlannerUtil.targetToSchema(projectionNode.getTargets()));
     projectionNode.setInSchema(child.getOutSchema());
     projectionNode.setChild(child);
 
@@ -311,7 +311,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       if (t.hasAlias() || t.getEvalTree().getType() == EvalType.FIELD) {
         name = t.getCanonicalName();
       } else { // if an alias is not given or this target is an expression
-        t.setAlias(plan.newGeneratedFieldName(t.getEvalTree().getName()));
+        t.setAlias(plan.newGeneratedFieldName(t.getEvalTree()));
         name = t.getAlias();
       }
       projected.addColumn(name,type);
