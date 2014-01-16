@@ -81,7 +81,7 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
   public LogicalNode visitProjection(PreprocessContext ctx, Stack<Expr> stack, Projection expr) throws PlanningException {
     // If Non-from statement, it immediately returns.
     if (!expr.hasChild()) {
-      return null;
+      return new EvalExprNode(ctx.plan.newPID());
     }
 
     stack.push(expr); // <--- push
@@ -254,6 +254,32 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
     TableSubQueryNode node = new TableSubQueryNode(ctx.plan.newPID(), expr.getName(), child);
     ctx.currentBlock.addRelation(node);
     return node;
+  }
+
+  ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+  // Data Definition Language Section
+  ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  @Override
+  public LogicalNode visitCreateTable(PreprocessContext ctx, Stack<Expr> stack, CreateTable expr)
+      throws PlanningException {
+
+    CreateTableNode createTableNode = new CreateTableNode(ctx.plan.newPID());
+
+    if (expr.hasSubQuery()) {
+      stack.push(expr);
+      visit(ctx, stack, expr.getSubQuery());
+      stack.pop();
+    }
+
+    return createTableNode;
+  }
+
+  @Override
+  public LogicalNode visitDropTable(PreprocessContext ctx, Stack<Expr> stack, DropTable expr)
+      throws PlanningException {
+    DropTableNode dropTable = new DropTableNode(ctx.plan.newPID());
+    return dropTable;
   }
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////////////

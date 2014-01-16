@@ -30,6 +30,7 @@ import org.apache.tajo.engine.exception.VerifyException;
 import org.apache.tajo.engine.planner.graph.DirectedGraphCursor;
 import org.apache.tajo.engine.planner.graph.SimpleDirectedGraph;
 import org.apache.tajo.engine.planner.logical.*;
+import org.apache.tajo.engine.planner.rewrite.ProjectionPushDownRule;
 import org.apache.tajo.util.TUtil;
 
 import java.util.*;
@@ -226,19 +227,22 @@ public class LogicalPlan {
         throw new VerifyException("ERROR: no such a column '"+ columnRef.getCanonicalName() + "'");
       }
 
-      // Try to check if column reference is already aliased.
-      // The original column name may not be used.
-      // If so, it replaces the column references by aliased name.
-      List<Column> candidates = TUtil.newList();
-      if (block.namedExprsMgr.isAliased(column.getQualifiedName())) {
-        String alias = block.namedExprsMgr.getAlias(columnRef.getCanonicalName());
-        Column found = resolveColumn(block, new ColumnReferenceExpr(alias));
-        if (found != null) {
-          candidates.add(found);
+      LogicalNode currentNode = block.getCurrentNode();
+      if (currentNode != null && !currentNode.getInSchema().contains(column)) {
+        // Try to check if column reference is already aliased.
+        // The original column name may not be used.
+        // If so, it replaces the column references by aliased name.
+        List<Column> candidates = TUtil.newList();
+        if (block.namedExprsMgr.isAliased(column.getQualifiedName())) {
+          String alias = block.namedExprsMgr.getAlias(columnRef.getCanonicalName());
+          Column found = resolveColumn(block, new ColumnReferenceExpr(alias));
+          if (found != null) {
+            candidates.add(found);
+          }
         }
-      }
-      if (!candidates.isEmpty()) {
-        return ensureUniqueColumn(candidates);
+        if (!candidates.isEmpty()) {
+          return ensureUniqueColumn(candidates);
+        }
       }
 
       return column;
@@ -440,6 +444,7 @@ public class LogicalPlan {
     private Map<String, LogicalNode> exprToNodeMap = TUtil.newHashMap();
     NamedExprsManager namedExprsMgr;
 
+    private LogicalNode currentNode;
     private LogicalNode latestNode;
     /**
      * Set true value if this query block has either implicit or explicit aggregation.
@@ -519,6 +524,20 @@ public class LogicalPlan {
 
     public boolean hasTableExpression() {
       return this.nameToRelationMap.size() > 0;
+    }
+
+    public void updateCurrentNode(Expr expr) throws PlanningException {
+
+      if (expr.getType() != OpType.RelationList) { // skip relation list because it is a virtual expr.
+        this.currentNode = exprToNodeMap.get(ObjectUtils.identityToString(expr));
+        if (currentNode == null) {
+          throw new PlanningException("Unregistered Algebra Expression: " + expr.getType());
+        }
+      }
+    }
+
+    public <T extends LogicalNode> T getCurrentNode() {
+      return (T) this.currentNode;
     }
 
     public void updateLatestNode(LogicalNode node) {

@@ -196,19 +196,6 @@ public class NamedExprsManager {
     return null;
   }
 
-//  public void refreshResolvedExpr() throws PlanningException {
-//    for (Iterator<NamedExpr> it = getUnresolvedExprs(); it.hasNext();) {
-//      NamedExpr namedExpr = it.next();
-//      if (namedExpr.getExpr().getType() == OpType.Column) {
-//        ColumnReferenceExpr columnRef = (ColumnReferenceExpr) namedExpr.getExpr();
-//        if (!columnRef.getCanonicalName().equals(namedExpr.getAlias())) {
-//          PlannerUtil.replaceColumnReference(namedExpr, (ColumnReferenceExpr) namedExpr.getExpr(),
-//              new ColumnReferenceExpr(namedExpr.getAlias()));
-//        }
-//      }
-//    }
-//  }
-
   public Target getTarget(Expr expr, boolean unresolved) {
     String name = exprToNameMap.get(expr);
     return getTarget(name, unresolved);
@@ -236,6 +223,9 @@ public class NamedExprsManager {
         + ", renamed=" + aliasedColumnMap.size();
   }
 
+  /**
+   * It returns an iterator for unresolved NamedExprs.
+   */
   public Iterator<NamedExpr> getUnresolvedExprs() {
     return new UnresolvedIterator();
   }

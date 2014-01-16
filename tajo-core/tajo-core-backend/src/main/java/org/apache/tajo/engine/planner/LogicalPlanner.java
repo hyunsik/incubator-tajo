@@ -121,6 +121,10 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     return this.exprAnnotator;
   }
 
+  public void preHook(PlanContext context, Stack<Expr> stack, Expr expr) throws PlanningException {
+    context.queryBlock.updateCurrentNode(expr);
+  }
+
   public LogicalNode postHook(PlanContext context, Stack<Expr> stack, Expr expr, LogicalNode current)
       throws PlanningException {
 
@@ -147,6 +151,9 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       queryBlock.setRoot(current);
     }
 
+    if (!stack.empty()) {
+      queryBlock.updateCurrentNode(stack.peek());
+    }
     return current;
   }
 
@@ -285,7 +292,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         targets[i] = new Target(evalNode, context.plan.newGeneratedFieldName(namedExpr.getExpr()));
       }
     }
-    EvalExprNode evalExprNode = new EvalExprNode(context.plan.newPID(), targets);
+    EvalExprNode evalExprNode = context.queryBlock.getNodeFromExpr(projection);
+    evalExprNode.setTargets(targets);
     evalExprNode.setOutSchema(PlannerUtil.targetToSchema(targets));
     // it's for debugging or unit testing
     block.setUnresolvedTargets(targets);
@@ -668,6 +676,21 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     LogicalNode right = visit(context, stack, join.getRight());
     stack.pop();
 
+
+    JoinNode joinNode = context.queryBlock.getNodeFromExpr(join);
+    joinNode.setJoinType(join.getJoinType());
+    joinNode.setLeftChild(left);
+    joinNode.setRightChild(right);
+
+    // Set A merged input schema
+    Schema merged;
+    if (join.isNatural()) {
+      merged = getNaturalJoinSchema(left, right);
+    } else {
+      merged = SchemaUtil.merge(left.getOutSchema(), right.getOutSchema());
+    }
+    joinNode.setInSchema(merged);
+
     // Create EvalNode for a search condition.
     EvalNode joinCondition = null;
     if (join.hasQual()) {
@@ -686,27 +709,11 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       } catch (VerifyException ve) {}
     }
 
-    // Phase 3: build this plan
-    JoinNode joinNode = context.queryBlock.getNodeFromExpr(join);
-    joinNode.setJoinType(join.getJoinType());
-    joinNode.setLeftChild(left);
-    joinNode.setRightChild(right);
-
-    // Set A merged input schema
-    Schema merged;
-    if (join.isNatural()) {
-      merged = getNaturalJoinSchema(left, right);
-    } else {
-      merged = SchemaUtil.merge(left.getOutSchema(), right.getOutSchema());
-    }
-
     List<Target> targets = TUtil.newList(PlannerUtil.schemaToTargets(merged));
 
     for (Expr newAddedExpr : newlyEvaluatedExprs) {
       targets.add(block.namedExprsMgr.getTarget(newAddedExpr, true));
     }
-
-    joinNode.setInSchema(merged);
     joinNode.setOutSchema(PlannerUtil.targetToSchema(targets));
 
     // Determine join conditions
@@ -1123,10 +1130,9 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         tableSchema = convertTableElementsSchema(expr.getTableElements());
       }
 
-      CreateTableNode createTableNode = new CreateTableNode(
-          context.plan.newPID(),
-          expr.getTableName(),
-          tableSchema);
+      CreateTableNode createTableNode = context.queryBlock.getNodeFromExpr(expr);
+      createTableNode.setTableName(expr.getTableName());
+      createTableNode.setSchema(tableSchema);
 
       if (expr.isExternal()) {
         createTableNode.setExternal(true);
@@ -1336,8 +1342,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
   @Override
   public LogicalNode visitDropTable(PlanContext context, Stack<Expr> stack, DropTable dropTable) {
-    DropTableNode dropTableNode = new DropTableNode(context.plan.newPID(), dropTable.getTableName(),
-        dropTable.isPurge());
+    DropTableNode dropTableNode = context.queryBlock.getNodeFromExpr(dropTable);
+    dropTableNode.set(dropTable.getTableName(), dropTable.isPurge());
     return dropTableNode;
   }
 }

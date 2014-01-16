@@ -239,8 +239,11 @@ public class BaseAlgebraVisitor<CONTEXT, RESULT> implements AlgebraVisitor<CONTE
     }
 
     // skip postHook against only one relation
-    if (expr.getType() == OpType.RelationList && ((RelationList)expr).size() == 1) {
-      return current;
+    if (expr.getType() == OpType.RelationList) {
+      RelationList relationList = (RelationList)expr;
+      if (relationList.size() == 1 && relationList.getRelations()[0].getType() == OpType.Relation) {
+        return current;
+      }
     }
 
     postHook(ctx, stack, expr, current);
