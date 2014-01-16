@@ -61,8 +61,9 @@ public class TestGroupByQuery extends QueryTestCaseBase {
 
   @Test
   public final void testGroupByNested1() throws Exception {
+    // select l_orderkey + l_partkey as unique_key from lineitem group by l_orderkey + l_partkey;
     ResultSet res = executeQuery();
-    System.out.println(resultSetToString(res));
+    assertResultSet(res);
     cleanupQuery(res);
   }
 

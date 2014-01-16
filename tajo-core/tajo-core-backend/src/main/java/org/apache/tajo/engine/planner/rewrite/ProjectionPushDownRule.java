@@ -425,11 +425,14 @@ public class ProjectionPushDownRule extends
         String groupingKey = groupingKeyNames[i];
 
         Target target = context.targetListMgr.getTarget(groupingKey);
-
-        if (target.getEvalTree().getType() == EvalType.FIELD) {
+        if (context.targetListMgr.isResolved(groupingKey)) {
           groupingColumns[i] = target.getNamedColumn();
         } else {
-          throw new PlanningException("Cannot evaluate this expression in grouping keys: " + target.getEvalTree());
+          if (target.getEvalTree().getType() == EvalType.FIELD) {
+            groupingColumns[i] = target.getNamedColumn();
+          } else {
+            throw new PlanningException("Cannot evaluate this expression in grouping keys: " + target.getEvalTree());
+          }
         }
       }
       node.setGroupingColumns(groupingColumns);

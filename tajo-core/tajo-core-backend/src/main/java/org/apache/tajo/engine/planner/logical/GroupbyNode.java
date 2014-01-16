@@ -183,7 +183,7 @@ public class GroupbyNode extends UnaryNode implements Projectable, Cloneable {
     for (int i = 0; i < targets.length; i++) {
       sb.append(targets[i]);
       if( i < targets.length - 1) {
-        sb.append(",");
+        sb.append(", ");
       }
     }
     planStr.addExplan(sb.toString());
