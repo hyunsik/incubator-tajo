@@ -39,6 +39,7 @@ import org.apache.tajo.engine.exception.InvalidQueryException;
 import org.apache.tajo.engine.exception.VerifyException;
 import org.apache.tajo.engine.planner.LogicalPlan.QueryBlock;
 import org.apache.tajo.engine.planner.logical.*;
+import org.apache.tajo.engine.planner.rewrite.ProjectionPushDownRule;
 import org.apache.tajo.engine.utils.SchemaUtil;
 import org.apache.tajo.util.TUtil;
 
@@ -830,9 +831,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     for (NamedExpr rawTarget : block.namedExprsMgr.getAllNamedExprs()) {
       try {
         EvalNode evalNode = exprAnnotator.createEvalNode(context.plan, context.queryBlock, rawTarget.getExpr());
-        if (PlannerUtil.canBeEvaluated(evalNode, scanNode) && EvalTreeUtil.findDistinctAggFunction(evalNode).size() == 0) {
+        if (block.checkIfBeEvaluatedForRelation(evalNode, scanNode)) {
           block.namedExprsMgr.resolveExpr(rawTarget.getAlias(), evalNode);
-
           newlyEvaluatedExprs.add(rawTarget.getExpr()); // newly added exr
         }
       } catch (VerifyException ve) {

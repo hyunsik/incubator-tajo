@@ -616,20 +616,6 @@ public class ProjectionPushDownRule extends
     }
   }
 
-  public static boolean checkIfBeEvaluatedForRelation(Target target, RelationNode node) {
-    Set<Column> columnRefs = EvalTreeUtil.findDistinctRefColumns(target.getEvalTree());
-
-    if (EvalTreeUtil.findDistinctAggFunction(target.getEvalTree()).size() > 0) {
-      return false;
-    }
-
-    if (node.getInSchema().containsAll(columnRefs)) {
-      return true;
-    } else {
-      return false;
-    }
-  }
-
   public static boolean checkIfBeEvaluate(Target target, LogicalNode node) {
     Set<Column> columnRefs = EvalTreeUtil.findDistinctRefColumns(target.getEvalTree());
     if (!node.getInSchema().containsAll(columnRefs)) {
@@ -746,7 +732,7 @@ public class ProjectionPushDownRule extends
     for (Iterator<Target> it = getFilteredTarget(targets, context.requiredSet); it.hasNext();) {
       Target target = it.next();
 
-      if (checkIfBeEvaluatedForRelation(target, node)) {
+      if (block.checkIfBeEvaluatedForRelation(target.getEvalTree(), node)) {
         projectedTargets.add(target);
         newContext.targetListMgr.resolve(target);
       }
@@ -779,7 +765,7 @@ public class ProjectionPushDownRule extends
     for (Iterator<Target> it = getFilteredTarget(targets, context.requiredSet); it.hasNext();) {
       Target target = it.next();
 
-      if (checkIfBeEvaluatedForRelation(target, node)) {
+      if (block.checkIfBeEvaluatedForRelation(target.getEvalTree(), node)) {
         projectedTargets.add(target);
         newContext.targetListMgr.resolve(target);
       }
@@ -815,7 +801,7 @@ public class ProjectionPushDownRule extends
     for (Iterator<Target> it = getFilteredTarget(targets, upperContext.requiredSet); it.hasNext();) {
       Target target = it.next();
 
-      if (checkIfBeEvaluatedForRelation(target, node)) {
+      if (block.checkIfBeEvaluatedForRelation(target.getEvalTree(), node)) {
         projectedTargets.add(target);
         childContext.targetListMgr.resolve(target);
       }

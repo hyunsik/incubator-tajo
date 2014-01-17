@@ -25,6 +25,7 @@ import org.apache.tajo.annotation.NotThreadSafe;
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.engine.eval.EvalNode;
+import org.apache.tajo.engine.eval.EvalTreeUtil;
 import org.apache.tajo.engine.exception.NoSuchColumnException;
 import org.apache.tajo.engine.exception.VerifyException;
 import org.apache.tajo.engine.planner.graph.DirectedGraphCursor;
@@ -194,7 +195,7 @@ public class LogicalPlan {
       if (relationOp == null) {
         // TODO - nested query can only refer outer query block? or not?
         for (QueryBlock eachBlock : queryBlocks.values()) {
-          if (eachBlock.containRelation(columnRef.getQualifier())) {
+          if (eachBlock.existsRelation(columnRef.getQualifier())) {
             relationOp = eachBlock.getRelation(columnRef.getQualifier());
           }
         }
@@ -414,22 +415,23 @@ public class LogicalPlan {
   }
 
   public class QueryBlock {
-    private String blockName;
+    private final String blockName;
     private LogicalNode rootNode;
     private NodeType rootType;
 
     // transient states
-    private Map<String, RelationNode> nameToRelationMap = TUtil.newHashMap();
-    private Map<OpType, List<Expr>> operatorToExprMap = TUtil.newHashMap();
+    private final Map<String, RelationNode> nameToRelationMap = TUtil.newHashMap();
+    private final Map<OpType, List<Expr>> operatorToExprMap = TUtil.newHashMap();
     /**
      * It's a map between nodetype and node. node types can be duplicated. So, latest node type is only kept.
      */
-    private Map<NodeType, LogicalNode> nodeTypeToNodeMap = TUtil.newHashMap();
-    private Map<String, LogicalNode> exprToNodeMap = TUtil.newHashMap();
-    NamedExprsManager namedExprsMgr;
+    private final Map<NodeType, LogicalNode> nodeTypeToNodeMap = TUtil.newHashMap();
+    private final Map<String, LogicalNode> exprToNodeMap = TUtil.newHashMap();
+    final NamedExprsManager namedExprsMgr;
 
     private LogicalNode currentNode;
     private LogicalNode latestNode;
+    private final Set<JoinType> includedJoinTypes = TUtil.newHashSet();
     /**
      * Set true value if this query block has either implicit or explicit aggregation.
      */
@@ -437,7 +439,7 @@ public class LogicalPlan {
     private Schema schema;
 
     /** It contains a planning log for this block */
-    private List<String> planingHistory = Lists.newArrayList();
+    private final List<String> planingHistory = Lists.newArrayList();
     /** It is for debugging or unit tests */
     private Target [] unresolvedTargets;
 
@@ -478,20 +480,24 @@ public class LogicalPlan {
       this.unresolvedTargets = unresolvedTargets;
     }
 
-    public boolean containRelation(String name) {
+    public boolean existsRelation(String name) {
       return nameToRelationMap.containsKey(PlannerUtil.normalizeTableName(name));
-    }
-
-    public void addRelation(RelationNode relation) {
-      nameToRelationMap.put(PlannerUtil.normalizeTableName(relation.getCanonicalName()), relation);
     }
 
     public RelationNode getRelation(String name) {
       return nameToRelationMap.get(PlannerUtil.normalizeTableName(name));
     }
 
+    public void addRelation(RelationNode relation) {
+      nameToRelationMap.put(PlannerUtil.normalizeTableName(relation.getCanonicalName()), relation);
+    }
+
     public Collection<RelationNode> getRelations() {
       return this.nameToRelationMap.values();
+    }
+
+    public boolean hasTableExpression() {
+      return this.nameToRelationMap.size() > 0;
     }
 
     public void setSchema(Schema schema) {
@@ -504,10 +510,6 @@ public class LogicalPlan {
 
     public NamedExprsManager getNamedExprsManager() {
       return namedExprsMgr;
-    }
-
-    public boolean hasTableExpression() {
-      return this.nameToRelationMap.size() > 0;
     }
 
     public void updateCurrentNode(Expr expr) throws PlanningException {
@@ -571,7 +573,7 @@ public class LogicalPlan {
     }
 
     // expr -> node
-    public void mapExprToLogicalNode(Expr expr, LogicalNode node) {
+    public void registerExprWithNode(Expr expr, LogicalNode node) {
       exprToNodeMap.put(ObjectUtils.identityToString(expr), node);
     }
 
@@ -601,6 +603,28 @@ public class LogicalPlan {
 
     public void setAggregationRequire() {
       aggregationRequired = false;
+    }
+
+    public boolean containsJoinType(JoinType joinType) {
+      return includedJoinTypes.contains(joinType);
+    }
+
+    public void addJoinType(JoinType joinType) {
+      includedJoinTypes.add(joinType);
+    }
+
+    public boolean checkIfBeEvaluatedForRelation(EvalNode evalNode, RelationNode node) {
+      Set<Column> columnRefs = EvalTreeUtil.findDistinctRefColumns(evalNode);
+
+      if (EvalTreeUtil.findDistinctAggFunction(evalNode).size() > 0) {
+        return false;
+      }
+
+      if (node.getInSchema().containsAll(columnRefs)) {
+        return true;
+      } else {
+        return false;
+      }
     }
 
     public List<String> getPlanHistory() {

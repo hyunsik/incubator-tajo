@@ -25,40 +25,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.Stack;
 
-/**
- * ExprNormalizer performs two kinds of works:
- *
- * <h3>1. Duplicate Removal.</h3>
- *
- * For example, assume a simple query as follows:
- * <pre>
- *   select price * rate as total_price, ..., order by price * rate
- * </pre>
- *
- * The expression <code>price * rate</code> is duplicated in both select list and order by clause.
- * Against those cases, ExprNormalizer removes duplicated expressions and replaces one with one reference.
- * In the case, ExprNormalizer replaces price * rate with total_price reference.
- *
- * <h3>2. Dissection of Expression</h3>
- *
- * A expression can be a complex expressions, including a mixed of scalar and aggregation expressions.
- * For example, assume an aggregation query as follows:
- * <pre>
- *   select sum(price * rate) * (1 - avg(discount_rate))), ...
- * </pre>
- *
- * In this case, ExprNormalizer dissects the expression 'sum(price * rate) * (1 - avg(discount_rate)))'
- * into the following expressions:
- * <ul>
- *   <li>$1 = price * rage</li>
- *   <li>$2 = sum($1)</li>
- *   <li>$3 = avg(discount_rate)</li>
- *   <li>$4 = $3 * (1 - $3)</li>
- * </ul>
- *
- * It mainly two advantages. Firstly, it makes complex expression evaluations easier across multiple physical executors.
- * Second, it gives move opportunities to remove duplicated expressions.
- */
 class ExprFinder extends SimpleAlgebraVisitor<ExprFinder.Context, Object> {
 
   static class Context {

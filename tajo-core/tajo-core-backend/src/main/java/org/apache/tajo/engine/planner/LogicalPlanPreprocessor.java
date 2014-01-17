@@ -72,7 +72,7 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
       // setNode method registers each node to corresponding block and plan.
       ctx.currentBlock.registerNode(result);
       // It makes a map between an expr and a logical node.
-      ctx.currentBlock.mapExprToLogicalNode(expr, result);
+      ctx.currentBlock.registerExprWithNode(expr, result);
     }
     return result;
   }
@@ -182,12 +182,12 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
     LogicalPlan.QueryBlock leftBlock = ctx.plan.newQueryBlock();
     PreprocessContext leftContext = new PreprocessContext(ctx, leftBlock);
     LogicalNode leftChild = visit(leftContext, new Stack<Expr>(), expr.getLeft());
-    ctx.currentBlock.mapExprToLogicalNode(expr.getLeft(), leftChild);
+    ctx.currentBlock.registerExprWithNode(expr.getLeft(), leftChild);
 
     LogicalPlan.QueryBlock rightBlock = ctx.plan.newQueryBlock();
     PreprocessContext rightContext = new PreprocessContext(ctx, rightBlock);
     LogicalNode rightChild = visit(rightContext, new Stack<Expr>(), expr.getRight());
-    ctx.currentBlock.mapExprToLogicalNode(expr.getRight(), rightChild);
+    ctx.currentBlock.registerExprWithNode(expr.getRight(), rightChild);
 
     UnionNode unionNode = new UnionNode(ctx.plan.newPID());
     unionNode.setLeftChild(leftChild);
@@ -216,9 +216,12 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
     LogicalNode right = visit(ctx, stack, expr.getRight());
     stack.pop();
     JoinNode joinNode = new JoinNode(ctx.plan.newPID());
+    joinNode.setJoinType(expr.getJoinType());
     Schema merged = SchemaUtil.merge(left.getOutSchema(), right.getOutSchema());
     joinNode.setInSchema(merged);
     joinNode.setOutSchema(merged);
+
+    ctx.currentBlock.addJoinType(expr.getJoinType());
     return joinNode;
   }
 
