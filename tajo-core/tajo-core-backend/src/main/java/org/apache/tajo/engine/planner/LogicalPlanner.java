@@ -1312,7 +1312,10 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
       case CountRowsFunction: {
         FunctionDesc countRows = catalog.getFunction("count", FunctionType.AGGREGATION, new DataType[] {});
-
+        if (countRows == null) {
+          throw new UndefinedFunctionException(CatalogUtil.
+              getCanonicalName(countRows.getSignature(), new DataType[]{}));
+        }
         try {
           block.setHasGrouping();
 
@@ -1359,8 +1362,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         // Given parameters
         Expr[] params = function.getParams();
         if (params == null) {
-            params = new Expr[1];
-            params[0] = new NullLiteral();
+          params = new Expr[0];
         }
 
         EvalNode[] givenArgs = new EvalNode[params.length];
@@ -1376,7 +1378,9 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         }
 
         FunctionDesc funcDesc = catalog.getFunction(function.getSignature(), paramTypes);
-
+        if (funcDesc == null) {
+          throw new UndefinedFunctionException(CatalogUtil.getCanonicalName(function.getSignature(), paramTypes));
+        }
         try {
 
           FunctionType functionType = funcDesc.getFuncType();
