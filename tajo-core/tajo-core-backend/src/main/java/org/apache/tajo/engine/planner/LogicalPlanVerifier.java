@@ -171,6 +171,11 @@ public class LogicalPlanVerifier extends BasicLogicalPlanVisitor<VerificationSta
       state.addVerification("relation \"" + node.getTableName() + "\" already exists");
     }
 
+    if (node.isCreatedTable() && node.hasPartition() &&
+        !node.getInSchema().containsAll(node.getPartitionMethod().getExpressionSchema().getColumns())) {
+      state.addVerification("relation \"" + node.getTableName() + "\" doesn't contain all schema of partition schema");
+    }
+
     return node;
   }
 
@@ -208,6 +213,11 @@ public class LogicalPlanVerifier extends BasicLogicalPlanVisitor<VerificationSta
                                       CreateTableNode node, Stack<LogicalNode> stack) {
     if (catalog.existsTable(node.getTableName())) {
       state.addVerification("relation \"" + node.getTableName() + "\" already exists");
+    }
+
+    if (node.hasPartition() &&
+        !node.getSchema().containsAll(node.getPartitionMethod().getExpressionSchema().getColumns())) {
+      state.addVerification("relation \"" + node.getTableName() + "\" doesn't contain all schema of partition schema");
     }
 
     return node;

@@ -35,7 +35,7 @@ import org.apache.tajo.catalog.CatalogService;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.catalog.TableDesc;
 import org.apache.tajo.catalog.TableMeta;
-import org.apache.tajo.catalog.partition.PartitionDesc;
+import org.apache.tajo.catalog.partition.PartitionMethodDesc;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.conf.TajoConf.ConfVars;
 import org.apache.tajo.ipc.ClientProtos;
@@ -407,9 +407,9 @@ public class TajoMasterClientService extends AbstractService {
 
         Schema schema = new Schema(request.getSchema());
         TableMeta meta = new TableMeta(request.getMeta());
-        PartitionDesc partitionDesc = null;
-        if (request.hasPartitions()) {
-          partitionDesc = new PartitionDesc(request.getPartitions());
+        PartitionMethodDesc partitionDesc = null;
+        if (request.hasPartition()) {
+          partitionDesc = new PartitionMethodDesc(request.getPartition());
         }
 
         TableDesc desc;

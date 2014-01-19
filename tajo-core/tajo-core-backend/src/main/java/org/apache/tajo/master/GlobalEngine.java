@@ -32,7 +32,7 @@ import org.apache.tajo.algebra.Expr;
 import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.exception.AlreadyExistsTableException;
 import org.apache.tajo.catalog.exception.NoSuchTableException;
-import org.apache.tajo.catalog.partition.PartitionDesc;
+import org.apache.tajo.catalog.partition.PartitionMethodDesc;
 import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.conf.TajoConf;
@@ -271,11 +271,11 @@ public class GlobalEngine extends AbstractService {
     }
 
     return createTableOnPath(createTable.getTableName(), createTable.getSchema(), meta,
-        createTable.getPath(), !createTable.isExternal(), createTable.getPartitions());
+        createTable.getPath(), !createTable.isExternal(), createTable.getPartitionMethod());
   }
 
   public TableDesc createTableOnPath(String tableName, Schema schema, TableMeta meta,
-                                     Path path, boolean isCreated, PartitionDesc partitionDesc)
+                                     Path path, boolean isCreated, PartitionMethodDesc partitionMethodDesc)
       throws IOException {
     if (catalog.existsTable(tableName)) {
       throw new AlreadyExistsTableException(tableName);
@@ -304,11 +304,10 @@ public class GlobalEngine extends AbstractService {
     stats.setNumBytes(totalSize);
     TableDesc desc = CatalogUtil.newTableDesc(tableName, schema, meta, path);
     desc.setStats(stats);
-    if (partitionDesc != null) {
-      desc.setPartitions(partitionDesc);
+    if (partitionMethodDesc != null) {
+      desc.setPartition(partitionMethodDesc);
     }
     catalog.addTable(desc);
-
     LOG.info("Table " + desc.getName() + " is created (" + desc.getStats().getNumBytes() + ")");
 
     return desc;
@@ -384,8 +383,8 @@ public class GlobalEngine extends AbstractService {
       String tableName = storeTableNode.getTableName();
       queryContext.setOutputTable(tableName);
       queryContext.setOutputPath(new Path(TajoConf.getWarehouseDir(context.getConf()), tableName));
-      if(storeTableNode.getPartitions() != null) {
-        queryContext.setPartitions(storeTableNode.getPartitions());
+      if(storeTableNode.getPartitionMethod() != null) {
+        queryContext.setPartitionMethod(storeTableNode.getPartitionMethod());
       }
       queryContext.setCreateTable();
     }
@@ -411,6 +410,7 @@ public class GlobalEngine extends AbstractService {
       Path outputPath;
       CatalogProtos.StoreType storeType;
       Options options = new Options();
+      PartitionMethodDesc partitionMethod = null;
       if (insertNode.hasTargetTable()) { // INSERT INTO [TB_NAME]
         TableDesc desc = insertNode.getTargetTable();
         outputTableName = desc.getName();
@@ -420,6 +420,10 @@ public class GlobalEngine extends AbstractService {
         // set default values
         options.putAll(desc.getMeta().getOptions());
         storeType = desc.getMeta().getStoreType();
+
+        if(desc.hasPartition()) {
+          partitionMethod = desc.getPartition();
+        }
       } else { // INSERT INTO LOCATION ...
         outputTableName = PlannerUtil.normalizeTableName(insertNode.getPath().getName());
         outputPath = insertNode.getPath();
@@ -443,6 +447,9 @@ public class GlobalEngine extends AbstractService {
       storeNode = new StoreTableNode(plan.newPID(), outputTableName);
       storeNode.setStorageType(storeType);
       storeNode.setOptions(options);
+      if(partitionMethod != null) {
+        storeNode.setPartitionMethod(partitionMethod);
+      }
 
       // set OutputPath
       queryContext.setOutputPath(outputPath);
@@ -506,11 +513,11 @@ public class GlobalEngine extends AbstractService {
       }
 
       // If InsertNode contains table partition information, StoreNode must has it.
-      if (insertNode.hasTargetTable()) {
-        if (insertNode.getTargetTable().getPartitions() != null) {
-          storeNode.setPartitions(insertNode.getTargetTable().getPartitions());
-        }
-      }
+//      if (insertNode.hasTargetTable()) {
+//        if (insertNode.getTargetTable().getPartitions() != null) {
+//          storeNode.setPartitions(insertNode.getTargetTable().getPartitions());
+//        }
+//      }
 
       // find a subquery query of insert node and merge root block and subquery into one query block.
       PlannerUtil.replaceNode(plan.getRootBlock().getRoot(), storeNode, NodeType.INSERT);

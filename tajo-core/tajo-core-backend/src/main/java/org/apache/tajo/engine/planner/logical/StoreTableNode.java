@@ -20,7 +20,7 @@ package org.apache.tajo.engine.planner.logical;
 
 import com.google.gson.annotations.Expose;
 import org.apache.tajo.catalog.Options;
-import org.apache.tajo.catalog.partition.PartitionDesc;
+import org.apache.tajo.catalog.partition.PartitionMethodDesc;
 import org.apache.tajo.engine.planner.PlanString;
 import org.apache.tajo.util.TUtil;
 
@@ -29,15 +29,15 @@ import static org.apache.tajo.catalog.proto.CatalogProtos.StoreType;
 public class StoreTableNode extends PersistentStoreNode implements Cloneable {
   @Expose private boolean isCreatedTable = false;
   @Expose private boolean isOverwritten = false;
-  @Expose private PartitionDesc partitionDesc;
+  @Expose private PartitionMethodDesc partitionMethodDesc;
 
   public StoreTableNode(int pid, String tableName) {
     super(pid, tableName);
   }
 
-  public StoreTableNode(int pid, String tableName, PartitionDesc partitionDesc) {
+  public StoreTableNode(int pid, String tableName, PartitionMethodDesc partitionMethodDesc) {
     super(pid, tableName);
-    this.partitionDesc = partitionDesc;
+    this.partitionMethodDesc = partitionMethodDesc;
   }
 
   public void setStorageType(StoreType storageType) {
@@ -60,12 +60,16 @@ public class StoreTableNode extends PersistentStoreNode implements Cloneable {
     return this.options;
   }
 
-  public PartitionDesc getPartitions() {
-    return partitionDesc;
+  public boolean hasPartition() {
+    return partitionMethodDesc != null;
   }
 
-  public void setPartitions(PartitionDesc partitionDesc) {
-    this.partitionDesc = partitionDesc;
+  public PartitionMethodDesc getPartitionMethod() {
+    return partitionMethodDesc;
+  }
+
+  public void setPartitionMethod(PartitionMethodDesc partitionMethodDesc) {
+    this.partitionMethodDesc = partitionMethodDesc;
   }
 
   @Override
@@ -92,7 +96,7 @@ public class StoreTableNode extends PersistentStoreNode implements Cloneable {
       boolean eq = super.equals(other);
       eq = eq && isCreatedTable == other.isCreatedTable;
       eq = eq && isOverwritten == other.isOverwritten;
-      eq = eq && TUtil.checkEquals(partitionDesc, other.partitionDesc);
+      eq = eq && TUtil.checkEquals(partitionMethodDesc, other.partitionMethodDesc);
       return eq;
     } else {
       return false;
@@ -104,7 +108,7 @@ public class StoreTableNode extends PersistentStoreNode implements Cloneable {
     StoreTableNode store = (StoreTableNode) super.clone();
     store.isCreatedTable = isCreatedTable;
     store.isOverwritten = isOverwritten;
-    store.partitionDesc = partitionDesc;
+    store.partitionMethodDesc = partitionMethodDesc;
     return store;
   }
 
@@ -118,8 +122,8 @@ public class StoreTableNode extends PersistentStoreNode implements Cloneable {
     sb.append("\n  \"out schema\": ").append(getOutSchema()).append(",")
     .append("\n  \"in schema\": ").append(getInSchema());
 
-    if(partitionDesc != null) {
-      sb.append(partitionDesc.toString());
+    if(partitionMethodDesc != null) {
+      sb.append(partitionMethodDesc.toString());
     }
 
     sb.append("}");

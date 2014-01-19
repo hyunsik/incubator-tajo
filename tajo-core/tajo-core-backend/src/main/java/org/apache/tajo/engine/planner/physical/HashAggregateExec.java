@@ -49,7 +49,7 @@ public class HashAggregateExec extends AggregationExec {
     tupleSlots = new HashMap<Tuple, EvalContext[]>(10000);
     this.tuple = new VTuple(evalSchema.getColumnNum());
   }
-  
+
   private void compute() throws IOException {
     Tuple tuple;
     Tuple keyTuple;

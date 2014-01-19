@@ -410,8 +410,8 @@ public class Query implements EventHandler<QueryEvent> {
         }
       }
 
-      if(queryContext.hasPartitions()) {
-        finalTableDesc.setPartitions(queryContext.getPartitions());
+      if(queryContext.hasPartition()) {
+        finalTableDesc.setPartition(queryContext.getPartitionMethod());
       }
 
       return finalTableDesc;

@@ -54,7 +54,7 @@ public class TestTablePartitions {
   public final void testColumnPartitionedTableByOneColumn() throws Exception {
     String tableName ="testColumnPartitionedTableByOneColumn";
     ResultSet res = tpch.execute(
-        "create table " + tableName +" (col1 int4, col2 int4, null_col int4) partition by column(key float8) ");
+        "create table " + tableName +" (col1 int4, col2 int4, null_col int4, key float8) partition by column(key float8) ");
     res.close();
     TajoTestingCluster cluster = tpch.getTestingCluster();
     CatalogService catalog = cluster.getMaster().getCatalog();
@@ -97,7 +97,7 @@ public class TestTablePartitions {
   public final void testColumnPartitionedTableByThreeColumns() throws Exception {
     String tableName ="testColumnPartitionedTableByThreeColumns";
     ResultSet res = tpch.execute(
-        "create table " + tableName +" (col4 text) partition by column(col1 int4, col2 int4, col3 float8) ");
+        "create table " + tableName +" (col4 text, col1 int4, col2 int4, col3 float8) partition by column(col1 int4, col2 int4, col3 float8) ");
     res.close();
     TajoTestingCluster cluster = tpch.getTestingCluster();
     CatalogService catalog = cluster.getMaster().getCatalog();
@@ -163,7 +163,7 @@ public class TestTablePartitions {
   public final void testColumnPartitionedTableByOneColumnsWithCompression() throws Exception {
     String tableName = "testColumnPartitionedTableByOneColumnsWithCompression";
     ResultSet res = tpch.execute(
-        "create table " + tableName + " (col2 int4, col3 float8) USING csv " +
+        "create table " + tableName + " (col1 int4, col2 int4, col3 float8) USING csv " +
             "WITH ('csvfile.delimiter'='|','compression.codec'='org.apache.hadoop.io.compress.DeflateCodec') " +
             "PARTITION BY column(col1 int4)");
     res.close();
@@ -172,7 +172,7 @@ public class TestTablePartitions {
     assertTrue(catalog.existsTable(tableName));
 
     res = tpch.execute(
-        "insert overwrite into " + tableName + " select  l_partkey, l_quantity, l_orderkey from lineitem");
+        "insert overwrite into " + tableName + " select l_orderkey, l_partkey, l_quantity from lineitem");
     res.close();
     TableDesc desc = catalog.getTableDesc(tableName);
     assertEquals(5, desc.getStats().getNumRows().intValue());
@@ -198,7 +198,7 @@ public class TestTablePartitions {
   @Test
   public final void testColumnPartitionedTableByTwoColumnsWithCompression() throws Exception {
     String tableName = "testColumnPartitionedTableByTwoColumnsWithCompression";
-    ResultSet res = tpch.execute("create table " + tableName + " (col3 float8, col4 text) USING csv " +
+    ResultSet res = tpch.execute("create table " + tableName + " (col1 int4, col2 int4, col3 float8, col4 text) USING csv " +
         "WITH ('csvfile.delimiter'='|','compression.codec'='org.apache.hadoop.io.compress.DeflateCodec') " +
         "PARTITION by column(col1 int4, col2 int4)");
     res.close();
@@ -208,7 +208,7 @@ public class TestTablePartitions {
 
     res = tpch.execute(
         "insert overwrite into " + tableName +
-            " select  l_quantity, l_returnflag, l_orderkey, l_partkey from lineitem");
+            " select  l_orderkey, l_partkey, l_quantity, l_returnflag from lineitem");
     res.close();
     TableDesc desc = catalog.getTableDesc(tableName);
     assertEquals(5, desc.getStats().getNumRows().intValue());
@@ -242,7 +242,7 @@ public class TestTablePartitions {
   public final void testColumnPartitionedTableByThreeColumnsWithCompression() throws Exception {
     String tableName = "testColumnPartitionedTableByThreeColumnsWithCompression";
     ResultSet res = tpch.execute(
-        "create table " + tableName + " (col4 text) USING csv " +
+        "create table " + tableName + " (col1 int4, col2 int4, col3 float8, col4 text) USING csv " +
             "WITH ('csvfile.delimiter'='|','compression.codec'='org.apache.hadoop.io.compress.DeflateCodec') " +
             "partition by column(col1 int4, col2 int4, col3 float8)");
     res.close();
@@ -252,7 +252,7 @@ public class TestTablePartitions {
 
     res = tpch.execute(
         "insert overwrite into " + tableName +
-            " select  l_returnflag, l_orderkey, l_partkey, l_quantity from lineitem");
+            " select l_orderkey, l_partkey, l_quantity, l_returnflag from lineitem");
     res.close();
     TableDesc desc = catalog.getTableDesc(tableName);
     assertEquals(5, desc.getStats().getNumRows().intValue());
@@ -296,8 +296,8 @@ public class TestTablePartitions {
 
     int i = 0;
     while (res.next()) {
-      assertEquals(resultRows1.get(res.getDouble(4))[0], res.getInt(2));
-      assertEquals(resultRows1.get(res.getDouble(4))[1], res.getInt(3));
+      assertEquals(resultRows1.get(res.getDouble(3))[0], res.getInt(1));
+      assertEquals(resultRows1.get(res.getDouble(3))[1], res.getInt(2));
       i++;
     }
     res.close();
@@ -311,8 +311,8 @@ public class TestTablePartitions {
     res = tpch.execute("select * from " + tableName + " where (col1 = 2 or col1 = 3) and col2 >= 2");
     i = 0;
     while(res.next()) {
-      assertEquals(resultRows2.get(res.getDouble(4))[0], res.getInt(2));
-      assertEquals(resultRows2.get(res.getDouble(4))[1], res.getInt(3));
+      assertEquals(resultRows2.get(res.getDouble(3))[0], res.getInt(1));
+      assertEquals(resultRows2.get(res.getDouble(3))[1], res.getInt(2));
       i++;
     }
 
@@ -324,7 +324,7 @@ public class TestTablePartitions {
   public final void testColumnPartitionedTableNoMatchedPartition() throws Exception {
     String tableName = "testColumnPartitionedTableNoMatchedPartition";
     ResultSet res = tpch.execute(
-        "create table " + tableName + " (col4 text) USING csv " +
+        "create table " + tableName + " (col1 int4, col2 int4, col3 float8, col4 text) USING csv " +
             "WITH ('csvfile.delimiter'='|','compression.codec'='org.apache.hadoop.io.compress.DeflateCodec') " +
             "partition by column(col1 int4, col2 int4, col3 float8)");
     res.close();
@@ -334,7 +334,7 @@ public class TestTablePartitions {
 
     res = tpch.execute(
         "insert overwrite into " + tableName +
-            " select  l_returnflag, l_orderkey, l_partkey, l_quantity from lineitem");
+            " select l_orderkey, l_partkey, l_quantity, l_returnflag from lineitem");
     res.close();
     TableDesc desc = catalog.getTableDesc(tableName);
     assertEquals(5, desc.getStats().getNumRows().intValue());

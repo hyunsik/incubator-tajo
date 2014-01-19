@@ -31,7 +31,7 @@ public class CreateTable extends Expr {
   private String location;
   private Expr subquery;
   private Map<String, String> params;
-  private PartitionDescExpr partition;
+  private PartitionMethodDescExpr partition;
 
   public CreateTable(final String tableName) {
     super(OpType.CreateTable);
@@ -107,11 +107,11 @@ public class CreateTable extends Expr {
     return partition != null;
   }
 
-  public void setPartition(PartitionDescExpr partition) {
+  public void setPartition(PartitionMethodDescExpr partition) {
     this.partition = partition;
   }
 
-  public <T extends PartitionDescExpr> T getPartition() {
+  public <T extends PartitionMethodDescExpr> T getPartition() {
     return (T) this.partition;
   }
 
@@ -178,10 +178,10 @@ public class CreateTable extends Expr {
     COLUMN
   }
 
-  public static abstract class PartitionDescExpr {
+  public static abstract class PartitionMethodDescExpr {
     PartitionType type;
 
-    public PartitionDescExpr(PartitionType type) {
+    public PartitionMethodDescExpr(PartitionType type) {
       this.type = type;
     }
 
@@ -190,7 +190,7 @@ public class CreateTable extends Expr {
     }
   }
 
-  public static class RangePartition extends PartitionDescExpr {
+  public static class RangePartition extends PartitionMethodDescExpr {
     ColumnReferenceExpr [] columns;
     List<RangePartitionSpecifier> specifiers;
 
@@ -209,7 +209,7 @@ public class CreateTable extends Expr {
     }
   }
 
-  public static class HashPartition extends PartitionDescExpr {
+  public static class HashPartition extends PartitionMethodDescExpr {
     ColumnReferenceExpr [] columns;
     Expr quantity;
     List<PartitionSpecifier> specifiers;
@@ -246,7 +246,7 @@ public class CreateTable extends Expr {
     }
   }
 
-  public static class ListPartition extends PartitionDescExpr {
+  public static class ListPartition extends PartitionMethodDescExpr {
     ColumnReferenceExpr [] columns;
     List<ListPartitionSpecifier> specifiers;
 
@@ -265,7 +265,7 @@ public class CreateTable extends Expr {
     }
   }
 
-  public static class ColumnPartition extends PartitionDescExpr {
+  public static class ColumnPartition extends PartitionMethodDescExpr {
     private ColumnDefinition [] columns;
     private boolean isOmitValues;
 

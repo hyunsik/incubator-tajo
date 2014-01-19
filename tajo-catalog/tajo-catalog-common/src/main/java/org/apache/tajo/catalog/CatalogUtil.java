@@ -19,6 +19,8 @@
 package org.apache.tajo.catalog;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.tajo.catalog.partition.PartitionMethodDesc;
+import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.catalog.proto.CatalogProtos.ColumnProto;
 import org.apache.tajo.catalog.proto.CatalogProtos.SchemaProto;
 import org.apache.tajo.catalog.proto.CatalogProtos.TableDescProto;
@@ -86,6 +88,10 @@ public class CatalogUtil {
 
   public static TableDesc newTableDesc(TableDescProto proto) {
     return new TableDesc(proto);
+  }
+
+  public static PartitionMethodDesc newPartitionMethodDesc(CatalogProtos.PartitionMethodProto proto) {
+    return new PartitionMethodDesc(proto);
   }
 
   public static TableDesc newTableDesc(String tableName, Schema schema, StoreType type, Options options, Path path) {

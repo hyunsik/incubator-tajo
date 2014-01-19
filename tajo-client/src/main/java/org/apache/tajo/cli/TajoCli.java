@@ -30,7 +30,6 @@ import org.apache.tajo.TajoProtos.QueryState;
 import org.apache.tajo.catalog.CatalogUtil;
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.TableDesc;
-import org.apache.tajo.catalog.partition.Specifier;
 import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.client.QueryStatus;
 import org.apache.tajo.client.TajoClient;
@@ -493,36 +492,36 @@ public class TajoCli {
 
     sb.append("\n");
     sb.append("Partitions: \n");
-    if (desc.getPartitions() != null) {
-      sb.append("type:").append(desc.getPartitions().getPartitionsType().name()).append("\n");
-      if (desc.getPartitions().getNumPartitions() > 0)
-        sb.append("numbers:").append(desc.getPartitions().getNumPartitions()).append("\n");
-
-      sb.append("columns:").append("\n");
-      for(Column eachColumn: desc.getPartitions().getColumns()) {
-        sb.append("  ");
-        sb.append(eachColumn.getColumnName()).append("\t").append(eachColumn.getDataType().getType());
-        if (eachColumn.getDataType().hasLength()) {
-          sb.append("(").append(eachColumn.getDataType().getLength()).append(")");
-        }
-        sb.append("\n");
-      }
-
-      if (desc.getPartitions().getSpecifiers() != null) {
-        sb.append("specifier:").append("\n");
-        for(Specifier specifier :desc.getPartitions().getSpecifiers()) {
-          sb.append("  ");
-          sb.append("name:").append(specifier.getName());
-          if (!specifier.getExpressions().equals("")) {
-            sb.append(", expressions:").append(specifier.getExpressions());
-          } else {
-            if (desc.getPartitions().getPartitionsType().name().equals("RANGE"));
-              sb.append(" expressions: MAXVALUE");
-          }
-          sb.append("\n");
-        }
-      }
-    }
+//    if (desc.getPartitions() != null) {
+//      sb.append("type:").append(desc.getPartitions().getPartitionsType().name()).append("\n");
+//      if (desc.getPartitions().getNumPartitions() > 0)
+//        sb.append("numbers:").append(desc.getPartitions().getNumPartitions()).append("\n");
+//
+//      sb.append("columns:").append("\n");
+//      for(Column eachColumn: desc.getPartitions().getColumns()) {
+//        sb.append("  ");
+//        sb.append(eachColumn.getColumnName()).append("\t").append(eachColumn.getDataType().getType());
+//        if (eachColumn.getDataType().hasLength()) {
+//          sb.append("(").append(eachColumn.getDataType().getLength()).append(")");
+//        }
+//        sb.append("\n");
+//      }
+//
+//      if (desc.getPartitions().getSpecifiers() != null) {
+//        sb.append("specifier:").append("\n");
+//        for(Specifier specifier :desc.getPartitions().getSpecifiers()) {
+//          sb.append("  ");
+//          sb.append("name:").append(specifier.getName());
+//          if (!specifier.getExpressions().equals("")) {
+//            sb.append(", expressions:").append(specifier.getExpressions());
+//          } else {
+//            if (desc.getPartitions().getPartitionsType().name().equals("RANGE"));
+//              sb.append(" expressions: MAXVALUE");
+//          }
+//          sb.append("\n");
+//        }
+//      }
+//    }
 
     return sb.toString();
   }

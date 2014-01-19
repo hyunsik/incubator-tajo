@@ -20,8 +20,7 @@ package org.apache.tajo.catalog;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.tajo.catalog.function.Function;
-import org.apache.tajo.catalog.partition.PartitionDesc;
-import org.apache.tajo.catalog.partition.Specifier;
+import org.apache.tajo.catalog.partition.PartitionMethodDesc;
 import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.catalog.proto.CatalogProtos.FunctionType;
 import org.apache.tajo.catalog.proto.CatalogProtos.IndexMethod;
@@ -214,13 +213,16 @@ public class TestCatalog {
     opts.put("file.delimiter", ",");
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV, opts);
 
-    PartitionDesc partitionDesc = new PartitionDesc();
-    partitionDesc.addColumn(new Column("id", Type.INT4));
-    partitionDesc.setPartitionsType(CatalogProtos.PartitionsType.HASH);
-    partitionDesc.setNumPartitions(2);
+    PartitionMethodDesc partitionDesc = new PartitionMethodDesc();
+    partitionDesc.setTableId(tableName);
+    partitionDesc.setExpression("id");
+    Schema partSchema = new Schema();
+    partSchema.addColumn("id", Type.INT4);
+    partitionDesc.setExpressionSchema(partSchema);
+    partitionDesc.setPartitionType(CatalogProtos.PartitionType.HASH);
 
     TableDesc desc = new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
-    desc.setPartitions(partitionDesc);
+    desc.setPartition(partitionDesc);
 
     assertFalse(catalog.existsTable(tableName));
     catalog.addTable(desc);
@@ -228,9 +230,8 @@ public class TestCatalog {
     TableDesc retrieved = catalog.getTableDesc(tableName);
 
     assertEquals(retrieved.getName(), tableName);
-    assertEquals(retrieved.getPartitions().getPartitionsType(), CatalogProtos.PartitionsType.HASH);
-    assertEquals(retrieved.getPartitions().getSchema().getColumn(0).getColumnName(), "id");
-    assertEquals(retrieved.getPartitions().getNumPartitions(), 2);
+    assertEquals(retrieved.getPartition().getPartitionType(), CatalogProtos.PartitionType.HASH);
+    assertEquals(retrieved.getPartition().getExpressionSchema().getColumn(0).getColumnName(), "id");
 
     catalog.deleteTable(tableName);
     assertFalse(catalog.existsTable(tableName));
@@ -250,17 +251,17 @@ public class TestCatalog {
     opts.put("file.delimiter", ",");
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV, opts);
 
-    PartitionDesc partitionDesc = new PartitionDesc();
-    partitionDesc.addColumn(new Column("id", Type.INT4));
-    partitionDesc.setPartitionsType(CatalogProtos.PartitionsType.HASH);
-    partitionDesc.setNumPartitions(2);
-
-    partitionDesc.addSpecifier(new Specifier("sub_part1"));
-    partitionDesc.addSpecifier(new Specifier("sub_part2"));
-    partitionDesc.addSpecifier(new Specifier("sub_part3"));
+    PartitionMethodDesc partitionDesc = new PartitionMethodDesc();
+    partitionDesc.setTableId(tableName);
+    partitionDesc.setExpression("id");
+    Schema partSchema = new Schema();
+    partSchema.addColumn("id", Type.INT4);
+    partitionDesc.setExpressionSchema(partSchema);
+    partitionDesc.setPartitionType(CatalogProtos.PartitionType.HASH);
 
     TableDesc desc = new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
-    desc.setPartitions(partitionDesc);
+    desc.setPartition(partitionDesc);
+
     assertFalse(catalog.existsTable(tableName));
     catalog.addTable(desc);
     assertTrue(catalog.existsTable(tableName));
@@ -268,15 +269,8 @@ public class TestCatalog {
     TableDesc retrieved = catalog.getTableDesc(tableName);
 
     assertEquals(retrieved.getName(), tableName);
-    assertEquals(retrieved.getPartitions().getPartitionsType(), CatalogProtos.PartitionsType.HASH);
-    assertEquals(retrieved.getPartitions().getSchema().getColumn(0).getColumnName(), "id");
-    assertEquals(retrieved.getPartitions().getNumPartitions(), 2);
-    assertEquals(retrieved.getPartitions().getSpecifiers().get(0).getName(),
-        "sub_part1");
-    assertEquals(retrieved.getPartitions().getSpecifiers().get(1).getName(),
-        "sub_part2");
-    assertEquals(retrieved.getPartitions().getSpecifiers().get(2).getName(),
-        "sub_part3");
+    assertEquals(retrieved.getPartition().getPartitionType(), CatalogProtos.PartitionType.HASH);
+    assertEquals(retrieved.getPartition().getExpressionSchema().getColumn(0).getColumnName(), "id");
 
     catalog.deleteTable(tableName);
     assertFalse(catalog.existsTable(tableName));
@@ -295,15 +289,16 @@ public class TestCatalog {
     opts.put("file.delimiter", ",");
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV, opts);
 
-    PartitionDesc partitionDesc = new PartitionDesc();
-    partitionDesc.addColumn(new Column("id", Type.INT4));
-    partitionDesc.setPartitionsType(CatalogProtos.PartitionsType.LIST);
-
-    partitionDesc.addSpecifier(new Specifier("sub_part1", "Seoul,서울"));
-    partitionDesc.addSpecifier(new Specifier("sub_part2", "Busan,부산"));
+    PartitionMethodDesc partitionDesc = new PartitionMethodDesc();
+    partitionDesc.setTableId(tableName);
+    partitionDesc.setExpression("id");
+    Schema partSchema = new Schema();
+    partSchema.addColumn("id", Type.INT4);
+    partitionDesc.setExpressionSchema(partSchema);
+    partitionDesc.setPartitionType(CatalogProtos.PartitionType.LIST);
 
     TableDesc desc = new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
-    desc.setPartitions(partitionDesc);
+    desc.setPartition(partitionDesc);
     assertFalse(catalog.existsTable(tableName));
     catalog.addTable(desc);
     assertTrue(catalog.existsTable(tableName));
@@ -311,16 +306,8 @@ public class TestCatalog {
     TableDesc retrieved = catalog.getTableDesc(tableName);
 
     assertEquals(retrieved.getName(), tableName);
-    assertEquals(retrieved.getPartitions().getPartitionsType(), CatalogProtos.PartitionsType.LIST);
-    assertEquals(retrieved.getPartitions().getSchema().getColumn(0).getColumnName(), "id");
-    assertEquals(retrieved.getPartitions().getSpecifiers().get(0).getName(),
-        "sub_part1");
-    assertEquals(retrieved.getPartitions().getSpecifiers().get(0).getExpressions(),
-        "Seoul,서울");
-    assertEquals(retrieved.getPartitions().getSpecifiers().get(1).getName(),
-        "sub_part2");
-    assertEquals(retrieved.getPartitions().getSpecifiers().get(1).getExpressions(),
-        "Busan,부산");
+    assertEquals(retrieved.getPartition().getPartitionType(), CatalogProtos.PartitionType.LIST);
+    assertEquals(retrieved.getPartition().getExpressionSchema().getColumn(0).getColumnName(), "id");
 
     catalog.deleteTable(tableName);
     assertFalse(catalog.existsTable(tableName));
@@ -339,16 +326,17 @@ public class TestCatalog {
     opts.put("file.delimiter", ",");
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV, opts);
 
-    PartitionDesc partitionDesc = new PartitionDesc();
-    partitionDesc.addColumn(new Column("id", Type.INT4));
-    partitionDesc.setPartitionsType(CatalogProtos.PartitionsType.RANGE);
 
-    partitionDesc.addSpecifier(new Specifier("sub_part1", "2"));
-    partitionDesc.addSpecifier(new Specifier("sub_part2", "5"));
-    partitionDesc.addSpecifier(new Specifier("sub_part3"));
+    PartitionMethodDesc partitionDesc = new PartitionMethodDesc();
+    partitionDesc.setTableId(tableName);
+    partitionDesc.setExpression("id");
+    Schema partSchema = new Schema();
+    partSchema.addColumn("id", Type.INT4);
+    partitionDesc.setExpressionSchema(partSchema);
+    partitionDesc.setPartitionType(CatalogProtos.PartitionType.RANGE);
 
     TableDesc desc = new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
-    desc.setPartitions(partitionDesc);
+    desc.setPartition(partitionDesc);
     assertFalse(catalog.existsTable(tableName));
     catalog.addTable(desc);
     assertTrue(catalog.existsTable(tableName));
@@ -356,20 +344,8 @@ public class TestCatalog {
     TableDesc retrieved = catalog.getTableDesc(tableName);
 
     assertEquals(retrieved.getName(), tableName);
-    assertEquals(retrieved.getPartitions().getPartitionsType(), CatalogProtos.PartitionsType.RANGE);
-    assertEquals(retrieved.getPartitions().getSchema().getColumn(0).getColumnName(), "id");
-    assertEquals(retrieved.getPartitions().getSpecifiers().get(0).getName(),
-        "sub_part1");
-    assertEquals(retrieved.getPartitions().getSpecifiers().get(0).getExpressions(),
-        "2");
-    assertEquals(retrieved.getPartitions().getSpecifiers().get(1).getName(),
-        "sub_part2");
-    assertEquals(retrieved.getPartitions().getSpecifiers().get(1).getExpressions(),
-        "5");
-    assertEquals(retrieved.getPartitions().getSpecifiers().get(2).getName(),
-        "sub_part3");
-    assertEquals(retrieved.getPartitions().getSpecifiers().get(2).getExpressions(),
-        "");
+    assertEquals(retrieved.getPartition().getPartitionType(), CatalogProtos.PartitionType.RANGE);
+    assertEquals(retrieved.getPartition().getExpressionSchema().getColumn(0).getColumnName(), "id");
 
     catalog.deleteTable(tableName);
     assertFalse(catalog.existsTable(tableName));
@@ -388,12 +364,16 @@ public class TestCatalog {
     opts.put("file.delimiter", ",");
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV, opts);
 
-    PartitionDesc partitionDesc = new PartitionDesc();
-    partitionDesc.addColumn(new Column("id", Type.INT4));
-    partitionDesc.setPartitionsType(CatalogProtos.PartitionsType.COLUMN);
+    PartitionMethodDesc partitionDesc = new PartitionMethodDesc();
+    partitionDesc.setTableId(tableName);
+    partitionDesc.setExpression("id");
+    Schema partSchema = new Schema();
+    partSchema.addColumn("id", Type.INT4);
+    partitionDesc.setExpressionSchema(partSchema);
+    partitionDesc.setPartitionType(CatalogProtos.PartitionType.COLUMN);
 
     TableDesc desc = new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
-    desc.setPartitions(partitionDesc);
+    desc.setPartition(partitionDesc);
     assertFalse(catalog.existsTable(tableName));
     catalog.addTable(desc);
     assertTrue(catalog.existsTable(tableName));
@@ -401,8 +381,8 @@ public class TestCatalog {
     TableDesc retrieved = catalog.getTableDesc(tableName);
 
     assertEquals(retrieved.getName(), tableName);
-    assertEquals(retrieved.getPartitions().getPartitionsType(), CatalogProtos.PartitionsType.COLUMN);
-    assertEquals(retrieved.getPartitions().getSchema().getColumn(0).getColumnName(), "id");
+    assertEquals(retrieved.getPartition().getPartitionType(), CatalogProtos.PartitionType.COLUMN);
+    assertEquals(retrieved.getPartition().getExpressionSchema().getColumn(0).getColumnName(), "id");
 
     catalog.deleteTable(tableName);
     assertFalse(catalog.existsTable(tableName));

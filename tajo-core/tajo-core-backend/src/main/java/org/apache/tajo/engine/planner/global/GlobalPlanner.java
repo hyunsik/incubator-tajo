@@ -27,7 +27,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
 import org.apache.tajo.algebra.JoinType;
 import org.apache.tajo.catalog.*;
-import org.apache.tajo.catalog.partition.PartitionDesc;
+import org.apache.tajo.catalog.partition.PartitionMethodDesc;
 import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.engine.eval.AggregationFunctionCallEval;
@@ -361,7 +361,7 @@ public class GlobalPlanner {
                                         ExecutionBlock childBlock,
                                         StoreTableNode currentNode) 
     throws PlanningException {
-    PartitionDesc partitionDesc = currentNode.getPartitions();
+    PartitionMethodDesc partitionDesc = currentNode.getPartitionMethod();
 
     // if result table is not a partitioned table, directly store it
     if(partitionDesc == null) {
@@ -380,12 +380,14 @@ public class GlobalPlanner {
     // 2. create a new execution block, pipeline 2 exec blocks through a DataChannel
     MasterPlan masterPlan = context.plan;
     ExecutionBlock currentBlock = masterPlan.newExecutionBlock();
-    DataChannel channel;
-    CatalogProtos.PartitionsType partitionsType = partitionDesc.getPartitionsType();
-    if(partitionsType == CatalogProtos.PartitionsType.COLUMN) {
+
+    DataChannel channel = null;
+    CatalogProtos.PartitionType partitionsType = partitionDesc.getPartitionType();
+    if(partitionsType == CatalogProtos.PartitionType.COLUMN) {
       channel = new DataChannel(childBlock, currentBlock, HASH_SHUFFLE, 32);
-      Column[] columns = new Column[partitionDesc.getColumns().size()];
-      channel.setShuffleKeys(partitionDesc.getColumns().toArray(columns));
+      List<Column> columnList = partitionDesc.getExpressionSchema().getColumns();
+      Column[] columns = new Column[columnList.size()];
+      channel.setShuffleKeys(columnList.toArray(columns));
       channel.setSchema(childNode.getOutSchema());
       channel.setStoreType(storeType);
     } else {

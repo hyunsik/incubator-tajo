@@ -30,25 +30,19 @@ import org.apache.tajo.catalog.CatalogUtil;
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.catalog.TableMeta;
-import org.apache.tajo.catalog.partition.PartitionDesc;
+import org.apache.tajo.catalog.partition.PartitionMethodDesc;
+import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.catalog.statistics.StatisticsUtil;
 import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.datum.Datum;
 import org.apache.tajo.engine.planner.logical.StoreTableNode;
 import org.apache.tajo.engine.planner.PlannerUtil;
-import org.apache.tajo.storage.Appender;
-import org.apache.tajo.storage.StorageManagerFactory;
-import org.apache.tajo.storage.StorageUtil;
-import org.apache.tajo.storage.Tuple;
+import org.apache.tajo.storage.*;
 import org.apache.tajo.worker.TaskAttemptContext;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
-import static org.apache.tajo.catalog.proto.CatalogProtos.PartitionsType;
 
 /**
  * This class is a physical operator to store at column partitioned table.
@@ -61,8 +55,9 @@ public class ColumnPartitionedTableStoreExec extends UnaryPhysicalExec {
   private Tuple tuple;
   private Path storeTablePath;
   private final Map<String, Appender> appenderMap = new HashMap<String, Appender>();
-  private int[] partitionColumnIndices;
-  private String[] partitionColumnNames;
+  private List<Column> columns;
+  private List<Integer> columnIndices;
+  private List<Integer> partitionColumnIndices;
 
   public ColumnPartitionedTableStoreExec(TaskAttemptContext context, StoreTableNode plan, PhysicalExec child)
       throws IOException {
@@ -78,24 +73,29 @@ public class ColumnPartitionedTableStoreExec extends UnaryPhysicalExec {
 
     // Rewrite a output schema because we don't have to store field values
     // corresponding to partition key columns.
-    if (plan.getPartitions() != null && plan.getPartitions().getPartitionsType() == PartitionsType.COLUMN) {
+    if (plan.getPartitionMethod() != null &&
+        plan.getPartitionMethod().getPartitionType() == CatalogProtos.PartitionType.COLUMN) {
       rewriteColumnPartitionedTableSchema();
     }
 
     // Find column index to name subpartition directory path
-    if (this.plan.getPartitions() != null) {
-      if (this.plan.getPartitions().getColumns() != null) {
-        partitionColumnIndices = new int[plan.getPartitions().getColumns().size()];
-        partitionColumnNames = new String[partitionColumnIndices.length];
-        Schema columnPartitionSchema = plan.getPartitions().getSchema();
-        for(int i = 0; i < columnPartitionSchema.getColumnNum(); i++)  {
-          Column targetColumn = columnPartitionSchema.getColumn(i);
-          for(int j = 0; j < plan.getInSchema().getColumns().size();j++) {
-            Column inputColumn = plan.getInSchema().getColumn(j);
-            if (inputColumn.getColumnName().equals(targetColumn.getColumnName())) {
-              partitionColumnIndices[i] = j;
-              partitionColumnNames[i] = targetColumn.getColumnName();
-            }
+    if (this.plan.getPartitionMethod() != null) {
+      Schema partSchema = plan.getPartitionMethod().getExpressionSchema();
+      if (partSchema.getColumns() != null) {
+        partitionColumnIndices = new ArrayList<Integer>();
+        columnIndices = new ArrayList<Integer>();
+        Set<String> partColSet = new HashSet<String>();
+        for (Column partCol : partSchema.getColumns()) {
+          partColSet.add(partCol.getColumnName());
+        }
+
+        columns = plan.getInSchema().getColumns();
+        for (int j = 0; j < columns.size(); j++) {
+          String inputColumnName = columns.get(j).getColumnName();
+          if(partColSet.contains(inputColumnName)) {
+            partitionColumnIndices.add(j);
+          } else {
+            columnIndices.add(j);
           }
         }
       }
@@ -108,10 +108,10 @@ public class ColumnPartitionedTableStoreExec extends UnaryPhysicalExec {
    * So, this method removes partition key columns from the input schema.
    */
   private void rewriteColumnPartitionedTableSchema() {
-    PartitionDesc partitionDesc = plan.getPartitions();
-    Schema columnPartitionSchema = (Schema) partitionDesc.getSchema().clone();
+    PartitionMethodDesc partitionDesc = plan.getPartitionMethod();
+    Schema columnPartitionSchema = (Schema) partitionDesc.getExpressionSchema().clone();
+    columnPartitionSchema.setQualifier(plan.getTableName());
     String qualifier = plan.getTableName();
-
     outSchema = PlannerUtil.rewriteColumnPartitionedTableSchema(
                                              partitionDesc,
                                              columnPartitionSchema,
@@ -172,19 +172,21 @@ public class ColumnPartitionedTableStoreExec extends UnaryPhysicalExec {
     while((tuple = child.next()) != null) {
       // set subpartition directory name
       sb.delete(0, sb.length());
-      if (partitionColumnIndices != null) {
-        for(int i = 0; i < partitionColumnIndices.length; i++) {
-          Datum datum = tuple.get(partitionColumnIndices[i]);
-          if(i > 0)
-            sb.append("/");
-          sb.append(partitionColumnNames[i]).append("=");
-          sb.append(datum.asChars());
-        }
+      for (int partIndex : partitionColumnIndices) {
+        Datum datum = tuple.get(partIndex);
+        sb.append(columns.get(partIndex).getColumnName()).append("=");
+        sb.append(datum.asChars()).append('/');
       }
+      sb.deleteCharAt(sb.length() - 1); // remove the last '/'
 
       // add tuple
       Appender appender = getAppender(sb.toString());
-      appender.addTuple(tuple);
+      Tuple newTuple = new VTuple(columnIndices.size());
+      for(int i = 0; i < columnIndices.size(); i++) {
+        int index = columnIndices.get(i);
+        newTuple.put(i, tuple.get(index));
+      }
+      appender.addTuple(newTuple);
     }
 
     List<TableStats> statSet = new ArrayList<TableStats>();
@@ -206,4 +208,5 @@ public class ColumnPartitionedTableStoreExec extends UnaryPhysicalExec {
   public void rescan() throws IOException {
     // nothing to do
   }
+
 }

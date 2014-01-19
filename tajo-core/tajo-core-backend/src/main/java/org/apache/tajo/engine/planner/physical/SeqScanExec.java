@@ -18,28 +18,27 @@
 
 package org.apache.tajo.engine.planner.physical;
 
-import org.apache.tajo.catalog.partition.PartitionDesc;
+import org.apache.tajo.catalog.Column;
+import org.apache.tajo.catalog.Schema;
+import org.apache.tajo.catalog.partition.PartitionMethodDesc;
 import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.datum.Datum;
 import org.apache.tajo.engine.eval.*;
-import org.apache.tajo.engine.utils.TupleUtil;
-import org.apache.tajo.storage.fragment.FileFragment;
-import org.apache.tajo.storage.fragment.FragmentConvertor;
-import org.apache.tajo.worker.TaskAttemptContext;
-import org.apache.tajo.catalog.Column;
-import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.engine.planner.Projector;
 import org.apache.tajo.engine.planner.Target;
 import org.apache.tajo.engine.planner.PlannerUtil;
 import org.apache.tajo.engine.planner.logical.ScanNode;
+import org.apache.tajo.engine.utils.TupleUtil;
 import org.apache.tajo.storage.*;
+import org.apache.tajo.storage.fragment.FileFragment;
+import org.apache.tajo.storage.fragment.FragmentConvertor;
+import org.apache.tajo.worker.TaskAttemptContext;
 
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import static org.apache.tajo.catalog.proto.CatalogProtos.PartitionsType;
 
 public class SeqScanExec extends PhysicalExec {
   private final ScanNode plan;
@@ -78,17 +77,18 @@ public class SeqScanExec extends PhysicalExec {
    * indicate partition keys. In this time, it is right. Later, we have to fix it.
    */
   private void rewriteColumnPartitionedTableSchema() throws IOException {
-    PartitionDesc partitionDesc = plan.getTableDesc().getPartitions();
-    Schema columnPartitionSchema = (Schema) partitionDesc.getSchema().clone();
+    PartitionMethodDesc partitionDesc = plan.getTableDesc().getPartition();
+    Schema columnPartitionSchema = (Schema) partitionDesc.getExpressionSchema().clone();
     String qualifier = inSchema.getColumn(0).getQualifier();
     columnPartitionSchema.setQualifier(qualifier);
 
     // Remove partition key columns from an input schema.
     this.inSchema = PlannerUtil.rewriteColumnPartitionedTableSchema(
-                                                 partitionDesc,
-                                                 columnPartitionSchema,
-                                                 inSchema,
-                                                 qualifier);
+        partitionDesc,
+        columnPartitionSchema,
+        inSchema,
+        qualifier);
+
 
     List<FileFragment> fileFragments = FragmentConvertor.convert(FileFragment.class, fragments);
 
@@ -124,8 +124,8 @@ public class SeqScanExec extends PhysicalExec {
   public void init() throws IOException {
     Schema projected;
 
-    if (plan.getTableDesc().hasPartitions()
-        && plan.getTableDesc().getPartitions().getPartitionsType() == PartitionsType.COLUMN) {
+    if (plan.getTableDesc().hasPartition()
+        && plan.getTableDesc().getPartition().getPartitionType() == CatalogProtos.PartitionType.COLUMN) {
       rewriteColumnPartitionedTableSchema();
     }
 

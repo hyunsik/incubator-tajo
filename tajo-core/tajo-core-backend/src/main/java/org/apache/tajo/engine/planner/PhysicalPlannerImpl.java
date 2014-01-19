@@ -643,12 +643,12 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
   public PhysicalExec createStorePlan(TaskAttemptContext ctx,
                                       StoreTableNode plan, PhysicalExec subOp) throws IOException {
 
-    if (plan.getPartitions() != null) {
-      switch (plan.getPartitions().getPartitionsType()) {
+    if (plan.getPartitionMethod() != null) {
+      switch (plan.getPartitionMethod().getPartitionType()) {
       case COLUMN:
         return new ColumnPartitionedTableStoreExec(ctx, plan, subOp);
       default:
-        throw new IllegalStateException(plan.getPartitions().getPartitionsType() + " is not supported yet.");
+        throw new IllegalStateException(plan.getPartitionMethod().getPartitionType() + " is not supported yet.");
       }
     } else {
       return new StoreTableExec(ctx, plan, subOp);

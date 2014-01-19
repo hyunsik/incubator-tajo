@@ -26,7 +26,7 @@ import org.apache.tajo.TajoTestingCluster;
 import org.apache.tajo.TpchTestBase;
 import org.apache.tajo.catalog.CatalogService;
 import org.apache.tajo.catalog.TableDesc;
-import org.apache.tajo.catalog.partition.PartitionDesc;
+import org.apache.tajo.catalog.partition.PartitionMethodDesc;
 import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -68,9 +68,9 @@ public class TestCTASQuery {
     TableDesc desc = catalog.getTableDesc(tableName);
     assertTrue(catalog.existsTable(tableName));
     assertTrue(desc.getSchema().contains("testCtasWithoutTableDefinition.col1"));
-    PartitionDesc partitionDesc = desc.getPartitions();
-    assertEquals(partitionDesc.getPartitionsType(), CatalogProtos.PartitionsType.COLUMN);
-    assertEquals("key", partitionDesc.getColumns().get(0).getColumnName());
+    PartitionMethodDesc partitionDesc = desc.getPartition();
+    assertEquals(partitionDesc.getPartitionType(), CatalogProtos.PartitionType.COLUMN);
+    assertEquals("key", partitionDesc.getExpressionSchema().getColumns().get(0).getColumnName());
 
     FileSystem fs = FileSystem.get(tpch.getTestingCluster().getConfiguration());
     Path path = desc.getPath();
@@ -111,9 +111,9 @@ public class TestCTASQuery {
     CatalogService catalog = cluster.getMaster().getCatalog();
     TableDesc desc = catalog.getTableDesc(tableName);
     assertTrue(catalog.existsTable(tableName));
-    PartitionDesc partitionDesc = desc.getPartitions();
-    assertEquals(partitionDesc.getPartitionsType(), CatalogProtos.PartitionsType.COLUMN);
-    assertEquals("key", partitionDesc.getColumns().get(0).getColumnName());
+    PartitionMethodDesc partitionDesc = desc.getPartition();
+    assertEquals(partitionDesc.getPartitionType(), CatalogProtos.PartitionType.COLUMN);
+    assertEquals("key", partitionDesc.getExpressionSchema().getColumns().get(0).getColumnName());
 
     FileSystem fs = FileSystem.get(tpch.getTestingCluster().getConfiguration());
     Path path = desc.getPath();

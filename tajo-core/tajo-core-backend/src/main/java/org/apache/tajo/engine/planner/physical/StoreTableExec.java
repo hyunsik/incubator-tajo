@@ -47,6 +47,14 @@ public class StoreTableExec extends UnaryPhysicalExec {
   public void init() throws IOException {
     super.init();
 
+
+    appender = getAppender();
+
+    appender.enableStats();
+    appender.init();
+  }
+
+  protected  Appender getAppender() throws  IOException {
     TableMeta meta;
     if (plan.hasOptions()) {
       meta = CatalogUtil.newTableMeta(plan.getStorageType(), plan.getOptions());
@@ -54,11 +62,8 @@ public class StoreTableExec extends UnaryPhysicalExec {
       meta = CatalogUtil.newTableMeta(plan.getStorageType());
     }
 
-    appender = StorageManagerFactory.getStorageManager(context.getConf()).getAppender(meta, outSchema,
+    return StorageManagerFactory.getStorageManager(context.getConf()).getAppender(meta, outSchema,
         context.getOutputPath());
-
-    appender.enableStats();
-    appender.init();
   }
 
   /* (non-Javadoc)
