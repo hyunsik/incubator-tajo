@@ -23,7 +23,6 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.tajo.algebra.Expr;
-import org.apache.tajo.engine.parser.SQLParser.Boolean_value_expressionContext;
 import org.apache.tajo.engine.parser.SQLParser.SqlContext;
 import org.apache.tajo.util.FileUtil;
 import org.junit.Test;
@@ -69,18 +68,6 @@ public class TestHiveConverter {
       LOG.info("### Hive Parse Result ### \n" + hiveExpr.toJson());
       throw new IOException(getMethodName(3));
     }
-  }
-
-  public static Expr parseExpr(String sql) {
-    ANTLRInputStream input = new ANTLRInputStream(sql);
-    SQLLexer lexer = new SQLLexer(input);
-    CommonTokenStream tokens = new CommonTokenStream(lexer);
-    SQLParser parser = new SQLParser(tokens);
-    parser.setBuildParseTree(true);
-    SQLAnalyzer visitor = new SQLAnalyzer();
-    Boolean_value_expressionContext context = parser.boolean_value_expression();
-    System.out.println(context.toStringTree(parser));
-    return visitor.visitBoolean_value_expression(context);
   }
 
   @Test

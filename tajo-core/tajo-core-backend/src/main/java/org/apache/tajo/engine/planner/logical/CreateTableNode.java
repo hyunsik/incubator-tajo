@@ -23,7 +23,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Options;
 import org.apache.tajo.catalog.Schema;
-import org.apache.tajo.catalog.partition.PartitionDesc;
 import org.apache.tajo.catalog.partition.PartitionMethodDesc;
 import org.apache.tajo.catalog.proto.CatalogProtos.StoreType;
 import org.apache.tajo.engine.planner.PlanString;
@@ -39,14 +38,20 @@ public class CreateTableNode extends LogicalNode implements Cloneable {
   @Expose private boolean external;
   @Expose private PartitionMethodDesc partitionMethodDesc;
 
-  public CreateTableNode(int pid, String tableName, Schema schema) {
+  public CreateTableNode(int pid) {
     super(pid, NodeType.CREATE_TABLE);
-    this.tableName = tableName;
-    this.schema = schema;
+  }
+
+  public void setTableName(String name) {
+    this.tableName = name;
   }
 
   public final String getTableName() {
     return this.tableName;
+  }
+
+  public void setSchema(Schema schema) {
+    this.schema = schema;
   }
     
   public Schema getSchema() {

@@ -18,8 +18,6 @@
 
 package org.apache.tajo.catalog.partition;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.annotations.Expose;
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.json.CatalogGsonHelper;
@@ -170,9 +168,8 @@ public class PartitionDesc implements ProtoObject<CatalogProtos.PartitionDescPro
   }
 
   public String toString() {
-    Gson gson = new GsonBuilder().setPrettyPrinting().
-        excludeFieldsWithoutExposeAnnotation().create();
-    return gson.toJson(this);
+    StringBuilder sb = new StringBuilder("name: " + partitionName);
+    return sb.toString();
   }
 
   @Override

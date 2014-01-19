@@ -117,6 +117,9 @@ Release 0.8.0 - unreleased
 
   IMPROVEMENTS
 
+    TAJO-499: Shorten the length of classpath in shell command. 
+    (hyoungjunkim via hyunsik)
+
     TAJO-483: Add getParentCount(), getParents(), getParent() functions to DirectedGraph. 
     (jihoon)
 
@@ -333,6 +336,11 @@ Release 0.8.0 - unreleased
     TAJO-293: querymasters directory not found in single node setup. (hyunsik)
 
   TASKS
+
+    TAJO-478: Add request-patch-review.py that helps submitting patches to
+    jira and reviewboard. (hyunsik)
+
+    TAJO-508: Apply findbugs-excludeFilterFile to TajoQA. (jinho)
 
     TAJO-457: Update committer list and contributor list. (hyunsik)
 
