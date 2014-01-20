@@ -400,123 +400,23 @@ public class GlobalEngine extends AbstractService {
       queryContext.setInsert();
 
       InsertNode insertNode = plan.getRootBlock().getNode(NodeType.INSERT);
-      StoreTableNode storeNode;
 
       // Set QueryContext settings, such as output table name and output path.
       // It also remove data files if overwrite is true.
       String outputTableName;
       Path outputPath;
-      CatalogProtos.StoreType storeType;
-      Options options = new Options();
       if (insertNode.hasTargetTable()) { // INSERT INTO [TB_NAME]
-        TableDesc desc = insertNode.getTargetTable();
-        outputTableName = desc.getName();
-        outputPath = desc.getPath();
-        queryContext.setOutputTable(outputTableName);
-
-        // set default values
-        options.putAll(desc.getMeta().getOptions());
-        storeType = desc.getMeta().getStoreType();
+        queryContext.setOutputTable(insertNode.getTableName());
       } else { // INSERT INTO LOCATION ...
         outputTableName = PlannerUtil.normalizeTableName(insertNode.getPath().getName());
         outputPath = insertNode.getPath();
         queryContext.setFileOutput();
-
-        // set default values
-        options = new Options();
-        storeType = CatalogProtos.StoreType.CSV;
+        queryContext.setOutputPath(outputPath);
       }
-
-      // overwrite the store type if store type is specified in the query statement
-      if (insertNode.hasStorageType()) {
-        storeType = insertNode.getStorageType();
-      }
-
-      // overwrite the table properties if they are specified in the query statement
-      if (insertNode.hasOptions()) {
-        options.putAll(insertNode.getOptions());
-      }
-
-      storeNode = new StoreTableNode(plan.newPID());
-      storeNode.setTableName(outputTableName);
-      storeNode.setStorageType(storeType);
-      storeNode.setOptions(options);
-
-      // set OutputPath
-      queryContext.setOutputPath(outputPath);
 
       if (insertNode.isOverwrite()) {
         queryContext.setOutputOverwrite();
       }
-
-      ////////////////////////////////////////////////////////////////////////////////////
-      //             [TARGET TABLE]  [TARGET COLUMN]         [SUBQUERY Schema]           /
-      // INSERT INTO    TB_NAME      (col1, col2)     SELECT    c1,   c2        FROM ... /
-      ////////////////////////////////////////////////////////////////////////////////////
-      LogicalNode subQuery = insertNode.getSubQuery();
-      Schema subQueryOutSchema = subQuery.getOutSchema();
-
-      if (insertNode.hasTargetTable()) { // if a target table is given, it computes the proper schema.
-        storeNode.getOptions().putAll(insertNode.getTargetTable().getMeta().toMap());
-
-        Schema targetTableSchema = insertNode.getTargetTable().getSchema();
-        Schema targetProjectedSchema = insertNode.getTargetSchema();
-
-        int [] targetColumnIds = new int[targetProjectedSchema.getColumnNum()];
-        int idx = 0;
-        for (Column column : targetProjectedSchema.getColumns()) {
-          targetColumnIds[idx++] = targetTableSchema.getColumnId(column.getQualifiedName());
-        }
-
-        Target [] targets = new Target[targetTableSchema.getColumnNum()];
-        boolean matched = false;
-        for (int i = 0; i < targetTableSchema.getColumnNum(); i++) {
-          Column column = targetTableSchema.getColumn(i);
-          for (int j = 0; j < targetColumnIds.length; j++) {
-            if (targetColumnIds[j] == i) {
-              Column outputColumn = subQueryOutSchema.getColumn(j);
-              targets[i] = new Target(new FieldEval(outputColumn), column.getColumnName());
-              matched = true;
-              break;
-            }
-          }
-          if (!matched) {
-            targets[i] = new Target(new ConstEval(NullDatum.get()), column.getColumnName());
-          }
-          matched = false;
-        }
-
-
-        ProjectionNode projectionNode = new ProjectionNode(plan.newPID());
-        projectionNode.setTargets(targets);
-        projectionNode.setInSchema(insertNode.getSubQuery().getOutSchema());
-        List<LogicalPlan.QueryBlock> blocks = plan.getChildBlocks(plan.getRootBlock());
-        projectionNode.setChild(blocks.get(0).getRoot());
-
-        storeNode.setOutSchema(projectionNode.getOutSchema());
-        storeNode.setInSchema(projectionNode.getOutSchema());
-        storeNode.setChild(projectionNode);
-      } else {
-        storeNode.setOutSchema(subQueryOutSchema);
-        storeNode.setInSchema(subQueryOutSchema);
-        List<LogicalPlan.QueryBlock> childBlocks = plan.getChildBlocks(plan.getRootBlock());
-        storeNode.setChild(childBlocks.get(0).getRoot());
-      }
-
-      // If InsertNode contains table partition information, StoreNode must has it.
-      if (insertNode.hasTargetTable()) {
-        if (insertNode.getTargetTable().getPartitions() != null) {
-          storeNode.setPartitions(insertNode.getTargetTable().getPartitions());
-        }
-      }
-
-      // find a subquery query of insert node and merge root block and subquery into one query block.
-      PlannerUtil.replaceNode(plan.getRootBlock().getRoot(), storeNode, NodeType.INSERT);
-      plan.getRootBlock().refresh();
-      LogicalPlan.QueryBlock subBlock = plan.getBlock(insertNode.getSubQuery());
-      // remove the sub block and connection from a block graph.
-      plan.removeBlock(subBlock);
-      plan.getQueryBlockGraph().removeEdge(subBlock.getName(), LogicalPlan.ROOT_BLOCK);
     }
   }
 }

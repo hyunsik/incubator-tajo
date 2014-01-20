@@ -39,6 +39,10 @@ public abstract class PersistentStoreNode extends UnaryNode implements Cloneable
     super(pid, nodeType);
   }
 
+  public boolean hasTargetTable() {
+    return tableName != null;
+  }
+
   public void setTableName(String tableName) {
     this.tableName = tableName;
   }

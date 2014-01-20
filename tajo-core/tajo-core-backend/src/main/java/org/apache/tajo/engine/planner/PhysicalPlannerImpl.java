@@ -117,6 +117,7 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
         return new EvalExprExec(ctx, evalExpr);
 
       case CREATE_TABLE:
+      case INSERT:
       case STORE:
         StoreTableNode storeNode = (StoreTableNode) logicalNode;
         leftExec = createPlanRecursive(ctx, storeNode.getChild());

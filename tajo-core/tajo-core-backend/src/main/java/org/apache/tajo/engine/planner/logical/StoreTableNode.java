@@ -24,8 +24,6 @@ import org.apache.tajo.engine.planner.PlanString;
 import org.apache.tajo.util.TUtil;
 
 public class StoreTableNode extends PersistentStoreNode implements Cloneable {
-  @Expose private boolean isCreatedTable = false;
-  @Expose private boolean isOverwritten = false;
   @Expose private PartitionDesc partitionDesc;
 
   public StoreTableNode(int pid) {
@@ -56,22 +54,12 @@ public class StoreTableNode extends PersistentStoreNode implements Cloneable {
 
     return planStr;
   }
-
-  public boolean isCreatedTable() {
-    return isCreatedTable;
-  }
-
-  public void setCreateTable() {
-    isCreatedTable = true;
-  }
   
   @Override
   public boolean equals(Object obj) {
     if (obj instanceof StoreTableNode) {
       StoreTableNode other = (StoreTableNode) obj;
       boolean eq = super.equals(other);
-      eq = eq && isCreatedTable == other.isCreatedTable;
-      eq = eq && isOverwritten == other.isOverwritten;
       eq = eq && TUtil.checkEquals(partitionDesc, other.partitionDesc);
       return eq;
     } else {
@@ -82,8 +70,6 @@ public class StoreTableNode extends PersistentStoreNode implements Cloneable {
   @Override
   public Object clone() throws CloneNotSupportedException {
     StoreTableNode store = (StoreTableNode) super.clone();
-    store.isCreatedTable = isCreatedTable;
-    store.isOverwritten = isOverwritten;
     store.partitionDesc = partitionDesc;
     return store;
   }

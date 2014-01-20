@@ -61,14 +61,7 @@ public class ProjectionPushDownRule extends
   public LogicalPlan rewrite(LogicalPlan plan) throws PlanningException {
     LogicalPlan.QueryBlock rootBlock = plan.getRootBlock();
 
-    LogicalPlan.QueryBlock topmostBlock;
-
-    // skip a non-table-expression block.
-    if (plan.getRootBlock().getRootType() == NodeType.INSERT) {
-      topmostBlock = plan.getChildBlocks(rootBlock).get(0);
-    } else {
-      topmostBlock = rootBlock;
-    }
+    LogicalPlan.QueryBlock topmostBlock = rootBlock;
 
     Stack<LogicalNode> stack = new Stack<LogicalNode>();
     Context context = new Context(plan);

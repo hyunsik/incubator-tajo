@@ -695,9 +695,10 @@ public class GlobalPlanner {
                                    InsertNode node, Stack<LogicalNode> stack)
         throws PlanningException {
       LogicalNode child = super.visitInsert(context, plan, queryBlock, node, stack);
-      ExecutionBlock execBlock = context.execBlockMap.remove(child.getPID());
-      execBlock.setPlan(node);
-      context.execBlockMap.put(node.getPID(), execBlock);
+
+      ExecutionBlock childBlock = context.execBlockMap.remove(child.getPID());
+      ExecutionBlock newExecBlock = buildStorePlan(context, childBlock, node);
+      context.execBlockMap.put(node.getPID(), newExecBlock);
 
       return node;
     }

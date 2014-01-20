@@ -34,6 +34,7 @@ import org.apache.tajo.catalog.partition.PartitionDesc;
 import org.apache.tajo.catalog.partition.Specifier;
 import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.common.TajoDataTypes;
+import org.apache.tajo.datum.NullDatum;
 import org.apache.tajo.engine.eval.*;
 import org.apache.tajo.engine.exception.InvalidQueryException;
 import org.apache.tajo.engine.exception.VerifyException;
@@ -1034,60 +1035,128 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
   public LogicalNode visitInsert(PlanContext context, Stack<Expr> stack, Insert expr) throws PlanningException {
     stack.push(expr);
-    QueryBlock newQueryBlock = context.plan.getBlockByExpr(expr.getSubQuery());
-    PlanContext newContext = new PlanContext(context, newQueryBlock);
-    Stack<Expr> subStack = new Stack<Expr>();
-    LogicalNode subQuery = visit(newContext, subStack, expr.getSubQuery());
-    context.plan.connectBlocks(newQueryBlock, context.queryBlock, BlockType.TableSubQuery);
+    LogicalNode subQuery = super.visitInsert(context, stack, expr);
     stack.pop();
 
-    InsertNode insertNode = null;
-    if (expr.hasTableName()) {
-      TableDesc desc = catalog.getTableDesc(expr.getTableName());
-      context.queryBlock.addRelation(new ScanNode(context.plan.newPID(), desc));
-
-      Schema targetSchema = new Schema();
-      if (expr.hasTargetColumns()) {
-        // INSERT OVERWRITE INTO TABLE tbl(col1 type, col2 type) SELECT ...
-        String [] targetColumnNames = expr.getTargetColumns();
-        for (int i = 0; i < targetColumnNames.length; i++) {
-          Column targetColumn = context.plan.resolveColumn(context.queryBlock,
-              new ColumnReferenceExpr(targetColumnNames[i]));
-          targetSchema.addColumn(targetColumn);
-        }
-      } else {
-        // use the output schema of select clause as target schema
-        // if didn't specific target columns like the way below,
-        // INSERT OVERWRITE INTO TABLE tbl SELECT ...
-        Schema targetTableSchema = desc.getSchema();
-        for (int i = 0; i < subQuery.getOutSchema().getColumnNum(); i++) {
-          targetSchema.addColumn(targetTableSchema.getColumn(i));
-        }
-      }
-
-      insertNode = context.queryBlock.getNodeFromExpr(expr);
-      insertNode.setTargetTableDesc(desc);
-      insertNode.setSubQuery(subQuery);
-      insertNode.setTargetSchema(targetSchema);
-      insertNode.setOutSchema(targetSchema);
-    }
-
-    if (expr.hasLocation()) {
-      insertNode = context.queryBlock.getNodeFromExpr(expr);
-      insertNode.setTargetLocation(new Path(expr.getLocation()));
-      insertNode.setSubQuery(subQuery);
-      if (expr.hasStorageType()) {
-        insertNode.setStorageType(CatalogUtil.getStoreType(expr.getStorageType()));
-      }
-      if (expr.hasParams()) {
-        Options options = new Options();
-        options.putAll(expr.getParams());
-        insertNode.setOptions(options);
-      }
-    }
-
+    InsertNode insertNode = context.queryBlock.getNodeFromExpr(expr);
     insertNode.setOverwrite(expr.isOverwrite());
+    insertNode.setSubQuery(subQuery);
 
+    if (expr.hasTableName()) {
+      return buildInsertIntoTable(context, insertNode, expr);
+    } else if (expr.hasLocation()) {
+      return insertIntoLocation(context, insertNode, expr);
+    } else {
+      throw new IllegalStateException("Invalid Query");
+    }
+  }
+
+  /**
+   * Builds a InsertNode with a target table.
+   *
+   * ex) INSERT OVERWRITE INTO TABLE ...
+   */
+  private InsertNode buildInsertIntoTable(PlanContext context, InsertNode insertNode, Insert expr)
+      throws PlanningException {
+    // Get a target table
+    TableDesc desc = catalog.getTableDesc(expr.getTableName());
+    context.queryBlock.addRelation(new ScanNode(context.plan.newPID(), desc));
+
+    // Set a target table
+    insertNode.setTargetTable(desc);
+
+    Schema targetSchema = new Schema();
+
+    if (expr.hasTargetColumns()) { // INSERT OVERWRITE INTO TABLE tbl(col1 type, col2 type) SELECT ...
+
+      ////////////////////////////////////////////////////////////////////////////////////
+      //             [TARGET TABLE]  [TARGET COLUMN]         [SUBQUERY Schema]           /
+      // INSERT INTO    TB_NAME      (col1, col2)     SELECT    c1,   c2        FROM ... /
+      ////////////////////////////////////////////////////////////////////////////////////
+
+      String [] targets = expr.getTargetColumns();
+      for (int i = 0; i < targets.length; i++) {
+        Column targetColumn = context.plan.resolveColumn(context.queryBlock, new ColumnReferenceExpr(targets[i]));
+        targetSchema.addColumn(targetColumn);
+      }
+      insertNode.setTargetSchema(targetSchema);
+      buildProjectedInsert(insertNode);
+
+      if (desc.hasPartitions()) {
+        insertNode.setPartitions(desc.getPartitions());
+      }
+    } else {
+      // use the output schema of select clause as target schema
+      // if didn't specific target columns like the way below,
+      // INSERT OVERWRITE INTO TABLE tbl SELECT ...
+      targetSchema = new Schema(desc.getSchema());
+      insertNode.setTargetSchema(targetSchema);
+    }
+
+    return insertNode;
+  }
+
+  private void buildProjectedInsert(InsertNode insertNode) {
+    ////////////////////////////////////////////////////////////////////////////////////
+    //             [TARGET TABLE]  [TARGET COLUMN]         [SUBQUERY Schema]           /
+    // INSERT INTO    TB_NAME      (col1, col2)     SELECT    c1,   c2        FROM ... /
+    ////////////////////////////////////////////////////////////////////////////////////
+    LogicalNode subQuery = insertNode.getChild();
+    Schema subQueryOutSchema = subQuery.getOutSchema();
+
+    Schema targetTableSchema = insertNode.getTableSchema();
+    Schema targetProjectedSchema = insertNode.getTargetSchema();
+
+    int [] targetColumnIds = new int[targetProjectedSchema.getColumnNum()];
+    int idx = 0;
+    for (Column column : targetProjectedSchema.getColumns()) {
+      targetColumnIds[idx++] = targetTableSchema.getColumnId(column.getQualifiedName());
+    }
+
+    Target [] targets = new Target[targetTableSchema.getColumnNum()];
+    boolean matched = false;
+    for (int i = 0; i < targetTableSchema.getColumnNum(); i++) {
+      Column column = targetTableSchema.getColumn(i);
+      for (int j = 0; j < targetColumnIds.length; j++) {
+        if (targetColumnIds[j] == i) {
+          Column outputColumn = subQueryOutSchema.getColumn(j);
+          targets[i] = new Target(new FieldEval(outputColumn), column.getColumnName());
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) {
+        targets[i] = new Target(new ConstEval(NullDatum.get()), column.getColumnName());
+      }
+      matched = false;
+    }
+
+    ProjectionNode projectionNode = new ProjectionNode(-1);
+    projectionNode.setChild(subQuery);
+    projectionNode.setInSchema(subQueryOutSchema);
+    projectionNode.setTargets(targets);
+    projectionNode.setOutSchema(PlannerUtil.targetToSchema(targets));
+
+    insertNode.setSubQuery(projectionNode);
+  }
+
+  /**
+   * Build a InsertNode with a location.
+   *
+   * ex) INSERT OVERWRITE INTO LOCATION 'hdfs://....' ..
+   */
+  private InsertNode insertIntoLocation(PlanContext context, InsertNode insertNode, Insert expr) {
+    // INSERT (OVERWRITE)? INTO LOCATION path (USING file_type (param_clause)?)? query_expression
+    insertNode.setTargetLocation(new Path(expr.getLocation()));
+
+    if (expr.hasStorageType()) {
+      insertNode.setStorageType(CatalogUtil.getStoreType(expr.getStorageType()));
+    }
+    if (expr.hasParams()) {
+      Options options = new Options();
+      options.putAll(expr.getParams());
+      insertNode.setOptions(options);
+    }
     return insertNode;
   }
 
@@ -1107,7 +1176,6 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       stack.pop();
       CreateTableNode createTableNode = context.queryBlock.getNodeFromExpr(expr);
       createTableNode.setTableName(tableName);
-      createTableNode.setCreateTable();
       createTableNode.setChild(subQuery);
 
       createTableNode.setInSchema(subQuery.getOutSchema());
