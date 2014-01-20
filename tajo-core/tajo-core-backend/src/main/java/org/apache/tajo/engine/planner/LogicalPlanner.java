@@ -1072,9 +1072,16 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         // if didn't specific target columns like the way below,
         // INSERT OVERWRITE INTO TABLE tbl SELECT ...
         Schema targetTableSchema = desc.getSchema();
-        for (int i = 0; i < subQuery.getOutSchema().getColumnNum(); i++) {
+        int i = 0;
+        for (;i < subQuery.getOutSchema().getColumnNum() && i < targetTableSchema.getColumnNum(); i++) {
           targetSchema.addColumn(targetTableSchema.getColumn(i));
         }
+        if (desc.hasPartition() && desc.getPartition().getPartitionType() == CatalogProtos.PartitionType.COLUMN) {
+          for (int j = 0; j < desc.getPartition().getExpressionSchema().getColumnNum(); j++) {
+            targetSchema.addColumn(desc.getPartition().getExpressionSchema().getColumn(j));
+          }
+        }
+        targetSchema.setQualifier(desc.getName());
       }
 
       insertNode = context.queryBlock.getNodeFromExpr(expr);

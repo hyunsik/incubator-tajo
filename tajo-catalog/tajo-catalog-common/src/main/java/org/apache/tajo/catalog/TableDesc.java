@@ -105,6 +105,17 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
     return schema;
   }
 
+  public Schema getLogicalSchema() {
+    if (hasPartition()) {
+      Schema logicalSchema = new Schema(schema);
+      logicalSchema.addColumns(getPartition().getExpressionSchema());
+      logicalSchema.setQualifier(tableName);
+      return logicalSchema;
+    } else {
+      return schema;
+    }
+  }
+
   public void setStats(TableStats stats) {
     this.stats = stats;
   }

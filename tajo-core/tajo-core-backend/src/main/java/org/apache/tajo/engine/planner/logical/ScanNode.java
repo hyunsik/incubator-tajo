@@ -31,7 +31,7 @@ import org.apache.tajo.util.TUtil;
 public class ScanNode extends RelationNode implements Projectable {
 	@Expose protected TableDesc tableDesc;
   @Expose protected String alias;
-  @Expose protected Schema renamedSchema;
+  @Expose protected Schema logicalSchema;
 	@Expose protected EvalNode qual;
 	@Expose protected Target[] targets;
 
@@ -44,14 +44,28 @@ public class ScanNode extends RelationNode implements Projectable {
     super(pid, NodeType.SCAN);
     this.tableDesc = desc;
     this.setInSchema(tableDesc.getSchema());
+
+    logicalSchema = new Schema(getInSchema());
+    if (tableDesc.hasPartition()) {
+      logicalSchema.addColumns(tableDesc.getPartition().getExpressionSchema());
+    }
+
     this.setOutSchema(tableDesc.getSchema());
   }
   
 	public ScanNode(int pid, TableDesc desc, String alias) {
     this(pid, desc);
     this.alias = PlannerUtil.normalizeTableName(alias);
-    renamedSchema = getOutSchema();
-    renamedSchema.setQualifier(this.alias);
+    this.setInSchema(tableDesc.getSchema());
+    this.getInSchema().setQualifier(alias);
+
+    logicalSchema = new Schema(getInSchema());
+    if (tableDesc.hasPartition()) {
+      logicalSchema.addColumns(tableDesc.getPartition().getExpressionSchema());
+    }
+    logicalSchema.setQualifier(this.alias);
+
+    this.setOutSchema(new Schema(getInSchema()));
 	}
 	
 	public String getTableName() {
@@ -67,7 +81,11 @@ public class ScanNode extends RelationNode implements Projectable {
   }
 
   public Schema getTableSchema() {
-    return hasAlias() ? renamedSchema : tableDesc.getSchema();
+    return logicalSchema;
+  }
+
+  public Schema getPhysicalSchema() {
+    return getInSchema();
   }
 	
 	public boolean hasQual() {

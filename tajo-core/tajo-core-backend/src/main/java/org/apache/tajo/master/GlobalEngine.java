@@ -470,7 +470,7 @@ public class GlobalEngine extends AbstractService {
       if (insertNode.hasTargetTable()) { // if a target table is given, it computes the proper schema.
         storeNode.getOptions().putAll(insertNode.getTargetTable().getMeta().toMap());
 
-        Schema targetTableSchema = insertNode.getTargetTable().getSchema();
+        Schema targetTableSchema = insertNode.getTargetTable().getLogicalSchema();
         Schema targetProjectedSchema = insertNode.getTargetSchema();
 
         int [] targetColumnIds = new int[targetProjectedSchema.getColumnNum()];

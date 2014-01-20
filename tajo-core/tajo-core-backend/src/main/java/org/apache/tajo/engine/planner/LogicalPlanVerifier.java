@@ -19,13 +19,20 @@
 package org.apache.tajo.engine.planner;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 import org.apache.tajo.catalog.CatalogService;
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Schema;
+import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.engine.planner.logical.*;
+import org.apache.tajo.util.TUtil;
 
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Stack;
+
+import static org.apache.tajo.catalog.proto.CatalogProtos.PartitionType;
 
 public class LogicalPlanVerifier extends BasicLogicalPlanVisitor<VerificationState, LogicalNode> {
   private TajoConf conf;
@@ -212,9 +219,22 @@ public class LogicalPlanVerifier extends BasicLogicalPlanVisitor<VerificationSta
       state.addVerification("relation \"" + node.getTableName() + "\" already exists");
     }
 
-    if (node.hasPartition() &&
-        !node.getSchema().containsAll(node.getPartitionMethod().getExpressionSchema().getColumns())) {
-      state.addVerification("relation \"" + node.getTableName() + "\" doesn't contain all schema of partition schema");
+    if (node.hasPartition()) {
+      PartitionType partitionType = node.getPartitionMethod().getPartitionType();
+      if (partitionType == PartitionType.COLUMN) {
+        Schema relationSchema = node.getSchema();
+        Schema partitonSchema = node.getPartitionMethod().getExpressionSchema();
+
+        Collection<Column> intersected =
+            Sets.intersection(
+                new HashSet<Column>(relationSchema.getColumns()),
+                new HashSet<Column>(partitonSchema.getColumns()));
+
+        if (intersected.size() > 0) {
+          state.addVerification("relation schema cannot include a part of partition schema: "
+              + TUtil.arrayToString(intersected.toArray(new Column[intersected.size()])));
+        }
+      }
     }
 
     return node;

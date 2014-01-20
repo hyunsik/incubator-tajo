@@ -28,6 +28,7 @@ import org.apache.hadoop.io.compress.DeflateCodec;
 import org.apache.tajo.TajoTestingCluster;
 import org.apache.tajo.TpchTestBase;
 import org.apache.tajo.catalog.CatalogService;
+import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.TableDesc;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -51,10 +52,24 @@ public class TestTablePartitions {
   }
 
   @Test
+  public final void testCreateColumnPartitionedTable() throws Exception {
+    String tableName ="testColumnPartitionedTableByOneColumn";
+    ResultSet res = tpch.execute(
+        "create table " + tableName +" (col1 int4, col2 int4) partition by column(key float8) ");
+    res.close();
+    TajoTestingCluster cluster = tpch.getTestingCluster();
+    CatalogService catalog = cluster.getMaster().getCatalog();
+    assertTrue(catalog.existsTable(tableName));
+
+    res = tpch.execute("insert overwrite into " + tableName + " select l_orderkey, l_partkey, l_quantity from lineitem");
+    res.close();
+  }
+
+  @Test
   public final void testColumnPartitionedTableByOneColumn() throws Exception {
     String tableName ="testColumnPartitionedTableByOneColumn";
     ResultSet res = tpch.execute(
-        "create table " + tableName +" (col1 int4, col2 int4, null_col int4, key float8) partition by column(key float8) ");
+        "create table " + tableName +" (col1 int4, col2 int4, null_col int4) partition by column(key float8) ");
     res.close();
     TajoTestingCluster cluster = tpch.getTestingCluster();
     CatalogService catalog = cluster.getMaster().getCatalog();
