@@ -371,23 +371,18 @@ public class GlobalEngine extends AbstractService {
     @Override
     public boolean isEligible(QueryContext queryContext, LogicalPlan plan) {
       LogicalRootNode rootNode = plan.getRootBlock().getRoot();
-      if (rootNode.getChild().getType() == NodeType.STORE) {
-        StoreTableNode storeTableNode = rootNode.getChild();
-        return storeTableNode.isCreatedTable();
-      } else {
-        return false;
-      }
+      return rootNode.getChild().getType() == NodeType.CREATE_TABLE;
     }
 
     @Override
     public void hook(QueryContext queryContext, LogicalPlan plan) throws Exception {
       LogicalRootNode rootNode = plan.getRootBlock().getRoot();
-      StoreTableNode storeTableNode = rootNode.getChild();
-      String tableName = storeTableNode.getTableName();
+      CreateTableNode createTableNode = rootNode.getChild();
+      String tableName = createTableNode.getTableName();
       queryContext.setOutputTable(tableName);
       queryContext.setOutputPath(new Path(TajoConf.getWarehouseDir(context.getConf()), tableName));
-      if(storeTableNode.getPartitions() != null) {
-        queryContext.setPartitions(storeTableNode.getPartitions());
+      if(createTableNode.getPartitions() != null) {
+        queryContext.setPartitions(createTableNode.getPartitions());
       }
       queryContext.setCreateTable();
     }
@@ -442,7 +437,8 @@ public class GlobalEngine extends AbstractService {
         options.putAll(insertNode.getOptions());
       }
 
-      storeNode = new StoreTableNode(plan.newPID(), outputTableName);
+      storeNode = new StoreTableNode(plan.newPID());
+      storeNode.setTableName(outputTableName);
       storeNode.setStorageType(storeType);
       storeNode.setOptions(options);
 

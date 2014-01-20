@@ -1105,36 +1105,38 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       stack.add(expr);
       LogicalNode subQuery = visit(context, stack, expr.getSubQuery());
       stack.pop();
-      StoreTableNode storeNode = new StoreTableNode(context.plan.newPID(), tableName);
-      storeNode.setCreateTable();
-      storeNode.setChild(subQuery);
+      CreateTableNode createTableNode = context.queryBlock.getNodeFromExpr(expr);
+      createTableNode.setTableName(tableName);
+      createTableNode.setCreateTable();
+      createTableNode.setChild(subQuery);
 
-      storeNode.setInSchema(subQuery.getOutSchema());
+      createTableNode.setInSchema(subQuery.getOutSchema());
       if(!expr.hasTableElements()) {
         // CREATE TABLE tbl AS SELECT ...
         expr.setTableElements(convertSchemaToTableElements(subQuery.getOutSchema()));
       }
       // else CREATE TABLE tbl(col1 type, col2 type) AS SELECT ...
-      storeNode.setOutSchema(convertTableElementsSchema(expr.getTableElements()));
+      createTableNode.setOutSchema(convertTableElementsSchema(expr.getTableElements()));
+      createTableNode.setSchema(convertTableElementsSchema(expr.getTableElements()));
 
       if (expr.hasStorageType()) {
-        storeNode.setStorageType(CatalogUtil.getStoreType(expr.getStorageType()));
+        createTableNode.setStorageType(CatalogUtil.getStoreType(expr.getStorageType()));
       } else {
         // default type
-        storeNode.setStorageType(CatalogProtos.StoreType.CSV);
+        createTableNode.setStorageType(CatalogProtos.StoreType.CSV);
       }
 
       if (expr.hasParams()) {
         Options options = new Options();
         options.putAll(expr.getParams());
-        storeNode.setOptions(options);
+        createTableNode.setOptions(options);
       }
 
       if (expr.hasPartition()) {
-        storeNode.setPartitions(convertTableElementsPartition(context, expr));
+        createTableNode.setPartitions(convertTableElementsPartition(context, expr));
       }
 
-      return storeNode;
+      return createTableNode;
     } else {
       Schema tableSchema;
       boolean mergedPartition = false;

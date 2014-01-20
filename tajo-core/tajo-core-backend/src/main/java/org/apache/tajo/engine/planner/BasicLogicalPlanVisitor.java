@@ -263,8 +263,14 @@ public class BasicLogicalPlanVisitor<CONTEXT, RESULT> implements LogicalPlanVisi
 
   @Override
   public RESULT visitCreateTable(CONTEXT context, LogicalPlan plan, LogicalPlan.QueryBlock block, CreateTableNode node,
-                                 Stack<LogicalNode> stack) {
-    return null;
+                                 Stack<LogicalNode> stack) throws PlanningException {
+    RESULT result = null;
+    stack.push(node);
+    if (node.hasSubQuery()) {
+      result = visit(context, plan, block, node.getChild(), stack);
+    }
+    stack.pop();
+    return result;
   }
 
   @Override

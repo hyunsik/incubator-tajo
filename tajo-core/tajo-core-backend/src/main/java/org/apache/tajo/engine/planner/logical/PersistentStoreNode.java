@@ -35,8 +35,11 @@ public abstract class PersistentStoreNode extends UnaryNode implements Cloneable
   @Expose protected CatalogProtos.StoreType storageType = CatalogProtos.StoreType.CSV;
   @Expose protected Options options;
 
-  public PersistentStoreNode(int pid, String tableName) {
-    super(pid, NodeType.STORE);
+  public PersistentStoreNode(int pid, NodeType nodeType) {
+    super(pid, nodeType);
+  }
+
+  public void setTableName(String tableName) {
     this.tableName = tableName;
   }
 
@@ -58,6 +61,10 @@ public abstract class PersistentStoreNode extends UnaryNode implements Cloneable
 
   public Options getOptions() {
     return this.options;
+  }
+
+  public void setOptions(Options options) {
+    this.options = options;
   }
 
   @Override

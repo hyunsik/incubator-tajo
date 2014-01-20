@@ -19,45 +19,25 @@
 package org.apache.tajo.engine.planner.logical;
 
 import com.google.gson.annotations.Expose;
-import org.apache.tajo.catalog.Options;
 import org.apache.tajo.catalog.partition.PartitionDesc;
 import org.apache.tajo.engine.planner.PlanString;
 import org.apache.tajo.util.TUtil;
-
-import static org.apache.tajo.catalog.proto.CatalogProtos.StoreType;
 
 public class StoreTableNode extends PersistentStoreNode implements Cloneable {
   @Expose private boolean isCreatedTable = false;
   @Expose private boolean isOverwritten = false;
   @Expose private PartitionDesc partitionDesc;
 
-  public StoreTableNode(int pid, String tableName) {
-    super(pid, tableName);
+  public StoreTableNode(int pid) {
+    super(pid, NodeType.STORE);
   }
 
-  public StoreTableNode(int pid, String tableName, PartitionDesc partitionDesc) {
-    super(pid, tableName);
-    this.partitionDesc = partitionDesc;
+  protected StoreTableNode(int pid, NodeType nodeType) {
+    super(pid, nodeType);
   }
 
-  public void setStorageType(StoreType storageType) {
-    this.storageType = storageType;
-  }
-
-  public StoreType getStorageType() {
-    return this.storageType;
-  }
-
-  public boolean hasOptions() {
-    return this.options != null;
-  }
-
-  public void setOptions(Options options) {
-    this.options = options;
-  }
-
-  public Options getOptions() {
-    return this.options;
+  public boolean hasPartition() {
+    return this.partitionDesc != null;
   }
 
   public PartitionDesc getPartitions() {

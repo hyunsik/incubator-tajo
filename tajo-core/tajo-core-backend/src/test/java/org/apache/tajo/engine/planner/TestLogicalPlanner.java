@@ -424,7 +424,7 @@ public class TestLogicalPlanner {
     assertEquals(NodeType.ROOT, plan.getType());
     LogicalRootNode root = (LogicalRootNode) plan;
 
-    assertEquals(NodeType.STORE, root.getChild().getType());
+    assertEquals(NodeType.CREATE_TABLE, root.getChild().getType());
     StoreTableNode storeNode = root.getChild();
     testQuery7(storeNode.getChild());
   }

@@ -90,8 +90,8 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
   private PhysicalExec buildOutputOperator(TaskAttemptContext context, LogicalNode plan,
                                            PhysicalExec execPlan) throws IOException {
     DataChannel channel = context.getDataChannel();
-    ShuffleFileWriteNode shuffleFileWriteNode =
-        new ShuffleFileWriteNode(UNGENERATED_PID, channel.getTargetId().toString());
+    ShuffleFileWriteNode shuffleFileWriteNode = new ShuffleFileWriteNode(UNGENERATED_PID);
+    shuffleFileWriteNode.setTableName(channel.getTargetId().toString());
     shuffleFileWriteNode.setStorageType(context.getDataChannel().getStoreType());
     shuffleFileWriteNode.setInSchema(plan.getOutSchema());
     shuffleFileWriteNode.setOutSchema(plan.getOutSchema());
@@ -116,6 +116,7 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
         EvalExprNode evalExpr = (EvalExprNode) logicalNode;
         return new EvalExprExec(ctx, evalExpr);
 
+      case CREATE_TABLE:
       case STORE:
         StoreTableNode storeNode = (StoreTableNode) logicalNode;
         leftExec = createPlanRecursive(ctx, storeNode.getChild());

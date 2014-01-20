@@ -679,6 +679,18 @@ public class GlobalPlanner {
     }
 
     @Override
+    public LogicalNode visitCreateTable(GlobalPlanContext context, LogicalPlan plan, LogicalPlan.QueryBlock queryBlock,
+                                       CreateTableNode node, Stack<LogicalNode> stack) throws PlanningException {
+      LogicalNode child = super.visitStoreTable(context, plan, queryBlock, node, stack);
+
+      ExecutionBlock childBlock = context.execBlockMap.remove(child.getPID());
+      ExecutionBlock newExecBlock = buildStorePlan(context, childBlock, node);
+      context.execBlockMap.put(node.getPID(), newExecBlock);
+
+      return node;
+    }
+
+    @Override
     public LogicalNode visitInsert(GlobalPlanContext context, LogicalPlan plan, LogicalPlan.QueryBlock queryBlock,
                                    InsertNode node, Stack<LogicalNode> stack)
         throws PlanningException {

@@ -327,7 +327,13 @@ public class ProjectionPushDownRule extends
       case INSERT:
         InsertNode insertNode = (InsertNode) parentNode;
         insertNode.setSubQuery(child);
-
+        break;
+      case CREATE_TABLE:
+        CreateTableNode createTableNode = (CreateTableNode) parentNode;
+        createTableNode.setChild(child);
+        createTableNode.setInSchema(child.getOutSchema());
+        createTableNode.setInSchema(child.getOutSchema());
+        break;
       default:
         throw new PlanningException("Unexpected Parent Node: " + parentNode.getType());
       }
