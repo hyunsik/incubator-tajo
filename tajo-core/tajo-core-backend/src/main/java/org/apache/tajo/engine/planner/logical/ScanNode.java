@@ -48,6 +48,7 @@ public class ScanNode extends RelationNode implements Projectable {
     logicalSchema = new Schema(getInSchema());
     if (tableDesc.hasPartition()) {
       logicalSchema.addColumns(tableDesc.getPartition().getExpressionSchema());
+      logicalSchema.setQualifier(tableDesc.getName());
     }
 
     this.setOutSchema(tableDesc.getSchema());
@@ -62,8 +63,8 @@ public class ScanNode extends RelationNode implements Projectable {
     logicalSchema = new Schema(getInSchema());
     if (tableDesc.hasPartition()) {
       logicalSchema.addColumns(tableDesc.getPartition().getExpressionSchema());
+      logicalSchema.setQualifier(this.alias);
     }
-    logicalSchema.setQualifier(this.alias);
 
     this.setOutSchema(new Schema(getInSchema()));
 	}

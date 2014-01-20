@@ -25,6 +25,7 @@ import org.apache.tajo.IntegrationTest;
 import org.apache.tajo.TajoTestingCluster;
 import org.apache.tajo.TpchTestBase;
 import org.apache.tajo.catalog.CatalogService;
+import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.TableDesc;
 import org.apache.tajo.catalog.partition.PartitionMethodDesc;
 import org.apache.tajo.catalog.proto.CatalogProtos;
@@ -67,6 +68,10 @@ public class TestCTASQuery {
     CatalogService catalog = cluster.getMaster().getCatalog();
     TableDesc desc = catalog.getTableDesc(tableName);
     assertTrue(catalog.existsTable(tableName));
+    for (Column column : desc.getSchema().getColumns()) {
+      System.out.println(column);
+    }
+
     assertTrue(desc.getSchema().contains("testCtasWithoutTableDefinition.col1"));
     PartitionMethodDesc partitionDesc = desc.getPartition();
     assertEquals(partitionDesc.getPartitionType(), CatalogProtos.PartitionType.COLUMN);
@@ -99,8 +104,7 @@ public class TestCTASQuery {
     assertEquals(2, i);
   }
 
-  //@Test
-  // TODO- to be enabled
+  @Test
   public final void testCtasWithColumnedPartition() throws Exception {
     String tableName ="testCtasWithColumnedPartition";
     tpch.execute(

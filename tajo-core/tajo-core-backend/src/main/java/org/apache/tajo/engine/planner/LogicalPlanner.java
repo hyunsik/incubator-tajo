@@ -879,7 +879,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
     // Assume that each unique expr is evaluated once.
     List<Target> targets = new ArrayList<Target>();
-    for (Column column : scanNode.getInSchema().getColumns()) {
+    for (Column column : scanNode.getTableSchema().getColumns()) {
       ColumnReferenceExpr columnRef = new ColumnReferenceExpr(column.getQualifier(), column.getColumnName());
       if (block.namedExprsMgr.contains(columnRef)) {
         String referenceName = block.namedExprsMgr.getName(columnRef);
@@ -1331,7 +1331,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       return false;
     }
 
-    if (node.getInSchema().containsAll(columnRefs)) {
+    if (node.getTableSchema().containsAll(columnRefs)) {
       // Why? - When a {case when} is used with outer join, case when must be evaluated at topmost outer join.
       if (block.containsJoinType(JoinType.LEFT_OUTER) || block.containsJoinType(JoinType.RIGHT_OUTER)) {
         Collection<CaseWhenEval> found = EvalTreeUtil.findEvalsByType(evalNode, EvalType.CASE);
