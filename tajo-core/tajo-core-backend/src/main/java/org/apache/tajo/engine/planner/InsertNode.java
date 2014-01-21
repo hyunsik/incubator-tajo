@@ -31,7 +31,11 @@ import org.apache.tajo.util.TUtil;
 public class InsertNode extends StoreTableNode implements Cloneable {
   @Expose private boolean overwrite;
   @Expose private Schema tableSchema;
+
+  /** a target schema of a target table */
   @Expose private Schema targetSchema;
+  /** a output schema of select clause */
+  @Expose private Schema projectedSchema;
   @Expose private Path path;
 
   public InsertNode(int pid) {
@@ -88,6 +92,14 @@ public class InsertNode extends StoreTableNode implements Cloneable {
     this.targetSchema = schema;
   }
 
+  public Schema getProjectedSchema() {
+    return this.projectedSchema;
+  }
+
+  public void setProjectedSchema(Schema projected) {
+    this.projectedSchema = projected;
+  }
+
   public boolean hasPath() {
     return this.path != null;
   }
@@ -137,15 +149,15 @@ public class InsertNode extends StoreTableNode implements Cloneable {
     sb.append("INTO ");
 
     if (hasTargetTable()) {
-      sb.append(tableName);
+      sb.append("  ").append(tableName);
     }
 
     if (hasTargetSchema()) {
-      sb.append(targetSchema);
+      sb.append("\n  ").append(targetSchema);
     }
 
     if (hasPath()) {
-      sb.append(" LOCATION ");
+      sb.append("\n  LOCATION ");
       sb.append(path);
     }
 
@@ -169,11 +181,11 @@ public class InsertNode extends StoreTableNode implements Cloneable {
   @Override
   public PlanString getPlanString() {
     PlanString planString = new PlanString("INSERT");
-    planString.addExplan(" INTO ");
+    planString.appendTitle(" INTO ");
     if (hasTargetTable()) {
-      planString.appendExplain(getTableName());
+      planString.appendTitle(getTableName());
       if (hasTargetSchema()) {
-        planString.appendExplain(getTargetSchema().toString());
+        planString.addExplan(getTargetSchema().toString());
       }
     } else {
       planString.addExplan("LOCATION " + path);

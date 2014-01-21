@@ -392,7 +392,20 @@ public class GlobalPlanner {
     if(partitionsType == CatalogProtos.PartitionsType.COLUMN) {
       channel = new DataChannel(childBlock, currentBlock, HASH_SHUFFLE, 32);
       Column[] columns = new Column[partitionDesc.getColumns().size()];
-      channel.setShuffleKeys(partitionDesc.getColumns().toArray(columns));
+
+      if (currentNode.getType() == NodeType.INSERT) {
+        InsertNode insertNode = (InsertNode) currentNode;
+        channel.setSchema(((InsertNode)currentNode).getTargetSchema());
+        Column [] shuffleKeys = new Column[partitionDesc.getColumns().size()];
+        int i = 0;
+        for (Column column : partitionDesc.getColumns()) {
+          int id = insertNode.getTableSchema().getColumnId(column.getQualifiedName());
+          shuffleKeys[i++] = insertNode.getTargetSchema().getColumn(id);
+        }
+        channel.setShuffleKeys(shuffleKeys);
+      } else {
+        channel.setShuffleKeys(partitionDesc.getColumns().toArray(columns));
+      }
       channel.setSchema(childNode.getOutSchema());
       channel.setStoreType(storeType);
     } else {

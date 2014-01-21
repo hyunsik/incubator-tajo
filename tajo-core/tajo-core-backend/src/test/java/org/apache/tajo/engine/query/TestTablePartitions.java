@@ -68,6 +68,11 @@ public class TestTablePartitions {
     Path path = desc.getPath();
 
     FileSystem fs = FileSystem.get(tpch.getTestingCluster().getConfiguration());
+
+    for (FileStatus s : fs.listStatus(path)) {
+      System.out.println(s.getPath());
+    }
+
     assertTrue(fs.isDirectory(path));
     assertTrue(fs.isDirectory(new Path(path.toUri() + "/key=17.0")));
     assertTrue(fs.isDirectory(new Path(path.toUri() + "/key=36.0")));
