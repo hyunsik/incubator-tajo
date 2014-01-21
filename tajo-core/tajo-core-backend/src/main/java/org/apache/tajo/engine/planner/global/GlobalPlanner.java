@@ -395,12 +395,12 @@ public class GlobalPlanner {
 
       if (currentNode.getType() == NodeType.INSERT) {
         InsertNode insertNode = (InsertNode) currentNode;
-        channel.setSchema(((InsertNode)currentNode).getTargetSchema());
+        channel.setSchema(((InsertNode)currentNode).getProjectedSchema());
         Column [] shuffleKeys = new Column[partitionDesc.getColumns().size()];
         int i = 0;
         for (Column column : partitionDesc.getColumns()) {
           int id = insertNode.getTableSchema().getColumnId(column.getQualifiedName());
-          shuffleKeys[i++] = insertNode.getTargetSchema().getColumn(id);
+          shuffleKeys[i++] = insertNode.getProjectedSchema().getColumn(id);
         }
         channel.setShuffleKeys(shuffleKeys);
       } else {

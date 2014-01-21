@@ -1126,7 +1126,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
     insertNode.setInSchema(projectionNode.getOutSchema());
     insertNode.setOutSchema(projectionNode.getOutSchema());
-    insertNode.setTargetSchema(PlannerUtil.targetToSchema(targets));
+    insertNode.setProjectedSchema(PlannerUtil.targetToSchema(targets));
   }
 
   /**
