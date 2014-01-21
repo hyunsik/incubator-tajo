@@ -41,6 +41,7 @@ public class InsertNode extends StoreTableNode implements Cloneable {
   public void setTargetTable(TableDesc desc) {
     setTableName(desc.getName());
     tableSchema = desc.getSchema();
+    setPath(desc.getPath());
     setOptions(desc.getMeta().getOptions());
     setStorageType(desc.getMeta().getStoreType());
 
@@ -71,6 +72,9 @@ public class InsertNode extends StoreTableNode implements Cloneable {
     return tableSchema;
   }
 
+  public void setTableSchema(Schema tableSchema) {
+    this.tableSchema = tableSchema;
+  }
 
   public boolean hasTargetSchema() {
     return this.targetSchema != null;
@@ -82,7 +86,6 @@ public class InsertNode extends StoreTableNode implements Cloneable {
 
   public void setTargetSchema(Schema schema) {
     this.targetSchema = schema;
-    this.setOutSchema(schema);
   }
 
   public boolean hasPath() {
@@ -131,7 +134,7 @@ public class InsertNode extends StoreTableNode implements Cloneable {
     if (overwrite) {
       sb.append("OVERWRITE ");
     }
-    sb.append("INTO");
+    sb.append("INTO ");
 
     if (hasTargetTable()) {
       sb.append(tableName);
@@ -146,7 +149,7 @@ public class InsertNode extends StoreTableNode implements Cloneable {
       sb.append(path);
     }
 
-    sb.append(" [SUBQUERY]");
+    sb.append("\n").append(getChild());
     
     return sb.toString();
   }

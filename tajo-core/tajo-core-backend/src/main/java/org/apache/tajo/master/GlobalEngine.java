@@ -407,6 +407,7 @@ public class GlobalEngine extends AbstractService {
       Path outputPath;
       if (insertNode.hasTargetTable()) { // INSERT INTO [TB_NAME]
         queryContext.setOutputTable(insertNode.getTableName());
+        queryContext.setOutputPath(insertNode.getPath());
       } else { // INSERT INTO LOCATION ...
         outputTableName = PlannerUtil.normalizeTableName(insertNode.getPath().getName());
         outputPath = insertNode.getPath();

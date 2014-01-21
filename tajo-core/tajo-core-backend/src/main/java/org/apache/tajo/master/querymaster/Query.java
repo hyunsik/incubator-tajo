@@ -330,7 +330,7 @@ public class Query implements EventHandler<QueryEvent> {
 
             if (queryContext.hasOutputTable()) { // TRUE only if a query command is 'CREATE TABLE' OR 'INSERT INTO'
               if (queryContext.isOutputOverwrite()) { // TRUE only if a query is 'INSERT OVERWRITE INTO'
-                catalog.deleteTable(finalOutputDir.getName());
+                catalog.deleteTable(finalTableDesc.getName());
               }
               catalog.addTable(finalTableDesc);
             }

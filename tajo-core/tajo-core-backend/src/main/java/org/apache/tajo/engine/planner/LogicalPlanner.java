@@ -1034,6 +1034,12 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
    ===============================================================================================*/
 
   public LogicalNode visitInsert(PlanContext context, Stack<Expr> stack, Insert expr) throws PlanningException {
+    TableDesc targetTableDesc = catalog.getTableDesc(expr.getTableName());
+    Projection projection = (Projection) expr.getSubQuery();
+    for (int i = 0; i < expr.getTargetColumns().length; i++) {
+      projection.getNamedExprs()[i].setAlias(targetTableDesc.getSchema().getColumn(i).getQualifiedName());
+    }
+
     stack.push(expr);
     LogicalNode subQuery = super.visitInsert(context, stack, expr);
     stack.pop();
@@ -1080,19 +1086,25 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         targetSchema.addColumn(targetColumn);
       }
       insertNode.setTargetSchema(targetSchema);
+      insertNode.setInSchema(targetSchema);
+      insertNode.setOutSchema(targetSchema);
       buildProjectedInsert(insertNode);
-
-      if (desc.hasPartitions()) {
-        insertNode.setPartitions(desc.getPartitions());
-      }
     } else {
       // use the output schema of select clause as target schema
       // if didn't specific target columns like the way below,
       // INSERT OVERWRITE INTO TABLE tbl SELECT ...
-      targetSchema = new Schema(desc.getSchema());
+      Schema childSchema = insertNode.getChild().getOutSchema();
+      for (int i = 0; i < childSchema.getColumnNum(); i++) {
+        targetSchema.addColumn(desc.getSchema().getColumn(i));
+      }
+
       insertNode.setTargetSchema(targetSchema);
+      buildProjectedInsert(insertNode);
     }
 
+    if (desc.hasPartitions()) {
+      insertNode.setPartitions(desc.getPartitions());
+    }
     return insertNode;
   }
 
@@ -1102,42 +1114,24 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     // INSERT INTO    TB_NAME      (col1, col2)     SELECT    c1,   c2        FROM ... /
     ////////////////////////////////////////////////////////////////////////////////////
     LogicalNode subQuery = insertNode.getChild();
-    Schema subQueryOutSchema = subQuery.getOutSchema();
 
     Schema targetTableSchema = insertNode.getTableSchema();
     Schema targetProjectedSchema = insertNode.getTargetSchema();
 
-    int [] targetColumnIds = new int[targetProjectedSchema.getColumnNum()];
-    int idx = 0;
-    for (Column column : targetProjectedSchema.getColumns()) {
-      targetColumnIds[idx++] = targetTableSchema.getColumnId(column.getQualifiedName());
-    }
+    ProjectionNode projectionNode = insertNode.getChild();
+    List<Target> targets = TUtil.newList();
 
-    Target [] targets = new Target[targetTableSchema.getColumnNum()];
-    boolean matched = false;
-    for (int i = 0; i < targetTableSchema.getColumnNum(); i++) {
-      Column column = targetTableSchema.getColumn(i);
-      for (int j = 0; j < targetColumnIds.length; j++) {
-        if (targetColumnIds[j] == i) {
-          Column outputColumn = subQueryOutSchema.getColumn(j);
-          targets[i] = new Target(new FieldEval(outputColumn), column.getColumnName());
-          matched = true;
-          break;
-        }
+    for (int i = 0, j =0; i < targetTableSchema.getColumnNum(); i++) {
+      Column tableColumn = targetTableSchema.getColumn(i);
+
+      if(targetProjectedSchema.contains(tableColumn)) {
+        Target target = projectionNode.getTargets()[j++];
+        targets.add(new Target(target.getEvalTree(), tableColumn.getColumnName()));
+      } else {
+        targets.add(new Target(new ConstEval(NullDatum.get()), tableColumn.getColumnName()));
       }
-      if (!matched) {
-        targets[i] = new Target(new ConstEval(NullDatum.get()), column.getColumnName());
-      }
-      matched = false;
     }
-
-    ProjectionNode projectionNode = new ProjectionNode(-1);
-    projectionNode.setChild(subQuery);
-    projectionNode.setInSchema(subQueryOutSchema);
-    projectionNode.setTargets(targets);
-    projectionNode.setOutSchema(PlannerUtil.targetToSchema(targets));
-
-    insertNode.setSubQuery(projectionNode);
+    projectionNode.setTargets(targets.toArray(new Target[targets.size()]));
   }
 
   /**
@@ -1147,6 +1141,12 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
    */
   private InsertNode insertIntoLocation(PlanContext context, InsertNode insertNode, Insert expr) {
     // INSERT (OVERWRITE)? INTO LOCATION path (USING file_type (param_clause)?)? query_expression
+
+    Schema childSchema = insertNode.getChild().getOutSchema();
+    insertNode.setInSchema(childSchema);
+    insertNode.setOutSchema(childSchema);
+    insertNode.setTableSchema(childSchema);
+
     insertNode.setTargetLocation(new Path(expr.getLocation()));
 
     if (expr.hasStorageType()) {

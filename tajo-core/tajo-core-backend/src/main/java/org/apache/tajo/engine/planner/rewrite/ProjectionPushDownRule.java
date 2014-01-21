@@ -91,6 +91,11 @@ public class ProjectionPushDownRule extends
     }
 
     private String add(String name, EvalNode evalNode) throws PlanningException {
+      if (evalNode.getType() == EvalType.CONST) {
+        nameToEvalMap.put(name, evalNode);
+        resolvedFlags.put(name, false);
+        return name;
+      }
       if (evalToNameMap.containsKey(evalNode)) {
         name = evalToNameMap.get(evalNode);
       } else {
@@ -171,6 +176,9 @@ public class ProjectionPushDownRule extends
 
     public void resolve(Target target) {
       EvalNode evalNode = target.getEvalTree();
+      if (evalNode.getType() == EvalType.CONST) { // if constant value
+        return; // keep it raw always
+      }
       if (!evalToNameMap.containsKey(evalNode)) {
         throw new RuntimeException("No such eval: " + evalNode);
       }
@@ -740,6 +748,15 @@ public class ProjectionPushDownRule extends
 
     node.setTargets(projectedTargets.toArray(new Target[projectedTargets.size()]));
 
+    return node;
+  }
+
+  @Override
+  public LogicalNode visitInsert(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, InsertNode node,
+                            Stack<LogicalNode> stack) throws PlanningException {
+    stack.push(node);
+    visit(context, plan, block, node.getChild(), stack);
+    stack.pop();
     return node;
   }
 }

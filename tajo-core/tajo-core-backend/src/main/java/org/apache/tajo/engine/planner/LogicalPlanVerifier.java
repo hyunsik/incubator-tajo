@@ -172,9 +172,9 @@ public class LogicalPlanVerifier extends BasicLogicalPlanVisitor<VerificationSta
                                  InsertNode node, Stack<LogicalNode> stack) throws PlanningException {
     LogicalNode child = visit(state, plan, block, node.getChild(), stack);
 
-    if (node.hasTargetSchema()) {
-      ensureDomains(state, node.getTargetSchema(), node.getChild().getOutSchema());
-    }
+//    if (node.hasTargetSchema()) {
+//      ensureDomains(state, node.getTargetSchema(), node.getChild().getOutSchema());
+//    }
 
     return child;
   }
