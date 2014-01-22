@@ -1043,9 +1043,9 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     insertNode.setSubQuery(subQuery);
 
     if (expr.hasTableName()) {
-      return buildInsertIntoTable(context, insertNode, expr);
+      return buildInsertIntoTablePlan(context, insertNode, expr);
     } else if (expr.hasLocation()) {
-      return insertIntoLocation(context, insertNode, expr);
+      return buildInsertIntoLocationPlan(context, insertNode, expr);
     } else {
       throw new IllegalStateException("Invalid Query");
     }
@@ -1055,8 +1055,16 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
    * Builds a InsertNode with a target table.
    *
    * ex) INSERT OVERWRITE INTO TABLE ...
+   * <br />
+   *
+   * <pre>
+   * ////////////////////////////////////////////////////////////////////////////////////
+   * //             [TARGET TABLE]  [TARGET COLUMN]         [SUBQUERY Schema]           /
+   * // INSERT INTO    TB_NAME      (col1, col2)     SELECT    c1,   c2        FROM ... /
+   * ////////////////////////////////////////////////////////////////////////////////////
+   * </pre>
    */
-  private InsertNode buildInsertIntoTable(PlanContext context, InsertNode insertNode, Insert expr)
+  private InsertNode buildInsertIntoTablePlan(PlanContext context, InsertNode insertNode, Insert expr)
       throws PlanningException {
     // Get a target table
     TableDesc desc = catalog.getTableDesc(expr.getTableName());
@@ -1064,16 +1072,11 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     // Set a target table
     insertNode.setTargetTable(desc);
 
-    Schema targetColumns = new Schema();
+    if (expr.hasTargetColumns()) { // INSERT (OVERWRITE)? INTO table_name (col1 type, col2 type) SELECT ...
 
-    if (expr.hasTargetColumns()) { // INSERT OVERWRITE INTO TABLE tbl(col1 type, col2 type) SELECT ...
-
-      ////////////////////////////////////////////////////////////////////////////////////
-      //             [TARGET TABLE]  [TARGET COLUMN]         [SUBQUERY Schema]           /
-      // INSERT INTO    TB_NAME      (col1, col2)     SELECT    c1,   c2        FROM ... /
-      ////////////////////////////////////////////////////////////////////////////////////
       context.queryBlock.addRelation(new ScanNode(context.plan.newPID(), desc));
       String [] targets = expr.getTargetColumns();
+      Schema targetColumns = new Schema();
       for (int i = 0; i < targets.length; i++) {
         Column targetColumn = context.plan.resolveColumn(context.queryBlock, new ColumnReferenceExpr(targets[i]));
         targetColumns.addColumn(targetColumn);
@@ -1082,14 +1085,15 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       insertNode.setOutSchema(targetColumns);
       buildProjectedInsert(insertNode);
 
-    } else { // INSERT OVERWRITE INTO TABLE tbl SELECT ...
+    } else { // INSERT (OVERWRITE)? INTO table_name SELECT ...
 
-      // It just uses the output schema of select clause as target schema.
-      // In this case, the output schema must be equivalent to the target table's schema.
+      // The output schema of select clause determines the target columns.
+      Schema tableSchema = desc.getSchema();
       Schema childSchema = insertNode.getChild().getOutSchema();
-      Schema targetTableSchema = desc.getSchema();
+
+      Schema targetColumns = new Schema();
       for (int i = 0; i < childSchema.getColumnNum(); i++) {
-        targetColumns.addColumn(targetTableSchema.getColumn(i));
+        targetColumns.addColumn(tableSchema.getColumn(i));
       }
       insertNode.setTargetSchema(targetColumns);
       buildProjectedInsert(insertNode);
@@ -1134,14 +1138,13 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
    *
    * ex) INSERT OVERWRITE INTO LOCATION 'hdfs://....' ..
    */
-  private InsertNode insertIntoLocation(PlanContext context, InsertNode insertNode, Insert expr) {
+  private InsertNode buildInsertIntoLocationPlan(PlanContext context, InsertNode insertNode, Insert expr) {
     // INSERT (OVERWRITE)? INTO LOCATION path (USING file_type (param_clause)?)? query_expression
 
     Schema childSchema = insertNode.getChild().getOutSchema();
     insertNode.setInSchema(childSchema);
     insertNode.setOutSchema(childSchema);
     insertNode.setTableSchema(childSchema);
-
     insertNode.setTargetLocation(new Path(expr.getLocation()));
 
     if (expr.hasStorageType()) {
