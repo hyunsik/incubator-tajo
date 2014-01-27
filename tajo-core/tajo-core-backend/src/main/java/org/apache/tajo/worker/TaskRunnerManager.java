@@ -172,12 +172,12 @@ public class TaskRunnerManager extends CompositeService {
     }
   }
 
-  public void startTask(final String[] params) {
+  public void startTask(final String executionBlockId, final String nodeId, final String containerId, final String qmHostName, final int queryMasterPort) {
     Thread t = new Thread() {
       public void run() {
         try {
           TajoConf systemConf = new TajoConf(tajoConf);
-          TaskRunner taskRunner = new TaskRunner(TaskRunnerManager.this, systemConf, params);
+          TaskRunner taskRunner = new TaskRunner(TaskRunnerManager.this, systemConf, executionBlockId, nodeId, containerId, qmHostName, queryMasterPort);
           LOG.info("Start TaskRunner:" + taskRunner.getId());
           synchronized(taskRunnerMap) {
             taskRunnerMap.put(taskRunner.getId(), taskRunner);

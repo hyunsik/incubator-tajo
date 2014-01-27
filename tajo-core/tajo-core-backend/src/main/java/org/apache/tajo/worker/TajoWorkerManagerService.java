@@ -113,18 +113,7 @@ public class TajoWorkerManagerService extends AbstractService
                                     RpcCallback<PrimitiveProtos.BoolProto> done) {
     workerContext.getWorkerSystemMetrics().counter("query", "executedExecutionBlocksNum").inc();
     try {
-      String[] params = new String[7];
-      params[0] = "standby";  //mode(never used)
-      params[1] = request.getExecutionBlockId();
-      // NodeId has a form of hostname:port.
-      params[2] = request.getNodeId();
-      params[3] = request.getContainerId();
-
-      // QueryMaster's address
-      params[4] = request.getQueryMasterHost();
-      params[5] = String.valueOf(request.getQueryMasterPort());
-      params[6] = request.getQueryOutputPath();
-      workerContext.getTaskRunnerManager().startTask(params);
+      workerContext.getTaskRunnerManager().startTask(request.getExecutionBlockId(), request.getNodeId(), request.getContainerId(), request.getQueryMasterHost(), request.getQueryMasterPort());
       done.run(TajoWorker.TRUE_PROTO);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);

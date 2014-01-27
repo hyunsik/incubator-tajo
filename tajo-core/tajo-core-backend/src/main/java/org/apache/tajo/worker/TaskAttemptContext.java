@@ -149,10 +149,6 @@ public class TaskAttemptContext {
   public Path getOutputPath() {
     return this.outputPath;
   }
-
-  public boolean isInterQuery() {
-    return this.interQuery;
-  }
   
   public void stop() {
     this.stopped = true;
