@@ -63,8 +63,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.tajo.catalog.proto.CatalogProtos.FragmentProto;
 
-public class Task {
-  private static final Log LOG = LogFactory.getLog(Task.class);
+public class TaskExecutor {
+  private static final Log LOG = LogFactory.getLog(TaskExecutor.class);
 
   private final TajoConf systemConf;
   private final QueryContext queryContext;
@@ -130,10 +130,10 @@ public class Task {
         }
       };
 
-  public Task(QueryUnitAttemptId taskId,
-              final TaskRunner.TaskRunnerContext worker,
-              final QueryMasterProtocolService.Interface masterProxy,
-              final QueryUnitRequest request) throws IOException {
+  public TaskExecutor(QueryUnitAttemptId taskId,
+                      final TaskRunner.TaskRunnerContext worker,
+                      final QueryMasterProtocolService.Interface masterProxy,
+                      final QueryUnitRequest request) throws IOException {
     this.request = request;
     this.reporter = new Reporter(masterProxy);
     this.reporter.startCommunicationThread();
@@ -483,8 +483,8 @@ public class Task {
   }
 
   public boolean equals(Object obj) {
-    if (obj instanceof Task) {
-      Task other = (Task) obj;
+    if (obj instanceof TaskExecutor) {
+      TaskExecutor other = (TaskExecutor) obj;
       return this.context.equals(other.context);
     }
     return false;
@@ -659,18 +659,6 @@ public class Task {
         pingThread.join();
       }
     }
-  }
-
-  public static final String FILECACHE = "filecache";
-  public static final String APPCACHE = "appcache";
-  public static final String USERCACHE = "usercache";
-
-  String fileCache;
-  public String getFileCacheDir() {
-    fileCache = USERCACHE + "/" + "hyunsik" + "/" + APPCACHE + "/" +
-        ConverterUtils.toString(ApplicationIdUtils.queryIdToAppId(taskId.getQueryUnitId().getExecutionBlockId().getQueryId())) +
-        "/" + "output";
-    return fileCache;
   }
 
   public static Path getTaskAttemptDir(QueryUnitAttemptId quid) {

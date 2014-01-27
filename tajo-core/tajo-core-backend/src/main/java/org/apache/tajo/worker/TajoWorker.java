@@ -42,7 +42,6 @@ import org.apache.tajo.pullserver.TajoPullServerService;
 import org.apache.tajo.rpc.CallFuture;
 import org.apache.tajo.rpc.NettyClientBase;
 import org.apache.tajo.rpc.RpcConnectionPool;
-import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos;
 import org.apache.tajo.storage.v2.DiskDeviceInfo;
 import org.apache.tajo.storage.v2.DiskMountInfo;
 import org.apache.tajo.storage.v2.DiskUtil;
@@ -63,27 +62,28 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.tajo.conf.TajoConf.ConfVars;
+import static org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.BoolProto;
 
 public class TajoWorker extends CompositeService {
-  public static PrimitiveProtos.BoolProto TRUE_PROTO = PrimitiveProtos.BoolProto.newBuilder().setValue(true).build();
-  public static PrimitiveProtos.BoolProto FALSE_PROTO = PrimitiveProtos.BoolProto.newBuilder().setValue(false).build();
+  private static final Log LOG = LogFactory.getLog(TajoWorker.class);
 
-  public static final String WORKER_MODE_YARN_TASKRUNNER = "tr";
-  public static final String WORKER_MODE_YARN_QUERYMASTER = "qm";
+  public static BoolProto TRUE_PROTO = BoolProto.newBuilder().setValue(true).build();
+  public static BoolProto FALSE_PROTO = BoolProto.newBuilder().setValue(false).build();
+
   public static final String WORKER_MODE_STANDBY = "standby";
   public static final String WORKER_MODE_QUERY_MASTER = "standby-qm";
-  public static final String WORKER_MODE_TASKRUNNER = "standby-tr";
-
-  private static final Log LOG = LogFactory.getLog(TajoWorker.class);
 
   private TajoConf systemConf;
 
+  /** Worker Web Info Server */
   private StaticHttpServer webServer;
 
+  /** RPC between Worker and Client */
   private TajoWorkerClientService tajoWorkerClientService;
 
   private QueryMasterManagerService queryMasterManagerService;
 
+  /** It allocate contains and manages them by TajoMaster's requests. */
   private TajoWorkerManagerService tajoWorkerManagerService;
 
   private InetSocketAddress tajoMasterAddress;
@@ -114,8 +114,6 @@ public class TajoWorker extends CompositeService {
 
   private RpcConnectionPool connPool;
 
-  private String[] cmdArgs;
-
   private DeletionService deletionService;
 
   private TajoSystemMetrics workerSystemMetrics;
@@ -126,7 +124,6 @@ public class TajoWorker extends CompositeService {
 
   public void startWorker(TajoConf systemConf, String[] args) {
     this.systemConf = systemConf;
-    this.cmdArgs = args;
     setWorkerMode(args);
     init(systemConf);
     start();
@@ -557,8 +554,8 @@ public class TajoWorker extends CompositeService {
             .setDiskSlots(workerDiskSlots)
             .setMemoryResourceMB(workerMemoryMB)
             .setJvmHeap(jvmHeap)
-            .setQueryMasterMode(PrimitiveProtos.BoolProto.newBuilder().setValue(queryMasterMode))
-            .setTaskRunnerMode(PrimitiveProtos.BoolProto.newBuilder().setValue(taskRunnerMode))
+            .setQueryMasterMode(BoolProto.newBuilder().setValue(queryMasterMode))
+            .setTaskRunnerMode(BoolProto.newBuilder().setValue(taskRunnerMode))
             .build();
 
         TajoMasterProtocol.TajoHeartbeat heartbeatProto = TajoMasterProtocol.TajoHeartbeat.newBuilder()

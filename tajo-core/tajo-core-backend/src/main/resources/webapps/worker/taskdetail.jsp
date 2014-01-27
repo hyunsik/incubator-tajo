@@ -23,7 +23,7 @@
 <%@ page import="org.apache.tajo.util.TajoIdUtils" %>
 <%@ page import="org.apache.tajo.webapp.StaticHttpServer" %>
 <%@ page import="org.apache.tajo.worker.TajoWorker" %>
-<%@ page import="org.apache.tajo.worker.Task" %>
+<%@ page import="org.apache.tajo.worker.TaskExecutor" %>
 <%@ page import="org.apache.tajo.worker.TaskHistory" %>
 <%@ page import="org.apache.tajo.worker.TaskRunner" %>
 <%@ page import="java.text.SimpleDateFormat" %>
@@ -34,21 +34,21 @@
     String containerId = request.getParameter("containerId");
     String quAttemptId = request.getParameter("queryUnitAttemptId");
     QueryUnitAttemptId queryUnitAttemptId = TajoIdUtils.parseQueryUnitAttemptId(quAttemptId);
-    Task task = null;
+    TaskExecutor taskExecutor = null;
     TaskHistory taskHistory = null;
     if(containerId == null || containerId.isEmpty() || "null".equals(containerId)) {
-        task = tajoWorker.getWorkerContext().getTaskRunnerManager().findTaskByQueryUnitAttemptId(queryUnitAttemptId);
-        if (task != null) {
-            taskHistory = task.getTaskHistory();
+        taskExecutor = tajoWorker.getWorkerContext().getTaskRunnerManager().findTaskByQueryUnitAttemptId(queryUnitAttemptId);
+        if (taskExecutor != null) {
+            taskHistory = taskExecutor.getTaskHistory();
         } else {
             taskHistory = tajoWorker.getWorkerContext().getTaskRunnerManager().findTaskHistoryByQueryUnitAttemptId(queryUnitAttemptId);
         }
     } else {
         TaskRunner taskRunner = tajoWorker.getWorkerContext().getTaskRunnerManager().findTaskRunner(containerId);
         if(taskRunner != null) {
-            task = taskRunner.getContext().getTask(queryUnitAttemptId);
-            if (task != null) {
-                taskHistory = task.getTaskHistory();
+            taskExecutor = taskRunner.getContext().getTask(queryUnitAttemptId);
+            if (taskExecutor != null) {
+                taskHistory = taskExecutor.getTaskHistory();
             } else {
                 taskHistory = taskRunner.getContext().getTaskHistory(queryUnitAttemptId);
             }

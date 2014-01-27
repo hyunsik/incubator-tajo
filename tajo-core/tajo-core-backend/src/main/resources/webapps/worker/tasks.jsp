@@ -60,7 +60,7 @@
     <table width="100%" border="1" class="border_table">
         <tr><th>Id</th><th>StartTime</th><th>FinishTime</th><th>RunTime</th><th>Status</th></tr>
 <%
-    for(Map.Entry<QueryUnitAttemptId, Task> entry: taskRunnerContext.getTasks().entrySet()) {
+    for(Map.Entry<QueryUnitAttemptId, TaskExecutor> entry: taskRunnerContext.getTasks().entrySet()) {
         QueryUnitAttemptId queryUnitId = entry.getKey();
         TaskHistory eachTask = entry.getValue().getTaskHistory();
 %>

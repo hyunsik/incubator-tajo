@@ -81,7 +81,7 @@ public class TaskRunner extends AbstractService {
   // for Fetcher
   private final ExecutorService fetchLauncher = Executors.newFixedThreadPool(coreNum * 4);
   // It keeps all of the query unit attempts while a TaskRunner is running.
-  private final Map<QueryUnitAttemptId, Task> tasks = new ConcurrentHashMap<QueryUnitAttemptId, Task>();
+  private final Map<QueryUnitAttemptId, TaskExecutor> tasks = new ConcurrentHashMap<QueryUnitAttemptId, TaskExecutor>();
 
   private final Map<QueryUnitAttemptId, TaskHistory> taskHistories =
       new ConcurrentHashMap<QueryUnitAttemptId, TaskHistory>();
@@ -195,10 +195,10 @@ public class TaskRunner extends AbstractService {
     this.stopped = true;
 
     // If TaskRunner is stopped, all running or pending tasks will be marked as failed.
-    for (Task task : tasks.values()) {
-      if (task.getStatus() == TaskAttemptState.TA_PENDING ||
-          task.getStatus() == TaskAttemptState.TA_RUNNING) {
-        task.setState(TaskAttemptState.TA_FAILED);
+    for (TaskExecutor taskExecutor : tasks.values()) {
+      if (taskExecutor.getStatus() == TaskAttemptState.TA_PENDING ||
+          taskExecutor.getStatus() == TaskAttemptState.TA_RUNNING) {
+        taskExecutor.setState(TaskAttemptState.TA_FAILED);
       }
     }
 
@@ -233,11 +233,11 @@ public class TaskRunner extends AbstractService {
       return queryEngine;
     }
 
-    public Map<QueryUnitAttemptId, Task> getTasks() {
+    public Map<QueryUnitAttemptId, TaskExecutor> getTasks() {
       return tasks;
     }
 
-    public Task getTask(QueryUnitAttemptId taskId) {
+    public TaskExecutor getTask(QueryUnitAttemptId taskId) {
       return tasks.get(taskId);
     }
 
@@ -347,18 +347,18 @@ public class TaskRunner extends AbstractService {
                   }
 
                   LOG.info("Initializing: " + taskAttemptId);
-                  Task task;
+                  TaskExecutor taskExecutor;
                   try {
-                    task = new Task(taskAttemptId, taskRunnerContext, qmClientService,
+                    taskExecutor = new TaskExecutor(taskAttemptId, taskRunnerContext, qmClientService,
                         new QueryUnitRequestImpl(taskRequest));
-                    tasks.put(taskAttemptId, task);
+                    tasks.put(taskAttemptId, taskExecutor);
 
-                    task.init();
-                    if (task.hasFetchPhase()) {
-                      task.fetch(); // The fetch is performed in an asynchronous way.
+                    taskExecutor.init();
+                    if (taskExecutor.hasFetchPhase()) {
+                      taskExecutor.fetch(); // The fetch is performed in an asynchronous way.
                     }
                     // task.run() is a blocking call.
-                    task.run();
+                    taskExecutor.run();
                   } catch (Throwable t) {
                     fatalError(qmClientService, taskAttemptId, t.getMessage());
                     t.printStackTrace();
@@ -384,7 +384,7 @@ public class TaskRunner extends AbstractService {
     } catch (Throwable t) {
       LOG.fatal("Unhandled exception. Starting shutdown.", t);
     } finally {
-      for (Task t : tasks.values()) {
+      for (TaskExecutor t : tasks.values()) {
         if (t.getStatus() != TaskAttemptState.TA_SUCCEEDED) {
           t.abort();
         }

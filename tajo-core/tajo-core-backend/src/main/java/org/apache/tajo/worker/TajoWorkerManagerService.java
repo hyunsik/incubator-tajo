@@ -34,9 +34,7 @@ import org.apache.tajo.util.NetUtils;
 
 import java.net.InetSocketAddress;
 
-/**
- * It allocates containers for allocated resources.
- */
+
 public class TajoWorkerManagerService extends AbstractService
     implements TajoWorkerProtocol.TajoWorkerProtocolService.Interface {
   private static final Log LOG = LogFactory.getLog(TajoWorkerManagerService.class.getName());

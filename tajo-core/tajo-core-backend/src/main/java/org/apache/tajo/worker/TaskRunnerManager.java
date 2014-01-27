@@ -115,14 +115,14 @@ public class TaskRunnerManager extends CompositeService {
     }
   }
 
-  public Task findTaskByQueryUnitAttemptId(QueryUnitAttemptId quAttemptId) {
+  public TaskExecutor findTaskByQueryUnitAttemptId(QueryUnitAttemptId quAttemptId) {
     ExecutionBlockId ebid = quAttemptId.getQueryUnitId().getExecutionBlockId();
     synchronized(taskRunnerMap) {
       for (TaskRunner eachTaskRunner: taskRunnerMap.values()) {
         if (eachTaskRunner.getExecutionBlockId().equals(ebid)) {
-          Task task = eachTaskRunner.getContext().getTask(quAttemptId);
-          if (task != null) {
-            return task;
+          TaskExecutor taskExecutor = eachTaskRunner.getContext().getTask(quAttemptId);
+          if (taskExecutor != null) {
+            return taskExecutor;
           }
         }
       }
@@ -130,9 +130,9 @@ public class TaskRunnerManager extends CompositeService {
     synchronized(finishedTaskRunnerMap) {
       for (TaskRunner eachTaskRunner: finishedTaskRunnerMap.values()) {
         if (eachTaskRunner.getExecutionBlockId().equals(ebid)) {
-          Task task = eachTaskRunner.getContext().getTask(quAttemptId);
-          if (task != null) {
-            return task;
+          TaskExecutor taskExecutor = eachTaskRunner.getContext().getTask(quAttemptId);
+          if (taskExecutor != null) {
+            return taskExecutor;
           }
         }
       }
