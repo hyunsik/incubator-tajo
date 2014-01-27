@@ -24,6 +24,9 @@ import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.common.ProtoObject;
 import org.apache.tajo.json.GsonObject;
 
+/**
+ * <code>PartitionDesc</code> presents a table partition.
+ */
 public class PartitionDesc implements ProtoObject<CatalogProtos.PartitionDescProto>, Cloneable, GsonObject {
 
   @Expose protected String tableId;                            // required
@@ -133,6 +136,9 @@ public class PartitionDesc implements ProtoObject<CatalogProtos.PartitionDescPro
 
     builder.setOrdinalPosition(this.ordinalPosition);
 
+    if (this.partitionValue != null) {
+      builder.setPartitionValue(this.partitionValue);
+    }
 
     if(this.path != null) {
       builder.setPath(this.path);

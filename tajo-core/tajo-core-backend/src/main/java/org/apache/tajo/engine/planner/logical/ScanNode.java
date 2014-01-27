@@ -26,6 +26,7 @@ import org.apache.tajo.engine.eval.EvalNode;
 import org.apache.tajo.engine.planner.PlanString;
 import org.apache.tajo.engine.planner.PlannerUtil;
 import org.apache.tajo.engine.planner.Target;
+import org.apache.tajo.engine.utils.SchemaUtil;
 import org.apache.tajo.util.TUtil;
 
 public class ScanNode extends RelationNode implements Projectable {
@@ -44,14 +45,8 @@ public class ScanNode extends RelationNode implements Projectable {
     super(pid, NodeType.SCAN);
     this.tableDesc = desc;
     this.setInSchema(tableDesc.getSchema());
-
-    logicalSchema = new Schema(getInSchema());
-    if (tableDesc.hasPartition()) {
-      logicalSchema.addColumns(tableDesc.getPartitionMethod().getExpressionSchema());
-      logicalSchema.setQualifier(tableDesc.getName());
-    }
-
     this.setOutSchema(tableDesc.getSchema());
+    logicalSchema = SchemaUtil.getQualifiedLogicalSchema(tableDesc, null);
   }
   
 	public ScanNode(int pid, TableDesc desc, String alias) {
@@ -59,14 +54,8 @@ public class ScanNode extends RelationNode implements Projectable {
     this.alias = PlannerUtil.normalizeTableName(alias);
     this.setInSchema(tableDesc.getSchema());
     this.getInSchema().setQualifier(alias);
-
-    logicalSchema = new Schema(getInSchema());
-    if (tableDesc.hasPartition()) {
-      logicalSchema.addColumns(tableDesc.getPartitionMethod().getExpressionSchema());
-      logicalSchema.setQualifier(this.alias);
-    }
-
     this.setOutSchema(new Schema(getInSchema()));
+    logicalSchema = SchemaUtil.getQualifiedLogicalSchema(tableDesc, alias);
 	}
 	
 	public String getTableName() {

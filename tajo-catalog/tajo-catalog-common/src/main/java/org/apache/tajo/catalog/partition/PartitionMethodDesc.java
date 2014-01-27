@@ -29,7 +29,7 @@ import org.apache.tajo.json.GsonObject;
 import org.apache.tajo.util.TUtil;
 
 /**
- *
+ * <code>PartitionMethodDesc</code> presents a table description, including partition type, and partition keys.
  */
 public class PartitionMethodDesc implements ProtoObject<CatalogProtos.PartitionMethodProto>, Cloneable, GsonObject {
   private CatalogProtos.PartitionMethodProto.Builder builder;
