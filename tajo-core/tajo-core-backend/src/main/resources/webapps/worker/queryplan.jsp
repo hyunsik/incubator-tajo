@@ -24,7 +24,7 @@
 <%@ page import="org.apache.tajo.master.querymaster.Query" %>
 <%@ page import="org.apache.tajo.QueryId" %>
 <%@ page import="org.apache.tajo.util.TajoIdUtils" %>
-<%@ page import="org.apache.tajo.master.querymaster.QueryMasterTask" %>
+<%@ page import="org.apache.tajo.master.querymaster.QueryMaster" %>
 <%@ page import="org.apache.tajo.master.querymaster.SubQuery" %>
 <%@ page import="org.apache.tajo.engine.planner.global.ExecutionBlock" %>
 <%@ page import="java.util.*" %>
@@ -36,15 +36,15 @@
   QueryId queryId = TajoIdUtils.parseQueryId(request.getParameter("queryId"));
 
   TajoWorker tajoWorker = (TajoWorker) StaticHttpServer.getInstance().getAttribute("tajo.info.server.object");
-  QueryMasterTask queryMasterTask = tajoWorker.getWorkerContext()
-          .getQueryMasterManagerService().getQueryMaster().getQueryMasterTask(queryId, true);
+  QueryMaster queryMaster = tajoWorker.getWorkerContext()
+          .getQueryMasterManagerService().getQueryMasterManager().getQueryMasterTask(queryId, true);
 
-  if(queryMasterTask == null) {
+  if(queryMaster == null) {
     out.write("<script type='text/javascript'>alert('no query'); history.back(0); </script>");
     return;
   }
 
-  Query query = queryMasterTask.getQuery();
+  Query query = queryMaster.getQuery();
 
   Map<ExecutionBlockId, SubQuery> subQueryMap = new HashMap<ExecutionBlockId, SubQuery>();
 

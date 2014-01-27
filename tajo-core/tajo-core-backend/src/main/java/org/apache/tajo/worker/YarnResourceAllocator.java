@@ -33,7 +33,7 @@ import org.apache.tajo.master.TaskRunnerGroupEvent;
 import org.apache.tajo.master.TaskRunnerLauncher;
 import org.apache.tajo.master.YarnTaskRunnerLauncherImpl;
 import org.apache.tajo.master.event.ContainerAllocatorEventType;
-import org.apache.tajo.master.querymaster.QueryMasterTask;
+import org.apache.tajo.master.querymaster.QueryMaster;
 import org.apache.tajo.master.rm.YarnRMContainerAllocator;
 
 public class YarnResourceAllocator extends AbstractResourceAllocator {
@@ -47,11 +47,11 @@ public class YarnResourceAllocator extends AbstractResourceAllocator {
 
   private static final Log LOG = LogFactory.getLog(YarnResourceAllocator.class.getName());
 
-  private QueryMasterTask.QueryMasterTaskContext queryTaskContext;
+  private QueryMaster.QueryMasterTaskContext queryTaskContext;
 
   private TajoConf systemConf;
 
-  public YarnResourceAllocator(QueryMasterTask.QueryMasterTaskContext queryTaskContext) {
+  public YarnResourceAllocator(QueryMaster.QueryMasterTaskContext queryTaskContext) {
     this.queryTaskContext = queryTaskContext;
   }
 

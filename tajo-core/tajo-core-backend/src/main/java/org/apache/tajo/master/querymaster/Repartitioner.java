@@ -73,7 +73,7 @@ public class Repartitioner {
       throws IOException {
     MasterPlan masterPlan = subQuery.getMasterPlan();
     ExecutionBlock execBlock = subQuery.getBlock();
-    QueryMasterTask.QueryMasterTaskContext masterContext = subQuery.getContext();
+    QueryMaster.QueryMasterTaskContext masterContext = subQuery.getContext();
     AbstractStorageManager storageManager = subQuery.getStorageManager();
 
     ScanNode[] scans = execBlock.getScanNodes();
@@ -264,7 +264,7 @@ public class Repartitioner {
     }
   }
 
-  private static TableStats computeChildBlocksStats(QueryMasterTask.QueryMasterTaskContext context, MasterPlan masterPlan,
+  private static TableStats computeChildBlocksStats(QueryMaster.QueryMasterTaskContext context, MasterPlan masterPlan,
                                                     ExecutionBlockId parentBlockId) {
     List<TableStats> tableStatses = new ArrayList<TableStats>();
     List<ExecutionBlock> childBlocks = masterPlan.getChilds(parentBlockId);

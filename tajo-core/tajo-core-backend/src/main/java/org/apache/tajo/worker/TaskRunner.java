@@ -70,8 +70,6 @@ public class TaskRunner extends AbstractService {
 
   // for temporal or intermediate files
   private FileSystem localFS;
-  // for input files
-  private FileSystem defaultFS;
 
   private TajoQueryEngine queryEngine;
 
@@ -156,7 +154,6 @@ public class TaskRunner extends AbstractService {
 
     try {
       // initialize DFS and LocalFileSystems
-      defaultFS = TajoConf.getTajoRootDir(systemConf).getFileSystem(conf);
       localFS = FileSystem.getLocal(conf);
 
       // the base dir for an output dir

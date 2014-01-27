@@ -66,7 +66,7 @@ public class Query implements EventHandler<QueryEvent> {
   private final EventHandler eventHandler;
   private final MasterPlan plan;
   private final AbstractStorageManager sm;
-  QueryMasterTask.QueryMasterTaskContext context;
+  QueryMaster.QueryMasterTaskContext context;
   private ExecutionBlockCursor cursor;
 
   // Query Status
@@ -137,7 +137,7 @@ public class Query implements EventHandler<QueryEvent> {
 
           .installTopology();
 
-  public Query(final QueryMasterTask.QueryMasterTaskContext context, final QueryId id,
+  public Query(final QueryMaster.QueryMasterTaskContext context, final QueryId id,
                final long appSubmitTime,
                final String queryStr,
                final EventHandler eventHandler,
@@ -394,15 +394,15 @@ public class Query implements EventHandler<QueryEvent> {
 
     private static interface QueryHook {
       boolean isEligible(QueryContext queryContext, Query query, ExecutionBlockId finalExecBlockId, Path finalOutputDir);
-      void execute(QueryMaster.QueryMasterContext context, QueryContext queryContext, Query query,
+      void execute(QueryMasterManager.QueryMasterContext context, QueryContext queryContext, Query query,
                    ExecutionBlockId finalExecBlockId, Path finalOutputDir) throws Exception;
     }
 
     private class QueryHookExecutor {
       private List<QueryHook> hookList = TUtil.newList();
-      private QueryMaster.QueryMasterContext context;
+      private QueryMasterManager.QueryMasterContext context;
 
-      public QueryHookExecutor(QueryMaster.QueryMasterContext context) {
+      public QueryHookExecutor(QueryMasterManager.QueryMasterContext context) {
         this.context = context;
         hookList.add(new MaterializedResultHook());
         hookList.add(new CreateTableHook());
@@ -431,7 +431,7 @@ public class Query implements EventHandler<QueryEvent> {
       }
 
       @Override
-      public void execute(QueryMaster.QueryMasterContext context, QueryContext queryContext, Query query,
+      public void execute(QueryMasterManager.QueryMasterContext context, QueryContext queryContext, Query query,
                           ExecutionBlockId finalExecBlockId,
                           Path finalOutputDir) throws Exception {
         SubQuery lastStage = query.getSubQuery(finalExecBlockId);
@@ -461,7 +461,7 @@ public class Query implements EventHandler<QueryEvent> {
       }
 
       @Override
-      public void execute(QueryMaster.QueryMasterContext context, QueryContext queryContext, Query query,
+      public void execute(QueryMasterManager.QueryMasterContext context, QueryContext queryContext, Query query,
                           ExecutionBlockId finalExecBlockId,
                           Path finalOutputDir) throws Exception {
         CatalogService catalog = context.getWorkerContext().getCatalog();
@@ -500,7 +500,7 @@ public class Query implements EventHandler<QueryEvent> {
       }
 
       @Override
-      public void execute(QueryMaster.QueryMasterContext context, QueryContext queryContext, Query query,
+      public void execute(QueryMasterManager.QueryMasterContext context, QueryContext queryContext, Query query,
                           ExecutionBlockId finalExecBlockId,
                           Path finalOutputDir)
           throws Exception {

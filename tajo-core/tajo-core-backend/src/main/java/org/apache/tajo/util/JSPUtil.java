@@ -22,7 +22,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.tajo.catalog.FunctionDesc;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.master.querymaster.QueryInProgress;
-import org.apache.tajo.master.querymaster.QueryMasterTask;
+import org.apache.tajo.master.querymaster.QueryMaster;
 import org.apache.tajo.master.querymaster.QueryUnit;
 import org.apache.tajo.master.querymaster.SubQuery;
 import org.apache.tajo.worker.TaskRunner;
@@ -71,14 +71,14 @@ public class JSPUtil {
     }
   }
 
-  public static List<QueryMasterTask> sortQueryMasterTask(Collection<QueryMasterTask> queryMasterTasks,
+  public static List<QueryMaster> sortQueryMasterTask(Collection<QueryMaster> queryMasters,
                                                           final boolean desc) {
-    List<QueryMasterTask> queryMasterTaskList = new ArrayList<QueryMasterTask>(queryMasterTasks);
+    List<QueryMaster> queryMasterList = new ArrayList<QueryMaster>(queryMasters);
 
-    Collections.sort(queryMasterTaskList, new Comparator<QueryMasterTask>() {
+    Collections.sort(queryMasterList, new Comparator<QueryMaster>() {
 
       @Override
-      public int compare(QueryMasterTask task1, QueryMasterTask task2) {
+      public int compare(QueryMaster task1, QueryMaster task2) {
         if(desc) {
           return task2.getQueryId().toString().compareTo(task1.getQueryId().toString());
         } else {
@@ -87,7 +87,7 @@ public class JSPUtil {
       }
     });
 
-    return queryMasterTaskList;
+    return queryMasterList;
   }
 
   public static List<QueryInProgress> sortQueryInProgress(Collection<QueryInProgress> queryInProgresses,

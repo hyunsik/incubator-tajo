@@ -33,7 +33,7 @@ import org.apache.hadoop.yarn.ipc.YarnRPC;
 import org.apache.tajo.ExecutionBlockId;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.master.TaskRunnerGroupEvent.EventType;
-import org.apache.tajo.master.querymaster.QueryMasterTask;
+import org.apache.tajo.master.querymaster.QueryMaster;
 
 import java.util.*;
 import java.util.concurrent.ExecutorService;
@@ -47,7 +47,7 @@ public class YarnTaskRunnerLauncherImpl extends AbstractService implements TaskR
   //private final YarnRPC yarnRPC;
   private final static RecordFactory recordFactory =
       RecordFactoryProvider.getRecordFactory(null);
-  private QueryMasterTask.QueryMasterTaskContext context;
+  private QueryMaster.QueryMasterTaskContext context;
 
   // For ContainerLauncherSpec
   private static AtomicBoolean initialClasspathFlag = new AtomicBoolean();
@@ -63,7 +63,7 @@ public class YarnTaskRunnerLauncherImpl extends AbstractService implements TaskR
 
   private YarnRPC yarnRPC;
 
-  public YarnTaskRunnerLauncherImpl(QueryMasterTask.QueryMasterTaskContext context, YarnRPC yarnRPC) {
+  public YarnTaskRunnerLauncherImpl(QueryMaster.QueryMasterTaskContext context, YarnRPC yarnRPC) {
     super(YarnTaskRunnerLauncherImpl.class.getName());
     this.context = context;
     this.yarnRPC = yarnRPC;
@@ -167,7 +167,7 @@ public class YarnTaskRunnerLauncherImpl extends AbstractService implements TaskR
 //  public class TaskRunnerContainerProxy extends ContainerProxy {
 //    private final ExecutionBlockId executionBlockId;
 //
-//    public TaskRunnerContainerProxy(QueryMasterTask.QueryContext context, Configuration conf, YarnRPC yarnRPC,
+//    public TaskRunnerContainerProxy(QueryMaster.QueryContext context, Configuration conf, YarnRPC yarnRPC,
 //                                    Container container, ExecutionBlockId executionBlockId) {
 //      super(context, conf, yarnRPC, container);
 //      this.executionBlockId = executionBlockId;

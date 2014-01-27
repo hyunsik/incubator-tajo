@@ -81,7 +81,7 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
   private EventHandler<Event> eventHandler;
   private final AbstractStorageManager sm;
   private AbstractTaskScheduler taskScheduler;
-  private QueryMasterTask.QueryMasterTaskContext context;
+  private QueryMaster.QueryMasterTaskContext context;
   private final List<String> diagnostics = new ArrayList<String>();
 
   private long startTime;
@@ -206,7 +206,7 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
   private int completedTaskCount = 0;
   private TaskSchedulerContext schedulerContext;
 
-  public SubQuery(QueryMasterTask.QueryMasterTaskContext context, MasterPlan masterPlan, ExecutionBlock block, AbstractStorageManager sm) {
+  public SubQuery(QueryMaster.QueryMasterTaskContext context, MasterPlan masterPlan, ExecutionBlock block, AbstractStorageManager sm) {
     this.context = context;
     this.masterPlan = masterPlan;
     this.block = block;
@@ -224,7 +224,7 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
         state == SubQueryState.CONTAINER_ALLOCATED || state == SubQueryState.RUNNING;
   }
 
-  public QueryMasterTask.QueryMasterTaskContext getContext() {
+  public QueryMaster.QueryMasterTaskContext getContext() {
     return context;
   }
 
@@ -691,7 +691,7 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
       return maxTaskNum;
     }
 
-    public static long getInputVolume(MasterPlan masterPlan, QueryMasterTask.QueryMasterTaskContext context,
+    public static long getInputVolume(MasterPlan masterPlan, QueryMaster.QueryMasterTaskContext context,
                                       ExecutionBlock execBlock) {
       Map<String, TableDesc> tableMap = context.getTableDescMap();
       if (masterPlan.isLeaf(execBlock)) {

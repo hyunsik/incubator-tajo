@@ -35,7 +35,7 @@ import org.apache.tajo.catalog.CatalogClient;
 import org.apache.tajo.catalog.CatalogService;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.ipc.TajoMasterProtocol;
-import org.apache.tajo.master.querymaster.QueryMaster;
+import org.apache.tajo.master.querymaster.QueryMasterManager;
 import org.apache.tajo.master.querymaster.QueryMasterManagerService;
 import org.apache.tajo.master.rm.TajoWorkerResourceManager;
 import org.apache.tajo.pullserver.TajoPullServerService;
@@ -49,6 +49,7 @@ import org.apache.tajo.util.CommonTestingUtil;
 import org.apache.tajo.util.NetUtils;
 import org.apache.tajo.util.metrics.TajoSystemMetrics;
 import org.apache.tajo.webapp.StaticHttpServer;
+import org.jboss.netty.channel.socket.nio.NioWorkerPool;
 
 import java.io.*;
 import java.lang.management.ManagementFactory;
@@ -57,6 +58,8 @@ import java.lang.management.ThreadMXBean;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -117,6 +120,8 @@ public class TajoWorker extends CompositeService {
   private DeletionService deletionService;
 
   private TajoSystemMetrics workerSystemMetrics;
+
+  private NioWorkerPool workerPool;
 
   public TajoWorker() throws Exception {
     super(TajoWorker.class.getName());
@@ -227,6 +232,11 @@ public class TajoWorker extends CompositeService {
       }
     }
 
+    int coreNums = Runtime.getRuntime().availableProcessors();
+    int fetchWorkerNum = coreNums * 2;
+    ExecutorService executor = Executors.newFixedThreadPool(fetchWorkerNum);
+    workerPool = new NioWorkerPool(executor, fetchWorkerNum);
+    workerPool.releaseExternalResources();
 
     super.init(conf);
 
@@ -244,7 +254,7 @@ public class TajoWorker extends CompositeService {
       @Override
       public Integer getValue() {
         if(queryMasterManagerService != null) {
-          return queryMasterManagerService.getQueryMaster().getQueryMasterTasks().size();
+          return queryMasterManagerService.getQueryMasterManager().getQueryMasterTasks().size();
         } else {
           return 0;
         }
@@ -315,11 +325,11 @@ public class TajoWorker extends CompositeService {
   }
 
   public class WorkerContext {
-    public QueryMaster getQueryMaster() {
+    public QueryMasterManager getQueryMaster() {
       if(queryMasterManagerService == null) {
         return null;
       }
-      return queryMasterManagerService.getQueryMaster();
+      return queryMasterManagerService.getQueryMasterManager();
     }
 
     public TajoWorkerManagerService getTajoWorkerManagerService() {
@@ -351,12 +361,6 @@ public class TajoWorker extends CompositeService {
         return getQueryMasterManagerService().getHostAndPort();
       } else {
         return getTajoWorkerManagerService().getHostAndPort();
-      }
-    }
-    public void stopWorker(boolean force) {
-      stop();
-      if(force) {
-        System.exit(0);
       }
     }
 

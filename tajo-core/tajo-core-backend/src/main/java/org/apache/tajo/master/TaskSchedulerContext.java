@@ -19,26 +19,23 @@
 package org.apache.tajo.master;
 
 import org.apache.tajo.ExecutionBlockId;
-import org.apache.tajo.master.querymaster.QueryMasterTask;
-
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import org.apache.tajo.master.querymaster.QueryMaster;
 
 public class TaskSchedulerContext {
-  private QueryMasterTask.QueryMasterTaskContext masterContext;
+  private QueryMaster.QueryMasterTaskContext masterContext;
   private boolean isLeafQuery;
   private ExecutionBlockId blockId;
   private int taskSize;
   private int estimatedTaskNum;
 
-  public TaskSchedulerContext(QueryMasterTask.QueryMasterTaskContext masterContext, boolean isLeafQuery,
+  public TaskSchedulerContext(QueryMaster.QueryMasterTaskContext masterContext, boolean isLeafQuery,
                               ExecutionBlockId blockId) {
     this.masterContext = masterContext;
     this.isLeafQuery = isLeafQuery;
     this.blockId = blockId;
   }
 
-  public QueryMasterTask.QueryMasterTaskContext getMasterContext() {
+  public QueryMaster.QueryMasterTaskContext getMasterContext() {
     return masterContext;
   }
 

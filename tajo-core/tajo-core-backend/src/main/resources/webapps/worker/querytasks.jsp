@@ -59,7 +59,7 @@
   TajoWorker tajoWorker = (TajoWorker) StaticHttpServer.getInstance().getAttribute("tajo.info.server.object");
 
   List<TajoMasterProtocol.WorkerResourceProto> allWorkers = tajoWorker.getWorkerContext()
-            .getQueryMasterManagerService().getQueryMaster().getAllWorker();
+            .getQueryMasterManagerService().getQueryMasterManager().getAllWorker();
 
   Map<String, TajoMasterProtocol.WorkerResourceProto> workerMap = new HashMap<String, TajoMasterProtocol.WorkerResourceProto>();
   if(allWorkers != null) {
@@ -67,15 +67,15 @@
       workerMap.put(eachWorker.getHost(), eachWorker);
     }
   }
-  QueryMasterTask queryMasterTask = tajoWorker.getWorkerContext()
-          .getQueryMasterManagerService().getQueryMaster().getQueryMasterTask(queryId, true);
+  QueryMaster queryMaster = tajoWorker.getWorkerContext()
+          .getQueryMasterManagerService().getQueryMasterManager().getQueryMasterTask(queryId, true);
 
-  if(queryMasterTask == null) {
+  if(queryMaster == null) {
     out.write("<script type='text/javascript'>alert('no query'); history.back(0); </script>");
     return;
   }
 
-  Query query = queryMasterTask.getQuery();
+  Query query = queryMaster.getQuery();
   SubQuery subQuery = query.getSubQuery(ebid);
 
   if(subQuery == null) {

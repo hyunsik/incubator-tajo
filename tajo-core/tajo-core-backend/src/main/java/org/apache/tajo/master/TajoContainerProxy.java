@@ -27,7 +27,7 @@ import org.apache.hadoop.yarn.proto.YarnProtos;
 import org.apache.tajo.ExecutionBlockId;
 import org.apache.tajo.ipc.TajoMasterProtocol;
 import org.apache.tajo.ipc.TajoWorkerProtocol;
-import org.apache.tajo.master.querymaster.QueryMasterTask;
+import org.apache.tajo.master.querymaster.QueryMaster;
 import org.apache.tajo.master.rm.TajoWorkerContainer;
 import org.apache.tajo.master.rm.TajoWorkerContainerId;
 import org.apache.tajo.rpc.NettyClientBase;
@@ -39,7 +39,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class TajoContainerProxy extends ContainerProxy {
-  public TajoContainerProxy(QueryMasterTask.QueryMasterTaskContext context,
+  public TajoContainerProxy(QueryMaster.QueryMasterTaskContext context,
                             Configuration conf, Container container,
                             ExecutionBlockId executionBlockId) {
     super(context, conf, executionBlockId, container);
@@ -117,7 +117,7 @@ public class TajoContainerProxy extends ContainerProxy {
     }
   }
 
-  public static void releaseWorkerResource(QueryMasterTask.QueryMasterTaskContext context,
+  public static void releaseWorkerResource(QueryMaster.QueryMasterTaskContext context,
                                            ExecutionBlockId executionBlockId,
                                            ContainerId containerId) throws Exception {
     List<ContainerId> containerIds = new ArrayList<ContainerId>();
@@ -126,7 +126,7 @@ public class TajoContainerProxy extends ContainerProxy {
     releaseWorkerResource(context, executionBlockId, containerIds);
   }
 
-  public static void releaseWorkerResource(QueryMasterTask.QueryMasterTaskContext context,
+  public static void releaseWorkerResource(QueryMaster.QueryMasterTaskContext context,
                                            ExecutionBlockId executionBlockId,
                                            List<ContainerId> containerIds) throws Exception {
     List<YarnProtos.ContainerIdProto> containerIdProtos =

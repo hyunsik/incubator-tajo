@@ -37,7 +37,7 @@ import org.apache.tajo.master.event.ContainerAllocationEvent;
 import org.apache.tajo.master.event.ContainerAllocatorEventType;
 import org.apache.tajo.master.event.SubQueryContainerAllocationEvent;
 import org.apache.tajo.master.querymaster.Query;
-import org.apache.tajo.master.querymaster.QueryMasterTask;
+import org.apache.tajo.master.querymaster.QueryMaster;
 import org.apache.tajo.master.querymaster.SubQuery;
 import org.apache.tajo.master.querymaster.SubQueryState;
 import org.apache.tajo.util.ApplicationIdUtils;
@@ -57,11 +57,11 @@ public class YarnRMContainerAllocator extends AMRMClientImpl
   private static final Log LOG = LogFactory.getLog(YarnRMContainerAllocator.
       class.getName());
 
-  private QueryMasterTask.QueryMasterTaskContext context;
+  private QueryMaster.QueryMasterTaskContext context;
   private ApplicationAttemptId appAttemptId;
   private final EventHandler eventHandler;
 
-  public YarnRMContainerAllocator(QueryMasterTask.QueryMasterTaskContext context) {
+  public YarnRMContainerAllocator(QueryMaster.QueryMasterTaskContext context) {
     super();
     this.context = context;
     this.appAttemptId = ApplicationIdUtils.createApplicationAttemptId(context.getQueryId());

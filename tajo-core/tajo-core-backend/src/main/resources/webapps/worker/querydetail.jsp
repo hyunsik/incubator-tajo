@@ -31,14 +31,14 @@
   QueryId queryId = TajoIdUtils.parseQueryId(request.getParameter("queryId"));
 
   TajoWorker tajoWorker = (TajoWorker) StaticHttpServer.getInstance().getAttribute("tajo.info.server.object");
-  QueryMasterTask queryMasterTask = tajoWorker.getWorkerContext()
-          .getQueryMasterManagerService().getQueryMaster().getQueryMasterTask(queryId, true);
+  QueryMaster queryMaster = tajoWorker.getWorkerContext()
+          .getQueryMasterManagerService().getQueryMasterManager().getQueryMasterTask(queryId, true);
 
-  if(queryMasterTask == null) {
+  if(queryMaster == null) {
     out.write("<script type='text/javascript'>alert('no query'); history.back(0); </script>");
     return;
   }
-  Query query = queryMasterTask.getQuery();
+  Query query = queryMaster.getQuery();
   List<SubQuery> subQueries = JSPUtil.sortSubQuery(query.getSubQueries());
 
   SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");

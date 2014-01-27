@@ -25,7 +25,7 @@
 <%@ page import="org.apache.tajo.catalog.proto.CatalogProtos" %>
 <%@ page import="org.apache.tajo.ipc.TajoWorkerProtocol" %>
 <%@ page import="org.apache.tajo.master.querymaster.Query" %>
-<%@ page import="org.apache.tajo.master.querymaster.QueryMasterTask" %>
+<%@ page import="org.apache.tajo.master.querymaster.QueryMaster" %>
 <%@ page import="org.apache.tajo.master.querymaster.QueryUnit" %>
 <%@ page import="org.apache.tajo.master.querymaster.SubQuery" %>
 <%@ page import="org.apache.tajo.storage.DataLocation" %>
@@ -52,15 +52,15 @@
 
     int queryUnitSeq = Integer.parseInt(request.getParameter("queryUnitSeq"));
     TajoWorker tajoWorker = (TajoWorker) StaticHttpServer.getInstance().getAttribute("tajo.info.server.object");
-    QueryMasterTask queryMasterTask = tajoWorker.getWorkerContext()
-            .getQueryMasterManagerService().getQueryMaster().getQueryMasterTask(queryId, true);
+    QueryMaster queryMaster = tajoWorker.getWorkerContext()
+            .getQueryMasterManagerService().getQueryMasterManager().getQueryMasterTask(queryId, true);
 
-    if(queryMasterTask == null) {
+    if(queryMaster == null) {
         out.write("<script type='text/javascript'>alert('no query'); history.back(0); </script>");
         return;
     }
 
-    Query query = queryMasterTask.getQuery();
+    Query query = queryMaster.getQuery();
     SubQuery subQuery = query.getSubQuery(ebid);
 
     if(subQuery == null) {

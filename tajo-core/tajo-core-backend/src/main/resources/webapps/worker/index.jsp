@@ -23,7 +23,7 @@
 <%@ page import="org.apache.tajo.webapp.StaticHttpServer" %>
 <%@ page import="org.apache.tajo.worker.*" %>
 <%@ page import="java.text.SimpleDateFormat" %>
-<%@ page import="org.apache.tajo.master.querymaster.QueryMasterTask" %>
+<%@ page import="org.apache.tajo.master.querymaster.QueryMaster" %>
 <%@ page import="org.apache.tajo.master.querymaster.Query" %>
 
 <%
@@ -57,23 +57,23 @@
 
 <%
 if(tajoWorker.getWorkerContext().isQueryMasterMode()) {
-  List<QueryMasterTask> queryMasterTasks = JSPUtil.sortQueryMasterTask(tajoWorker.getWorkerContext()
-          .getQueryMasterManagerService().getQueryMaster().getQueryMasterTasks(), true);
+  List<QueryMaster> queryMasters = JSPUtil.sortQueryMasterTask(tajoWorker.getWorkerContext()
+          .getQueryMasterManagerService().getQueryMasterManager().getQueryMasterTasks(), true);
 
-  List<QueryMasterTask> finishedQueryMasterTasks = JSPUtil.sortQueryMasterTask(tajoWorker.getWorkerContext()
-          .getQueryMasterManagerService().getQueryMaster().getFinishedQueryMasterTasks(), true);
+  List<QueryMaster> finishedQueryMasters = JSPUtil.sortQueryMasterTask(tajoWorker.getWorkerContext()
+          .getQueryMasterManagerService().getQueryMasterManager().getFinishedQueryMasterTasks(), true);
 %>
   <h3>Running Query</h3>
   <%
-    if(queryMasterTasks.isEmpty()) {
+    if(queryMasters.isEmpty()) {
       out.write("No running query master");
     } else {
   %>
   <table width="100%" border="1" class="border_table">
     <tr><th>QueryId</th><th>StartTime</th><th>FinishTime</th><th>Progress</th><th>RunTime</th></tr>
     <%
-      for(QueryMasterTask eachQueryMasterTask: queryMasterTasks) {
-        Query query = eachQueryMasterTask.getQuery();
+      for(QueryMaster eachQueryMaster : queryMasters) {
+        Query query = eachQueryMaster.getQuery();
     %>
     <tr>
       <td align='center'><a href='querydetail.jsp?queryId=<%=query.getId()%>'><%=query.getId()%></a></td>
@@ -91,15 +91,15 @@ if(tajoWorker.getWorkerContext().isQueryMasterMode()) {
   <hr/>
   <h3>Finished Query</h3>
   <%
-    if(finishedQueryMasterTasks.isEmpty()) {
+    if(finishedQueryMasters.isEmpty()) {
       out.write("No finished query master");
     } else {
   %>
   <table width="100%" border="1" class="border_table">
     <tr><th>QueryId</th><th>StartTime</th><th>FinishTime</th><th>Progress</th><th>RunTime</th></tr>
     <%
-      for(QueryMasterTask eachQueryMasterTask: finishedQueryMasterTasks) {
-        Query query = eachQueryMasterTask.getQuery();
+      for(QueryMaster eachQueryMaster : finishedQueryMasters) {
+        Query query = eachQueryMaster.getQuery();
     %>
     <tr>
       <td align='center'><a href='querydetail.jsp?queryId=<%=query.getId()%>'><%=query.getId()%></a></td>

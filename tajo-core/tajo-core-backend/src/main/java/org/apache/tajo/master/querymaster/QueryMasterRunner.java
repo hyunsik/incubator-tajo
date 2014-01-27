@@ -39,7 +39,7 @@ import java.lang.management.ThreadMXBean;
 public class QueryMasterRunner extends AbstractService {
   private static final Log LOG = LogFactory.getLog(QueryMasterRunner.class);
   private TajoConf systemConf;
-  private QueryMaster queryMaster;
+  private QueryMasterManager queryMasterManager;
   private QueryId queryId;
   private String queryMasterManagerAddress;
 
@@ -70,7 +70,7 @@ public class QueryMasterRunner extends AbstractService {
   @Override
   public void start() {
     //create QueryMaster
-    QueryMaster query = new QueryMaster(null);
+    QueryMasterManager query = new QueryMasterManager(null);
 
     query.init(systemConf);
     query.start();

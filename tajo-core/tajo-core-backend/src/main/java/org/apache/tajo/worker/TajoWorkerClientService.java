@@ -32,7 +32,7 @@ import org.apache.tajo.TajoProtos;
 import org.apache.tajo.ipc.ClientProtos;
 import org.apache.tajo.ipc.QueryMasterClientProtocol;
 import org.apache.tajo.master.querymaster.Query;
-import org.apache.tajo.master.querymaster.QueryMasterTask;
+import org.apache.tajo.master.querymaster.QueryMaster;
 import org.apache.tajo.rpc.BlockingRpcServer;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos;
 import org.apache.tajo.util.NetUtils;
@@ -166,21 +166,21 @@ public class TajoWorkerClientService extends AbstractService {
         builder.setResultCode(ClientProtos.ResultCode.OK);
         builder.setState(TajoProtos.QueryState.QUERY_SUCCEEDED);
       } else {
-        QueryMasterTask queryMasterTask = workerContext.getQueryMaster().getQueryMasterTask(queryId);
+        QueryMaster queryMaster = workerContext.getQueryMaster().getQueryMasterTask(queryId);
         builder.setResultCode(ClientProtos.ResultCode.OK);
         builder.setQueryMasterHost(bindAddr.getHostName());
         builder.setQueryMasterPort(bindAddr.getPort());
 
-        if (queryMasterTask != null) {
-          queryMasterTask.touchSessionTime();
-          Query query = queryMasterTask.getQuery();
+        if (queryMaster != null) {
+          queryMaster.touchSessionTime();
+          Query query = queryMaster.getQuery();
 
           builder.setState(query.getState());
           builder.setProgress(query.getProgress());
           builder.setSubmitTime(query.getAppSubmitTime());
           builder.setHasResult(
-              !(queryMasterTask.getQueryTaskContext().getQueryContext().isCreateTable() ||
-                  queryMasterTask.getQueryTaskContext().getQueryContext().isInsert())
+              !(queryMaster.getQueryTaskContext().getQueryContext().isCreateTable() ||
+                  queryMaster.getQueryTaskContext().getQueryContext().isInsert())
           );
           if (query.getState() == TajoProtos.QueryState.QUERY_SUCCEEDED) {
             builder.setFinishTime(query.getFinishTime());

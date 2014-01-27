@@ -18,222 +18,164 @@
 
 package org.apache.tajo.master.querymaster;
 
-import com.google.common.collect.Maps;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.CompositeService;
-import org.apache.hadoop.yarn.event.Event;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.util.Clock;
-import org.apache.hadoop.yarn.util.SystemClock;
-import org.apache.tajo.QueryId;
-import org.apache.tajo.TajoProtos;
+import org.apache.tajo.*;
+import org.apache.tajo.algebra.Expr;
+import org.apache.tajo.catalog.CatalogService;
+import org.apache.tajo.catalog.TableDesc;
 import org.apache.tajo.conf.TajoConf;
-import org.apache.tajo.engine.planner.global.GlobalPlanner;
+import org.apache.tajo.engine.parser.HiveConverter;
+import org.apache.tajo.engine.parser.SQLAnalyzer;
+import org.apache.tajo.engine.planner.*;
+import org.apache.tajo.engine.planner.global.MasterPlan;
+import org.apache.tajo.engine.planner.logical.LogicalNode;
+import org.apache.tajo.engine.planner.logical.NodeType;
+import org.apache.tajo.engine.planner.logical.ScanNode;
+import org.apache.tajo.engine.query.QueryContext;
 import org.apache.tajo.ipc.TajoMasterProtocol;
-import org.apache.tajo.ipc.TajoWorkerProtocol;
+import org.apache.tajo.master.GlobalEngine;
 import org.apache.tajo.master.TajoAsyncDispatcher;
-import org.apache.tajo.master.event.QueryStartEvent;
+import org.apache.tajo.master.event.*;
+import org.apache.tajo.master.rm.TajoWorkerResourceManager;
 import org.apache.tajo.rpc.CallFuture;
 import org.apache.tajo.rpc.NettyClientBase;
-import org.apache.tajo.rpc.NullCallback;
 import org.apache.tajo.rpc.RpcConnectionPool;
-import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos;
 import org.apache.tajo.storage.AbstractStorageManager;
-import org.apache.tajo.storage.StorageManagerFactory;
-import org.apache.tajo.util.CommonTestingUtil;
-import org.apache.tajo.util.NetUtils;
-import org.apache.tajo.worker.TajoWorker;
+import org.apache.tajo.util.metrics.TajoMetrics;
+import org.apache.tajo.util.metrics.reporter.MetricsConsoleReporter;
+import org.apache.tajo.worker.AbstractResourceAllocator;
+import org.apache.tajo.worker.TajoResourceAllocator;
+import org.apache.tajo.worker.YarnResourceAllocator;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
-import static org.apache.tajo.ipc.TajoMasterProtocol.TajoHeartbeat;
-import static org.apache.tajo.ipc.TajoMasterProtocol.TajoHeartbeatResponse;
-
-// TODO - when exception, send error status to QueryJobManager
-public class QueryMaster extends CompositeService implements EventHandler {
+public class QueryMaster extends CompositeService {
   private static final Log LOG = LogFactory.getLog(QueryMaster.class.getName());
 
-  private int querySessionTimeout;
+  // query submission directory is private!
+  final public static FsPermission STAGING_DIR_PERMISSION =
+      FsPermission.createImmutable((short) 0700); // rwx--------
 
-  private Clock clock;
+  private QueryId queryId;
+
+  private QueryContext queryContext;
+
+  private QueryMasterTaskContext queryTaskContext;
+
+  private QueryMasterManager.QueryMasterContext queryMasterContext;
+
+  private Query query;
+
+  private MasterPlan masterPlan;
+
+  private String sql;
+
+  private String logicalPlanJson;
 
   private TajoAsyncDispatcher dispatcher;
 
-  private GlobalPlanner globalPlanner;
+  private final long querySubmitTime;
 
-  private AbstractStorageManager storageManager;
+  private Map<String, TableDesc> tableDescMap = new HashMap<String, TableDesc>();
 
   private TajoConf systemConf;
 
-  private Map<QueryId, QueryMasterTask> queryMasterTasks = Maps.newConcurrentMap();
+  private AtomicLong lastClientHeartbeat = new AtomicLong(-1);
 
-  private Map<QueryId, QueryMasterTask> finishedQueryMasterTasks = Maps.newConcurrentMap();
+  private AbstractResourceAllocator resourceAllocator;
 
-  private ClientSessionTimeoutCheckThread clientSessionTimeoutCheckThread;
+  private AtomicBoolean stopped = new AtomicBoolean(false);
 
-  private AtomicBoolean queryMasterStop = new AtomicBoolean(false);
+  private TajoMetrics queryMetrics;
 
-  private QueryMasterContext queryMasterContext;
-
-  private QueryHeartbeatThread queryHeartbeatThread;
-
-  private FinishedQueryMasterTaskCleanThread finishedQueryMasterTaskCleanThread;
-
-  private TajoWorker.WorkerContext workerContext;
-
-  private RpcConnectionPool connPool;
-
-  public QueryMaster(TajoWorker.WorkerContext workerContext) {
+  public QueryMaster(QueryMasterManager.QueryMasterContext queryMasterContext,
+                     QueryId queryId, QueryContext queryContext, String sql, String logicalPlanJson) {
     super(QueryMaster.class.getName());
-    this.workerContext = workerContext;
+    this.queryMasterContext = queryMasterContext;
+    this.queryId = queryId;
+    this.queryContext = queryContext;
+    this.sql = sql;
+    this.logicalPlanJson = logicalPlanJson;
+    this.querySubmitTime = System.currentTimeMillis();
   }
 
+  @Override
   public void init(Configuration conf) {
-    LOG.info("QueryMaster init");
+    systemConf = (TajoConf)conf;
+
     try {
-      this.systemConf = (TajoConf)conf;
-      this.connPool = RpcConnectionPool.getPool(systemConf);
+      queryTaskContext = new QueryMasterTaskContext();
+      String resourceManagerClassName = systemConf.getVar(TajoConf.ConfVars.RESOURCE_MANAGER_CLASS);
 
-      querySessionTimeout = systemConf.getIntVar(TajoConf.ConfVars.QUERY_SESSION_TIMEOUT);
-      queryMasterContext = new QueryMasterContext(systemConf);
+      if(resourceManagerClassName.indexOf(TajoWorkerResourceManager.class.getName()) >= 0) {
+        resourceAllocator = new TajoResourceAllocator(queryTaskContext);
+      } else {
+        resourceAllocator = new YarnResourceAllocator(queryTaskContext);
+      }
+      addService(resourceAllocator);
 
-      clock = new SystemClock();
+      dispatcher = new TajoAsyncDispatcher(queryId.toString());
+      addService(dispatcher);
 
-      this.dispatcher = new TajoAsyncDispatcher("querymaster_" + System.currentTimeMillis());
-      addIfService(dispatcher);
+      dispatcher.register(SubQueryEventType.class, new SubQueryEventDispatcher());
+      dispatcher.register(TaskEventType.class, new TaskEventDispatcher());
+      dispatcher.register(TaskAttemptEventType.class, new TaskAttemptEventDispatcher());
+      dispatcher.register(QueryFinishEvent.EventType.class, new QueryFinishEventHandler());
+      dispatcher.register(TaskSchedulerEvent.EventType.class, new TaskSchedulerDispatcher());
 
-      this.storageManager = StorageManagerFactory.getStorageManager(systemConf);
+      initStagingDir();
 
-      globalPlanner = new GlobalPlanner(systemConf, storageManager);
+      queryMetrics = new TajoMetrics(queryId.toString());
 
-      dispatcher.register(QueryStartEvent.EventType.class, new QueryStartEventHandler());
-
-    } catch (Throwable t) {
-      LOG.error(t.getMessage(), t);
-      throw new RuntimeException(t);
+      super.init(systemConf);
+    } catch (IOException e) {
+      LOG.error(e.getMessage(), e);
     }
-    super.init(conf);
+  }
+
+  public boolean isStopped() {
+    return stopped.get();
   }
 
   @Override
   public void start() {
-    LOG.info("QueryMaster start");
-
-    queryHeartbeatThread = new QueryHeartbeatThread();
-    queryHeartbeatThread.start();
-
-    clientSessionTimeoutCheckThread = new ClientSessionTimeoutCheckThread();
-    clientSessionTimeoutCheckThread.start();
-
-    finishedQueryMasterTaskCleanThread = new FinishedQueryMasterTaskCleanThread();
-    finishedQueryMasterTaskCleanThread.start();
-
+    startQuery();
     super.start();
   }
 
   @Override
   public void stop() {
-    synchronized(queryMasterStop) {
-      if(queryMasterStop.get()) {
-         return;
-      }
-
-      queryMasterStop.set(true);
-      queryMasterStop.notifyAll();
+    if(stopped.get()) {
+      return;
     }
+    stopped.set(true);
 
-    if(queryHeartbeatThread != null) {
-      queryHeartbeatThread.interrupt();
-    }
+    LOG.info("Stopping QueryMaster:" + queryId);
 
-    if(clientSessionTimeoutCheckThread != null) {
-      clientSessionTimeoutCheckThread.interrupt();
-    }
+    CallFuture future = new CallFuture();
 
-    if(finishedQueryMasterTaskCleanThread != null) {
-      finishedQueryMasterTaskCleanThread.interrupt();
-    }
-    super.stop();
-
-    LOG.info("QueryMaster stop");
-  }
-
-  private void cleanup(QueryId queryId) {
-    LOG.info("cleanup query resources : " + queryId);
-    NettyClientBase rpc = null;
-    List<TajoMasterProtocol.WorkerResourceProto> workers = getAllWorker();
-
-    for (TajoMasterProtocol.WorkerResourceProto worker : workers) {
-      try {
-        if (worker.getPeerRpcPort() == 0) continue;
-
-        rpc = connPool.getConnection(NetUtils.createSocketAddr(worker.getHost(), worker.getPeerRpcPort()),
-            TajoWorkerProtocol.class, true);
-        TajoWorkerProtocol.TajoWorkerProtocolService tajoWorkerProtocolService = rpc.getStub();
-
-        tajoWorkerProtocolService.cleanup(null, queryId.getProto(), NullCallback.get());
-      } catch (Exception e) {
-        connPool.closeConnection(rpc);
-        rpc = null;
-        LOG.error(e.getMessage());
-      } finally {
-        connPool.releaseConnection(rpc);
-      }
-    }
-  }
-
-  public List<TajoMasterProtocol.WorkerResourceProto> getAllWorker() {
-
-    NettyClientBase rpc = null;
-    try {
-      rpc = connPool.getConnection(queryMasterContext.getWorkerContext().getTajoMasterAddress(),
-          TajoMasterProtocol.class, true);
-      TajoMasterProtocol.TajoMasterProtocolService masterService = rpc.getStub();
-
-      CallFuture<TajoMasterProtocol.WorkerResourcesRequest> callBack =
-          new CallFuture<TajoMasterProtocol.WorkerResourcesRequest>();
-      masterService.getAllWorkerResource(callBack.getController(),
-          PrimitiveProtos.NullProto.getDefaultInstance(), callBack);
-
-      TajoMasterProtocol.WorkerResourcesRequest workerResourcesRequest = callBack.get(2, TimeUnit.SECONDS);
-      return workerResourcesRequest.getWorkerResourcesList();
-    } catch (Exception e) {
-      connPool.closeConnection(rpc);
-      rpc = null;
-      LOG.error(e.getMessage(), e);
-    } finally {
-      connPool.releaseConnection(rpc);
-    }
-    return new ArrayList<TajoMasterProtocol.WorkerResourceProto>();
-  }
-
-  public void reportQueryStatusToQueryMaster(QueryId queryId, TajoProtos.QueryState state) {
-    LOG.info("Send QueryMaster Ready to QueryJobManager:" + queryId);
+    RpcConnectionPool connPool = RpcConnectionPool.getPool(queryMasterContext.getConf());
     NettyClientBase tmClient = null;
     try {
       tmClient = connPool.getConnection(queryMasterContext.getWorkerContext().getTajoMasterAddress(),
           TajoMasterProtocol.class, true);
       TajoMasterProtocol.TajoMasterProtocolService masterClientService = tmClient.getStub();
-
-      TajoHeartbeat.Builder queryHeartbeatBuilder = TajoHeartbeat.newBuilder()
-          .setTajoWorkerHost(workerContext.getQueryMasterManagerService().getBindAddr().getHostName())
-          .setPeerRpcPort(workerContext.getPeerRpcPort())
-          .setTajoQueryMasterPort(workerContext.getQueryMasterManagerService().getBindAddr().getPort())
-          .setTajoWorkerClientPort(workerContext.getTajoWorkerClientService().getBindAddr().getPort())
-          .setState(state)
-          .setQueryId(queryId.getProto());
-
-      CallFuture<TajoHeartbeatResponse> callBack =
-          new CallFuture<TajoHeartbeatResponse>();
-
-      masterClientService.heartbeat(callBack.getController(), queryHeartbeatBuilder.build(), callBack);
+      masterClientService.stopQueryMaster(null, queryId.getProto(), future);
     } catch (Exception e) {
       connPool.closeConnection(tmClient);
       tmClient = null;
@@ -241,258 +183,337 @@ public class QueryMaster extends CompositeService implements EventHandler {
     } finally {
       connPool.releaseConnection(tmClient);
     }
+
+    try {
+      future.get(3, TimeUnit.SECONDS);
+    } catch (Throwable t) {
+      LOG.warn(t);
+    }
+
+    super.stop();
+
+    //TODO change report to tajo master
+    queryMetrics.report(new MetricsConsoleReporter());
+
+    LOG.info("Stopped QueryMaster:" + queryId);
   }
 
-  @Override
-  public void handle(Event event) {
-    dispatcher.getEventHandler().handle(event);
+  public void handleTaskRequestEvent(TaskRequestEvent event) {
+    ExecutionBlockId id = event.getExecutionBlockId();
+    query.getSubQuery(id).handleTaskRequestEvent(event);
   }
 
-  public Query getQuery(QueryId queryId) {
-    return queryMasterTasks.get(queryId).getQuery();
-  }
-
-  public QueryMasterTask getQueryMasterTask(QueryId queryId) {
-    return queryMasterTasks.get(queryId);
-  }
-
-  public QueryMasterTask getQueryMasterTask(QueryId queryId, boolean includeFinished) {
-    QueryMasterTask queryMasterTask =  queryMasterTasks.get(queryId);
-    if(queryMasterTask != null) {
-      return queryMasterTask;
-    } else {
-      if(includeFinished) {
-        return finishedQueryMasterTasks.get(queryId);
-      } else {
-        return null;
+  private class SubQueryEventDispatcher implements EventHandler<SubQueryEvent> {
+    public void handle(SubQueryEvent event) {
+      ExecutionBlockId id = event.getSubQueryId();
+      if(LOG.isDebugEnabled()) {
+        LOG.debug("SubQueryEventDispatcher:" + id + "," + event.getType());
       }
+      //Query query = queryMasterTasks.get(id.getQueryId()).getQuery();
+      query.getSubQuery(id).handle(event);
     }
   }
 
-  public QueryMasterContext getContext() {
-    return this.queryMasterContext;
+  private class TaskEventDispatcher
+      implements EventHandler<TaskEvent> {
+    public void handle(TaskEvent event) {
+      QueryUnitId taskId = event.getTaskId();
+      if(LOG.isDebugEnabled()) {
+        LOG.debug("TaskEventDispatcher>" + taskId + "," + event.getType());
+      }
+      //Query query = queryMasterTasks.get(taskId.getExecutionBlockId().getQueryId()).getQuery();
+      QueryUnit task = query.getSubQuery(taskId.getExecutionBlockId()).
+          getQueryUnit(taskId);
+      task.handle(event);
+    }
   }
 
-  public Collection<QueryMasterTask> getQueryMasterTasks() {
-    return queryMasterTasks.values();
+  private class TaskAttemptEventDispatcher
+      implements EventHandler<TaskAttemptEvent> {
+    public void handle(TaskAttemptEvent event) {
+      QueryUnitAttemptId attemptId = event.getTaskAttemptId();
+      //Query query = queryMasterTasks.get(attemptId.getQueryUnitId().getExecutionBlockId().getQueryId()).getQuery();
+      SubQuery subQuery = query.getSubQuery(attemptId.getQueryUnitId().getExecutionBlockId());
+      QueryUnit task = subQuery.getQueryUnit(attemptId.getQueryUnitId());
+      QueryUnitAttempt attempt = task.getAttempt(attemptId);
+      attempt.handle(event);
+    }
   }
 
-  public Collection<QueryMasterTask> getFinishedQueryMasterTasks() {
-    return finishedQueryMasterTasks.values();
+  private class TaskSchedulerDispatcher
+      implements EventHandler<TaskSchedulerEvent> {
+    public void handle(TaskSchedulerEvent event) {
+      //Query query = queryMasterTasks.get(event.getExecutionBlockId().getQueryId()).getQuery();
+      SubQuery subQuery = query.getSubQuery(event.getExecutionBlockId());
+      subQuery.getTaskScheduler().handle(event);
+    }
   }
 
-  public class QueryMasterContext {
-    private TajoConf conf;
+  private class QueryFinishEventHandler implements EventHandler<QueryFinishEvent> {
+    @Override
+    public void handle(QueryFinishEvent event) {
+      QueryId queryId = event.getQueryId();
+      LOG.info("Query end notification started for QueryId : " + queryId);
+      //QueryMaster must be lived until client fetching all query result data.
+    }
+  }
 
-    public QueryMasterContext(TajoConf conf) {
-      this.conf = conf;
+  public synchronized void startQuery() {
+    if(query != null) {
+      LOG.warn("Query already started");
+      return;
+    }
+
+    CatalogService catalog = getQueryTaskContext().getQueryMasterContext().getWorkerContext().getCatalog();
+    LogicalPlanner planner = new LogicalPlanner(catalog);
+    LogicalOptimizer optimizer = new LogicalOptimizer(systemConf);
+    Expr expr;
+    if (queryContext.isHiveQueryMode()) {
+      HiveConverter hiveConverter = new HiveConverter();
+      expr = hiveConverter.parse(sql);
+    } else {
+      SQLAnalyzer analyzer = new SQLAnalyzer();
+      expr = analyzer.parse(sql);
+    }
+    LogicalPlan plan = null;
+    try {
+      plan = planner.createPlan(expr);
+      optimizer.optimize(plan);
+    } catch (PlanningException e) {
+      e.printStackTrace();
+    }
+
+    GlobalEngine.DistributedQueryHookManager hookManager = new GlobalEngine.DistributedQueryHookManager();
+    hookManager.addHook(new GlobalEngine.InsertHook());
+    hookManager.doHooks(queryContext, plan);
+
+    try {
+
+      for (LogicalPlan.QueryBlock block : plan.getQueryBlocks()) {
+        LogicalNode[] scanNodes = PlannerUtil.findAllNodes(block.getRoot(), NodeType.SCAN);
+        if(scanNodes != null) {
+          for(LogicalNode eachScanNode: scanNodes) {
+            ScanNode scanNode = (ScanNode)eachScanNode;
+            tableDescMap.put(scanNode.getCanonicalName(), scanNode.getTableDesc());
+          }
+        }
+
+        scanNodes = PlannerUtil.findAllNodes(block.getRoot(), NodeType.PARTITIONS_SCAN);
+        if(scanNodes != null) {
+          for(LogicalNode eachScanNode: scanNodes) {
+            ScanNode scanNode = (ScanNode)eachScanNode;
+            tableDescMap.put(scanNode.getCanonicalName(), scanNode.getTableDesc());
+          }
+        }
+      }
+
+      MasterPlan masterPlan = new MasterPlan(queryId, queryContext, plan);
+      queryMasterContext.getGlobalPlanner().build(masterPlan);
+      //this.masterPlan = queryMasterContext.getGlobalOptimizer().optimize(masterPlan);
+
+      query = new Query(queryTaskContext, queryId, querySubmitTime,
+          "", queryTaskContext.getEventHandler(), masterPlan);
+
+      dispatcher.register(QueryEventType.class, query);
+
+      queryTaskContext.getEventHandler().handle(new QueryEvent(queryId, QueryEventType.START));
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      //TODO how set query failed(???)
+      //send FAIL query status
+      //this.statusMessage = StringUtils.stringifyException(e);
+    }
+  }
+
+  /**
+   * It initializes the final output and staging directory and sets
+   * them to variables.
+   */
+  private void initStagingDir() throws IOException {
+
+    String realUser;
+    String currentUser;
+    UserGroupInformation ugi;
+    ugi = UserGroupInformation.getLoginUser();
+    realUser = ugi.getShortUserName();
+    currentUser = UserGroupInformation.getCurrentUser().getShortUserName();
+    FileSystem defaultFS = TajoConf.getWarehouseDir(systemConf).getFileSystem(systemConf);
+
+    Path stagingDir = null;
+    Path outputDir = null;
+    try {
+      ////////////////////////////////////////////
+      // Create Output Directory
+      ////////////////////////////////////////////
+
+      stagingDir = new Path(TajoConf.getStagingDir(systemConf), queryId.toString());
+
+      if (defaultFS.exists(stagingDir)) {
+        throw new IOException("The staging directory '" + stagingDir + "' already exists");
+      }
+      defaultFS.mkdirs(stagingDir, new FsPermission(STAGING_DIR_PERMISSION));
+      FileStatus fsStatus = defaultFS.getFileStatus(stagingDir);
+      String owner = fsStatus.getOwner();
+
+      if (!(owner.equals(currentUser) || owner.equals(realUser))) {
+        throw new IOException("The ownership on the user's query " +
+            "directory " + stagingDir + " is not as expected. " +
+            "It is owned by " + owner + ". The directory must " +
+            "be owned by the submitter " + currentUser + " or " +
+            "by " + realUser);
+      }
+
+      if (!fsStatus.getPermission().equals(STAGING_DIR_PERMISSION)) {
+        LOG.info("Permissions on staging directory " + stagingDir + " are " +
+            "incorrect: " + fsStatus.getPermission() + ". Fixing permissions " +
+            "to correct value " + STAGING_DIR_PERMISSION);
+        defaultFS.setPermission(stagingDir, new FsPermission(STAGING_DIR_PERMISSION));
+      }
+
+      // Create a subdirectories
+      defaultFS.mkdirs(new Path(stagingDir, TajoConstants.RESULT_DIR_NAME));
+      LOG.info("The staging dir '" + outputDir + "' is created.");
+      queryContext.setStagingDir(stagingDir);
+
+      /////////////////////////////////////////////////
+      // Check and Create Output Directory If Necessary
+      /////////////////////////////////////////////////
+      if (queryContext.hasOutputPath()) {
+        outputDir = queryContext.getOutputPath();
+        if (queryContext.isOutputOverwrite()) {
+          if (defaultFS.exists(outputDir.getParent())) {
+            if (defaultFS.exists(outputDir)) {
+              defaultFS.delete(outputDir, true);
+              LOG.info("The output directory '" + outputDir + "' is cleaned.");
+            }
+          } else {
+            defaultFS.mkdirs(outputDir.getParent());
+            LOG.info("The output directory's parent '" + outputDir.getParent() + "' is created.");
+          }
+        } else {
+          if (defaultFS.exists(outputDir)) {
+            throw new IOException("The output directory '" + outputDir + " already exists.");
+          }
+        }
+      }
+    } catch (IOException ioe) {
+      if (stagingDir != null && defaultFS.exists(stagingDir)) {
+        defaultFS.delete(stagingDir, true);
+        LOG.info("The staging directory '" + stagingDir + "' is deleted");
+      }
+
+      if (outputDir != null && defaultFS.exists(outputDir)) {
+        defaultFS.delete(outputDir, true);
+        LOG.info("The output directory '" + outputDir + "' is deleted");
+      }
+
+      throw ioe;
+    }
+  }
+
+  public Query getQuery() {
+    return query;
+  }
+
+  public void expiredSessionTimeout() {
+    stop();
+  }
+
+  public QueryMasterTaskContext getQueryTaskContext() {
+    return queryTaskContext;
+  }
+
+  public EventHandler getEventHandler() {
+    return queryTaskContext.getEventHandler();
+  }
+
+  public void touchSessionTime() {
+    this.lastClientHeartbeat.set(System.currentTimeMillis());
+  }
+
+  public long getLastClientHeartbeat() {
+    return this.lastClientHeartbeat.get();
+  }
+
+  public QueryId getQueryId() {
+    return queryId;
+  }
+
+  public TajoProtos.QueryState getState() {
+    if(query == null) {
+      return TajoProtos.QueryState.QUERY_NOT_ASSIGNED;
+    } else {
+      return query.getState();
+    }
+  }
+
+  public class QueryMasterTaskContext {
+    EventHandler eventHandler;
+    public QueryMasterManager.QueryMasterContext getQueryMasterContext() {
+      return queryMasterContext;
+    }
+
+    public QueryContext getQueryContext() {
+      return queryContext;
     }
 
     public TajoConf getConf() {
-      return conf;
+      return systemConf;
+    }
+
+    public Clock getClock() {
+      return queryMasterContext.getClock();
+    }
+
+    public Query getQuery() {
+      return query;
+    }
+
+    public QueryId getQueryId() {
+      return queryId;
+    }
+
+    public AbstractStorageManager getStorageManager() {
+      return queryMasterContext.getStorageManager();
+    }
+
+    public Path getStagingDir() {
+      return queryContext.getStagingDir();
+    }
+
+    public synchronized EventHandler getEventHandler() {
+      if(eventHandler == null) {
+        eventHandler = dispatcher.getEventHandler();
+      }
+      return eventHandler;
     }
 
     public TajoAsyncDispatcher getDispatcher() {
       return dispatcher;
     }
 
-    public Clock getClock() {
-      return clock;
+    public SubQuery getSubQuery(ExecutionBlockId id) {
+      return query.getSubQuery(id);
     }
 
-    public AbstractStorageManager getStorageManager() {
-      return storageManager;
+    public Map<String, TableDesc> getTableDescMap() {
+      return tableDescMap;
     }
 
-    public QueryMaster getQueryMaster() {
-      return QueryMaster.this;
-    }
-
-    public GlobalPlanner getGlobalPlanner() {
-      return globalPlanner;
-    }
-
-    public TajoWorker.WorkerContext getWorkerContext() {
-      return workerContext;
-    }
-
-    public EventHandler getEventHandler() {
-      return dispatcher.getEventHandler();
-    }
-
-    public void stopQuery(QueryId queryId) {
-      QueryMasterTask queryMasterTask;
-      queryMasterTask = queryMasterTasks.remove(queryId);
-      finishedQueryMasterTasks.put(queryId, queryMasterTask);
-
-      if(queryMasterTask != null) {
-        TajoHeartbeat queryHeartbeat = buildTajoHeartBeat(queryMasterTask);
-        CallFuture<TajoHeartbeatResponse> future = new CallFuture<TajoHeartbeatResponse>();
-
-        NettyClientBase tmClient = null;
-        try {
-          tmClient = connPool.getConnection(queryMasterContext.getWorkerContext().getTajoMasterAddress(),
-              TajoMasterProtocol.class, true);
-          TajoMasterProtocol.TajoMasterProtocolService masterClientService = tmClient.getStub();
-          masterClientService.heartbeat(future.getController(), queryHeartbeat, future);
-        } catch (Exception e) {
-          connPool.closeConnection(tmClient);
-          tmClient = null;
-          LOG.error(e.getMessage(), e);
-        } finally {
-          connPool.releaseConnection(tmClient);
-        }
-
-        try {
-          queryMasterTask.stop();
-          if (!systemConf.get(CommonTestingUtil.TAJO_TEST, "FALSE").equalsIgnoreCase("TRUE")) {
-            cleanup(queryId);
-          }
-        } catch (Exception e) {
-          LOG.error(e.getMessage(), e);
-        }
-      } else {
-        LOG.warn("No query info:" + queryId);
+    public float getProgress() {
+      if(query == null) {
+        return 0.0f;
       }
+      return query.getProgress();
+    }
+
+    public AbstractResourceAllocator getResourceAllocator() {
+      return resourceAllocator;
+    }
+
+    public TajoMetrics getQueryMetrics() {
+      return queryMetrics;
     }
   }
 
-  private TajoHeartbeat buildTajoHeartBeat(QueryMasterTask queryMasterTask) {
-    TajoHeartbeat queryHeartbeat = TajoHeartbeat.newBuilder()
-        .setTajoWorkerHost(workerContext.getQueryMasterManagerService().getBindAddr().getHostName())
-        .setTajoQueryMasterPort(workerContext.getQueryMasterManagerService().getBindAddr().getPort())
-        .setPeerRpcPort(workerContext.getPeerRpcPort())
-        .setTajoWorkerClientPort(workerContext.getTajoWorkerClientService().getBindAddr().getPort())
-        .setState(queryMasterTask.getState())
-        .setQueryId(queryMasterTask.getQueryId().getProto())
-        .setQueryProgress(queryMasterTask.getQuery().getProgress())
-        .setQueryFinishTime(queryMasterTask.getQuery().getFinishTime())
-        .build();
-    return queryHeartbeat;
-  }
-
-  private class QueryStartEventHandler implements EventHandler<QueryStartEvent> {
-    @Override
-    public void handle(QueryStartEvent event) {
-      LOG.info("Start QueryStartEventHandler:" + event.getQueryId());
-      QueryMasterTask queryMasterTask = new QueryMasterTask(queryMasterContext,
-          event.getQueryId(), event.getQueryContext(), event.getSql(), event.getLogicalPlanJson());
-
-      queryMasterTask.init(systemConf);
-      queryMasterTask.start();
-      synchronized(queryMasterTasks) {
-        queryMasterTasks.put(event.getQueryId(), queryMasterTask);
-      }
-    }
-  }
-
-  class QueryHeartbeatThread extends Thread {
-    public QueryHeartbeatThread() {
-      super("QueryHeartbeatThread");
-    }
-
-    @Override
-    public void run() {
-      LOG.info("Start QueryMaster heartbeat thread");
-      while(!queryMasterStop.get()) {
-        List<QueryMasterTask> tempTasks = new ArrayList<QueryMasterTask>();
-        synchronized(queryMasterTasks) {
-          tempTasks.addAll(queryMasterTasks.values());
-        }
-        synchronized(queryMasterTasks) {
-          for(QueryMasterTask eachTask: tempTasks) {
-            NettyClientBase tmClient;
-            try {
-              tmClient = connPool.getConnection(queryMasterContext.getWorkerContext().getTajoMasterAddress(),
-                  TajoMasterProtocol.class, true);
-              TajoMasterProtocol.TajoMasterProtocolService masterClientService = tmClient.getStub();
-
-              CallFuture<TajoHeartbeatResponse> callBack =
-                  new CallFuture<TajoHeartbeatResponse>();
-
-              TajoHeartbeat queryHeartbeat = buildTajoHeartBeat(eachTask);
-              masterClientService.heartbeat(callBack.getController(), queryHeartbeat, callBack);
-            } catch (Throwable t) {
-              t.printStackTrace();
-            }
-          }
-        }
-        synchronized(queryMasterStop) {
-          try {
-            queryMasterStop.wait(2000);
-          } catch (InterruptedException e) {
-            break;
-          }
-        }
-      }
-      LOG.info("QueryMaster heartbeat thread stopped");
-    }
-  }
-
-  class ClientSessionTimeoutCheckThread extends Thread {
-    public void run() {
-      LOG.info("ClientSessionTimeoutCheckThread started");
-      while(!queryMasterStop.get()) {
-        try {
-          Thread.sleep(1000);
-        } catch (InterruptedException e) {
-          break;
-        }
-        List<QueryMasterTask> tempTasks = new ArrayList<QueryMasterTask>();
-        synchronized(queryMasterTasks) {
-          tempTasks.addAll(queryMasterTasks.values());
-        }
-
-        for(QueryMasterTask eachTask: tempTasks) {
-          if(!eachTask.isStopped()) {
-            try {
-              long lastHeartbeat = eachTask.getLastClientHeartbeat();
-              long time = System.currentTimeMillis() - lastHeartbeat;
-              if(lastHeartbeat > 0 && time > querySessionTimeout * 1000) {
-                LOG.warn("Query " + eachTask.getQueryId() + " stopped cause query sesstion timeout: " + time + " ms");
-                eachTask.expiredSessionTimeout();
-              }
-            } catch (Exception e) {
-              LOG.error(eachTask.getQueryId() + ":" + e.getMessage(), e);
-            }
-          }
-        }
-      }
-    }
-  }
-
-  class FinishedQueryMasterTaskCleanThread extends Thread {
-    public void run() {
-      int expireIntervalTime = systemConf.getIntVar(TajoConf.ConfVars.WORKER_HISTORY_EXPIRE_PERIOD);
-      LOG.info("FinishedQueryMasterTaskCleanThread started: expire interval minutes = " + expireIntervalTime);
-      while(!queryMasterStop.get()) {
-        try {
-          Thread.sleep(60 * 1000 * 60);   // hourly
-        } catch (InterruptedException e) {
-          break;
-        }
-        try {
-          long expireTime = System.currentTimeMillis() - expireIntervalTime * 60 * 1000;
-          cleanExpiredFinishedQueryMasterTask(expireTime);
-        } catch (Exception e) {
-          LOG.error(e.getMessage(), e);
-        }
-      }
-    }
-
-    private void cleanExpiredFinishedQueryMasterTask(long expireTime) {
-      synchronized(finishedQueryMasterTasks) {
-        List<QueryId> expiredQueryIds = new ArrayList<QueryId>();
-        for(Map.Entry<QueryId, QueryMasterTask> entry: finishedQueryMasterTasks.entrySet()) {
-          if(entry.getValue().getStartTime() < expireTime) {
-            expiredQueryIds.add(entry.getKey());
-          }
-        }
-
-        for(QueryId eachId: expiredQueryIds) {
-          finishedQueryMasterTasks.remove(eachId);
-        }
-      }
-    }
-  }
 }

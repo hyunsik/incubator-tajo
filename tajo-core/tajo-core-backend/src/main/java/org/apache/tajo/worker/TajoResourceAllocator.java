@@ -21,10 +21,6 @@ package org.apache.tajo.worker;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -42,7 +38,7 @@ import org.apache.tajo.master.TaskRunnerLauncher;
 import org.apache.tajo.master.event.ContainerAllocationEvent;
 import org.apache.tajo.master.event.ContainerAllocatorEventType;
 import org.apache.tajo.master.event.SubQueryContainerAllocationEvent;
-import org.apache.tajo.master.querymaster.QueryMasterTask;
+import org.apache.tajo.master.querymaster.QueryMaster;
 import org.apache.tajo.master.querymaster.SubQuery;
 import org.apache.tajo.master.querymaster.SubQueryState;
 import org.apache.tajo.master.rm.TajoWorkerContainer;
@@ -53,7 +49,6 @@ import org.apache.tajo.rpc.NettyClientBase;
 import org.apache.tajo.rpc.RpcConnectionPool;
 import org.apache.tajo.util.ApplicationIdUtils;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -63,18 +58,17 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class TajoResourceAllocator extends AbstractResourceAllocator {
   private static final Log LOG = LogFactory.getLog(TajoResourceAllocator.class);
 
   private TajoConf tajoConf;
-  private QueryMasterTask.QueryMasterTaskContext queryTaskContext;
+  private QueryMaster.QueryMasterTaskContext queryTaskContext;
   private final ExecutorService executorService;
 
   private AtomicBoolean stopped = new AtomicBoolean(false);
 
-  public TajoResourceAllocator(QueryMasterTask.QueryMasterTaskContext queryTaskContext) {
+  public TajoResourceAllocator(QueryMaster.QueryMasterTaskContext queryTaskContext) {
     this.queryTaskContext = queryTaskContext;
     executorService = Executors.newFixedThreadPool(
         queryTaskContext.getConf().getIntVar(TajoConf.ConfVars.YARN_RM_TASKRUNNER_LAUNCH_PARALLEL_NUM));

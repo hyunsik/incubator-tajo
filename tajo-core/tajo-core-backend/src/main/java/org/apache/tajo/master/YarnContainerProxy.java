@@ -41,7 +41,7 @@ import org.apache.hadoop.yarn.util.Records;
 import org.apache.tajo.ExecutionBlockId;
 import org.apache.tajo.TajoConstants;
 import org.apache.tajo.conf.TajoConf;
-import org.apache.tajo.master.querymaster.QueryMasterTask;
+import org.apache.tajo.master.querymaster.QueryMaster;
 import org.apache.tajo.pullserver.PullServerAuxService;
 import org.apache.tajo.worker.TajoWorker;
 
@@ -58,7 +58,7 @@ public class YarnContainerProxy extends ContainerProxy {
   final protected String containerMgrAddress;
   protected Token containerToken;
 
-  public YarnContainerProxy(QueryMasterTask.QueryMasterTaskContext context, Configuration conf, YarnRPC yarnRPC,
+  public YarnContainerProxy(QueryMaster.QueryMasterTaskContext context, Configuration conf, YarnRPC yarnRPC,
                                   Container container, ExecutionBlockId executionBlockId) {
     super(context, conf, executionBlockId, container);
     this.yarnRPC = yarnRPC;
