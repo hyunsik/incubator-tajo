@@ -68,7 +68,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class TajoResourceAllocator extends AbstractResourceAllocator {
   private static final Log LOG = LogFactory.getLog(TajoResourceAllocator.class);
 
-  static AtomicInteger containerIdSeq = new AtomicInteger(0);
   private TajoConf tajoConf;
   private QueryMasterTask.QueryMasterTaskContext queryTaskContext;
   private final ExecutorService executorService;
@@ -107,11 +106,8 @@ public class TajoResourceAllocator extends AbstractResourceAllocator {
   @Override
   public void init(Configuration conf) {
     tajoConf = (TajoConf)conf;
-
     queryTaskContext.getDispatcher().register(TaskRunnerGroupEvent.EventType.class, new TajoTaskRunnerLauncher());
-//
     queryTaskContext.getDispatcher().register(ContainerAllocatorEventType.class, new TajoWorkerAllocationHandler());
-
     super.init(conf);
   }
 
@@ -137,23 +133,6 @@ public class TajoResourceAllocator extends AbstractResourceAllocator {
   @Override
   public void start() {
     super.start();
-  }
-
-  final public static FsPermission QUERYCONF_FILE_PERMISSION =
-      FsPermission.createImmutable((short) 0644); // rw-r--r--
-
-  private static void writeConf(Configuration conf, Path queryConfFile)
-      throws IOException {
-    // Write job file to Tajo's fs
-    FileSystem fs = queryConfFile.getFileSystem(conf);
-    FSDataOutputStream out =
-        FileSystem.create(fs, queryConfFile,
-            new FsPermission(QUERYCONF_FILE_PERMISSION));
-    try {
-      conf.writeXml(out);
-    } finally {
-      out.close();
-    }
   }
 
   class TajoTaskRunnerLauncher implements TaskRunnerLauncher {

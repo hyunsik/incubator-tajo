@@ -23,7 +23,7 @@ import com.google.protobuf.RpcController;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.service.CompositeService;
+import org.apache.hadoop.service.AbstractService;
 import org.apache.tajo.QueryId;
 import org.apache.tajo.TajoIdProtos;
 import org.apache.tajo.conf.TajoConf;
@@ -34,7 +34,10 @@ import org.apache.tajo.util.NetUtils;
 
 import java.net.InetSocketAddress;
 
-public class TajoWorkerManagerService extends CompositeService
+/**
+ * It allocates containers for allocated resources.
+ */
+public class TajoWorkerManagerService extends AbstractService
     implements TajoWorkerProtocol.TajoWorkerProtocolService.Interface {
   private static final Log LOG = LogFactory.getLog(TajoWorkerManagerService.class.getName());
 
@@ -56,8 +59,7 @@ public class TajoWorkerManagerService extends CompositeService
     TajoConf tajoConf = (TajoConf) conf;
     try {
       // Setup RPC server
-      InetSocketAddress initIsa =
-          new InetSocketAddress("0.0.0.0", port);
+      InetSocketAddress initIsa = new InetSocketAddress("0.0.0.0", port);
       if (initIsa.getAddress() == null) {
         throw new IllegalArgumentException("Failed resolve of " + initIsa);
       }

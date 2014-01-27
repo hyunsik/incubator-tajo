@@ -80,9 +80,6 @@ public class TaskRunnerManager extends CompositeService {
       finishedTaskCleanThread.interrupted();
     }
     super.stop();
-    if(workerContext.isYarnContainerMode()) {
-      workerContext.stopWorker(true);
-    }
   }
 
   public void stopTask(String id) {
@@ -92,9 +89,6 @@ public class TaskRunnerManager extends CompositeService {
       if(taskRunner != null) {
         finishedTaskRunnerMap.put(id, taskRunner);
       }
-    }
-    if(workerContext.isYarnContainerMode()) {
-      stop();
     }
   }
 
@@ -179,7 +173,6 @@ public class TaskRunnerManager extends CompositeService {
   }
 
   public void startTask(final String[] params) {
-    //TODO change to use event dispatcher
     Thread t = new Thread() {
       public void run() {
         try {

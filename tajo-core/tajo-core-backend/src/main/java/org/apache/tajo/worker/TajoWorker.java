@@ -30,9 +30,7 @@ import org.apache.hadoop.fs.shell.PathData;
 import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.util.RackResolver;
-import org.apache.tajo.QueryId;
 import org.apache.tajo.TajoConstants;
-import org.apache.tajo.TajoProtos;
 import org.apache.tajo.catalog.CatalogClient;
 import org.apache.tajo.catalog.CatalogService;
 import org.apache.tajo.conf.TajoConf;
@@ -50,7 +48,6 @@ import org.apache.tajo.storage.v2.DiskMountInfo;
 import org.apache.tajo.storage.v2.DiskUtil;
 import org.apache.tajo.util.CommonTestingUtil;
 import org.apache.tajo.util.NetUtils;
-import org.apache.tajo.util.TajoIdUtils;
 import org.apache.tajo.util.metrics.TajoSystemMetrics;
 import org.apache.tajo.webapp.StaticHttpServer;
 
@@ -99,8 +96,6 @@ public class TajoWorker extends CompositeService {
 
   private TajoPullServerService pullService;
 
-  private boolean yarnContainerMode;
-
   private boolean queryMasterMode;
 
   private boolean taskRunnerMode;
@@ -145,17 +140,9 @@ public class TajoWorker extends CompositeService {
       if(WORKER_MODE_STANDBY.equals(args[0])) {
         queryMasterMode = true;
         taskRunnerMode = true;
-      } else if(WORKER_MODE_YARN_TASKRUNNER.equals(args[0])) {
-        yarnContainerMode = true;
-        queryMasterMode = true;
-      } else if(WORKER_MODE_YARN_QUERYMASTER.equals(args[0])) {
-        yarnContainerMode = true;
-        taskRunnerMode = true;
       } else if(WORKER_MODE_QUERY_MASTER.equals(args[0])) {
-        yarnContainerMode = false;
         queryMasterMode = true;
       } else {
-        yarnContainerMode = false;
         taskRunnerMode = true;
       }
     }
@@ -206,63 +193,50 @@ public class TajoWorker extends CompositeService {
       taskRunnerManager = new TaskRunnerManager(workerContext);
       addService(taskRunnerManager);
 
-      if(!yarnContainerMode) {
-        tajoWorkerManagerService = new TajoWorkerManagerService(workerContext, peerRpcPort);
-        addService(tajoWorkerManagerService);
-      }
+
+      tajoWorkerManagerService = new TajoWorkerManagerService(workerContext, peerRpcPort);
+      addService(tajoWorkerManagerService);
     }
 
     LOG.info("Tajo Worker started: queryMaster=" + queryMasterMode + " taskRunner=" + taskRunnerMode +
-        ",yarnContainer=" + yarnContainerMode + ", clientPort=" + clientPort +
+        ", clientPort=" + clientPort +
         ", peerRpcPort=" + peerRpcPort + ":" + qmManagerPort);
 
-    if(!yarnContainerMode) {
-      if(taskRunnerMode) {
-        pullService = new TajoPullServerService();
-        addService(pullService);
-      }
 
-      if (!systemConf.get(CommonTestingUtil.TAJO_TEST, "FALSE").equalsIgnoreCase("TRUE")) {
-        try {
-          httpPort = systemConf.getSocketAddrVar(ConfVars.WORKER_INFO_ADDRESS).getPort();
-          if(queryMasterMode && !taskRunnerMode) {
-            //If QueryMaster and TaskRunner run on single host, http port conflicts
-            httpPort = systemConf.getSocketAddrVar(ConfVars.WORKER_QM_INFO_ADDRESS).getPort();
-          }
-          webServer = StaticHttpServer.getInstance(this ,"worker", null, httpPort ,
-              true, null, systemConf, null);
-          webServer.start();
-          httpPort = webServer.getPort();
-          LOG.info("Worker info server started:" + httpPort);
+    if(taskRunnerMode) {
+      pullService = new TajoPullServerService();
+      addService(pullService);
+    }
 
-          deletionService = new DeletionService(getMountPath().size(), 0);
-          if(systemConf.getBoolVar(ConfVars.WORKER_TEMPORAL_DIR_CLEANUP)){
-            getWorkerContext().cleanupTemporalDirectories();
-          }
-        } catch (IOException e) {
-          LOG.error(e.getMessage(), e);
+    if (!systemConf.get(CommonTestingUtil.TAJO_TEST, "FALSE").equalsIgnoreCase("TRUE")) {
+      try {
+        httpPort = systemConf.getSocketAddrVar(ConfVars.WORKER_INFO_ADDRESS).getPort();
+        if(queryMasterMode && !taskRunnerMode) {
+          //If QueryMaster and TaskRunner run on single host, http port conflicts
+          httpPort = systemConf.getSocketAddrVar(ConfVars.WORKER_QM_INFO_ADDRESS).getPort();
         }
+        webServer = StaticHttpServer.getInstance(this ,"worker", null, httpPort ,
+            true, null, systemConf, null);
+        webServer.start();
+        httpPort = webServer.getPort();
+        LOG.info("Worker info server started:" + httpPort);
+
+        deletionService = new DeletionService(getMountPath().size(), 0);
+        if(systemConf.getBoolVar(ConfVars.WORKER_TEMPORAL_DIR_CLEANUP)){
+          getWorkerContext().cleanupTemporalDirectories();
+        }
+      } catch (IOException e) {
+        LOG.error(e.getMessage(), e);
       }
     }
+
 
     super.init(conf);
 
-    if(yarnContainerMode && queryMasterMode) {
-      tajoMasterAddress = NetUtils.createSocketAddr(cmdArgs[2]);
-      connectToCatalog();
-
-      QueryId queryId = TajoIdUtils.parseQueryId(cmdArgs[1]);
-      queryMasterManagerService.getQueryMaster().reportQueryStatusToQueryMaster(
-          queryId, TajoProtos.QueryState.QUERY_MASTER_LAUNCHED);
-    } else if(yarnContainerMode && taskRunnerMode) { //TaskRunner mode
-      taskRunnerManager.startTask(cmdArgs);
-    } else {
-      tajoMasterAddress = NetUtils.createSocketAddr(systemConf.getVar(ConfVars.TAJO_MASTER_UMBILICAL_RPC_ADDRESS));
-      connectToCatalog();
-      workerHeartbeatThread = new WorkerHeartbeatThread();
-      workerHeartbeatThread.start();
-    }
-
+    tajoMasterAddress = NetUtils.createSocketAddr(systemConf.getVar(ConfVars.TAJO_MASTER_UMBILICAL_RPC_ADDRESS));
+    connectToCatalog();
+    workerHeartbeatThread = new WorkerHeartbeatThread();
+    workerHeartbeatThread.start();
   }
 
   private void initWorkerMetrics() {
@@ -429,10 +403,6 @@ public class TajoWorker extends CompositeService {
       }
     }
 
-    public boolean isYarnContainerMode() {
-      return yarnContainerMode;
-    }
-
     public void setNumClusterNodes(int numClusterNodes) {
       TajoWorker.this.numClusterNodes.set(numClusterNodes);
     }
@@ -498,7 +468,6 @@ public class TajoWorker extends CompositeService {
       int workerCpuCoreNum;
 
       boolean dedicatedResource = systemConf.getBoolVar(ConfVars.WORKER_RESOURCE_DEDICATED);
-      int workerCpuCoreSlots = Runtime.getRuntime().availableProcessors();
 
       try {
         diskDeviceInfos = DiskUtil.getDiskDeviceInfos();

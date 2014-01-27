@@ -43,8 +43,7 @@ public class AsyncRpcClient extends NettyClientBase {
   private final ProxyRpcChannel rpcChannel;
 
   private final AtomicInteger sequence = new AtomicInteger(0);
-  private final Map<Integer, ResponseCallback> requests =
-      new ConcurrentHashMap<Integer, ResponseCallback>();
+  private final Map<Integer, ResponseCallback> requests = new ConcurrentHashMap<Integer, ResponseCallback>();
 
   private final Class<?> protocol;
   private final Method stubMethod;
@@ -66,8 +65,7 @@ public class AsyncRpcClient extends NettyClientBase {
     stubMethod = serviceClass.getMethod("newStub", RpcChannel.class);
 
     this.handler = new ClientChannelUpstreamHandler();
-    pipeFactory = new ProtoPipelineFactory(handler,
-        RpcResponse.getDefaultInstance());
+    pipeFactory = new ProtoPipelineFactory(handler, RpcResponse.getDefaultInstance());
     super.init(addr, pipeFactory);
     rpcChannel = new ProxyRpcChannel(getChannel());
     this.key = new RpcConnectionKey(addr, protocol, true);

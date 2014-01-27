@@ -68,9 +68,6 @@ public class TaskRunner extends AbstractService {
   private NodeId nodeId;
   private ContainerId containerId;
 
-  // Cluster Management
-  //private TajoWorkerProtocol.TajoWorkerProtocolService.Interface master;
-
   // for temporal or intermediate files
   private FileSystem localFS;
   // for input files
@@ -82,11 +79,9 @@ public class TaskRunner extends AbstractService {
   private final int coreNum = 4;
 
   // for Fetcher
-  private final ExecutorService fetchLauncher =
-      Executors.newFixedThreadPool(coreNum * 4);
+  private final ExecutorService fetchLauncher = Executors.newFixedThreadPool(coreNum * 4);
   // It keeps all of the query unit attempts while a TaskRunner is running.
-  private final Map<QueryUnitAttemptId, Task> tasks =
-      new ConcurrentHashMap<QueryUnitAttemptId, Task>();
+  private final Map<QueryUnitAttemptId, Task> tasks = new ConcurrentHashMap<QueryUnitAttemptId, Task>();
 
   private final Map<QueryUnitAttemptId, TaskHistory> taskHistories =
       new ConcurrentHashMap<QueryUnitAttemptId, TaskHistory>();
@@ -138,20 +133,7 @@ public class TaskRunner extends AbstractService {
       this.qmMasterAddr = NetUtils.createSocketAddrForHost(host, port);
 
       LOG.info("QueryMaster Address:" + qmMasterAddr);
-      // TODO - 'load credential' should be implemented
-      // Getting taskOwner
       UserGroupInformation taskOwner = UserGroupInformation.createRemoteUser(conf.getVar(ConfVars.USERNAME));
-      //taskOwner.addToken(token);
-
-      // initialize MasterWorkerProtocol as an actual task owner.
-//      this.client =
-//          taskOwner.doAs(new PrivilegedExceptionAction<AsyncRpcClient>() {
-//            @Override
-//            public AsyncRpcClient run() throws Exception {
-//              return new AsyncRpcClient(TajoWorkerProtocol.class, masterAddr);
-//            }
-//          });
-//      this.master = client.getStub();
 
       this.executionBlockId = executionBlockId;
       this.queryId = executionBlockId.getQueryId();
@@ -220,11 +202,6 @@ public class TaskRunner extends AbstractService {
       }
     }
 
-//    if(client != null) {
-//      client.close();
-//      client = null;
-//    }
-
     LOG.info("Stop TaskRunner: " + executionBlockId);
     synchronized (this) {
       notifyAll();
@@ -244,16 +221,8 @@ public class TaskRunner extends AbstractService {
       return nodeId.toString();
     }
 
-//    public TajoWorkerProtocolService.Interface getMaster() {
-//      return master;
-//    }
-
     public FileSystem getLocalFS() {
       return localFS;
-    }
-
-    public FileSystem getDefaultFS() {
-      return defaultFS;
     }
 
     public LocalDirAllocator getLocalDirAllocator() {

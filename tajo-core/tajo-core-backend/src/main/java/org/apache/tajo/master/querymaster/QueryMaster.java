@@ -163,9 +163,6 @@ public class QueryMaster extends CompositeService implements EventHandler {
     super.stop();
 
     LOG.info("QueryMaster stop");
-    if(queryMasterContext.getWorkerContext().isYarnContainerMode()) {
-      queryMasterContext.getWorkerContext().stopWorker(true);
-    }
   }
 
   private void cleanup(QueryId queryId) {
@@ -348,18 +345,14 @@ public class QueryMaster extends CompositeService implements EventHandler {
 
         try {
           queryMasterTask.stop();
-          if (!systemConf.get(CommonTestingUtil.TAJO_TEST, "FALSE").equalsIgnoreCase("TRUE")
-              && !workerContext.isYarnContainerMode()) {
-            cleanup(queryId);       // TODO We will support yarn mode
+          if (!systemConf.get(CommonTestingUtil.TAJO_TEST, "FALSE").equalsIgnoreCase("TRUE")) {
+            cleanup(queryId);
           }
         } catch (Exception e) {
           LOG.error(e.getMessage(), e);
         }
       } else {
         LOG.warn("No query info:" + queryId);
-      }
-      if(workerContext.isYarnContainerMode()) {
-        stop();
       }
     }
   }
