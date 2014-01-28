@@ -34,6 +34,8 @@ import org.apache.tajo.util.NetUtils;
 
 import java.net.InetSocketAddress;
 
+import static org.apache.tajo.ipc.TajoWorkerProtocol.RunExecutionBlockRequestProto;
+
 
 public class TajoWorkerManagerService extends AbstractService
     implements TajoWorkerProtocol.TajoWorkerProtocolService.Interface {
@@ -109,11 +111,11 @@ public class TajoWorkerManagerService extends AbstractService
 
   @Override
   public void executeExecutionBlock(RpcController controller,
-                                    TajoWorkerProtocol.RunExecutionBlockRequestProto request,
+                                    RunExecutionBlockRequestProto request,
                                     RpcCallback<PrimitiveProtos.BoolProto> done) {
     workerContext.getWorkerSystemMetrics().counter("query", "executedExecutionBlocksNum").inc();
     try {
-      workerContext.getTaskRunnerManager().startTask(request.getExecutionBlockId(), request.getNodeId(), request.getContainerId(), request.getQueryMasterHost(), request.getQueryMasterPort());
+      workerContext.getTaskRunnerManager().startTask(request);
       done.run(TajoWorker.TRUE_PROTO);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);

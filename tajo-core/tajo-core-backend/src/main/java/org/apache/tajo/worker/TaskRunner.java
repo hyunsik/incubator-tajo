@@ -106,16 +106,14 @@ public class TaskRunner extends AbstractService {
 
   private InetSocketAddress qmMasterAddr;
 
-  public TaskRunner(TaskRunnerManager taskRunnerManager, TajoConf conf, String executionBlockIdStr,
-                    String nodeIdStr, String containerIdStr,
-                    String masterHostName, int masterPort) {
+  public TaskRunner(TaskRunnerManager taskRunnerManager, TajoConf conf, RunExecutionBlockRequestProto request) {
     super(TaskRunner.class.getName());
 
     this.taskRunnerManager = taskRunnerManager;
     this.connPool = RpcConnectionPool.getPool(conf);
 
     try {
-      final ExecutionBlockId executionBlockId = TajoIdUtils.createExecutionBlockId(executionBlockIdStr);
+      final ExecutionBlockId executionBlockId = TajoIdUtils.createExecutionBlockId(request.getExecutionBlockId());
 
       LOG.info("Tajo Root Dir: " + conf.getVar(ConfVars.ROOT_DIR));
       LOG.info("Worker Local Dir: " + conf.getVar(ConfVars.WORKER_TEMPORAL_DIR));
@@ -124,10 +122,10 @@ public class TaskRunner extends AbstractService {
 
       // QueryBlockId from String
       // NodeId has a form of hostname:port.
-      NodeId nodeId = ConverterUtils.toNodeId(nodeIdStr);
-      this.containerId = ConverterUtils.toContainerId(containerIdStr);
+      NodeId nodeId = ConverterUtils.toNodeId(request.getNodeId());
+      this.containerId = ConverterUtils.toContainerId(request.getContainerId());
 
-      this.qmMasterAddr = NetUtils.createSocketAddrForHost(masterHostName, masterPort);
+      this.qmMasterAddr = NetUtils.createSocketAddrForHost(request.getQueryMasterHost(), request.getQueryMasterPort());
 
       LOG.info("QueryMaster Address:" + qmMasterAddr);
       UserGroupInformation taskOwner = UserGroupInformation.createRemoteUser(conf.getVar(ConfVars.USERNAME));

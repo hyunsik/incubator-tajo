@@ -25,10 +25,16 @@ import org.apache.hadoop.service.CompositeService;
 import org.apache.tajo.ExecutionBlockId;
 import org.apache.tajo.QueryUnitAttemptId;
 import org.apache.tajo.conf.TajoConf;
+import org.apache.tajo.ipc.TajoWorkerProtocol;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static org.apache.tajo.ipc.TajoWorkerProtocol.RunExecutionBlockRequestProto;
+
+/**
+ * Container Manager
+ */
 public class TaskRunnerManager extends CompositeService {
   private static final Log LOG = LogFactory.getLog(TaskRunnerManager.class);
 
@@ -172,12 +178,12 @@ public class TaskRunnerManager extends CompositeService {
     }
   }
 
-  public void startTask(final String executionBlockId, final String nodeId, final String containerId, final String qmHostName, final int queryMasterPort) {
+  public void startTask(final RunExecutionBlockRequestProto request) {
     Thread t = new Thread() {
       public void run() {
         try {
           TajoConf systemConf = new TajoConf(tajoConf);
-          TaskRunner taskRunner = new TaskRunner(TaskRunnerManager.this, systemConf, executionBlockId, nodeId, containerId, qmHostName, queryMasterPort);
+          TaskRunner taskRunner = new TaskRunner(TaskRunnerManager.this, systemConf, request);
           LOG.info("Start TaskRunner:" + taskRunner.getId());
           synchronized(taskRunnerMap) {
             taskRunnerMap.put(taskRunner.getId(), taskRunner);
