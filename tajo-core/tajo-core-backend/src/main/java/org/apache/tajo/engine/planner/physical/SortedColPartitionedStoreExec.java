@@ -39,7 +39,8 @@ import org.apache.tajo.worker.TaskAttemptContext;
 import java.io.IOException;
 
 /**
- * This class is a physical operator to store at column partitioned table.
+ * It stores a sorted data set into a number of partition files. It assumes that input tuples are sorted in an
+ * ascending or descending order of partition columns.
  */
 public class SortedColPartitionedStoreExec extends ColPartitionedStoreExec {
   private static Log LOG = LogFactory.getLog(SortedColPartitionedStoreExec.class);
