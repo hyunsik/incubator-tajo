@@ -231,7 +231,17 @@ Release 0.8.0 - unreleased
 
   BUG FIXES
 
-    TAJO-552: Fix Bug verify-protocbuf.sh runs with bash. 
+    TAJO-560: CTAS PARTITION BY with UNION can cause invalid global plan.
+    (hyunsik)
+
+    TAJO-558: HCatalogStore can't scan columns. (jaehwa)
+
+    TAJO-556: java.lang.NoSuchFieldError: IS_SECURITY_ENABLED. (jaehwa)
+
+    TAJO-372: When an exception except for network issues occurs, the
+    operation should not be repeated. (hyunsik)
+
+    TAJO-552: Fix Bug verify-protocbuf.sh runs with bash.
     (DaeMyung Kang via jihoon)
 
     TAJO-551: Fix bug getFunction can get wrong function that have invalid 
@@ -375,6 +385,10 @@ Release 0.8.0 - unreleased
     TAJO-293: querymasters directory not found in single node setup. (hyunsik)
 
   TASKS
+
+    TAJO-520: Move tajo-core-storage to tajo-storage. (jinho)
+
+    TAJO-536: Fix warnings in tajo-core-storage. (jinho)
 
     TAJO-545: MySQLStore Documentation. (jaehwa)
 
