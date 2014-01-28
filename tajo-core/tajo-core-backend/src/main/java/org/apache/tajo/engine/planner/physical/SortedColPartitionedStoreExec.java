@@ -115,13 +115,14 @@ public class SortedColPartitionedStoreExec extends ColPartitionedStoreExec {
 
       if (prevKey == null) {
         appender = getAppender(getSubdirectory(currentKey));
+        prevKey = new VTuple(currentKey);
       } else {
         if (!prevKey.equals(currentKey)) {
           appender.close();
           StatisticsUtil.aggregateTableStat(aggregated, appender.getStats());
 
           appender = getAppender(getSubdirectory(currentKey));
-          prevKey = currentKey;
+          prevKey = new VTuple(currentKey);
         }
       }
 
@@ -132,7 +133,9 @@ public class SortedColPartitionedStoreExec extends ColPartitionedStoreExec {
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
+    appender.close();
+    StatisticsUtil.aggregateTableStat(aggregated, appender.getStats());
     context.setResultStats(aggregated);
   }
 

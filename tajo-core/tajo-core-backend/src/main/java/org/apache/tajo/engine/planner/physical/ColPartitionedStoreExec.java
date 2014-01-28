@@ -19,6 +19,7 @@
 package org.apache.tajo.engine.planner.physical;
 
 
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.tajo.catalog.CatalogUtil;
 import org.apache.tajo.catalog.Column;
@@ -29,6 +30,8 @@ import org.apache.tajo.engine.planner.logical.NodeType;
 import org.apache.tajo.engine.planner.logical.StoreTableNode;
 import org.apache.tajo.storage.StorageUtil;
 import org.apache.tajo.worker.TaskAttemptContext;
+
+import java.io.IOException;
 
 public abstract class ColPartitionedStoreExec extends UnaryPhysicalExec {
   protected final TableMeta meta;
@@ -76,6 +79,17 @@ public abstract class ColPartitionedStoreExec extends UnaryPhysicalExec {
         // Don't use output schema because it is rewritten.
         keyIds[i] = plan.getOutSchema().getColumnId(column.getQualifiedName());
       }
+    }
+  }
+
+  @Override
+  public void init() throws IOException {
+    super.init();
+
+    storeTablePath = context.getOutputPath();
+    FileSystem fs = storeTablePath.getFileSystem(context.getConf());
+    if (!fs.exists(storeTablePath.getParent())) {
+      fs.mkdirs(storeTablePath.getParent());
     }
   }
 

@@ -75,7 +75,7 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
       if (execPlan instanceof StoreTableExec
           || execPlan instanceof RangeShuffleFileWriteExec
           || execPlan instanceof HashShuffleFileWriteExec
-          || execPlan instanceof ColumnPartitionedTableStoreExec) {
+          || execPlan instanceof ColPartitionedStoreExec) {
         return execPlan;
       } else if (context.getDataChannel() != null) {
         return buildOutputOperator(context, logicalPlan, execPlan);
@@ -692,14 +692,25 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
 
     Column[] partitionKeyColumns = storeTableNode.getPartitionMethod().getExpressionSchema().toArray();
     SortSpec[] sortSpecs = new SortSpec[partitionKeyColumns.length];
-    for (int i = 0; i < partitionKeyColumns.length; i++) {
-      sortSpecs[i] = new SortSpec(partitionKeyColumns[i], true, false);
+
+    if (storeTableNode.getType() == NodeType.INSERT) {
+      InsertNode insertNode = (InsertNode) storeTableNode;
+      for (int i = 0; i < partitionKeyColumns.length; i++) {
+        for (Column column : partitionKeyColumns) {
+          int id = insertNode.getTableSchema().getColumnId(column.getQualifiedName());
+          sortSpecs[i++] = new SortSpec(insertNode.getProjectedSchema().getColumn(id), true, false);
+        }
+      }
+    } else {
+      for (int i = 0; i < partitionKeyColumns.length; i++) {
+        sortSpecs[i] = new SortSpec(partitionKeyColumns[i], true, false);
+      }
     }
 
     SortNode sortNode = new SortNode(-1);
     sortNode.setSortSpecs(sortSpecs);
-    sortNode.setInSchema(storeTableNode.getOutSchema());
-    sortNode.setOutSchema(storeTableNode.getOutSchema());
+    sortNode.setInSchema(child.getSchema());
+    sortNode.setOutSchema(child.getSchema());
 
     ExternalSortExec sortExec = new ExternalSortExec(context, sm, sortNode, child);
     LOG.info("The planner chooses [Sort And Store Partitioned Table] in (" + TUtil.arrayToString(sortSpecs) + ")");
