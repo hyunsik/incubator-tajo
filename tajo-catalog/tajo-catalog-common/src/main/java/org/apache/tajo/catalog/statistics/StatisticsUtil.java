@@ -42,6 +42,37 @@ public class StatisticsUtil {
     return aggregated;
   }
 
+  public static void aggregateTableStat(TableStats aggregated, TableStats current) {
+
+    if (current.getColumnStats().size() > 0) {
+      // aggregate column stats for each table
+      for (int i = 0; i < current.getColumnStats().size(); i++) {
+        ColumnStats cs = current.getColumnStats().get(i);
+        ColumnStats agg = aggregated.getColumnStats().get(i);
+        if (cs == null) {
+          LOG.warn("ERROR: One of column stats is NULL (expected column: " + agg.getColumn() + ")");
+          continue;
+        }
+
+        agg.setNumDistVals(agg.getNumDistValues() + cs.getNumDistValues());
+        agg.setNumNulls(agg.getNumNulls() + cs.getNumNulls());
+        if (!cs.minIsNotSet() && (agg.minIsNotSet() ||
+            agg.getMinValue().compareTo(cs.getMinValue()) > 0)) {
+          agg.setMinValue(cs.getMinValue());
+        }
+        if (!cs.maxIsNotSet() && (agg.maxIsNotSet() ||
+            agg.getMaxValue().compareTo(cs.getMaxValue()) < 0)) {
+          agg.setMaxValue(current.getColumnStats().get(i).getMaxValue());
+        }
+      }
+    }
+
+    aggregated.setNumRows(aggregated.getNumRows() + current.getNumRows());
+    aggregated.setNumBytes(aggregated.getNumBytes() + current.getNumBytes());
+    aggregated.setNumBlocks(aggregated.getNumBlocks() + current.getNumBlocks());
+    aggregated.setNumShuffleOutputs(aggregated.getNumShuffleOutputs() + current.getNumShuffleOutputs());
+  }
+
   public static TableStats aggregateTableStat(List<TableStats> tableStatses) {
     TableStats aggregated = new TableStats();
 

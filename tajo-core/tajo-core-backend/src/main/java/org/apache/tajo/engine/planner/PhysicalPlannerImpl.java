@@ -677,13 +677,33 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
     if (plan.getPartitionMethod() != null) {
       switch (plan.getPartitionMethod().getPartitionType()) {
       case COLUMN:
-        return new ColumnPartitionedTableStoreExec(ctx, plan, subOp);
+        return createColumnPartitionedTableStorePlan(ctx, plan, subOp);
       default:
         throw new IllegalStateException(plan.getPartitionMethod().getPartitionType() + " is not supported yet.");
       }
     } else {
       return new StoreTableExec(ctx, plan, subOp);
     }
+  }
+
+  private PhysicalExec createColumnPartitionedTableStorePlan(TaskAttemptContext context,
+                                                             StoreTableNode storeTableNode,
+                                                             PhysicalExec child) throws IOException {
+
+    Column[] partitionKeyColumns = storeTableNode.getPartitionMethod().getExpressionSchema().toArray();
+    SortSpec[] sortSpecs = new SortSpec[partitionKeyColumns.length];
+    for (int i = 0; i < partitionKeyColumns.length; i++) {
+      sortSpecs[i] = new SortSpec(partitionKeyColumns[i], true, false);
+    }
+
+    SortNode sortNode = new SortNode(-1);
+    sortNode.setSortSpecs(sortSpecs);
+    sortNode.setInSchema(storeTableNode.getOutSchema());
+    sortNode.setOutSchema(storeTableNode.getOutSchema());
+
+    ExternalSortExec sortExec = new ExternalSortExec(context, sm, sortNode, child);
+    LOG.info("The planner chooses [Sort And Store Partitioned Table] in (" + TUtil.arrayToString(sortSpecs) + ")");
+    return new SortedColPartitionedStoreExec(context, storeTableNode, sortExec);
   }
 
   public PhysicalExec createScanPlan(TaskAttemptContext ctx, ScanNode scanNode) throws IOException {
@@ -716,8 +736,8 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
     return new HashAggregateExec(ctx, groupbyNode, subOp);
   }
 
-  private PhysicalExec createSortAggregation(TaskAttemptContext ctx, EnforceProperty property, GroupbyNode groupbyNode, PhysicalExec subOp)
-      throws IOException {
+  private PhysicalExec createSortAggregation(TaskAttemptContext ctx, EnforceProperty property, GroupbyNode groupbyNode,
+                                             PhysicalExec subOp) throws IOException {
 
     Column[] grpColumns = groupbyNode.getGroupingColumns();
     SortSpec[] sortSpecs = new SortSpec[grpColumns.length];
