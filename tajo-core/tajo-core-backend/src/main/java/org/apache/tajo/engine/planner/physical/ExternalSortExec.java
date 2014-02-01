@@ -18,6 +18,8 @@
 
 package org.apache.tajo.engine.planner.physical;
 
+import com.sun.org.apache.commons.logging.Log;
+import com.sun.org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.tajo.catalog.CatalogUtil;
@@ -26,15 +28,17 @@ import org.apache.tajo.catalog.proto.CatalogProtos.StoreType;
 import org.apache.tajo.conf.TajoConf.ConfVars;
 import org.apache.tajo.engine.planner.logical.SortNode;
 import org.apache.tajo.storage.*;
+import org.apache.tajo.util.ClassSize;
 import org.apache.tajo.worker.TaskAttemptContext;
 
 import java.io.IOException;
 import java.util.*;
 
 public class ExternalSortExec extends SortExec {
+  private static final Log LOG = LogFactory.getLog(ExternalSortExec.class);
   private SortNode plan;
 
-  private final List<Tuple> tupleSlots;
+  private final List<ByteBufTuple> tupleSlots;
   private boolean sorted = false;
   private RawFile.RawFileScanner result;
   private RawFile.RawFileAppender appender;
@@ -42,7 +46,9 @@ public class ExternalSortExec extends SortExec {
 
   private final TableMeta meta;
   private final Path sortTmpDir;
-  private int MEM_TUPLE_NUM;
+  private final int bufferBytesSize;
+
+  private final TupleFactory tupleFactory;
 
   public ExternalSortExec(final TaskAttemptContext context,
       final AbstractStorageManager sm, final SortNode plan, final PhysicalExec child)
@@ -50,12 +56,14 @@ public class ExternalSortExec extends SortExec {
     super(context, plan.getInSchema(), plan.getOutSchema(), child, plan.getSortKeys());
     this.plan = plan;
 
-    this.MEM_TUPLE_NUM = context.getConf().getIntVar(ConfVars.EXECUTOR_SORT_EXTENAL_BUFFER_SIZE);
-    this.tupleSlots = new ArrayList<Tuple>(MEM_TUPLE_NUM);
+    this.bufferBytesSize = context.getConf().getIntVar(ConfVars.EXECUTOR_SORT_EXTENAL_BUFFER_SIZE);
+    this.tupleSlots = new ArrayList<ByteBufTuple>();
 
     this.sortTmpDir = new Path(context.getWorkDir(), UUID.randomUUID().toString());
     this.localFS = FileSystem.getLocal(context.getConf());
     meta = CatalogUtil.newTableMeta(StoreType.ROWFILE);
+
+    tupleFactory = new TupleFactory(false, plan.getInSchema());
   }
 
   public void init() throws IOException {
@@ -67,7 +75,7 @@ public class ExternalSortExec extends SortExec {
     return this.plan;
   }
 
-  private void sortAndStoreChunk(int chunkId, List<Tuple> tupleSlots)
+  private void sortAndStoreChunk(int chunkId, List<ByteBufTuple> tupleSlots)
       throws IOException {
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.RAW);
     Collections.sort(tupleSlots, getComparator());
@@ -78,7 +86,7 @@ public class ExternalSortExec extends SortExec {
     appender = new RawFile.RawFileAppender(context.getConf(), inSchema, meta, localPath);
     appender.init();
 
-    for (Tuple t : tupleSlots) {
+    for (ByteBufTuple t : tupleSlots) {
       appender.addTuple(t);
     }
     appender.close();
@@ -94,16 +102,37 @@ public class ExternalSortExec extends SortExec {
     int chunkId = 0;
 
     Tuple tuple;
+    int memoryConsumption = 0;
+
+    long runStartTime = System.currentTimeMillis();
     while ((tuple = child.next()) != null) { // partition sort start
-      tupleSlots.add(new VTuple(tuple));
-      if (tupleSlots.size() == MEM_TUPLE_NUM) {
+      ByteBufTuple byteBufTuple = tupleFactory.newByteBufTuple();
+      byteBufTuple.put(0, tuple);
+      tupleSlots.add(byteBufTuple);
+      memoryConsumption += byteBufTuple.getMemorySize() + ClassSize.OBJECT;
+
+      if (memoryConsumption > bufferBytesSize) {
+        long runEndTime = System.currentTimeMillis();
+        LOG.info(chunkId + " run time: " + (runEndTime - runStartTime) + " msec");
+        runStartTime = runEndTime;
+
+        long start = System.currentTimeMillis();
+        LOG.info("Memory Consumption exceeds " + bufferBytesSize + " bytes");
+        int rowNum = tupleSlots.size();
         sortAndStoreChunk(chunkId, tupleSlots);
+        long end = System.currentTimeMillis();
+        LOG.info("Chunk #" + chunkId + " " + rowNum + " rows written (" + (end - start) + " msec)");
+        memoryConsumption = 0;
         chunkId++;
       }
     }
 
     if (tupleSlots.size() > 0) {
+      long start = System.currentTimeMillis();
+      int rowNum = tupleSlots.size();
       sortAndStoreChunk(chunkId, tupleSlots);
+      long end = System.currentTimeMillis();
+      LOG.info("Last Chunk #" + chunkId + " " + rowNum + " rows written (" + (end - start) + " msec)");
       chunkId++;
     }
 

@@ -18,18 +18,17 @@
 
 package org.apache.tajo.storage;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.buffer.*;
 import org.apache.tajo.catalog.Schema;
 
 public class TupleFactory {
 
-  private final PooledByteBufAllocator allocator;
+  private final UnpooledByteBufAllocator allocator;
   private final Schema schema;
 
-  public TupleFactory(boolean directedPrefer, Schema schema) {
+  public TupleFactory(boolean preferDirect, Schema schema) {
     this.schema = schema;
-    allocator = new PooledByteBufAllocator(directedPrefer);
+    allocator = new UnpooledByteBufAllocator(preferDirect);
   }
 
   public ByteBufTuple newByteBufTuple() {

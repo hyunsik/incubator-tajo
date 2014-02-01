@@ -166,7 +166,7 @@ public class TajoConf extends Configuration {
     //////////////////////////////////
     // Physical Executors
     //////////////////////////////////
-    EXECUTOR_SORT_EXTENAL_BUFFER_SIZE("tajo.executor.sort.external-buffer-num", 1000000),
+    EXECUTOR_SORT_EXTENAL_BUFFER_SIZE("tajo.executor.sort.external-buffer-bytes", 400 * 1048576),
     EXECUTOR_INNER_JOIN_INMEMORY_HASH_TABLE_SIZE("tajo.executor.join.inner.in-memory-table-num", (long)1000000),
     EXECUTOR_INNER_JOIN_INMEMORY_HASH_THRESHOLD("tajo.executor.join.inner.in-memory-hash-threshold-bytes",
         (long)256 * 1048576),

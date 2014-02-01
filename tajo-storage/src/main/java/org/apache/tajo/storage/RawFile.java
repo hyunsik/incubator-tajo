@@ -403,7 +403,7 @@ public class RawFile {
 
           case BOOLEAN:
           case BIT:
-            buffer.put(t.get(i).asByte());
+            buffer.put(t.getByte(i));
             break;
 
           case CHAR :
@@ -414,27 +414,27 @@ public class RawFile {
             break;
 
           case INT2 :
-            buffer.putShort(t.get(i).asInt2());
+            buffer.putShort(t.getShort(i));
             break;
 
           case INT4 :
-            buffer.putInt(t.get(i).asInt4());
+            buffer.putInt(t.getInt(i));
             break;
 
           case INT8 :
-            buffer.putLong(t.get(i).asInt8());
+            buffer.putLong(t.getLong(i));
             break;
 
           case FLOAT4 :
-            buffer.putFloat(t.get(i).asFloat4());
+            buffer.putFloat(t.getFloat(i));
             break;
 
           case FLOAT8 :
-            buffer.putDouble(t.get(i).asFloat8());
+            buffer.putDouble(t.getDouble(i));
             break;
 
           case TEXT:
-            byte [] strBytes2 = t.get(i).asByteArray();
+            byte [] strBytes2 = t.getBytes(i);
             if (flushBufferAndReplace(recordOffset, strBytes2.length + 4)) {
               recordOffset = 0;
             }
@@ -443,11 +443,11 @@ public class RawFile {
             break;
 
           case TIMESTAMP:
-            buffer.putLong(((TimestampDatum)t.get(i)).getMillis());
+            buffer.putLong(t.getLong(i));
             break;
 
           case BLOB : {
-            byte [] rawBytes = t.get(i).asByteArray();
+            byte [] rawBytes = t.getBytes(i);
             if (flushBufferAndReplace(recordOffset, rawBytes.length + 4)) {
               recordOffset = 0;
             }
@@ -478,7 +478,7 @@ public class RawFile {
           }
 
           case INET4 :
-            buffer.put(t.get(i).asByteArray());
+            buffer.put(t.getBytes(i));
             break;
 
           default:
