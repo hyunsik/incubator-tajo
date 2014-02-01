@@ -64,7 +64,7 @@ public interface Tuple extends Cloneable {
 	
 	public double getDouble(int fieldId);
 	
-	public String getString(int fieldId);
+	public String getText(int fieldId);
 
   public Tuple clone() throws CloneNotSupportedException;
 

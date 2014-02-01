@@ -167,7 +167,7 @@ public class VTuple implements Tuple, Cloneable {
 	}
 
   @Override
-	public String getString(int fieldId) {
+	public String getText(int fieldId) {
 		return values[fieldId].asChars();
 	}
 

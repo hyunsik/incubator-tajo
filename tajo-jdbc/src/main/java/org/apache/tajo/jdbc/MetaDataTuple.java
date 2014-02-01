@@ -135,7 +135,7 @@ public class MetaDataTuple implements Tuple {
   }
 
   @Override
-  public String getString(int fieldId) {
+  public String getText(int fieldId) {
     return values.get(fieldId).toString();
   }
 

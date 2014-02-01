@@ -22,30 +22,58 @@ import io.netty.buffer.ByteBuf;
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.datum.Datum;
+import org.apache.tajo.datum.DatumFactory;
 import org.apache.tajo.exception.UnsupportedException;
+import org.apache.tajo.util.Bytes;
+import org.apache.tajo.util.ClassSize;
 
+/**
+ * Immutable Tuple
+ */
 public class ByteBufTuple implements Tuple {
   private final short num;
   private final Schema schema;
+  private final int [] offsets;
+  private final ByteBuf byteBuf;
 
   private short currentIdx = 0;
-  private int [] offsets;
-  private ByteBuf byteBuf;
 
-  public ByteBufTuple(Schema schema) {
+  private static final int staticBytesSize;
+  static {
+    staticBytesSize =
+            ClassSize.REFERENCE +   // this
+            Bytes.SIZEOF_SHORT +    // num
+            ClassSize.REFERENCE +   // schema
+            ClassSize.ARRAY +       // offsets
+            ClassSize.REFERENCE +   // bytebuf
+            Bytes.SIZEOF_SHORT;     // currentIdx
+  }
+
+  public ByteBufTuple(Schema schema, ByteBuf bytebuf) {
     this.schema = schema;
     this.num = (short) schema.getColumnNum();
-    offsets = new int[this.num];
+    this.offsets = new int[this.num];
+    this.byteBuf = bytebuf;
+  }
+
+  public void release() {
+    byteBuf.release();
+  }
+
+  public int getMemorySize() {
+    return staticBytesSize +
+        (Bytes.SIZEOF_INT * num) + // the contents of offsets
+        byteBuf.writerIndex();     // the contents of byteBuf
   }
 
   @Override
   public int size() {
-    return byteBuf.writerIndex();
+    return num;
   }
 
   @Override
   public boolean contains(int fieldid) {
-    return offsets[fieldid] > 0;
+    return offsets[fieldid] > -1;
   }
 
   @Override
@@ -60,6 +88,15 @@ public class ByteBufTuple implements Tuple {
 
   @Override
   public void put(int fieldId, Datum value) {
+
+    if (currentIdx < fieldId) {
+      for (;currentIdx < fieldId; currentIdx++) {
+        offsets[currentIdx] = -1;
+      }
+    }
+
+    int offset = byteBuf.writerIndex();
+
     switch (value.type()) {
     case BOOLEAN:
       byteBuf.writeBoolean(value.asBool());
@@ -72,42 +109,55 @@ public class ByteBufTuple implements Tuple {
     case INT2:
     case INT4:
     case TIME:
-      writeRawVarint32(value.asInt4());
+      //writeRawVarint32(value.asInt4());
+      byteBuf.writeInt(value.asInt4());
       break;
 
     case DATE:
     case TIMESTAMP:
     case INT8:
-      writeRawVarint64(value.asInt8());
+      //writeRawVarint64(value.asInt8());
+      byteBuf.writeLong(value.asInt8());
       break;
 
     case FLOAT4:
-      writeRawLittleEndian32(Float.floatToRawIntBits(value.asFloat4()));
+      //writeRawLittleEndian32(Float.floatToRawIntBits(value.asFloat4()));
+      byteBuf.writeFloat(value.asFloat4());
       break;
 
     case FLOAT8:
-      writeRawLittleEndian64(Double.doubleToRawLongBits(value.asFloat8()));
+      //writeRawLittleEndian64(Double.doubleToRawLongBits(value.asFloat8()));
+      byteBuf.writeDouble(value.asFloat8());
       break;
 
     case TEXT:
-      writeRawVarint32(value.size());
-      byteBuf.writeBytes(value.asByteArray());
+      //writeRawVarint32(value.size());
+      //byteBuf.writeBytes(value.asByteArray());
+      byte [] bytes = value.asByteArray();
+      byteBuf.writeInt(bytes.length);
+      byteBuf.writeBytes(bytes);
       break;
+
+    case NULL_TYPE:
+      offsets[currentIdx++] = -1;
+      return;
     }
 
     if (currentIdx < num) {
-      offsets[currentIdx++] = byteBuf.writerIndex();
+      offsets[currentIdx++] = offset;
     }
   }
 
   @Override
   public void put(int fieldId, Datum[] values) {
-
+    throw new UnsupportedException("put(int, Datum[]) is not supported in " + ByteBufTuple.class.getSimpleName());
   }
 
   @Override
   public void put(int fieldId, Tuple tuple) {
-
+    for (int i = 0, j = currentIdx; i < tuple.size(); i++,  j++) {
+      put(j, tuple.get(i));
+    }
   }
 
   @Override
@@ -122,18 +172,30 @@ public class ByteBufTuple implements Tuple {
     Column column = schema.getColumn(fieldId);
     switch (column.getDataType().getType()) {
     case BOOLEAN:
+      return DatumFactory.createBool(getBool(fieldId));
     case BIT:
+      return DatumFactory.createBit(getByte(fieldId));
     case CHAR:
+      return DatumFactory.createChar(getChar(fieldId));
     case INT1:
     case INT2:
+      return DatumFactory.createInt2(getShort(fieldId));
     case INT4:
+      return DatumFactory.createInt4(getInt(fieldId));
     case INT8:
+      return DatumFactory.createInt8(getLong(fieldId));
     case FLOAT4:
+      return DatumFactory.createFloat4(getFloat(fieldId));
     case FLOAT8:
+      return DatumFactory.createFloat8(getDouble(fieldId));
     case TEXT:
+      return DatumFactory.createText(getText(fieldId));
     case BLOB:
+      return DatumFactory.createBlob(getBytes(fieldId));
+    default:
+      throw new UnsupportedException(column.getDataType().getType() + " is not supported in "
+          + ByteBufTuple.class.getSimpleName());
     }
-    return null;
   }
 
   @Override
@@ -195,7 +257,7 @@ public class ByteBufTuple implements Tuple {
   }
 
   @Override
-  public String getString(int fieldId) {
+  public String getText(int fieldId) {
     int len = byteBuf.getInt(offsets[fieldId]);
     byte [] bytes = new byte[len];
     byteBuf.getBytes(offsets[fieldId] + 4, bytes);
@@ -204,12 +266,27 @@ public class ByteBufTuple implements Tuple {
 
   @Override
   public Tuple clone() throws CloneNotSupportedException {
-    return null;
+    byteBuf.retain();
+    return this;
   }
 
   @Override
   public Datum[] getValues() {
-    return new Datum[0];
+    throw new UnsupportedException("getValues() is not supported in " + ByteBufTuple.class.getSimpleName());
+  }
+
+  public boolean equals(Object object) {
+    if (object instanceof ByteBufTuple) {
+      ByteBufTuple another = (ByteBufTuple) object;
+      return byteBuf.equals(another.byteBuf);
+    } else {
+      return false;
+    }
+  }
+
+  @Override
+  public int hashCode() {
+    return byteBuf.hashCode();
   }
 
   /** Write a little-endian 32-bit integer. */

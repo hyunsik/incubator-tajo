@@ -187,7 +187,7 @@ public class LazyTuple implements Tuple, Cloneable {
   }
 
   @Override
-  public String getString(int fieldId) {
+  public String getText(int fieldId) {
     return get(fieldId).asChars();
   }
 
