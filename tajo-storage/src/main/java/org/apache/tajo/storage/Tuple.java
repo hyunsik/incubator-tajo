@@ -46,35 +46,25 @@ public interface Tuple extends Cloneable {
 	
 	public long getOffset();
 
-	public BooleanDatum getBoolean(int fieldId);
-	
-	public BitDatum getByte(int fieldId);
+	public boolean getBool(int fieldId);
 
-  public CharDatum getChar(int fieldId);
-	
-	public BlobDatum getBytes(int fieldId);
-	
-	public Int2Datum getShort(int fieldId);
-	
-	public Int4Datum getInt(int fieldId);
-	
-	public Int8Datum getLong(int fieldId);
-	
-	public Float4Datum getFloat(int fieldId);
-	
-	public Float8Datum getDouble(int fieldId);
-	
-	public Inet4Datum getIPv4(int fieldId);
-	
-	public byte [] getIPv4Bytes(int fieldId);
-	
-	public InetAddress getIPv6(int fieldId);
-	
-	public byte [] getIPv6Bytes(int fieldId);
-	
-	public TextDatum getString(int fieldId);
+	public byte getByte(int fieldId);
 
-  public TextDatum getText(int fieldId);
+  public char getChar(int fieldId);
+	
+	public byte [] getBytes(int fieldId);
+	
+	public short getShort(int fieldId);
+	
+	public int getInt(int fieldId);
+	
+	public long getLong(int fieldId);
+	
+	public float getFloat(int fieldId);
+	
+	public double getDouble(int fieldId);
+	
+	public String getString(int fieldId);
 
   public Tuple clone() throws CloneNotSupportedException;
 

@@ -407,7 +407,7 @@ public class RawFile {
             break;
 
           case CHAR :
-            byte[] src = t.getChar(i).asByteArray();
+            byte[] src = t.get(i).asByteArray();
             byte[] dst = Arrays.copyOf(src, columnTypes[i].getLength());
             buffer.putInt(src.length);
             buffer.put(dst);

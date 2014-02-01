@@ -106,47 +106,55 @@ public class VTuple implements Tuple, Cloneable {
 	}
 	
 	@Override
-	public BooleanDatum getBoolean(int fieldId) {
-		return (BooleanDatum) values[fieldId];
+	public boolean getBool(int fieldId) {
+		return values[fieldId].asBool();
 	}
 
-	public BitDatum getByte(int fieldId) {
-		return (BitDatum) values[fieldId];
+  @Override
+	public byte getByte(int fieldId) {
+		return values[fieldId].asByte();
 	}
 
-  public CharDatum getChar(int fieldId) {
-    return (CharDatum) values[fieldId];
+  @Override
+  public char getChar(int fieldId) {
+    return values[fieldId].asChar();
   }
 
-	public BlobDatum getBytes(int fieldId) {
-		return (BlobDatum) values[fieldId];
+  @Override
+	public byte [] getBytes(int fieldId) {
+		return values[fieldId].asByteArray();
 	}
 
-	public Int2Datum getShort(int fieldId) {
-		return (Int2Datum) values[fieldId];
+  @Override
+	public short getShort(int fieldId) {
+		return values[fieldId].asInt2();
 	}
 
-	public Int4Datum getInt(int fieldId) {
-		return (Int4Datum) values[fieldId];
+  @Override
+	public int getInt(int fieldId) {
+		return values[fieldId].asInt4();
 	}
 
-	public Int8Datum getLong(int fieldId) {
-		return (Int8Datum) values[fieldId];
+  @Override
+	public long getLong(int fieldId) {
+		return values[fieldId].asInt8();
 	}
 
-	public Float4Datum getFloat(int fieldId) {
-		return (Float4Datum) values[fieldId];
+  @Override
+	public float getFloat(int fieldId) {
+		return values[fieldId].asFloat4();
 	}
 
-	public Float8Datum getDouble(int fieldId) {
-		return (Float8Datum) values[fieldId];
+  @Override
+	public double getDouble(int fieldId) {
+		return values[fieldId].asFloat8();
 	}
 
 	public Inet4Datum getIPv4(int fieldId) {
 		return (Inet4Datum) values[fieldId];
 	}
 
-	public byte[] getIPv4Bytes(int fieldId) {
+	public byte [] getIPv4Bytes(int fieldId) {
 		return values[fieldId].asByteArray();
 	}
 
@@ -158,14 +166,10 @@ public class VTuple implements Tuple, Cloneable {
 	  throw new InvalidCastException("IPv6 is unsupported yet");
 	}
 
-	public TextDatum getString(int fieldId) {
-		return (TextDatum) values[fieldId];
-	}
-
   @Override
-  public TextDatum getText(int fieldId) {
-    return (TextDatum) values[fieldId];
-  }
+	public String getString(int fieldId) {
+		return values[fieldId].asChars();
+	}
 
   @Override
   public Tuple clone() throws CloneNotSupportedException {
