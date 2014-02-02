@@ -57,7 +57,7 @@ public class TestExternalSortExec {
   private Path testDir;
 
 
-  private final int numTuple = 20000000;
+  private final int numTuple = 2800000;
   private Random rnd = new Random(System.currentTimeMillis());
 
 
@@ -157,7 +157,6 @@ public class TestExternalSortExec {
       cnt++;
     }
     long end = System.currentTimeMillis();
-    exec.close();
     assertEquals(numTuple, cnt);
 
     // for rescan test

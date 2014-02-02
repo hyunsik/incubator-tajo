@@ -37,40 +37,42 @@ import org.apache.tajo.worker.TaskAttemptContext;
 import java.io.IOException;
 import java.util.*;
 
+import static org.apache.tajo.storage.RawFile.RawFileAppender;
 import static org.apache.tajo.storage.RawFile.RawFileScanner;
 
 public class ExternalSortExec extends SortExec {
   private static final Log LOG = LogFactory.getLog(ExternalSortExec.class);
-  private SortNode plan;
 
-  private final List<Tuple> tupleSlots;
-  private boolean sorted = false;
-  private Scanner result;
-  private RawFile.RawFileAppender appender;
-  private FileSystem localFS;
-
+  private final SortNode plan;
   private final TableMeta meta;
-  private final Path sortTmpDir;
-  private final int bufferBytesSize;
+  /** the fanout of external sort */
   private final int fanout;
+  /** It's the size of in-memory table. If memory consumption exceeds it, store the memory table into a disk. */
+  private final int bufferBytesSize;
+  private final FileSystem localFS;
+  private final Path sortTmpDir;
 
-  private final TupleFactory tupleFactory;
+  private final List<Tuple> inMemoryTable;
+  /** already sorted or not */
+  private boolean sorted = false;
+  /** a flag to point whether memory exceeded or not */
+  private boolean memoryExceeded = false;
+  /** the final result */
+  private Scanner result;
 
   public ExternalSortExec(final TaskAttemptContext context,
-      final AbstractStorageManager sm, final SortNode plan, final PhysicalExec child)
+                          final AbstractStorageManager sm, final SortNode plan, final PhysicalExec child)
       throws IOException {
     super(context, plan.getInSchema(), plan.getOutSchema(), child, plan.getSortKeys());
     this.plan = plan;
 
     this.fanout = context.getConf().getIntVar(ConfVars.EXECUTOR_EXTERNAL_SORT_FANOUT);
     this.bufferBytesSize = context.getConf().getIntVar(ConfVars.EXECUTOR_EXTERNAL_SORT_BUFFER_SIZE);
-    this.tupleSlots = new ArrayList<Tuple>();
+    this.inMemoryTable = new ArrayList<Tuple>(1000000);
 
     this.sortTmpDir = new Path(context.getWorkDir(), UUID.randomUUID().toString());
     this.localFS = FileSystem.getLocal(context.getConf());
     meta = CatalogUtil.newTableMeta(StoreType.ROWFILE);
-
-    tupleFactory = new TupleFactory(false, plan.getInSchema());
   }
 
   public void init() throws IOException {
@@ -90,7 +92,7 @@ public class ExternalSortExec extends SortExec {
     // So, I add the scheme 'file:/' to path. But, it should be improved.
     Path localPath = new Path(sortTmpDir + "/0_" + chunkId);
 
-    appender = new RawFile.RawFileAppender(context.getConf(), inSchema, meta, localPath);
+    final RawFileAppender appender = new RawFileAppender(context.getConf(), inSchema, meta, localPath);
     appender.init();
 
     for (Tuple t : tupleSlots) {
@@ -113,35 +115,39 @@ public class ExternalSortExec extends SortExec {
 
     long runStartTime = System.currentTimeMillis();
     while ((tuple = child.next()) != null) { // partition sort start
-      //ByteBufTuple vtuple = tupleFactory.newByteBufTuple();
-      //vtuple.put(0, tuple);
       VTuple vtuple = new VTuple(tuple);
-
-      tupleSlots.add(vtuple);
+      inMemoryTable.add(vtuple);
       memoryConsumption += MemoryUtil.calculateMemorySize(vtuple);
 
       if (memoryConsumption > bufferBytesSize) {
+        memoryExceeded = true;
         long runEndTime = System.currentTimeMillis();
-        LOG.info(chunkId + " run time: " + (runEndTime - runStartTime) + " msec");
+        LOG.info(chunkId + " run loading time: " + (runEndTime - runStartTime) + " msec");
         runStartTime = runEndTime;
 
         long start = System.currentTimeMillis();
         LOG.info("Memory Consumption exceeds " + bufferBytesSize + " bytes");
-        int rowNum = tupleSlots.size();
-        sortAndStoreChunk(chunkId, tupleSlots);
+        int rowNum = inMemoryTable.size();
+        sortAndStoreChunk(chunkId, inMemoryTable);
         long end = System.currentTimeMillis();
-        LOG.info("Chunk #" + chunkId + " " + rowNum + " rows written (" + (end - start) + " msec)");
+        LOG.info("Chunk #" + chunkId + " " + rowNum + " rows - sorted and written (" + (end - start) + " msec)");
         memoryConsumption = 0;
         chunkId++;
       }
     }
 
-    if (tupleSlots.size() > 0) {
-      long start = System.currentTimeMillis();
-      int rowNum = tupleSlots.size();
-      sortAndStoreChunk(chunkId, tupleSlots);
-      long end = System.currentTimeMillis();
-      LOG.info("Last Chunk #" + chunkId + " " + rowNum + " rows written (" + (end - start) + " msec)");
+    if (inMemoryTable.size() > 0) {
+      if (memoryExceeded) {
+        if (inMemoryTable.size() > 0) {
+          long start = System.currentTimeMillis();
+          int rowNum = inMemoryTable.size();
+          sortAndStoreChunk(chunkId, inMemoryTable);
+          long end = System.currentTimeMillis();
+          LOG.info("Last Chunk #" + chunkId + " " + rowNum + " rows written (" + (end - start) + " msec)");
+        }
+      }
+
+      // if at least one or more tuples
       chunkId++;
     }
 
@@ -157,73 +163,82 @@ public class ExternalSortExec extends SortExec {
     if (!sorted) {
 
       // the total number of chunks for zero level
+      long startSplitRuns = System.currentTimeMillis();
       int totalChunkNumForLevel = sortAndStoreAllChunks();
+      long endSplitRuns = System.currentTimeMillis();
+      LOG.info("Run creation time: " + (endSplitRuns - startSplitRuns) + " msec");
 
       // if there are no chunk
       if (totalChunkNumForLevel == 0) {
         return null;
       }
 
-      int level = 0;
-      int chunkId = 0;
+      if (memoryExceeded) {
 
-      long mergeStart = System.currentTimeMillis();
-      // continue until the chunk remains only one
-      while (totalChunkNumForLevel > fanout) {
+        int level = 0;
+        int chunkId = 0;
 
-        while (chunkId < totalChunkNumForLevel) {
+        long mergeStart = System.currentTimeMillis();
+        // continue until the chunk remains only one
+        while (totalChunkNumForLevel > fanout) {
 
-          Path nextChunk = getChunkPath(level + 1, chunkId / fanout);
+          while (chunkId < totalChunkNumForLevel) {
 
-          // if number of chunkId is odd just copy it.
-          if (chunkId + 1 >= totalChunkNumForLevel) {
+            Path nextChunk = getChunkPath(level + 1, chunkId / fanout);
 
-            Path chunk = getChunkPath(level, chunkId);
-            localFS.moveFromLocalFile(chunk, nextChunk);
+            // if number of chunkId is odd just copy it.
+            if (chunkId + 1 >= totalChunkNumForLevel) {
 
-          } else {
+              Path chunk = getChunkPath(level, chunkId);
+              localFS.moveFromLocalFile(chunk, nextChunk);
 
-            appender = new RawFile.RawFileAppender(context.getConf(), inSchema, meta, nextChunk);
-            appender.init();
+            } else {
 
-            // we use choose the minimum k-ways between the remain chunks and fanout
-            int kway = Math.min((totalChunkNumForLevel - chunkId), fanout);
-            Scanner merger = createKWayMerger(level, chunkId, kway);
-            merger.init();
-            Tuple mergeTuple;
-            while((mergeTuple = merger.next()) != null) {
-              appender.addTuple(mergeTuple);
+              final RawFileAppender appender = new RawFileAppender(context.getConf(), inSchema, meta, nextChunk);
+              appender.init();
+
+              // we use choose the minimum k-ways between the remain chunks and fanout
+              int kway = Math.min((totalChunkNumForLevel - chunkId), fanout);
+              Scanner merger = createKWayMerger(level, chunkId, kway);
+              merger.init();
+              Tuple mergeTuple;
+              while((mergeTuple = merger.next()) != null) {
+                appender.addTuple(mergeTuple);
+              }
+              merger.close();
+
+              appender.flush();
+              appender.close();
+              LOG.info(nextChunk + " is written");
             }
-            merger.close();
 
-            appender.flush();
-            appender.close();
-            LOG.info(nextChunk + " is written");
+            chunkId += fanout;
           }
 
-          chunkId += fanout;
+          // increase the level
+          level++;
+
+          // init chunkId for each level
+          chunkId = 0;
+
+          // calculate the total number of chunks for next level
+          totalChunkNumForLevel = (int) Math.ceil((float)totalChunkNumForLevel / fanout);
         }
 
-        level++;
-        // init chunkId for each level
-        chunkId = 0;
-        // calculate the total number of chunks for next level
-        totalChunkNumForLevel = (totalChunkNumForLevel / fanout) + ((totalChunkNumForLevel % fanout) > 0 ? 1 : 0);
-      }
-
-      if (totalChunkNumForLevel == 1) {
-        Path result = getChunkPath(level, 0);
-        this.result = new RawFileScanner(context.getConf(), plan.getInSchema(), meta, result);
+        if (totalChunkNumForLevel == 1) {
+          Path result = getChunkPath(level, 0);
+          this.result = new RawFileScanner(context.getConf(), plan.getInSchema(), meta, result);
+        } else {
+          this.result = createKWayMerger(level, chunkId, totalChunkNumForLevel);
+        }
+        long mergeEnd = System.currentTimeMillis();
+        LOG.info("Total merge time: " + (mergeEnd - mergeStart) + " msec");
       } else {
-        this.result = createKWayMerger(level, chunkId, totalChunkNumForLevel);
+        this.result = new MemScanner();
       }
       this.result.init();
       sorted = true;
-
-      long mergeEnd = System.currentTimeMillis();
-      System.out.println("Total merge time: " + (mergeEnd - mergeStart) + " msec");
     }
-
     return result.next();
   }
 
@@ -248,6 +263,62 @@ public class ExternalSortExec extends SortExec {
           createKWayMergerInternal(sources, startId + mid, num - mid));
     } else {
       return sources.get(startId);
+    }
+  }
+
+  private class MemScanner implements Scanner {
+    Iterator<Tuple> iterator;
+
+    @Override
+    public void init() throws IOException {
+      iterator = inMemoryTable.iterator();
+    }
+
+    @Override
+    public Tuple next() throws IOException {
+      if (iterator.hasNext()) {
+        return iterator.next();
+      } else {
+        return null;
+      }
+    }
+
+    @Override
+    public void reset() throws IOException {
+      init();
+    }
+
+    @Override
+    public void close() throws IOException {
+      iterator = null;
+    }
+
+    @Override
+    public boolean isProjectable() {
+      return false;
+    }
+
+    @Override
+    public void setTarget(Column[] targets) {
+    }
+
+    @Override
+    public boolean isSelectable() {
+      return false;
+    }
+
+    @Override
+    public void setSearchCondition(Object expr) {
+    }
+
+    @Override
+    public boolean isSplittable() {
+      return false;
+    }
+
+    @Override
+    public Schema getSchema() {
+      return null;
     }
   }
 
@@ -336,6 +407,12 @@ public class ExternalSortExec extends SortExec {
     public Schema getSchema() {
       return inSchema;
     }
+  }
+
+  @Override
+  public void close() throws IOException {
+    result.close();
+    inMemoryTable.clear();
   }
 
   @Override

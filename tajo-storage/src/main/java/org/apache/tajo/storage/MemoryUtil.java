@@ -99,7 +99,7 @@ public class MemoryUtil {
     return tuple.getMemorySize() + ClassSize.OBJECT;
   }
 
-  public static long calculateMemorySize(VTuple tuple) {
+  public static long calculateMemorySize(Tuple tuple) {
     long total = ClassSize.OBJECT;
     for (Datum datum : tuple.getValues()) {
       switch (datum.type()) {
