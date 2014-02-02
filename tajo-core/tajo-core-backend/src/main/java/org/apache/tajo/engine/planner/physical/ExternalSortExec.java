@@ -185,7 +185,7 @@ public class ExternalSortExec extends SortExec {
 
           while (chunkId < totalChunkNumForLevel) {
 
-            Path nextChunk = getChunkPath(level + 1, chunkId / fanout);
+            final Path nextChunk = getChunkPath(level + 1, chunkId / fanout);
 
             // if number of chunkId is odd just copy it.
             if (chunkId + 1 >= totalChunkNumForLevel) {
@@ -198,9 +198,9 @@ public class ExternalSortExec extends SortExec {
               final RawFileAppender appender = new RawFileAppender(context.getConf(), inSchema, meta, nextChunk);
               appender.init();
 
-              // we use choose the minimum k-ways between the remain chunks and fanout
-              int kway = Math.min((totalChunkNumForLevel - chunkId), fanout);
-              Scanner merger = createKWayMerger(level, chunkId, kway);
+              // we use the minimum k-ways between the remain chunks and fanout
+              final int kway = Math.min((totalChunkNumForLevel - chunkId), fanout);
+              final Scanner merger = createKWayMerger(level, chunkId, kway);
               merger.init();
               Tuple mergeTuple;
               while((mergeTuple = merger.next()) != null) {
@@ -226,44 +226,52 @@ public class ExternalSortExec extends SortExec {
           totalChunkNumForLevel = (int) Math.ceil((float)totalChunkNumForLevel / fanout);
         }
 
-        if (totalChunkNumForLevel == 1) {
-          Path result = getChunkPath(level, 0);
-          this.result = new RawFileScanner(context.getConf(), plan.getInSchema(), meta, result);
-        } else {
-          this.result = createKWayMerger(level, chunkId, totalChunkNumForLevel);
-        }
+        result = createFinalMerger(level, totalChunkNumForLevel);
         long mergeEnd = System.currentTimeMillis();
         LOG.info("Total merge time: " + (mergeEnd - mergeStart) + " msec");
       } else {
         this.result = new MemScanner();
       }
+
+      // preparing the sorted result
       this.result.init();
       sorted = true;
     }
     return result.next();
   }
 
+  private Scanner createFinalMerger(int level, int remainRunNum) throws IOException {
+    if (remainRunNum == 1) {
+      Path result = getChunkPath(level, 0);
+      this.result = new RawFileScanner(context.getConf(), plan.getInSchema(), meta, result);
+    } else {
+      this.result = createKWayMerger(level, 0, remainRunNum);
+    }
+    return result;
+  }
+
   private Scanner getFileScanner(Path path) throws IOException {
     return new RawFileScanner(context.getConf(), plan.getInSchema(), meta, path);
   }
 
-  private Scanner createKWayMerger(int level, int startChunkId, int num) throws IOException {
-    List<Scanner> sources = TUtil.newList();
+  private Scanner createKWayMerger(final int level, final int startChunkId, final int num) throws IOException {
+    final Scanner [] sources = new Scanner[num];
     for (int i = 0; i < num; i++) {
-      sources.add(getFileScanner(getChunkPath(level, startChunkId + i)));
+      sources[i] = getFileScanner(getChunkPath(level, startChunkId + i));
     }
 
     return createKWayMergerInternal(sources, 0, num);
   }
 
-  private Scanner createKWayMergerInternal(List<Scanner> sources, int startId, int num) throws IOException {
+  private Scanner createKWayMergerInternal(final Scanner [] sources, final int startIdx, final int num)
+      throws IOException {
     if (num > 1) {
-      int mid = (int) Math.ceil((float)num / 2);
+      final int mid = (int) Math.ceil((float)num / 2);
       return new PairWiseMerger(
-          createKWayMergerInternal(sources, startId, mid),
-          createKWayMergerInternal(sources, startId + mid, num - mid));
+          createKWayMergerInternal(sources, startIdx, mid),
+          createKWayMergerInternal(sources, startIdx + mid, num - mid));
     } else {
-      return sources.get(startId);
+      return sources[startIdx];
     }
   }
 

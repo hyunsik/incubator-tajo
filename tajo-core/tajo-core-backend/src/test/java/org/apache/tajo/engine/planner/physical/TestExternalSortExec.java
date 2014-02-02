@@ -57,7 +57,7 @@ public class TestExternalSortExec {
   private Path testDir;
 
 
-  private final int numTuple = 100000;
+  private final int numTuple = 20000000;
   private Random rnd = new Random(System.currentTimeMillis());
 
 
