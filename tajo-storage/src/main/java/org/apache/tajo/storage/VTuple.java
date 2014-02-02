@@ -34,8 +34,7 @@ public class VTuple implements Tuple, Cloneable {
 	}
 
   public VTuple(Tuple tuple) {
-    this.values = new Datum[tuple.size()];
-    System.arraycopy(((VTuple)tuple).values, 0, values, 0, tuple.size());
+    this.values = tuple.getValues().clone();
     this.offset = ((VTuple)tuple).offset;
   }
 

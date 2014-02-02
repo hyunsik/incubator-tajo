@@ -31,6 +31,7 @@ import org.apache.tajo.conf.TajoConf.ConfVars;
 import org.apache.tajo.engine.planner.logical.SortNode;
 import org.apache.tajo.storage.*;
 import org.apache.tajo.storage.Scanner;
+import org.apache.tajo.util.TUtil;
 import org.apache.tajo.worker.TaskAttemptContext;
 
 import java.io.IOException;
@@ -168,11 +169,11 @@ public class ExternalSortExec extends SortExec {
 
       long mergeStart = System.currentTimeMillis();
       // continue until the chunk remains only one
-      while (totalChunkNumForLevel > 2) {
+      while (totalChunkNumForLevel > fanout) {
 
         while (chunkId < totalChunkNumForLevel) {
 
-          Path nextChunk = getChunkPath(level + 1, chunkId / 2);
+          Path nextChunk = getChunkPath(level + 1, chunkId / fanout);
 
           // if number of chunkId is odd just copy it.
           if (chunkId + 1 >= totalChunkNumForLevel) {
@@ -182,13 +183,12 @@ public class ExternalSortExec extends SortExec {
 
           } else {
 
-            Path leftChunk = getChunkPath(level, chunkId);
-            Path rightChunk = getChunkPath(level, chunkId + 1);
-
             appender = new RawFile.RawFileAppender(context.getConf(), inSchema, meta, nextChunk);
             appender.init();
 
-            SortMerger merger = new SortMerger(leftChunk, rightChunk);
+            // we use choose the minimum k-ways between the remain chunks and fanout
+            int kway = Math.min((totalChunkNumForLevel - chunkId), fanout);
+            Scanner merger = createKWayMerger(level, chunkId, kway);
             merger.init();
             Tuple mergeTuple;
             while((mergeTuple = merger.next()) != null) {
@@ -198,25 +198,24 @@ public class ExternalSortExec extends SortExec {
 
             appender.flush();
             appender.close();
+            LOG.info(nextChunk + " is written");
           }
 
-          chunkId += 2;
+          chunkId += fanout;
         }
 
         level++;
         // init chunkId for each level
         chunkId = 0;
         // calculate the total number of chunks for next level
-        totalChunkNumForLevel = totalChunkNumForLevel / 2 + totalChunkNumForLevel % 2;
+        totalChunkNumForLevel = (totalChunkNumForLevel / fanout) + ((totalChunkNumForLevel % fanout) > 0 ? 1 : 0);
       }
 
       if (totalChunkNumForLevel == 1) {
         Path result = getChunkPath(level, 0);
         this.result = new RawFileScanner(context.getConf(), plan.getInSchema(), meta, result);
       } else {
-        Path leftChunk = getChunkPath(level, chunkId);
-        Path rightChunk = getChunkPath(level, chunkId + 1);
-        this.result = new SortMerger(leftChunk, rightChunk);
+        this.result = createKWayMerger(level, chunkId, totalChunkNumForLevel);
       }
       this.result.init();
       sorted = true;
@@ -228,22 +227,49 @@ public class ExternalSortExec extends SortExec {
     return result.next();
   }
 
-  private class SortMerger implements Scanner {
-    private final RawFileScanner leftScan;
-    private final RawFileScanner rightScan;
+  private Scanner getFileScanner(Path path) throws IOException {
+    return new RawFileScanner(context.getConf(), plan.getInSchema(), meta, path);
+  }
+
+  private Scanner createKWayMerger(int level, int startChunkId, int num) throws IOException {
+    List<Scanner> sources = TUtil.newList();
+    for (int i = 0; i < num; i++) {
+      sources.add(getFileScanner(getChunkPath(level, startChunkId + i)));
+    }
+
+    return createKWayMergerInternal(sources, 0, num);
+  }
+
+  private Scanner createKWayMergerInternal(List<Scanner> sources, int startId, int num) throws IOException {
+    if (num > 1) {
+      int mid = (int) Math.ceil((float)num / 2);
+      return new PairWiseMerger(
+          createKWayMergerInternal(sources, startId, mid),
+          createKWayMergerInternal(sources, startId + mid, num - mid));
+    } else {
+      return sources.get(startId);
+    }
+  }
+
+  private class PairWiseMerger implements Scanner {
+    private final Scanner leftScan;
+    private final Scanner rightScan;
 
     private Tuple leftTuple;
     private Tuple rightTuple;
 
     private final Comparator<Tuple> comparator = getComparator();
 
-    public SortMerger(Path leftPath, Path rightPath) throws IOException {
-      leftScan = new RawFileScanner(context.getConf(), plan.getInSchema(), meta, leftPath);
-      rightScan = new RawFileScanner(context.getConf(), plan.getInSchema(), meta, rightPath);
+    public PairWiseMerger(Scanner leftScanner, Scanner rightScanner) throws IOException {
+      this.leftScan = leftScanner;
+      this.rightScan = rightScanner;
     }
 
     @Override
     public void init() throws IOException {
+      leftScan.init();
+      rightScan.init();
+
       leftTuple = leftScan.next();
       rightTuple = rightScan.next();
     }
