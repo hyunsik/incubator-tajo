@@ -65,14 +65,13 @@ public class ExternalSortExec extends SortExec {
       throws IOException {
     super(context, plan.getInSchema(), plan.getOutSchema(), child, plan.getSortKeys());
     this.plan = plan;
+    this.meta = CatalogUtil.newTableMeta(StoreType.ROWFILE);
+    this.localFS = FileSystem.getLocal(context.getConf());
+    this.sortTmpDir = new Path(context.getWorkDir(), UUID.randomUUID().toString());
 
     this.fanout = context.getConf().getIntVar(ConfVars.EXECUTOR_EXTERNAL_SORT_FANOUT);
     this.bufferBytesSize = context.getConf().getIntVar(ConfVars.EXECUTOR_EXTERNAL_SORT_BUFFER_SIZE);
     this.inMemoryTable = new ArrayList<Tuple>(1000000);
-
-    this.sortTmpDir = new Path(context.getWorkDir(), UUID.randomUUID().toString());
-    this.localFS = FileSystem.getLocal(context.getConf());
-    meta = CatalogUtil.newTableMeta(StoreType.ROWFILE);
   }
 
   public void init() throws IOException {
@@ -145,9 +144,11 @@ public class ExternalSortExec extends SortExec {
           long end = System.currentTimeMillis();
           LOG.info("Last Chunk #" + chunkId + " " + rowNum + " rows written (" + (end - start) + " msec)");
         }
+      } else {
+        Collections.sort(inMemoryTable, getComparator());
       }
 
-      // if at least one or more tuples
+      // if there are at least one or more tuples
       chunkId++;
     }
 
@@ -411,7 +412,9 @@ public class ExternalSortExec extends SortExec {
 
   @Override
   public void close() throws IOException {
-    result.close();
+    if (result != null) {
+      result.close();
+    }
     inMemoryTable.clear();
   }
 

@@ -57,7 +57,7 @@ public class TestExternalSortExec {
   private Path testDir;
 
 
-  private final int numTuple = 2800000;
+  private final int numTuple = 100000;
   private Random rnd = new Random(System.currentTimeMillis());
 
 
@@ -111,7 +111,7 @@ public class TestExternalSortExec {
 
   @Test
   public final void testNext() throws IOException, PlanningException {
-    FileFragment[] frags = sm.splitNG(conf, "employee", employee.getMeta(), employee.getPath(),
+    FileFragment[] frags = StorageManager.splitNG(conf, "employee", employee.getMeta(), employee.getPath(),
         Integer.MAX_VALUE);
     Path workDir = new Path(testDir, TestExternalSortExec.class.getName());
     TaskAttemptContext ctx = new TaskAttemptContext(conf,
