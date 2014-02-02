@@ -56,6 +56,15 @@ public class ClassSize {
   /** Overhead for an Integer */
   public static final int INTEGER;
 
+  /** Overhead for an Long */
+  public static final int LONG;
+
+  /** Overhead for an Float */
+  public static final int FLOAT;
+
+  /** Overhead for an Double */
+  public static final int DOUBLE;
+
   /** Overhead for entry in map */
   public static final int MAP_ENTRY;
 
@@ -154,6 +163,12 @@ public class ClassSize {
     SHORT = align(OBJECT + Bytes.SIZEOF_SHORT);
 
     INTEGER = align(OBJECT + Bytes.SIZEOF_INT);
+
+    LONG = align(OBJECT + Bytes.SIZEOF_LONG);
+
+    FLOAT = align(OBJECT + Bytes.SIZEOF_FLOAT);
+
+    DOUBLE = align(OBJECT + Bytes.SIZEOF_DOUBLE);
 
     MAP_ENTRY = align(OBJECT + 5 * REFERENCE + Bytes.SIZEOF_BOOLEAN);
 

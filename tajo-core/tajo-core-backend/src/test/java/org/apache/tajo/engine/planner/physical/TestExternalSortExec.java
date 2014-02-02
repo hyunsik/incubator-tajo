@@ -57,7 +57,7 @@ public class TestExternalSortExec {
   private Path testDir;
 
 
-  private final int numTuple = 5000000;
+  private final int numTuple = 20000000;
   private Random rnd = new Random(System.currentTimeMillis());
 
 
@@ -91,7 +91,8 @@ public class TestExternalSortExec {
     appender.flush();
     appender.close();
 
-    System.out.println("Total Rows: " + appender.getStats().getNumRows());
+    System.out.println(appender.getStats().getNumRows() + " rows (" + (appender.getStats().getNumBytes() / 1048576) +
+        " MB)");
 
     employee = new TableDesc("employee", schema, employeeMeta, employeePath);
     catalog.addTable(employee);
@@ -105,7 +106,7 @@ public class TestExternalSortExec {
   }
 
   String[] QUERIES = {
-      "select managerId, empId, deptName from employee order by managerId, empId desc"
+      "select managerId, empId from employee order by managerId, empId"
   };
 
   @Test
@@ -127,8 +128,8 @@ public class TestExternalSortExec {
 
     // TODO - should be planed with user's optimization hint
     if (!(proj.getChild() instanceof ExternalSortExec)) {
-      UnaryPhysicalExec sortExec = (UnaryPhysicalExec) proj.getChild();
-      SeqScanExec scan = (SeqScanExec)sortExec.getChild();
+      UnaryPhysicalExec sortExec = proj.getChild();
+      SeqScanExec scan = sortExec.getChild();
 
       ExternalSortExec extSort = new ExternalSortExec(ctx, sm,
           ((MemSortExec)sortExec).getPlan(), scan);
@@ -136,16 +137,21 @@ public class TestExternalSortExec {
     }
 
     Tuple tuple;
-    Datum preVal = null;
-    Datum curVal;
+    Tuple preVal = null;
+    Tuple curVal;
     int cnt = 0;
     exec.init();
     long start = System.currentTimeMillis();
+    TupleComparator comparator = new TupleComparator(proj.getSchema(),
+        new SortSpec[]{
+            new SortSpec(new Column("managerId", Type.INT4)),
+            new SortSpec(new Column("empId", Type.INT4))
+        });
 
     while ((tuple = exec.next()) != null) {
-      curVal = tuple.get(0);
+      curVal = tuple;
       if (preVal != null) {
-        assertTrue(preVal.lessThanEqual(curVal).asBool());
+        assertTrue("prev: " + preVal + ", but cur: " + curVal, comparator.compare(preVal, curVal) <= 0);
       }
       preVal = curVal;
       cnt++;
@@ -159,9 +165,9 @@ public class TestExternalSortExec {
     exec.rescan();
     cnt = 0;
     while ((tuple = exec.next()) != null) {
-      curVal = tuple.get(0);
+      curVal = tuple;
       if (preVal != null) {
-        assertTrue(preVal.lessThanEqual(curVal).asBool());
+        assertTrue("prev: " + preVal + ", but cur: " + curVal, comparator.compare(preVal, curVal) <= 0);
       }
       preVal = curVal;
       cnt++;

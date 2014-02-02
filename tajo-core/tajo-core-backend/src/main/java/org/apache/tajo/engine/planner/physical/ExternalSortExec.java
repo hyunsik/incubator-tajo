@@ -23,30 +23,35 @@ import com.sun.org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.tajo.catalog.CatalogUtil;
+import org.apache.tajo.catalog.Column;
+import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.catalog.TableMeta;
 import org.apache.tajo.catalog.proto.CatalogProtos.StoreType;
 import org.apache.tajo.conf.TajoConf.ConfVars;
 import org.apache.tajo.engine.planner.logical.SortNode;
 import org.apache.tajo.storage.*;
-import org.apache.tajo.util.ClassSize;
+import org.apache.tajo.storage.Scanner;
 import org.apache.tajo.worker.TaskAttemptContext;
 
 import java.io.IOException;
 import java.util.*;
 
+import static org.apache.tajo.storage.RawFile.RawFileScanner;
+
 public class ExternalSortExec extends SortExec {
   private static final Log LOG = LogFactory.getLog(ExternalSortExec.class);
   private SortNode plan;
 
-  private final List<ByteBufTuple> tupleSlots;
+  private final List<Tuple> tupleSlots;
   private boolean sorted = false;
-  private RawFile.RawFileScanner result;
+  private Scanner result;
   private RawFile.RawFileAppender appender;
   private FileSystem localFS;
 
   private final TableMeta meta;
   private final Path sortTmpDir;
   private final int bufferBytesSize;
+  private final int fanout;
 
   private final TupleFactory tupleFactory;
 
@@ -56,8 +61,9 @@ public class ExternalSortExec extends SortExec {
     super(context, plan.getInSchema(), plan.getOutSchema(), child, plan.getSortKeys());
     this.plan = plan;
 
-    this.bufferBytesSize = context.getConf().getIntVar(ConfVars.EXECUTOR_SORT_EXTENAL_BUFFER_SIZE);
-    this.tupleSlots = new ArrayList<ByteBufTuple>();
+    this.fanout = context.getConf().getIntVar(ConfVars.EXECUTOR_EXTERNAL_SORT_FANOUT);
+    this.bufferBytesSize = context.getConf().getIntVar(ConfVars.EXECUTOR_EXTERNAL_SORT_BUFFER_SIZE);
+    this.tupleSlots = new ArrayList<Tuple>();
 
     this.sortTmpDir = new Path(context.getWorkDir(), UUID.randomUUID().toString());
     this.localFS = FileSystem.getLocal(context.getConf());
@@ -75,7 +81,7 @@ public class ExternalSortExec extends SortExec {
     return this.plan;
   }
 
-  private void sortAndStoreChunk(int chunkId, List<ByteBufTuple> tupleSlots)
+  private void sortAndStoreChunk(int chunkId, List<Tuple> tupleSlots)
       throws IOException {
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.RAW);
     Collections.sort(tupleSlots, getComparator());
@@ -86,7 +92,7 @@ public class ExternalSortExec extends SortExec {
     appender = new RawFile.RawFileAppender(context.getConf(), inSchema, meta, localPath);
     appender.init();
 
-    for (ByteBufTuple t : tupleSlots) {
+    for (Tuple t : tupleSlots) {
       appender.addTuple(t);
     }
     appender.close();
@@ -106,10 +112,12 @@ public class ExternalSortExec extends SortExec {
 
     long runStartTime = System.currentTimeMillis();
     while ((tuple = child.next()) != null) { // partition sort start
-      ByteBufTuple byteBufTuple = tupleFactory.newByteBufTuple();
-      byteBufTuple.put(0, tuple);
-      tupleSlots.add(byteBufTuple);
-      memoryConsumption += byteBufTuple.getMemorySize() + ClassSize.OBJECT;
+      //ByteBufTuple vtuple = tupleFactory.newByteBufTuple();
+      //vtuple.put(0, tuple);
+      VTuple vtuple = new VTuple(tuple);
+
+      tupleSlots.add(vtuple);
+      memoryConsumption += MemoryUtil.calculateMemorySize(vtuple);
 
       if (memoryConsumption > bufferBytesSize) {
         long runEndTime = System.currentTimeMillis();
@@ -158,8 +166,9 @@ public class ExternalSortExec extends SortExec {
       int level = 0;
       int chunkId = 0;
 
+      long mergeStart = System.currentTimeMillis();
       // continue until the chunk remains only one
-      while (totalChunkNumForLevel > 1) {
+      while (totalChunkNumForLevel > 2) {
 
         while (chunkId < totalChunkNumForLevel) {
 
@@ -178,7 +187,14 @@ public class ExternalSortExec extends SortExec {
 
             appender = new RawFile.RawFileAppender(context.getConf(), inSchema, meta, nextChunk);
             appender.init();
-            merge(appender, leftChunk, rightChunk);
+
+            SortMerger merger = new SortMerger(leftChunk, rightChunk);
+            merger.init();
+            Tuple mergeTuple;
+            while((mergeTuple = merger.next()) != null) {
+              appender.addTuple(mergeTuple);
+            }
+            merger.close();
 
             appender.flush();
             appender.close();
@@ -191,53 +207,109 @@ public class ExternalSortExec extends SortExec {
         // init chunkId for each level
         chunkId = 0;
         // calculate the total number of chunks for next level
-        totalChunkNumForLevel = totalChunkNumForLevel / 2
-            + totalChunkNumForLevel % 2;
+        totalChunkNumForLevel = totalChunkNumForLevel / 2 + totalChunkNumForLevel % 2;
       }
 
-      Path result = getChunkPath(level, 0);
-      this.result = new RawFile.RawFileScanner(context.getConf(), plan.getInSchema(), meta, result);
+      if (totalChunkNumForLevel == 1) {
+        Path result = getChunkPath(level, 0);
+        this.result = new RawFileScanner(context.getConf(), plan.getInSchema(), meta, result);
+      } else {
+        Path leftChunk = getChunkPath(level, chunkId);
+        Path rightChunk = getChunkPath(level, chunkId + 1);
+        this.result = new SortMerger(leftChunk, rightChunk);
+      }
+      this.result.init();
       sorted = true;
+
+      long mergeEnd = System.currentTimeMillis();
+      System.out.println("Total merge time: " + (mergeEnd - mergeStart) + " msec");
     }
 
     return result.next();
   }
 
-  private void merge(RawFile.RawFileAppender appender, Path left, Path right)
-      throws IOException {
-    RawFile.RawFileScanner leftScan = new RawFile.RawFileScanner(context.getConf(), plan.getInSchema(), meta, left);
+  private class SortMerger implements Scanner {
+    private final RawFileScanner leftScan;
+    private final RawFileScanner rightScan;
 
-    RawFile.RawFileScanner rightScan =
-        new RawFile.RawFileScanner(context.getConf(), plan.getInSchema(), meta, right);
+    private Tuple leftTuple;
+    private Tuple rightTuple;
 
-    Tuple leftTuple = leftScan.next();
-    Tuple rightTuple = rightScan.next();
+    private final Comparator<Tuple> comparator = getComparator();
 
-    Comparator<Tuple> comparator = getComparator();
-    while (leftTuple != null && rightTuple != null) {
-      if (comparator.compare(leftTuple, rightTuple) < 0) {
-        appender.addTuple(leftTuple);
-        leftTuple = leftScan.next();
-      } else {
-        appender.addTuple(rightTuple);
+    public SortMerger(Path leftPath, Path rightPath) throws IOException {
+      leftScan = new RawFileScanner(context.getConf(), plan.getInSchema(), meta, leftPath);
+      rightScan = new RawFileScanner(context.getConf(), plan.getInSchema(), meta, rightPath);
+    }
+
+    @Override
+    public void init() throws IOException {
+      leftTuple = leftScan.next();
+      rightTuple = rightScan.next();
+    }
+
+    public Tuple next() throws IOException {
+      Tuple outTuple = null;
+      if (leftTuple != null && rightTuple != null) {
+        if (comparator.compare(leftTuple, rightTuple) < 0) {
+          outTuple = leftTuple;
+          leftTuple = leftScan.next();
+        } else {
+          outTuple = rightTuple;
+          rightTuple = rightScan.next();
+        }
+        return outTuple;
+      }
+
+      if (leftTuple == null) {
+        outTuple = rightTuple;
         rightTuple = rightScan.next();
+      } else {
+        outTuple = leftTuple;
+        leftTuple = leftScan.next();
       }
+      return outTuple;
     }
 
-    if (leftTuple == null) {
-      appender.addTuple(rightTuple);
-      while ((rightTuple = rightScan.next()) != null) {
-        appender.addTuple(rightTuple);
-      }
-    } else {
-      appender.addTuple(leftTuple);
-      while ((leftTuple = leftScan.next()) != null) {
-        appender.addTuple(leftTuple);
-      }
+    @Override
+    public void reset() throws IOException {
+      leftScan.reset();
+      rightScan.reset();
+      init();
     }
 
-    leftScan.close();
-    rightScan.close();
+    public void close() throws IOException {
+      leftScan.close();
+      rightScan.close();
+    }
+
+    @Override
+    public boolean isProjectable() {
+      return false;
+    }
+
+    @Override
+    public void setTarget(Column[] targets) {
+    }
+
+    @Override
+    public boolean isSelectable() {
+      return false;
+    }
+
+    @Override
+    public void setSearchCondition(Object expr) {
+    }
+
+    @Override
+    public boolean isSplittable() {
+      return false;
+    }
+
+    @Override
+    public Schema getSchema() {
+      return inSchema;
+    }
   }
 
   @Override
