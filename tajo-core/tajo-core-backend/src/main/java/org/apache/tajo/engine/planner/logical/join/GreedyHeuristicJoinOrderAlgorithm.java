@@ -65,6 +65,7 @@ public class GreedyHeuristicJoinOrderAlgorithm implements JoinOrderAlgorithm {
     }
 
     JoinNode joinTree = (JoinNode) remainRelations.iterator().next();
+    block.registerNode(joinTree);
     return new FoundJoinOrder(joinTree, getCost(joinTree));
   }
 

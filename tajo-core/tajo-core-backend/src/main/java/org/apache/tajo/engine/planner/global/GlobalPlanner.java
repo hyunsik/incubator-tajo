@@ -801,6 +801,7 @@ public class GlobalPlanner {
                                           LogicalPlan.QueryBlock queryBlock,
                                           TableSubQueryNode node, Stack<LogicalNode> stack) throws PlanningException {
       LogicalNode child = super.visitTableSubQuery(context, plan, queryBlock, node, stack);
+      node.setSubQuery(child);
 
       ExecutionBlock currentBlock = context.execBlockMap.remove(child.getPID());
 

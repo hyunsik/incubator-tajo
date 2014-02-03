@@ -54,14 +54,18 @@ public class TableSubQueryNode extends RelationNode implements Projectable {
 
   @Override
   public Schema getTableSchema() {
-    return getOutSchema();
+    return getInSchema();
   }
 
   public void setSubQuery(LogicalNode node) {
     this.subQuery = node;
     setInSchema((Schema) this.subQuery.getOutSchema().clone());
     getInSchema().setQualifier(this.tableName);
-    setOutSchema((Schema) this.subQuery.getOutSchema().clone());
+    if (hasTargets()) {
+      setOutSchema(PlannerUtil.targetToSchema(targets));
+    } else {
+      setOutSchema((Schema) this.subQuery.getOutSchema().clone());
+    }
     getOutSchema().setQualifier(this.tableName);
   }
 

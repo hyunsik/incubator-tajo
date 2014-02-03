@@ -304,45 +304,49 @@ public class ProjectionPushDownRule extends
 
     // Removing ProjectionNode
     // TODO - Consider INSERT and CTAS statement, and then remove the check of stack.empty.
-    if (resolvingCount == 0 && !stack.empty() &&
-        PlannerUtil.targetToSchema(finalTargets).equals(child.getOutSchema())) {
-      LogicalNode parentNode = stack.peek();
-      switch (parentNode.getType()) {
-      case ROOT:
-        LogicalRootNode rootNode = (LogicalRootNode) parentNode;
-        rootNode.setChild(child);
-        rootNode.setInSchema(child.getOutSchema());
-        rootNode.setOutSchema(child.getOutSchema());
-        break;
-      case TABLE_SUBQUERY:
-        TableSubQueryNode tableSubQueryNode = (TableSubQueryNode) parentNode;
-        tableSubQueryNode.setSubQuery(child);
-        break;
-      case STORE:
-        StoreTableNode storeTableNode = (StoreTableNode) parentNode;
-        storeTableNode.setChild(child);
-        storeTableNode.setInSchema(child.getOutSchema());
-        break;
-      case INSERT:
-        InsertNode insertNode = (InsertNode) parentNode;
-        insertNode.setSubQuery(child);
-        break;
-      case CREATE_TABLE:
-        CreateTableNode createTableNode = (CreateTableNode) parentNode;
-        createTableNode.setChild(child);
-        createTableNode.setInSchema(child.getOutSchema());
-        createTableNode.setInSchema(child.getOutSchema());
-        break;
-      default:
-        throw new PlanningException("Unexpected Parent Node: " + parentNode.getType());
+    if (resolvingCount == 0 && PlannerUtil.targetToSchema(finalTargets).equals(child.getOutSchema())) {
+      if (stack.empty()) {
+        block.setRoot(child);
+      } else {
+        LogicalNode parentNode = stack.peek();
+        switch (parentNode.getType()) {
+        case ROOT:
+          LogicalRootNode rootNode = (LogicalRootNode) parentNode;
+          rootNode.setChild(child);
+          rootNode.setInSchema(child.getOutSchema());
+          rootNode.setOutSchema(child.getOutSchema());
+          break;
+        case TABLE_SUBQUERY:
+          TableSubQueryNode tableSubQueryNode = (TableSubQueryNode) parentNode;
+          tableSubQueryNode.setSubQuery(child);
+          break;
+        case STORE:
+          StoreTableNode storeTableNode = (StoreTableNode) parentNode;
+          storeTableNode.setChild(child);
+          storeTableNode.setInSchema(child.getOutSchema());
+          break;
+        case INSERT:
+          InsertNode insertNode = (InsertNode) parentNode;
+          insertNode.setSubQuery(child);
+          break;
+        case CREATE_TABLE:
+          CreateTableNode createTableNode = (CreateTableNode) parentNode;
+          createTableNode.setChild(child);
+          createTableNode.setInSchema(child.getOutSchema());
+          break;
+        default:
+          throw new PlanningException("Unexpected Parent Node: " + parentNode.getType());
+        }
+        plan.addHistory("ProjectionNode is eliminated.");
       }
-      plan.addHistory("ProjectionNode is eliminated.");
+
+      return child;
+
     } else {
       node.setInSchema(child.getOutSchema());
       node.setTargets(finalTargets.toArray(new Target[finalTargets.size()]));
+      return node;
     }
-
-    return node;
   }
 
   public LogicalNode visitLimit(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, LimitNode node,
@@ -382,6 +386,9 @@ public class ProjectionPushDownRule extends
 
     LogicalNode child = super.visitHaving(newContext, plan, block, node, stack);
 
+    node.setInSchema(child.getOutSchema());
+    node.setOutSchema(child.getOutSchema());
+
     Target target = context.targetListMgr.getTarget(referenceName);
     if (newContext.targetListMgr.isResolved(referenceName)) {
       node.setQual(new FieldEval(target.getNamedColumn()));
@@ -390,8 +397,6 @@ public class ProjectionPushDownRule extends
       newContext.targetListMgr.resolve(target);
     }
 
-    node.setInSchema(child.getOutSchema());
-    node.setOutSchema(child.getOutSchema());
     return node;
   }
 
@@ -427,6 +432,8 @@ public class ProjectionPushDownRule extends
 
     // visit a child node
     LogicalNode child = super.visitGroupBy(newContext, plan, block, node, stack);
+
+    node.setInSchema(child.getOutSchema());
 
     if (groupingKeyNum > 0) {
       // Restoring grouping key columns
@@ -466,7 +473,6 @@ public class ProjectionPushDownRule extends
         node.setAggFunctions(aggEvals);
       }
     }
-    node.setInSchema(child.getOutSchema());
     Target [] targets = buildGroupByTarget(node, aggEvalNames);
     node.setTargets(targets);
 
@@ -501,6 +507,9 @@ public class ProjectionPushDownRule extends
 
     LogicalNode child = super.visitFilter(newContext, plan, block, node, stack);
 
+    node.setInSchema(child.getOutSchema());
+    node.setOutSchema(child.getOutSchema());
+
     Target target = context.targetListMgr.getTarget(referenceName);
     if (newContext.targetListMgr.isResolved(referenceName)) {
       node.setQual(new FieldEval(target.getNamedColumn()));
@@ -508,9 +517,6 @@ public class ProjectionPushDownRule extends
       node.setQual(target.getEvalTree());
       newContext.targetListMgr.resolve(target);
     }
-
-    node.setInSchema(child.getOutSchema());
-    node.setOutSchema(child.getOutSchema());
 
     return node;
   }
@@ -540,6 +546,7 @@ public class ProjectionPushDownRule extends
     stack.pop();
 
     Schema merged = SchemaUtil.merge(left.getOutSchema(), right.getOutSchema());
+
     node.setInSchema(merged);
 
     if (node.hasJoinQual()) {
@@ -751,7 +758,8 @@ public class ProjectionPushDownRule extends
                                    TableSubQueryNode node, Stack<LogicalNode> stack) throws PlanningException {
     Context childContext = new Context(plan, upperContext.requiredSet);
     stack.push(node);
-    LogicalNode child = visit(childContext, plan, plan.getBlock(node.getSubQuery()), node.getSubQuery(), stack);
+    LogicalNode child = super.visitTableSubQuery(childContext, plan, block, node, stack);
+    node.setSubQuery(child);
     stack.pop();
 
     Context newContext = new Context(upperContext);
@@ -779,7 +787,7 @@ public class ProjectionPushDownRule extends
     }
 
     node.setTargets(projectedTargets.toArray(new Target[projectedTargets.size()]));
-
+    LogicalPlanner.verifyProjectedFields(block, node);
     return node;
   }
 

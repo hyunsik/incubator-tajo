@@ -124,6 +124,47 @@ public class TestTablePartitions {
   }
 
   @Test
+  public final void testColumnPartitionedTableByOneColumnWithSubQuery() throws Exception {
+    String tableName ="testColumnPartitionedTableByOneColumnWithSubQuery";
+    ResultSet res = tpch.execute(
+        "create table " + tableName +" (col1 int4, col2 int4, null_col int4) partition by column(key float8) ");
+    res.close();
+    TajoTestingCluster cluster = tpch.getTestingCluster();
+    CatalogService catalog = cluster.getMaster().getCatalog();
+    assertTrue(catalog.existsTable(tableName));
+
+    res = tpch.execute("insert overwrite into " + tableName
+        + " (col1, col2, key) select l_orderkey, l_partkey, l_quantity from lineitem");
+    res.close();
+
+    TableDesc desc = catalog.getTableDesc(tableName);
+    Path path = desc.getPath();
+
+    FileSystem fs = FileSystem.get(tpch.getTestingCluster().getConfiguration());
+    assertTrue(fs.isDirectory(path));
+    assertTrue(fs.isDirectory(new Path(path.toUri() + "/key=17.0")));
+    assertTrue(fs.isDirectory(new Path(path.toUri() + "/key=36.0")));
+    assertTrue(fs.isDirectory(new Path(path.toUri() + "/key=38.0")));
+    assertTrue(fs.isDirectory(new Path(path.toUri() + "/key=45.0")));
+    assertTrue(fs.isDirectory(new Path(path.toUri() + "/key=49.0")));
+    assertEquals(5, desc.getStats().getNumRows().intValue());
+
+    res = tpch.execute(
+        "select * from (select col1, col2, null_col, key from " + tableName + " where (key = 45.0 or key = 38.0) and null_col is null) test");
+
+    Map<Double, int []> resultRows1 = Maps.newHashMap();
+    resultRows1.put(45.0d, new int[]{3, 2});
+    resultRows1.put(38.0d, new int[]{2, 2});
+
+    for (int i = 0; i < 2; i++) {
+      assertTrue(res.next());
+      assertEquals(resultRows1.get(res.getDouble(4))[0], res.getInt(1));
+      assertEquals(resultRows1.get(res.getDouble(4))[1], res.getInt(2));
+    }
+    res.close();
+  }
+
+  @Test
   public final void testColumnPartitionedTableByThreeColumns() throws Exception {
     String tableName ="testColumnPartitionedTableByThreeColumns";
     ResultSet res = tpch.execute(
