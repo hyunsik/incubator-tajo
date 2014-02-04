@@ -63,7 +63,7 @@ public class TajoResultSet extends TajoResultSetBase {
       fs = FileScanner.getFileSystem(conf, desc.getPath());
       this.totalRow = desc.getStats() != null ? desc.getStats().getNumRows() : 0;
 
-      Collection<FileFragment> frags = getFragments(desc.getMeta(), desc.getPath());
+      List<FileFragment> frags = getFragments(desc.getMeta(), desc.getPath());
       scanner = new MergeScanner(conf, schema, desc.getMeta(), frags);
     }
     init();
@@ -75,7 +75,7 @@ public class TajoResultSet extends TajoResultSetBase {
     curRow = 0;
   }
 
-  static class FileNameComparator implements Comparator<FileStatus> {
+  public static class FileNameComparator implements Comparator<FileStatus> {
 
     @Override
     public int compare(FileStatus f1, FileStatus f2) {
@@ -83,7 +83,7 @@ public class TajoResultSet extends TajoResultSetBase {
     }
   }
 
-  private Collection<FileFragment> getFragments(TableMeta meta, Path tablePath)
+  private List<FileFragment> getFragments(TableMeta meta, Path tablePath)
       throws IOException {
     List<FileFragment> fraglist = Lists.newArrayList();
     FileStatus[] files = fs.listStatus(tablePath, new PathFilter() {
