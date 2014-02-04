@@ -37,7 +37,6 @@ import org.apache.tajo.storage.fragment.FileFragment;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 
@@ -63,7 +62,7 @@ public class TajoResultSet extends TajoResultSetBase {
       fs = FileScanner.getFileSystem(conf, desc.getPath());
       this.totalRow = desc.getStats() != null ? desc.getStats().getNumRows() : 0;
 
-      Collection<FileFragment> frags = getFragments(desc.getMeta(), desc.getPath());
+      List<FileFragment> frags = getFragments(desc.getMeta(), desc.getPath());
       scanner = new MergeScanner(conf, schema, desc.getMeta(), frags);
     }
     init();
@@ -75,15 +74,15 @@ public class TajoResultSet extends TajoResultSetBase {
     curRow = 0;
   }
 
-  static class FileNameComparator implements Comparator<FileStatus> {
+  public static class FileNameComparator implements Comparator<FileStatus> {
 
     @Override
     public int compare(FileStatus f1, FileStatus f2) {
-      return f2.getPath().getName().compareTo(f1.getPath().getName());
+      return f1.getPath().getName().compareTo(f2.getPath().getName());
     }
   }
 
-  private Collection<FileFragment> getFragments(TableMeta meta, Path tablePath)
+  private List<FileFragment> getFragments(TableMeta meta, Path tablePath)
       throws IOException {
     List<FileFragment> fraglist = Lists.newArrayList();
     FileStatus[] files = fs.listStatus(tablePath, new PathFilter() {

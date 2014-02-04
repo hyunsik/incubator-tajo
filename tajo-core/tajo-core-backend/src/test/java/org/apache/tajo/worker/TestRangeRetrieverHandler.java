@@ -34,6 +34,7 @@ import org.apache.tajo.datum.Datum;
 import org.apache.tajo.datum.DatumFactory;
 import org.apache.tajo.engine.parser.SQLAnalyzer;
 import org.apache.tajo.engine.planner.*;
+import org.apache.tajo.engine.planner.enforce.Enforcer;
 import org.apache.tajo.engine.planner.logical.LogicalNode;
 import org.apache.tajo.engine.planner.physical.*;
 import org.apache.tajo.storage.*;
@@ -131,7 +132,7 @@ public class TestRangeRetrieverHandler {
 
     TaskAttemptContext ctx = new TaskAttemptContext(conf, LocalTajoTestingUtility.newQueryUnitAttemptId(),
         new FileFragment[] {frags[0]}, testDir);
-
+    ctx.setEnforcer(new Enforcer());
     Expr expr = analyzer.parse(SORT_QUERY[0]);
     LogicalPlan plan = planner.createPlan(expr);
     LogicalNode rootNode = optimizer.optimize(plan);
@@ -253,6 +254,7 @@ public class TestRangeRetrieverHandler {
     TaskAttemptContext
         ctx = new TaskAttemptContext(conf, LocalTajoTestingUtility.newQueryUnitAttemptId(),
         new FileFragment[] {frags[0]}, testDir);
+    ctx.setEnforcer(new Enforcer());
     Expr expr = analyzer.parse(SORT_QUERY[1]);
     LogicalPlan plan = planner.createPlan(expr);
     LogicalNode rootNode = optimizer.optimize(plan);

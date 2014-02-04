@@ -431,6 +431,7 @@ public class GlobalPlanner {
         currentNode.setChild(secondScan);
         currentNode.setInSchema(secondScan.getOutSchema());
         currentBlock.setPlan(currentNode);
+        currentBlock.getEnforcer().addSortedInput(secondScan.getTableName(), currentNode.getSortKeys());
       }
     } else {
       LogicalNode childBlockPlan = childBlock.getPlan();
@@ -449,6 +450,7 @@ public class GlobalPlanner {
       currentNode.setChild(secondScan);
       currentNode.setInSchema(secondScan.getOutSchema());
       currentBlock.setPlan(currentNode);
+      currentBlock.getEnforcer().addSortedInput(secondScan.getTableName(), currentNode.getSortKeys());
       masterPlan.addConnect(channel);
     }
 

@@ -27,11 +27,14 @@ import org.apache.tajo.catalog.CatalogUtil;
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.catalog.TableMeta;
+import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.catalog.proto.CatalogProtos.StoreType;
 import org.apache.tajo.conf.TajoConf.ConfVars;
 import org.apache.tajo.engine.planner.logical.SortNode;
 import org.apache.tajo.storage.*;
 import org.apache.tajo.storage.Scanner;
+import org.apache.tajo.storage.fragment.FileFragment;
+import org.apache.tajo.storage.fragment.FragmentConvertor;
 import org.apache.tajo.util.FileUtil;
 import org.apache.tajo.util.TUtil;
 import org.apache.tajo.worker.TaskAttemptContext;
@@ -78,6 +81,8 @@ public class ExternalSortExec extends SortExec {
   private final RawLocalFileSystem localFS;
   /** final output files */
   private List<Path> finalOutputFiles = null;
+  /** for directly merging sorted inputs */
+  private List<Path> mergedInputPaths = null;
 
   ///////////////////////////////////////////////////
   // transient variables
@@ -89,10 +94,10 @@ public class ExternalSortExec extends SortExec {
   /** the final result */
   private Scanner result;
 
-  public ExternalSortExec(final TaskAttemptContext context,
-                          final AbstractStorageManager sm, final SortNode plan, final PhysicalExec child)
-      throws IOException {
-    super(context, plan.getInSchema(), plan.getOutSchema(), child, plan.getSortKeys());
+  private ExternalSortExec(final TaskAttemptContext context, final AbstractStorageManager sm, final SortNode plan)
+      throws PhysicalPlanningException {
+    super(context, plan.getInSchema(), plan.getOutSchema(), null, plan.getSortKeys());
+
     this.plan = plan;
     this.meta = CatalogUtil.newTableMeta(StoreType.ROWFILE);
 
@@ -111,6 +116,25 @@ public class ExternalSortExec extends SortExec {
     localFS = new RawLocalFileSystem();
   }
 
+  public ExternalSortExec(final TaskAttemptContext context,
+                          final AbstractStorageManager sm, final SortNode plan,
+                          final CatalogProtos.FragmentProto[] fragments) throws PhysicalPlanningException {
+    this(context, sm, plan);
+
+    mergedInputPaths = TUtil.newList();
+    for (CatalogProtos.FragmentProto proto : fragments) {
+      FileFragment fragment = FragmentConvertor.convert(FileFragment.class, proto);
+      mergedInputPaths.add(fragment.getPath());
+    }
+  }
+
+  public ExternalSortExec(final TaskAttemptContext context,
+                          final AbstractStorageManager sm, final SortNode plan, final PhysicalExec child)
+      throws IOException {
+    this(context, sm, plan);
+    setChild(child);
+  }
+
   public void init() throws IOException {
     super.init();
   }
@@ -122,7 +146,7 @@ public class ExternalSortExec extends SortExec {
   /**
    * Sort tuple block and store them into a chunk file
    */
-  private final Path sortAndStoreChunk(int chunkId, List<Tuple> tupleBlock)
+  private Path sortAndStoreChunk(int chunkId, List<Tuple> tupleBlock)
       throws IOException {
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.RAW);
     int rowNum = tupleBlock.size();
@@ -156,7 +180,7 @@ public class ExternalSortExec extends SortExec {
    * @return All paths of chunks
    * @throws java.io.IOException
    */
-  private final List<Path> sortAndStoreAllChunks() throws IOException {
+  private List<Path> sortAndStoreAllChunks() throws IOException {
     Tuple tuple;
     int memoryConsumption = 0;
     List<Path> chunkPaths = TUtil.newList();
@@ -211,23 +235,30 @@ public class ExternalSortExec extends SortExec {
   public Tuple next() throws IOException {
 
     if (!sorted) { // if not sorted, first sort all data
-
-      // Try to sort all data, and store them into a number of chunks if memory exceeds
-      long startTimeOfChunkSplit = System.currentTimeMillis();
-      List<Path> chunks = sortAndStoreAllChunks();
-      long endTimeOfChunkSplit = System.currentTimeMillis();
-      info(LOG, "Chunks creation time: " + (endTimeOfChunkSplit - startTimeOfChunkSplit) + " msec");
-
-      if (memoryResident) { // if all sorted data reside in a main-memory table.
-        this.result = new MemTableScanner();
-      } else { // if input data exceeds main-memory at least once
-
+      if (mergedInputPaths != null) {
         try {
-          this.result = externalMergeAndSort(chunks);
-        } catch (Exception exception) {
-          throw new PhysicalPlanningException(exception);
+          this.result = externalMergeAndSort(mergedInputPaths);
+        } catch (Exception e) {
+          throw new PhysicalPlanningException(e);
         }
+      } else {
+        // Try to sort all data, and store them into a number of chunks if memory exceeds
+        long startTimeOfChunkSplit = System.currentTimeMillis();
+        List<Path> chunks = sortAndStoreAllChunks();
+        long endTimeOfChunkSplit = System.currentTimeMillis();
+        info(LOG, "Chunks creation time: " + (endTimeOfChunkSplit - startTimeOfChunkSplit) + " msec");
 
+        if (memoryResident) { // if all sorted data reside in a main-memory table.
+          this.result = new MemTableScanner();
+        } else { // if input data exceeds main-memory at least once
+
+          try {
+            this.result = externalMergeAndSort(chunks);
+          } catch (Exception e) {
+            throw new PhysicalPlanningException(e);
+          }
+
+        }
       }
 
       sorted = true;
