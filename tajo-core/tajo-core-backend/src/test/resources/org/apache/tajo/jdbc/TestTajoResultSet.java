@@ -56,6 +56,8 @@ public class TestTajoResultSet {
       } else {
         assertTrue(comparator.compare(prev, fileStatuses[i]) <= 0);
       }
+
+      assertTrue(prev.getPath().getName().compareTo(fileStatuses[i].getPath().getName()) <= 0);
     }
   }
 }
