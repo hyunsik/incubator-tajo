@@ -57,7 +57,7 @@ public class MergeScanner implements Scanner {
     this.meta = meta;
     this.target = target;
 
-    // it should keep the input order.
+    // it should keep the input order. Otherwise, it causes wrong result of sort queries.
     this.fragments = ImmutableList.copyOf(rawFragmentList);
     this.reset();
 
@@ -99,6 +99,7 @@ public class MergeScanner implements Scanner {
   private Scanner getNextScanner() throws IOException {
     if (iterator.hasNext()) {
       currentFragment = iterator.next();
+      System.out.println(">>>>>>>>>> " + currentFragment.getPath());
       currentScanner = StorageManagerFactory.getStorageManager((TajoConf)conf).getScanner(meta, schema,
           currentFragment, target);
       currentScanner.init();

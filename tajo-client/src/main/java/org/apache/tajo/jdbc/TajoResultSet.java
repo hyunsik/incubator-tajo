@@ -64,6 +64,10 @@ public class TajoResultSet extends TajoResultSetBase {
       this.totalRow = desc.getStats() != null ? desc.getStats().getNumRows() : 0;
 
       List<FileFragment> frags = getFragments(desc.getMeta(), desc.getPath());
+      System.out.println("================================================================");
+      for (FileFragment fragment : frags) {
+        System.out.println(fragment.getPath());
+      }
       scanner = new MergeScanner(conf, schema, desc.getMeta(), frags);
     }
     init();
@@ -93,6 +97,10 @@ public class TajoResultSet extends TajoResultSetBase {
       }
     });
     Arrays.sort(files, new FileNameComparator());
+
+    for (FileStatus status : files) {
+      System.out.println(status.getPath());
+    }
 
     String tbname = tablePath.getName();
     for (int i = 0; i < files.length; i++) {
