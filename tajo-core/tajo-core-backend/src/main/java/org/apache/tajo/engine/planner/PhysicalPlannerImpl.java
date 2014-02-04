@@ -793,7 +793,7 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
     // check if an input is sorted in the same order to the subsequence sort operator.
     // TODO - it works if an input data is raw file. We should check the file format.
     // Since the default intermediate file format is raw file, it is not problem right now.
-    if (ctx.isInterQuery() && checkIfSortEquivalance(ctx, scanNode, node)) {
+    if (checkIfSortEquivalance(ctx, scanNode, node)) {
       return new ExternalSortExec(ctx, sm, (SortNode) node.peek(), fragments);
     } else {
       return new SeqScanExec(ctx, sm, scanNode, fragments);
