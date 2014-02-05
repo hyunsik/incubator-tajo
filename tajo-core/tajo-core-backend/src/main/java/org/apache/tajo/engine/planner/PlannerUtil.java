@@ -632,7 +632,11 @@ public class PlannerUtil {
   public static <T extends LogicalNode> T clone(LogicalPlan plan, LogicalNode node) {
     try {
       T copy = (T) node.clone();
-      copy.setPID(plan.newPID());
+      if (plan == null) {
+        copy.setPID(-1);
+      } else {
+        copy.setPID(plan.newPID());
+      }
       return copy;
     } catch (CloneNotSupportedException e) {
       throw new RuntimeException(e);

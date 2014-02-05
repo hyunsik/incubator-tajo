@@ -175,7 +175,8 @@ public class GlobalPlanner {
     boolean leftBroadcasted = false;
     boolean rightBroadcasted = false;
 
-    if (leftNode.getType() == NodeType.SCAN && rightNode.getType() == NodeType.SCAN ) {
+    if ((leftNode.getType() == NodeType.SCAN || leftNode.getType() == NodeType.PARTITIONS_SCAN)
+        && (rightNode.getType() == NodeType.SCAN || rightNode.getType() == NodeType.PARTITIONS_SCAN)) {
       ScanNode leftScan = (ScanNode) leftNode;
       ScanNode rightScan = (ScanNode) rightNode;
 
