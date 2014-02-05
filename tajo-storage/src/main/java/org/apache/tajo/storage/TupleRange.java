@@ -34,7 +34,7 @@ public class TupleRange implements Comparable<TupleRange> {
   public TupleRange(final Schema schema, final Tuple start, final Tuple end) {
     this.comp = new TupleComparator(schema, schemaToSortSpecs(schema));
     // if there is only one value, start == end
-    Preconditions.checkArgument(comp.compare(start, end) <= 0, ("start=" + start) + ", end=" + end);
+    //Preconditions.checkArgument(comp.compare(start, end) <= 0, ("start=" + start) + ", end=" + end);
     this.schema = schema;
     this.start = start;
     this.end = end;

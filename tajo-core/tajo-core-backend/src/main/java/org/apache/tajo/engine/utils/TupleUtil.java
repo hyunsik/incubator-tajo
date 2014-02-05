@@ -370,7 +370,8 @@ public class TupleUtil {
         .toTuple(schema, endBytes));
   }
 
-  public static TupleRange columnStatToRange(Schema schema, Schema target, List<ColumnStats> colStats) {
+  public static TupleRange columnStatToRange(Schema schema, Schema target, List<ColumnStats> colStats,
+                                             SortSpec [] sortSpecs) {
     Map<Column, ColumnStats> statSet = Maps.newHashMap();
     for (ColumnStats stat : colStats) {
       statSet.put(stat.getColumn(), stat);
@@ -385,8 +386,13 @@ public class TupleUtil {
     Tuple endTuple = new VTuple(target.getColumnNum());
     int i = 0;
     for (Column col : target.getColumns()) {
-      startTuple.put(i, statSet.get(col).getMinValue());
-      endTuple.put(i, statSet.get(col).getMaxValue());
+      if (sortSpecs[i].isAscending()) {
+        startTuple.put(i, statSet.get(col).getMinValue());
+        endTuple.put(i, statSet.get(col).getMaxValue());
+      } else {
+        startTuple.put(i, statSet.get(col).getMaxValue());
+        endTuple.put(i, statSet.get(col).getMinValue());
+      }
       i++;
     }
     return new TupleRange(target, startTuple, endTuple);

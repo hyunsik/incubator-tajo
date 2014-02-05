@@ -126,9 +126,6 @@ public class ExternalSortExec extends SortExec {
       FileFragment fragment = FragmentConvertor.convert(FileFragment.class, proto);
       mergedInputPaths.add(fragment.getPath());
     }
-    for (Path path : mergedInputPaths) {
-      System.out.println(path);
-    }
   }
 
   public ExternalSortExec(final TaskAttemptContext context,
@@ -147,7 +144,7 @@ public class ExternalSortExec extends SortExec {
   }
 
   /**
-   * Sort tuple block and store them into a chunk file
+   * Sort a tuple block and store them into a chunk file
    */
   private Path sortAndStoreChunk(int chunkId, List<Tuple> tupleBlock)
       throws IOException {
@@ -545,7 +542,7 @@ public class ExternalSortExec extends SortExec {
           outTuple = rightTuple;
           rightTuple = rightScan.next();
         }
-        return outTuple;
+        return new VTuple(outTuple);
       }
 
       if (leftTuple == null) {

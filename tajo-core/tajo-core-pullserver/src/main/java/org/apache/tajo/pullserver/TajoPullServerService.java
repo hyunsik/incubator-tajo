@@ -587,13 +587,6 @@ public class TajoPullServerService extends AbstractService {
           + ", decoded byte size: " + endBytes.length, t);
     }
 
-
-    if(!comparator.isAscendingFirstKey()) {
-      Tuple tmpKey = start;
-      start = end;
-      end = tmpKey;
-    }
-
     LOG.info("GET Request for " + data.getAbsolutePath() + " (start="+start+", end="+ end +
         (last ? ", last=true" : "") + ")");
 

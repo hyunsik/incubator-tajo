@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Schema;
+import org.apache.tajo.catalog.SortSpec;
 import org.apache.tajo.datum.Datum;
 import org.apache.tajo.datum.DatumFactory;
 import org.apache.tajo.engine.exception.RangeOverflowException;
@@ -44,12 +45,12 @@ public class UniformRangePartition extends RangePartitionAlgorithm {
    * @param range
    * @param inclusive true if the end of the range is inclusive
    */
-  public UniformRangePartition(Schema schema, TupleRange range, boolean inclusive) {
-    super(schema, range, inclusive);
+  public UniformRangePartition(Schema schema, TupleRange range, boolean inclusive, SortSpec [] sortSpecs) {
+    super(schema, range, inclusive, sortSpecs);
     colCards = new BigDecimal[schema.getColumnNum()];
-    for (int i = 0; i < schema.getColumnNum(); i++) {
-      colCards[i] = computeCardinality(schema.getColumn(i).getDataType(), range.getStart().get(i),
-          range.getEnd().get(i), inclusive);
+    for (int i = 0; i < sortSpecs.length; i++) {
+      colCards[i] = computeCardinality(sortSpecs[i].getSortKey().getDataType(), range.getStart().get(i),
+          range.getEnd().get(i), inclusive, sortSpecs[i].isAscending());
     }
 
     cardForEachDigit = new BigDecimal[colCards.length];
@@ -62,8 +63,8 @@ public class UniformRangePartition extends RangePartitionAlgorithm {
     }
   }
 
-  public UniformRangePartition(Schema schema, TupleRange range) {
-    this(schema, range, true);
+  public UniformRangePartition(Schema schema, TupleRange range, SortSpec [] sortSpecs) {
+    this(schema, range, true, sortSpecs);
   }
 
   @Override
@@ -109,8 +110,8 @@ public class UniformRangePartition extends RangePartitionAlgorithm {
     return ranges.toArray(new TupleRange[ranges.size()]);
   }
 
-  public boolean isOverflow(int colId, Datum last, BigDecimal inc) {
-    Column column = schema.getColumn(colId);
+  public boolean isOverflow(int colId, Datum last, BigDecimal inc, SortSpec [] sortSpecs) {
+    Column column = sortSpecs[colId].getSortKey();
     BigDecimal candidate;
     boolean overflow = false;
     switch (column.getDataType().getType()) {
@@ -128,8 +129,14 @@ public class UniformRangePartition extends RangePartitionAlgorithm {
       }
       case DATE:
       case INT4: {
-        candidate = inc.add(new BigDecimal(last.asInt4()));
-        return new BigDecimal(range.getEnd().get(colId).asInt4()).compareTo(candidate) < 0;
+        if (sortSpecs[colId].isAscending()) {
+          candidate = inc.add(new BigDecimal(last.asInt4()));
+          return new BigDecimal(range.getEnd().get(colId).asInt4()).compareTo(candidate) < 0;
+        } else {
+          candidate = new BigDecimal(last.asInt4()).subtract(inc);
+          boolean r = candidate.compareTo(new BigDecimal(range.getEnd().get(colId).asInt4())) < 0;
+          return r;
+        }
       }
       case TIME:
       case TIMESTAMP:
@@ -237,7 +244,7 @@ public class UniformRangePartition extends RangePartitionAlgorithm {
     int finalId = baseDigit;
     incs[finalId] = value;
     for (int i = finalId; i >= 0; i--) {
-      if (isOverflow(i, last.get(i), incs[i])) {
+      if (isOverflow(i, last.get(i), incs[i], sortSpecs)) {
         if (i == 0) {
           throw new RangeOverflowException(range, last, incs[i].longValue());
         }
@@ -292,7 +299,11 @@ public class UniformRangePartition extends RangePartitionAlgorithm {
             end.put(i, DatumFactory.createInt4(
                 (int) (range.getStart().get(i).asInt4() + incs[i].longValue())));
           } else {
-            end.put(i, DatumFactory.createInt4((int) (last.get(i).asInt4() + incs[i].longValue())));
+            if (sortSpecs[i].isAscending()) {
+              end.put(i, DatumFactory.createInt4((int) (last.get(i).asInt4() + incs[i].longValue())));
+            } else {
+              end.put(i, DatumFactory.createInt4((int) (last.get(i).asInt4() - incs[i].longValue())));
+            }
           }
           break;
         case INT8:

@@ -290,8 +290,9 @@ public class Repartitioner {
 
     // calculate the number of maximum query ranges
     TableStats totalStat = computeChildBlocksStats(subQuery.getContext(), masterPlan, subQuery.getId());
-    TupleRange mergedRange = TupleUtil.columnStatToRange(channel.getSchema(), sortSchema, totalStat.getColumnStats());
-    RangePartitionAlgorithm partitioner = new UniformRangePartition(sortSchema, mergedRange);
+    TupleRange mergedRange = TupleUtil.columnStatToRange(channel.getSchema(), sortSchema, totalStat.getColumnStats(),
+        sortSpecs);
+    RangePartitionAlgorithm partitioner = new UniformRangePartition(sortSchema, mergedRange, sortSpecs);
     BigDecimal card = partitioner.getTotalCardinality();
 
     // if the number of the range cardinality is less than the desired number of tasks,

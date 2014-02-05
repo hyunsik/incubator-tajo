@@ -56,7 +56,7 @@ public class TestExternalSortExec {
   private AbstractStorageManager sm;
   private Path testDir;
 
-  private final int numTuple = 100000;
+  private final int numTuple = 20000000;
   private Random rnd = new Random(System.currentTimeMillis());
 
   private TableDesc employee;
@@ -74,7 +74,6 @@ public class TestExternalSortExec {
     schema.addColumn("managerId", Type.INT4);
     schema.addColumn("empId", Type.INT4);
     schema.addColumn("deptName", Type.TEXT);
-    schema.addColumn("text_field", Type.TEXT);
 
     TableMeta employeeMeta = CatalogUtil.newTableMeta(StoreType.CSV);
     Path employeePath = new Path(testDir, "employee.csv");
@@ -87,7 +86,6 @@ public class TestExternalSortExec {
           DatumFactory.createInt4(rnd.nextInt(50)),
           DatumFactory.createInt4(rnd.nextInt(100)),
           DatumFactory.createText("dept_" + i),
-          DatumFactory.createText("f_" + i)
       });
       appender.addTuple(tuple);
     }
