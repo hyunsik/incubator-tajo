@@ -126,10 +126,13 @@ public class UniformRangePartition extends RangePartitionAlgorithm {
         candidate = inc.add(new BigDecimal(last.asInt2()));
         return new BigDecimal(range.getEnd().get(colId).asInt2()).compareTo(candidate) < 0;
       }
+      case DATE:
       case INT4: {
         candidate = inc.add(new BigDecimal(last.asInt4()));
         return new BigDecimal(range.getEnd().get(colId).asInt4()).compareTo(candidate) < 0;
       }
+      case TIME:
+      case TIMESTAMP:
       case INT8: {
         candidate = inc.add(new BigDecimal(last.asInt8()));
         return new BigDecimal(range.getEnd().get(colId).asInt8()).compareTo(candidate) < 0;
@@ -166,12 +169,15 @@ public class UniformRangePartition extends RangePartitionAlgorithm {
         reminder = candidate - end;
         break;
       }
+      case DATE:
       case INT4: {
         int candidate = (int) (last.asInt4() + inc);
         int end = range.getEnd().get(colId).asInt4();
         reminder = candidate - end;
         break;
       }
+      case TIME:
+      case TIMESTAMP:
       case INT8: {
         long candidate = last.asInt8() + inc;
         long end = range.getEnd().get(colId).asInt8();
@@ -292,7 +298,7 @@ public class UniformRangePartition extends RangePartitionAlgorithm {
         case INT8:
           if (overflowFlag[i]) {
             end.put(i, DatumFactory.createInt8(
-                range.getStart().get(i).asInt4() + incs[i].longValue()));
+                range.getStart().get(i).asInt8() + incs[i].longValue()));
           } else {
             end.put(i, DatumFactory.createInt8(last.get(i).asInt8() + incs[i].longValue()));
           }
@@ -320,6 +326,28 @@ public class UniformRangePartition extends RangePartitionAlgorithm {
           } else {
             end.put(i, DatumFactory.createText(
                 ((char) (last.get(i).asChars().charAt(0) + incs[i].longValue())) + ""));
+          }
+          break;
+        case DATE:
+          if (overflowFlag[i]) {
+            end.put(i, DatumFactory.createDate((int) (range.getStart().get(i).asInt4() + incs[i].longValue())));
+          } else {
+            end.put(i, DatumFactory.createDate((int) (last.get(i).asInt4() + incs[i].longValue())));
+          }
+          break;
+        case TIME:
+          if (overflowFlag[i]) {
+            end.put(i, DatumFactory.createTime(range.getStart().get(i).asInt8() + incs[i].longValue()));
+          } else {
+            end.put(i, DatumFactory.createTime(last.get(i).asInt8() + incs[i].longValue()));
+          }
+          break;
+        case TIMESTAMP:
+          if (overflowFlag[i]) {
+            end.put(i, DatumFactory.createTimeStampFromMillis(
+                range.getStart().get(i).asInt8() + incs[i].longValue()));
+          } else {
+            end.put(i, DatumFactory.createTimeStampFromMillis(last.get(i).asInt8() + incs[i].longValue()));
           }
           break;
         default:

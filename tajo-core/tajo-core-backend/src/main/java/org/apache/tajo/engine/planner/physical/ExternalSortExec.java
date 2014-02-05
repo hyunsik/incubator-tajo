@@ -126,6 +126,9 @@ public class ExternalSortExec extends SortExec {
       FileFragment fragment = FragmentConvertor.convert(FileFragment.class, proto);
       mergedInputPaths.add(fragment.getPath());
     }
+    for (Path path : mergedInputPaths) {
+      System.out.println(path);
+    }
   }
 
   public ExternalSortExec(final TaskAttemptContext context,
