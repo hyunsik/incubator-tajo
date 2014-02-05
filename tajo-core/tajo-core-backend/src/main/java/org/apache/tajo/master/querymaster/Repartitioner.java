@@ -29,10 +29,12 @@ import org.apache.tajo.catalog.statistics.StatisticsUtil;
 import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.conf.TajoConf.ConfVars;
 import org.apache.tajo.engine.planner.PlannerUtil;
+import org.apache.tajo.engine.planner.PlanningException;
 import org.apache.tajo.engine.planner.RangePartitionAlgorithm;
 import org.apache.tajo.engine.planner.UniformRangePartition;
 import org.apache.tajo.engine.planner.global.DataChannel;
 import org.apache.tajo.engine.planner.global.ExecutionBlock;
+import org.apache.tajo.engine.planner.global.GlobalPlanner;
 import org.apache.tajo.engine.planner.global.MasterPlan;
 import org.apache.tajo.engine.planner.logical.GroupbyNode;
 import org.apache.tajo.engine.planner.logical.NodeType;
@@ -80,10 +82,10 @@ public class Repartitioner {
 
     Path tablePath;
     FileFragment[] fragments = new FileFragment[2];
-    TableStats[] stats = new TableStats[2];
+    long[] stats = new long[2];
 
     // initialize variables from the child operators
-    for (int i =0; i < 2; i++) {
+    for (int i =0; i < scans.length; i++) {
       TableDesc tableDesc = masterContext.getTableDescMap().get(scans[i].getCanonicalName());
       if (tableDesc == null) { // if it is a real table stored on storage
         // TODO - to be fixed (wrong directory)
@@ -92,11 +94,15 @@ public class Repartitioner {
         childBlocks[1] = masterPlan.getChild(execBlock.getId(), 1);
 
         tablePath = storageManager.getTablePath(scans[i].getTableName());
-        stats[i] = masterContext.getSubQuery(childBlocks[i].getId()).getTableStat();
+        stats[i] = masterContext.getSubQuery(childBlocks[i].getId()).getTableStat().getNumBytes();
         fragments[i] = new FileFragment(scans[i].getCanonicalName(), tablePath, 0, 0, new String[]{UNKNOWN_HOST});
       } else {
         tablePath = tableDesc.getPath();
-        stats[i] = tableDesc.getStats();
+        try {
+          stats[i] = GlobalPlanner.computeDecendentVolume(scans[i]);
+        } catch (PlanningException e) {
+          throw new IOException(e);
+        }
         fragments[i] = storageManager.getSplits(scans[i].getCanonicalName(), tableDesc.getMeta(), tableDesc.getSchema(),
             tablePath).get(0);
       }
@@ -115,8 +121,8 @@ public class Repartitioner {
       int broadcastIdx = leftSmall ? 0 : 1;
       int baseScanIdx = leftSmall ? 1 : 0;
 
-      LOG.info("Broadcasting Table Volume: " + stats[broadcastIdx].getNumBytes());
-      LOG.info("Base Table Volume: " + stats[baseScanIdx].getNumBytes());
+      LOG.info("Broadcasting Table Volume: " + stats[baseScanIdx]);
+      LOG.info("Base Table Volume: " + stats[baseScanIdx]);
 
       scheduleLeafTasksWithBroadcastTable(schedulerContext, subQuery, baseScanIdx, fragments[broadcastIdx]);
     } else {
@@ -151,22 +157,22 @@ public class Repartitioner {
         }
       }
 
-      LOG.info("Outer Intermediate Volume: " + stats[0].getNumBytes());
-      LOG.info("Inner Intermediate Volume: " + stats[1].getNumBytes());
+      LOG.info("Outer Intermediate Volume: " + stats[0]);
+      LOG.info("Inner Intermediate Volume: " + stats[1]);
 
       int [] avgSize = new int[2];
-      avgSize[0] = (int) (stats[0].getNumBytes() / hashEntries.size());
-      avgSize[1] = (int) (stats[1].getNumBytes() / hashEntries.size());
+      avgSize[0] = (int) (stats[0] / hashEntries.size());
+      avgSize[1] = (int) (stats[1] / hashEntries.size());
       int bothFetchSize = avgSize[0] + avgSize[1];
 
       // Getting the desire number of join tasks according to the volumn
       // of a larger table
-      int largerIdx = stats[0].getNumBytes() >= stats[1].getNumBytes() ? 0 : 1;
+      int largerIdx = stats[0] >= stats[1] ? 0 : 1;
       int desireJoinTaskVolumn = subQuery.getContext().getConf().
           getIntVar(ConfVars.DIST_QUERY_JOIN_TASK_VOLUME);
 
       // calculate the number of tasks according to the data size
-      int mb = (int) Math.ceil((double)stats[largerIdx].getNumBytes() / 1048576);
+      int mb = (int) Math.ceil((double)stats[largerIdx] / 1048576);
       LOG.info("Larger intermediate data is approximately " + mb + " MB");
       // determine the number of task per 64MB
       int maxTaskNum = (int) Math.ceil((double)mb / desireJoinTaskVolumn);

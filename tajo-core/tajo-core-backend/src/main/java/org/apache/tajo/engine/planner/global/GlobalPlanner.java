@@ -30,10 +30,7 @@ import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.partition.PartitionMethodDesc;
 import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.conf.TajoConf;
-import org.apache.tajo.engine.eval.AggregationFunctionCallEval;
-import org.apache.tajo.engine.eval.EvalNode;
-import org.apache.tajo.engine.eval.EvalTreeUtil;
-import org.apache.tajo.engine.eval.FieldEval;
+import org.apache.tajo.engine.eval.*;
 import org.apache.tajo.engine.planner.*;
 import org.apache.tajo.engine.planner.logical.*;
 import org.apache.tajo.engine.planner.rewrite.ProjectionPushDownRule;
@@ -135,6 +132,35 @@ public class GlobalPlanner {
       }
     }
     return channel;
+  }
+
+  public static long computeDecendentVolume(LogicalNode node) throws PlanningException {
+
+    if (node instanceof RelationNode) {
+      switch (node.getType()) {
+      case SCAN:
+      case PARTITIONS_SCAN:
+        ScanNode scanNode = (ScanNode) node;
+        if (scanNode.getTableDesc().getStats() == null) {
+          // TODO - this case means that data is not located in HDFS. So, we need additional
+          // broadcast method.
+          return Long.MAX_VALUE;
+        } else {
+          return scanNode.getTableDesc().getStats().getNumBytes();
+        }
+      case TABLE_SUBQUERY:
+        return computeDecendentVolume(((TableSubQueryNode) node).getSubQuery());
+      default:
+        throw new IllegalArgumentException("Not RelationNode");
+      }
+    } else if (node instanceof UnaryNode) {
+      return computeDecendentVolume(((UnaryNode) node).getChild());
+    } else if (node instanceof BinaryNode) {
+      BinaryNode binaryNode = (BinaryNode) node;
+      return computeDecendentVolume(binaryNode.getLeftChild()) + computeDecendentVolume(binaryNode.getRightChild());
+    }
+
+    throw new PlanningException("Invalid State");
   }
 
   private ExecutionBlock buildJoinPlan(GlobalPlanContext context, JoinNode joinNode,

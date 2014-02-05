@@ -674,9 +674,6 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
         Repartitioner.scheduleFragmentsForJoinQuery(subQuery.schedulerContext, subQuery);
       } else { // Case 3: Others (Sort or Aggregation)
         int numTasks = getNonLeafTaskNum(subQuery);
-//        ExecutionBlockId childId = masterPlan.getChilds(subQuery.getBlock()).get(0).getId();
-//        SubQuery child = subQuery.context.getSubQuery(childId);
-//        DataChannel channel = masterPlan.getChannel(child.getId(), subQuery.getId());
         Repartitioner.scheduleFragmentsForNonLeafTasks(subQuery.schedulerContext, masterPlan, subQuery, numTasks);
       }
     }

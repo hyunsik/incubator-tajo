@@ -144,6 +144,10 @@ public class TestTablePartitions extends QueryTestCaseBase {
     res = executeQuery("case2.sql");
     assertResultSet(res, "case2.result");
     res.close();
+
+    res = executeQuery("case3.sql");
+    assertResultSet(res, "case3.result");
+    res.close();
   }
 
   @Test
