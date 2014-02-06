@@ -142,8 +142,7 @@ public class TajoConf extends Configuration {
     // Storage Configuration
     //////////////////////////////////
     RAWFILE_SYNC_INTERVAL("rawfile.sync.interval", null),
-    MINIMUM_SPLIT_SIZE("tajo.min.split.size", (long) 536870912),
-    MAXIMUM_SPLIT_SIZE("tajo.max.split.size", (long) 67108864),
+    MINIMUM_SPLIT_SIZE("tajo.min.split.size", (long) 1),
     // for RCFile
     HIVEUSEEXPLICITRCFILEHEADER("tajo.exec.rcfile.use.explicit.header", true),
 
@@ -203,7 +202,7 @@ public class TajoConf extends Configuration {
     // Task Configuration
     TASK_DEFAULT_MEMORY("tajo.task.memory-slot-mb.default", 512),
     TASK_DEFAULT_DISK("tajo.task.disk-slot.default", 1.0f),
-    TASK_DEFAULT_SIZE("tajo.task.size-mb", 64),
+    TASK_DEFAULT_SIZE("tajo.task.size-mb", 128),
     //////////////////////////////////
 
     // Metrics
