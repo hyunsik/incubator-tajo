@@ -23,7 +23,7 @@ import org.junit.Test;
 
 import java.sql.ResultSet;
 
-public class TestJoinPartitionTables extends QueryTestCaseBase {
+public class TestJoinOnPartitionedTables extends QueryTestCaseBase {
 
   @Test
   public void testPartitionTableJoinSmallTable() throws Exception {
@@ -31,7 +31,12 @@ public class TestJoinPartitionTables extends QueryTestCaseBase {
     ResultSet res = executeFile("insert_into_customer.sql");
     res.close();
 
-    res = executeQuery();
+//    res = executeQuery();
+//    assertResultSet(res);
+//    res.close();
+
+    res = executeFile("selfJoinOfPartitionedTable.sql");
+    System.out.println(resultSetToString(res));
     res.close();
   }
 }
