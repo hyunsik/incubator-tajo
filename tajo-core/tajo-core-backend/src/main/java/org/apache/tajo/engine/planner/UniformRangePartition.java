@@ -21,7 +21,6 @@ package org.apache.tajo.engine.planner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.apache.tajo.catalog.Column;
-import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.catalog.SortSpec;
 import org.apache.tajo.datum.Datum;
 import org.apache.tajo.datum.DatumFactory;
@@ -34,6 +33,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 
+
 public class UniformRangePartition extends RangePartitionAlgorithm {
   private int variableId;
   private BigDecimal[] cardForEachDigit;
@@ -41,16 +41,16 @@ public class UniformRangePartition extends RangePartitionAlgorithm {
 
   /**
    *
-   * @param schema
-   * @param range
+   * @param totalRange
+   * @param sortSpecs The description of sort keys
    * @param inclusive true if the end of the range is inclusive
    */
-  public UniformRangePartition(Schema schema, TupleRange range, boolean inclusive, SortSpec [] sortSpecs) {
-    super(schema, range, inclusive, sortSpecs);
-    colCards = new BigDecimal[schema.getColumnNum()];
+  public UniformRangePartition(TupleRange totalRange, SortSpec[] sortSpecs, boolean inclusive) {
+    super(sortSpecs, totalRange, inclusive);
+    colCards = new BigDecimal[sortSpecs.length];
     for (int i = 0; i < sortSpecs.length; i++) {
-      colCards[i] = computeCardinality(sortSpecs[i].getSortKey().getDataType(), range.getStart().get(i),
-          range.getEnd().get(i), inclusive, sortSpecs[i].isAscending());
+      colCards[i] = computeCardinality(sortSpecs[i].getSortKey().getDataType(), totalRange.getStart().get(i),
+          totalRange.getEnd().get(i), inclusive, sortSpecs[i].isAscending());
     }
 
     cardForEachDigit = new BigDecimal[colCards.length];
@@ -63,15 +63,15 @@ public class UniformRangePartition extends RangePartitionAlgorithm {
     }
   }
 
-  public UniformRangePartition(Schema schema, TupleRange range, SortSpec [] sortSpecs) {
-    this(schema, range, true, sortSpecs);
+  public UniformRangePartition(TupleRange range, SortSpec [] sortSpecs) {
+    this(range, sortSpecs, true);
   }
 
   @Override
   public TupleRange[] partition(int partNum) {
     Preconditions.checkArgument(partNum > 0,
         "The number of partitions must be positive, but the given number: "
-        + partNum);
+            + partNum);
     Preconditions.checkArgument(totalCard.compareTo(new BigDecimal(partNum)) >= 0,
         "the number of partition cannot exceed total cardinality (" + totalCard + ")");
 
@@ -98,10 +98,10 @@ public class UniformRangePartition extends RangePartitionAlgorithm {
     Tuple last = range.getStart();
     while(reminder.compareTo(new BigDecimal(0)) > 0) {
       if (reminder.compareTo(term) <= 0) { // final one is inclusive
-        ranges.add(new TupleRange(schema, last, range.getEnd()));
+        ranges.add(new TupleRange(sortSpecs, last, range.getEnd()));
       } else {
         Tuple next = increment(last, term.longValue(), variableId);
-        ranges.add(new TupleRange(schema, last, next));
+        ranges.add(new TupleRange(sortSpecs, last, next));
       }
       last = ranges.get(ranges.size() - 1).getEnd();
       reminder = reminder.subtract(term);
@@ -110,22 +110,47 @@ public class UniformRangePartition extends RangePartitionAlgorithm {
     return ranges.toArray(new TupleRange[ranges.size()]);
   }
 
+  /**
+  *  Check whether an overflow occurs or not.
+   *
+   * @param colId The column id to be checked
+   * @param last
+   * @param inc
+   * @param sortSpecs
+   * @return
+   */
   public boolean isOverflow(int colId, Datum last, BigDecimal inc, SortSpec [] sortSpecs) {
     Column column = sortSpecs[colId].getSortKey();
     BigDecimal candidate;
     boolean overflow = false;
+
     switch (column.getDataType().getType()) {
       case BIT: {
-        candidate = inc.add(new BigDecimal(last.asByte()));
-        return new BigDecimal(range.getEnd().get(colId).asByte()).compareTo(candidate) < 0;
+        if (sortSpecs[colId].isAscending()) {
+          candidate = inc.add(new BigDecimal(last.asByte()));
+          return new BigDecimal(range.getEnd().get(colId).asByte()).compareTo(candidate) < 0;
+        } else {
+          candidate = new BigDecimal(last.asByte()).subtract(inc);
+          return candidate.compareTo(new BigDecimal(range.getEnd().get(colId).asByte())) < 0;
+        }
       }
       case CHAR: {
-        candidate = inc.add(new BigDecimal((int)last.asChar()));
-        return new BigDecimal((int)range.getEnd().get(colId).asChar()).compareTo(candidate) < 0;
+        if (sortSpecs[colId].isAscending()) {
+          candidate = inc.add(new BigDecimal((int)last.asChar()));
+          return new BigDecimal((int)range.getEnd().get(colId).asChar()).compareTo(candidate) < 0;
+        } else {
+          candidate = new BigDecimal((int)last.asChar()).subtract(inc);
+          return candidate.compareTo(new BigDecimal((int)range.getEnd().get(colId).asChar())) < 0;
+        }
       }
       case INT2: {
-        candidate = inc.add(new BigDecimal(last.asInt2()));
-        return new BigDecimal(range.getEnd().get(colId).asInt2()).compareTo(candidate) < 0;
+        if (sortSpecs[colId].isAscending()) {
+          candidate = inc.add(new BigDecimal(last.asInt2()));
+          return new BigDecimal(range.getEnd().get(colId).asInt2()).compareTo(candidate) < 0;
+        } else {
+          candidate = new BigDecimal(last.asInt2()).subtract(inc);
+          return candidate.compareTo(new BigDecimal(range.getEnd().get(colId).asInt2())) < 0;
+        }
       }
       case DATE:
       case INT4: {
@@ -134,34 +159,54 @@ public class UniformRangePartition extends RangePartitionAlgorithm {
           return new BigDecimal(range.getEnd().get(colId).asInt4()).compareTo(candidate) < 0;
         } else {
           candidate = new BigDecimal(last.asInt4()).subtract(inc);
-          boolean r = candidate.compareTo(new BigDecimal(range.getEnd().get(colId).asInt4())) < 0;
-          return r;
+          return candidate.compareTo(new BigDecimal(range.getEnd().get(colId).asInt4())) < 0;
         }
       }
       case TIME:
       case TIMESTAMP:
       case INT8: {
-        candidate = inc.add(new BigDecimal(last.asInt8()));
-        return new BigDecimal(range.getEnd().get(colId).asInt8()).compareTo(candidate) < 0;
+        if (sortSpecs[colId].isAscending()) {
+          candidate = inc.add(new BigDecimal(last.asInt8()));
+          return new BigDecimal(range.getEnd().get(colId).asInt8()).compareTo(candidate) < 0;
+        } else {
+          candidate = new BigDecimal(last.asInt8()).subtract(inc);
+          return candidate.compareTo(new BigDecimal(range.getEnd().get(colId).asInt8())) < 0;
+        }
       }
       case FLOAT4: {
-        candidate = inc.add(new BigDecimal(last.asFloat4()));
-        return new BigDecimal(range.getEnd().get(colId).asFloat4()).compareTo(candidate) < 0;
+        if (sortSpecs[colId].isAscending()) {
+          candidate = inc.add(new BigDecimal(last.asFloat4()));
+          return new BigDecimal(range.getEnd().get(colId).asFloat4()).compareTo(candidate) < 0;
+        } else {
+          candidate = new BigDecimal(last.asFloat4()).subtract(inc);
+          return candidate.compareTo(new BigDecimal(range.getEnd().get(colId).asFloat4())) < 0;
+        }
       }
       case FLOAT8: {
-        candidate = inc.add(new BigDecimal(last.asFloat8()));
-        return new BigDecimal(range.getEnd().get(colId).asFloat8()).compareTo(candidate) < 0;
+        if (sortSpecs[colId].isAscending()) {
+          candidate = inc.add(new BigDecimal(last.asFloat8()));
+          return new BigDecimal(range.getEnd().get(colId).asFloat8()).compareTo(candidate) < 0;
+        } else {
+          candidate = new BigDecimal(last.asFloat8()).subtract(inc);
+          return candidate.compareTo(new BigDecimal(range.getEnd().get(colId).asFloat8())) < 0;
+        }
+
       }
       case TEXT: {
-        candidate = inc.add(new BigDecimal((int)(last.asChars().charAt(0))));
-        return new BigDecimal(range.getEnd().get(colId).asChars().charAt(0)).compareTo(candidate) < 0;
+        if (sortSpecs[colId].isAscending()) {
+          candidate = inc.add(new BigDecimal((int)(last.asChars().charAt(0))));
+          return new BigDecimal(range.getEnd().get(colId).asChars().charAt(0)).compareTo(candidate) < 0;
+        } else {
+          candidate = new BigDecimal((int)(last.asChars().charAt(0))).subtract(inc);
+          return candidate.compareTo(new BigDecimal(range.getEnd().get(colId).asChars().charAt(0))) < 0;
+        }
       }
     }
     return overflow;
   }
 
   public long incrementAndGetReminder(int colId, Datum last, long inc) {
-    Column column = schema.getColumn(colId);
+    Column column = sortSpecs[colId].getSortKey();
     long reminder = 0;
     switch (column.getDataType().getType()) {
       case BIT: {
@@ -266,10 +311,10 @@ public class UniformRangePartition extends RangePartitionAlgorithm {
       }
     }
 
-    Tuple end = new VTuple(schema.getColumnNum());
+    Tuple end = new VTuple(sortSpecs.length);
     Column column;
     for (int i = 0; i < last.size(); i++) {
-      column = schema.getColumn(i);
+      column = sortSpecs[i].getSortKey();
       switch (column.getDataType().getType()) {
         case CHAR:
           if (overflowFlag[i]) {

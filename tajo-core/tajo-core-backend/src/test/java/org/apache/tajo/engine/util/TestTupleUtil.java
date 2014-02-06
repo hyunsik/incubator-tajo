@@ -218,7 +218,7 @@ public class TestTupleUtil {
     e.put(1, DatumFactory.createText("O"));
     TupleRange expected = new TupleRange(schema, s, e);
 
-    RangePartitionAlgorithm partitioner = new UniformRangePartition(schema, expected, true);
+    RangePartitionAlgorithm partitioner = new UniformRangePartition(schema, true, expected);
     TupleRange [] ranges = partitioner.partition(31);
 
     String query;

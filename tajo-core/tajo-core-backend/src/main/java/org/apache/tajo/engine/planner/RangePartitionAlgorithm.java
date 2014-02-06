@@ -19,7 +19,6 @@
 package org.apache.tajo.engine.planner;
 
 import org.apache.tajo.catalog.Column;
-import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.catalog.SortSpec;
 import org.apache.tajo.common.TajoDataTypes.DataType;
 import org.apache.tajo.datum.Datum;
@@ -29,7 +28,6 @@ import org.apache.tajo.storage.TupleRange;
 import java.math.BigDecimal;
 
 public abstract class RangePartitionAlgorithm {
-  protected Schema schema;
   protected SortSpec [] sortSpecs;
   protected TupleRange range;
   protected final BigDecimal totalCard;
@@ -39,15 +37,14 @@ public abstract class RangePartitionAlgorithm {
   /**
    *
    * @param sortSpecs The array of sort keys
-   * @param range range to be partition
+   * @param totalRange The total range to be partition
    * @param inclusive true if the end of the range is inclusive. Otherwise, false.
    */
-  public RangePartitionAlgorithm(Schema schema, TupleRange range, boolean inclusive, SortSpec [] sortSpecs) {
-    this.schema = schema;
-    this.range = range;
-    this.inclusive = inclusive;
+  public RangePartitionAlgorithm(SortSpec [] sortSpecs, TupleRange totalRange, boolean inclusive) {
     this.sortSpecs = sortSpecs;
-    this.totalCard = computeCardinalityForAllColumns(sortSpecs, range, inclusive);
+    this.range = totalRange;
+    this.inclusive = inclusive;
+    this.totalCard = computeCardinalityForAllColumns(sortSpecs, totalRange, inclusive);
   }
 
   /**

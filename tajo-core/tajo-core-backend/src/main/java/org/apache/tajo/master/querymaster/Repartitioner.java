@@ -292,7 +292,7 @@ public class Repartitioner {
     TableStats totalStat = computeChildBlocksStats(subQuery.getContext(), masterPlan, subQuery.getId());
     TupleRange mergedRange = TupleUtil.columnStatToRange(channel.getSchema(), sortSchema, totalStat.getColumnStats(),
         sortSpecs);
-    RangePartitionAlgorithm partitioner = new UniformRangePartition(sortSchema, mergedRange, sortSpecs);
+    RangePartitionAlgorithm partitioner = new UniformRangePartition(sortSchema, sortSpecs, mergedRange);
     BigDecimal card = partitioner.getTotalCardinality();
 
     // if the number of the range cardinality is less than the desired number of tasks,

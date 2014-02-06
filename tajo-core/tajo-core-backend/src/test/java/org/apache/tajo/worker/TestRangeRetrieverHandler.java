@@ -190,8 +190,8 @@ public class TestRangeRetrieverHandler {
       //assertTrue("[seek check " + (i) + " ]" , ("name_" + i).equals(tuple.get(1).asChars()));
     }
 
-    TupleRange totalRange = new TupleRange(keySchema, firstTuple, lastTuple);
-    UniformRangePartition partitioner = new UniformRangePartition(keySchema, totalRange, true, sortSpecs);
+    TupleRange totalRange = new TupleRange(sortSpecs, firstTuple, lastTuple);
+    UniformRangePartition partitioner = new UniformRangePartition(totalRange, sortSpecs, true);
     TupleRange [] partitions = partitioner.partition(7);
 
     // The below is for testing RangeRetrieverHandler.
@@ -309,8 +309,8 @@ public class TestRangeRetrieverHandler {
       assertTrue("[seek check " + (i) + " ]" , i == tuple.get(0).asInt4());
     }
 
-    TupleRange totalRange = new TupleRange(keySchema, firstTuple, lastTuple);
-    UniformRangePartition partitioner = new UniformRangePartition(keySchema, totalRange, true, sortSpecs);
+    TupleRange totalRange = new TupleRange(sortSpecs, firstTuple, lastTuple);
+    UniformRangePartition partitioner = new UniformRangePartition(totalRange, sortSpecs, true);
     TupleRange [] partitions = partitioner.partition(25);
 
     File dataFile = new File((new Path(testDir, "output")).toUri());
