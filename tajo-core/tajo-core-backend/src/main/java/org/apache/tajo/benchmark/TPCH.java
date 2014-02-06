@@ -175,7 +175,7 @@ public class TPCH extends BenchmarkSet {
     loadTable(PART);
     loadTable(REGION);
     loadTable(ORDERS);
-    loadTable(PARTSUPP) ;
+    loadTable(PARTSUPP);
     loadTable(SUPPLIER);
   }
 

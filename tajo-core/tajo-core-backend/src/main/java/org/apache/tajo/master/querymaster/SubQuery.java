@@ -44,7 +44,10 @@ import org.apache.tajo.engine.planner.PlannerUtil;
 import org.apache.tajo.engine.planner.global.DataChannel;
 import org.apache.tajo.engine.planner.global.ExecutionBlock;
 import org.apache.tajo.engine.planner.global.MasterPlan;
-import org.apache.tajo.engine.planner.logical.*;
+import org.apache.tajo.engine.planner.logical.GroupbyNode;
+import org.apache.tajo.engine.planner.logical.NodeType;
+import org.apache.tajo.engine.planner.logical.ScanNode;
+import org.apache.tajo.engine.planner.logical.StoreTableNode;
 import org.apache.tajo.ipc.TajoMasterProtocol;
 import org.apache.tajo.master.*;
 import org.apache.tajo.master.TaskRunnerGroupEvent.EventType;
@@ -744,22 +747,6 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
       subQuery.eventHandler.handle(event);
     }
 
-    /**
-     * It creates a number of fragments for all partitions.
-     */
-    private static Collection<FileFragment> getFragmentsFromPartitionedTable(SubQuery subQuery,
-                                                                      ScanNode scan,
-                                                                      TableDesc table) throws IOException {
-      List<FileFragment> fragments = Lists.newArrayList();
-      PartitionedTableScanNode partitionsScan = (PartitionedTableScanNode) scan;
-      for (Path path : partitionsScan.getInputPaths()) {
-        fragments.addAll(subQuery.getStorageManager().getSplits(
-            scan.getCanonicalName(), table.getMeta(), table.getSchema(), path));
-      }
-      partitionsScan.setInputPaths(null);
-      return fragments;
-    }
-
     private static void scheduleFragmentsForLeafQuery(SubQuery subQuery) throws IOException {
       ExecutionBlock execBlock = subQuery.getBlock();
       ScanNode[] scans = execBlock.getScanNodes();
@@ -775,7 +762,7 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
       // Otherwise, it creates at least one fragments for a table, which may
       // span a number of blocks or possibly consists of a number of files.
       if (scan.getType() == NodeType.PARTITIONS_SCAN) {
-        fragments = getFragmentsFromPartitionedTable(subQuery, scan, table);
+        fragments = Repartitioner.getFragmentsFromPartitionedTable(subQuery.getStorageManager(), scan, table);
       } else {
         Path inputPath = table.getPath();
         fragments = subQuery.getStorageManager().getSplits(scan.getCanonicalName(), meta, table.getSchema(), inputPath);
@@ -808,7 +795,7 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
         subQuery.getId(), fragment));
   }
 
-  public static void scheduleFragments(SubQuery subQuery, List<FileFragment> leftFragments,
+  public static void scheduleFragments(SubQuery subQuery, Collection<FileFragment> leftFragments,
                                        FileFragment broadcastFragment) {
     for (FileFragment eachLeafFragment : leftFragments) {
       scheduleFragment(subQuery, eachLeafFragment, broadcastFragment);

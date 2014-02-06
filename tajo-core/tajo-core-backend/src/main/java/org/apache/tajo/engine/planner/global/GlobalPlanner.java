@@ -39,6 +39,7 @@ import org.apache.tajo.storage.AbstractStorageManager;
 import java.io.IOException;
 import java.util.*;
 
+import static org.apache.tajo.conf.TajoConf.ConfVars;
 import static org.apache.tajo.ipc.TajoWorkerProtocol.ShuffleType.*;
 
 /**
@@ -47,12 +48,15 @@ import static org.apache.tajo.ipc.TajoWorkerProtocol.ShuffleType.*;
 public class GlobalPlanner {
   private static Log LOG = LogFactory.getLog(GlobalPlanner.class);
 
+  final static int LEFT = 0;
+  final static int RIGHT = 1;
+
   private TajoConf conf;
   private CatalogProtos.StoreType storeType;
 
   public GlobalPlanner(final TajoConf conf, final AbstractStorageManager sm) throws IOException {
     this.conf = conf;
-    this.storeType = CatalogProtos.StoreType.valueOf(conf.getVar(TajoConf.ConfVars.SHUFFLE_FILE_FORMAT).toUpperCase());
+    this.storeType = CatalogProtos.StoreType.valueOf(conf.getVar(ConfVars.SHUFFLE_FILE_FORMAT).toUpperCase());
     Preconditions.checkArgument(storeType != null);
   }
 
@@ -196,9 +200,13 @@ public class GlobalPlanner {
         currentBlock.setPlan(joinNode);
         if (leftBroadcasted) {
           currentBlock.addBroadcastTable(leftScan.getCanonicalName());
+          LOG.info("The left table " + rightScan.getCanonicalName() + " ("
+              + rightScan.getTableDesc().getStats().getNumBytes() + ") is marked a broadcasted table");
         }
         if (rightBroadcasted) {
           currentBlock.addBroadcastTable(rightScan.getCanonicalName());
+          LOG.info("The right table " + rightScan.getCanonicalName() + " ("
+              + rightScan.getTableDesc().getStats().getNumBytes() + ") is marked a broadcasted table");
         }
 
         context.execBlockMap.remove(leftScan.getPID());

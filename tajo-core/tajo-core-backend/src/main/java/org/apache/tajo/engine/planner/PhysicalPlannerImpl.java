@@ -749,21 +749,35 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
     Preconditions.checkNotNull(ctx.getTable(scanNode.getCanonicalName()),
         "Error: There is no table matched to %s", scanNode.getCanonicalName() + "(" + scanNode.getTableName() + ")");
 
+    Enforcer enforcer = ctx.getEnforcer();
+
+    // check if this table is broadcasted or not.
+    boolean broadcastFlag = false;
+    if (enforcer != null && enforcer.hasEnforceProperty(EnforceType.BROADCAST)) {
+      List<EnforceProperty> properties = enforcer.getEnforceProperties(EnforceType.BROADCAST);
+      for (EnforceProperty property : properties) {
+        broadcastFlag |= scanNode.getCanonicalName().equals(property.getBroadcast().getTableName());
+      }
+    }
+
     if (scanNode instanceof PartitionedTableScanNode
         && ((PartitionedTableScanNode)scanNode).getInputPaths() != null &&
         ((PartitionedTableScanNode)scanNode).getInputPaths().length > 0) {
-      PartitionedTableScanNode partitionedTableScanNode = (PartitionedTableScanNode) scanNode;
-      List<FileFragment> fileFragments = TUtil.newList();
-      for (Path path : partitionedTableScanNode.getInputPaths()) {
-        fileFragments.addAll(TUtil.newList(sm.split(scanNode.getCanonicalName(), path)));
-      }
 
-      return new PartitionMergeScanExec(ctx, sm, scanNode,
-          FragmentConvertor.toFragmentProtoArray(fileFragments.toArray(new FileFragment[fileFragments.size()])));
-    } else {
-      FragmentProto [] fragments = ctx.getTables(scanNode.getCanonicalName());
-      return new SeqScanExec(ctx, sm, scanNode, fragments);
+      if (broadcastFlag) {
+        PartitionedTableScanNode partitionedTableScanNode = (PartitionedTableScanNode) scanNode;
+        List<FileFragment> fileFragments = TUtil.newList();
+        for (Path path : partitionedTableScanNode.getInputPaths()) {
+          fileFragments.addAll(TUtil.newList(sm.split(scanNode.getCanonicalName(), path)));
+        }
+
+        return new PartitionMergeScanExec(ctx, sm, scanNode,
+            FragmentConvertor.toFragmentProtoArray(fileFragments.toArray(new FileFragment[fileFragments.size()])));
+      }
     }
+
+    FragmentProto [] fragments = ctx.getTables(scanNode.getCanonicalName());
+    return new SeqScanExec(ctx, sm, scanNode, fragments);
   }
 
   public PhysicalExec createGroupByPlan(TaskAttemptContext context,GroupbyNode groupbyNode, PhysicalExec subOp)
