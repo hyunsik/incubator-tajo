@@ -36,10 +36,7 @@ import org.apache.tajo.engine.planner.global.DataChannel;
 import org.apache.tajo.engine.planner.global.ExecutionBlock;
 import org.apache.tajo.engine.planner.global.GlobalPlanner;
 import org.apache.tajo.engine.planner.global.MasterPlan;
-import org.apache.tajo.engine.planner.logical.GroupbyNode;
-import org.apache.tajo.engine.planner.logical.NodeType;
-import org.apache.tajo.engine.planner.logical.ScanNode;
-import org.apache.tajo.engine.planner.logical.SortNode;
+import org.apache.tajo.engine.planner.logical.*;
 import org.apache.tajo.engine.utils.TupleUtil;
 import org.apache.tajo.exception.InternalException;
 import org.apache.tajo.master.TaskSchedulerContext;
@@ -85,7 +82,7 @@ public class Repartitioner {
     long[] stats = new long[2];
 
     // initialize variables from the child operators
-    for (int i =0; i < scans.length; i++) {
+    for (int i = 0; i < 2; i++) {
       TableDesc tableDesc = masterContext.getTableDescMap().get(scans[i].getCanonicalName());
       if (tableDesc == null) { // if it is a real table stored on storage
         // TODO - to be fixed (wrong directory)
@@ -108,6 +105,8 @@ public class Repartitioner {
       }
     }
 
+    LOG.info(String.format("Left Volume: %d, Right Volume: %d", stats[0], stats[1]));
+
     // Assigning either fragments or fetch urls to query units
     boolean leftSmall = execBlock.isBroadcastTable(scans[0].getCanonicalName());
     boolean rightSmall = execBlock.isBroadcastTable(scans[1].getCanonicalName());
@@ -117,16 +116,13 @@ public class Repartitioner {
       SubQuery.scheduleFragment(subQuery, fragments[0], fragments[1]);
       schedulerContext.setEstimatedTaskNum(1);
     } else if (leftSmall ^ rightSmall) {
-      LOG.info("[Distributed Join Strategy] : Broadcast Join");
       int broadcastIdx = leftSmall ? 0 : 1;
       int baseScanIdx = leftSmall ? 1 : 0;
-
-      LOG.info("Broadcasting Table Volume: " + stats[baseScanIdx]);
-      LOG.info("Base Table Volume: " + stats[baseScanIdx]);
-
+      LOG.info(String.format("[BRDCAST JOIN] base_table=%s, base_volume=%d",
+          scans[baseScanIdx].getCanonicalName(), stats[baseScanIdx]));
       scheduleLeafTasksWithBroadcastTable(schedulerContext, subQuery, baseScanIdx, fragments[broadcastIdx]);
     } else {
-      LOG.info("[Distributed Join Strategy] : Repartition Join");
+      LOG.info("[Distributed Join Strategy] : Symmetric Repartition Join");
       // The hash map is modeling as follows:
       // <Part Id, <Table Name, Intermediate Data>>
       Map<Integer, Map<String, List<IntermediateEntry>>> hashEntries = new HashMap<Integer, Map<String, List<IntermediateEntry>>>();
@@ -156,9 +152,6 @@ public class Repartitioner {
           }
         }
       }
-
-      LOG.info("Outer Intermediate Volume: " + stats[0]);
-      LOG.info("Inner Intermediate Volume: " + stats[1]);
 
       int [] avgSize = new int[2];
       avgSize[0] = (int) (stats[0] / hashEntries.size());
@@ -196,20 +189,39 @@ public class Repartitioner {
     }
   }
 
+  /**
+   * It creates a number of fragments for all partitions.
+   */
+  public static List<FileFragment> getFragmentsFromPartitionedTable(AbstractStorageManager sm,
+                                                                          ScanNode scan,
+                                                                          TableDesc table) throws IOException {
+    List<FileFragment> fragments = Lists.newArrayList();
+    PartitionedTableScanNode partitionsScan = (PartitionedTableScanNode) scan;
+    for (Path path : partitionsScan.getInputPaths()) {
+      fragments.addAll(sm.getSplits(
+          scan.getCanonicalName(), table.getMeta(), table.getSchema(), path));
+    }
+    partitionsScan.setInputPaths(null);
+    return fragments;
+  }
+
   private static void scheduleLeafTasksWithBroadcastTable(TaskSchedulerContext schedulerContext, SubQuery subQuery,
                                                           int baseScanId, FileFragment broadcasted) throws IOException {
     ExecutionBlock execBlock = subQuery.getBlock();
     ScanNode[] scans = execBlock.getScanNodes();
     Preconditions.checkArgument(scans.length == 2, "Must be Join Query");
     TableMeta meta;
-    Path inputPath;
     ScanNode scan = scans[baseScanId];
     TableDesc desc = subQuery.getContext().getTableDescMap().get(scan.getCanonicalName());
-    inputPath = desc.getPath();
     meta = desc.getMeta();
 
-    List<FileFragment> fragments = subQuery.getStorageManager().getSplits(scan.getCanonicalName(), meta, desc.getSchema(),
-        inputPath);
+    Collection<FileFragment> fragments;
+    if (scan.getType() == NodeType.PARTITIONS_SCAN) {
+      fragments = getFragmentsFromPartitionedTable(subQuery.getStorageManager(), scan, desc);
+    } else {
+      fragments = subQuery.getStorageManager().getSplits(scan.getCanonicalName(), meta, desc.getSchema(),
+          desc.getPath());
+    }
 
     SubQuery.scheduleFragments(subQuery, fragments, broadcasted);
     schedulerContext.setEstimatedTaskNum(fragments.size());

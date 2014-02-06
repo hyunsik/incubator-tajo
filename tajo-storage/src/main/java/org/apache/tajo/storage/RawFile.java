@@ -49,7 +49,6 @@ public class RawFile {
     private Path path;
 
     private ByteBuffer buffer;
-    private Tuple tuple;
 
     private int headerSize = 0;
     private BitArray nullFlags;
@@ -91,8 +90,6 @@ public class RawFile {
       for (int i = 0; i < schema.getColumnNum(); i++) {
         columnTypes[i] = schema.getColumn(i).getDataType();
       }
-
-      tuple = new VTuple(columnTypes.length);
 
       // initial read
       channel.read(buffer);
@@ -241,6 +238,8 @@ public class RawFile {
           return null;
         }
       }
+
+      Tuple tuple = new VTuple(columnTypes.length);
 
       for (int i = 0; i < columnTypes.length; i++) {
         // check if the i'th column is null

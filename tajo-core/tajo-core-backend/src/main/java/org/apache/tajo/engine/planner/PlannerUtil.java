@@ -197,7 +197,23 @@ public class PlannerUtil {
       }
       return node;
     }
+
+    @Override
+    public LogicalNode visitPartitionedTableScan(ReplacerContext context, LogicalPlan plan,
+                                                 LogicalPlan.QueryBlock block, PartitionedTableScanNode node,
+                                                 Stack<LogicalNode> stack)
+        throws PlanningException {
+      return node;
+    }
+
+    @Override
+    public LogicalNode visitScan(ReplacerContext context, LogicalPlan plan, LogicalPlan.QueryBlock block, ScanNode node,
+                            Stack<LogicalNode> stack) throws PlanningException {
+      return node;
+    }
   }
+
+
   
   public static void replaceNode(LogicalNode plan, LogicalNode newNode, NodeType type) {
     LogicalNode parent = findTopParentNode(plan, type);
