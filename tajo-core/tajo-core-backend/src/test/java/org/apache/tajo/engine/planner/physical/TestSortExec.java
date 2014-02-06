@@ -21,8 +21,7 @@ package org.apache.tajo.engine.planner.physical;
 import org.apache.hadoop.fs.Path;
 import org.apache.tajo.LocalTajoTestingUtility;
 import org.apache.tajo.TajoTestingCluster;
-import org.apache.tajo.storage.fragment.FileFragment;
-import org.apache.tajo.worker.TaskAttemptContext;
+import org.apache.tajo.TpchTestBase;
 import org.apache.tajo.algebra.Expr;
 import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.proto.CatalogProtos.StoreType;
@@ -35,7 +34,9 @@ import org.apache.tajo.engine.planner.*;
 import org.apache.tajo.engine.planner.enforce.Enforcer;
 import org.apache.tajo.engine.planner.logical.LogicalNode;
 import org.apache.tajo.storage.*;
+import org.apache.tajo.storage.fragment.FileFragment;
 import org.apache.tajo.util.CommonTestingUtil;
+import org.apache.tajo.worker.TaskAttemptContext;
 import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -48,12 +49,12 @@ import static org.junit.Assert.assertTrue;
 public class TestSortExec {
   private static TajoConf conf;
   private static final String TEST_PATH = "target/test-data/TestPhysicalPlanner";
+  private static TajoTestingCluster util;
   private static CatalogService catalog;
   private static SQLAnalyzer analyzer;
   private static LogicalPlanner planner;
   private static LogicalOptimizer optimizer;
   private static AbstractStorageManager sm;
-  private static TajoTestingCluster util;
   private static Path workDir;
   private static Path tablePath;
   private static TableMeta employeeMeta;
@@ -63,8 +64,8 @@ public class TestSortExec {
   @BeforeClass
   public static void setUp() throws Exception {
     conf = new TajoConf();
-    util = new TajoTestingCluster();
-    catalog = util.startCatalogCluster().getCatalog();
+    util = TpchTestBase.getInstance().getTestingCluster();
+    catalog = util.getMaster().getCatalog();
     workDir = CommonTestingUtil.getTestDir(TEST_PATH);
     sm = StorageManagerFactory.getStorageManager(conf, workDir);
 
