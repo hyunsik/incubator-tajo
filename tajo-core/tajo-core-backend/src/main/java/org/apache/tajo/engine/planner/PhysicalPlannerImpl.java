@@ -154,6 +154,7 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
         return new ProjectionExec(ctx, subQueryNode, leftExec);
 
       }
+
       case PARTITIONS_SCAN:
       case SCAN:
         leftExec = createScanPlan(ctx, (ScanNode) logicalNode, stack);
@@ -788,15 +789,45 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
   public PhysicalExec createScanPlan(TaskAttemptContext ctx, ScanNode scanNode, Stack<LogicalNode> node)
       throws IOException {
     Preconditions.checkNotNull(ctx.getTable(scanNode.getCanonicalName()),
-        "Error: There is no table matched to %s", scanNode.getCanonicalName() + "(" + scanNode.getTableName() + ")");
-    FragmentProto [] fragments = ctx.getTables(scanNode.getCanonicalName());
+        "Error: There is no table matched to %s", scanNode.getCanonicalName() + "(" + scanNode.getTableName() + ")");    
 
     // check if an input is sorted in the same order to the subsequence sort operator.
     // TODO - it works if an input data is raw file. We should check the file format.
     // Since the default intermediate file format is raw file, it is not problem right now.
     if (checkIfSortEquivalance(ctx, scanNode, node)) {
+      FragmentProto [] fragments = ctx.getTables(scanNode.getCanonicalName());
       return new ExternalSortExec(ctx, sm, (SortNode) node.peek(), fragments);
     } else {
+      Enforcer enforcer = ctx.getEnforcer();
+
+      // check if this table is broadcasted one or not.
+      boolean broadcastFlag = false;
+      if (enforcer != null && enforcer.hasEnforceProperty(EnforceType.BROADCAST)) {
+        List<EnforceProperty> properties = enforcer.getEnforceProperties(EnforceType.BROADCAST);
+        for (EnforceProperty property : properties) {
+          broadcastFlag |= scanNode.getCanonicalName().equals(property.getBroadcast().getTableName());
+        }
+      }
+
+      if (scanNode instanceof PartitionedTableScanNode
+          && ((PartitionedTableScanNode)scanNode).getInputPaths() != null &&
+          ((PartitionedTableScanNode)scanNode).getInputPaths().length > 0) {
+
+        if (scanNode instanceof PartitionedTableScanNode) {
+          if (broadcastFlag) {
+            PartitionedTableScanNode partitionedTableScanNode = (PartitionedTableScanNode) scanNode;
+            List<FileFragment> fileFragments = TUtil.newList();
+            for (Path path : partitionedTableScanNode.getInputPaths()) {
+              fileFragments.addAll(TUtil.newList(sm.split(scanNode.getCanonicalName(), path)));
+            }
+
+            return new PartitionMergeScanExec(ctx, sm, scanNode,
+                FragmentConvertor.toFragmentProtoArray(fileFragments.toArray(new FileFragment[fileFragments.size()])));
+          }
+        }
+      }
+
+      FragmentProto [] fragments = ctx.getTables(scanNode.getCanonicalName());
       return new SeqScanExec(ctx, sm, scanNode, fragments);
     }
   }
