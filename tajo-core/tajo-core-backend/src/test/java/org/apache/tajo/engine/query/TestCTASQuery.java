@@ -162,4 +162,10 @@ public class TestCTASQuery extends QueryTestCaseBase {
     resultSetToString(res2);
     res2.close();
   }
+
+  @Test
+  public final void testError() throws Exception {
+    ResultSet res = executeQuery();
+    res.close();
+  }
 }
