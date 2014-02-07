@@ -755,7 +755,7 @@ public class PlannerUtil {
     SortSpec [] sortSpecs = new SortSpec[sortSpecProtos.size()];
     int i = 0;
     for (CatalogProtos.SortSpecProto proto : sortSpecProtos) {
-      sortSpecs[i] = new SortSpec(proto);
+      sortSpecs[i++] = new SortSpec(proto);
     }
     return sortSpecs;
   }
