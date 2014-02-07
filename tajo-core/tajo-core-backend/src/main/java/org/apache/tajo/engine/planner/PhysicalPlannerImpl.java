@@ -760,10 +760,11 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
       }
     }
 
-    if (scanNode instanceof PartitionedTableScanNode
-        && ((PartitionedTableScanNode)scanNode).getInputPaths() != null &&
-        ((PartitionedTableScanNode)scanNode).getInputPaths().length > 0) {
+//    if (scanNode instanceof PartitionedTableScanNode
+//        && ((PartitionedTableScanNode)scanNode).getInputPaths() != null &&
+//        ((PartitionedTableScanNode)scanNode).getInputPaths().length > 0) {
 
+    if (scanNode instanceof PartitionedTableScanNode) {
       if (broadcastFlag) {
         PartitionedTableScanNode partitionedTableScanNode = (PartitionedTableScanNode) scanNode;
         List<FileFragment> fileFragments = TUtil.newList();

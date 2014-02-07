@@ -1,0 +1,1 @@
+select count(1) from customer_parts t1, customer_parts t2 where t1.c_nationkey = t2.c_nationkey and t1.c_nationkey = 10;

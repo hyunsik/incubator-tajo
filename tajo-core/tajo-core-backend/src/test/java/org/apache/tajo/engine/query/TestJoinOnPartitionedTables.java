@@ -35,7 +35,11 @@ public class TestJoinOnPartitionedTables extends QueryTestCaseBase {
 //    assertResultSet(res);
 //    res.close();
 
-    res = executeFile("selfJoinOfPartitionedTable.sql");
+//    res = executeFile("selfJoinOfPartitionedTable.sql");
+//    assertResultSet(res);
+//    res.close();
+
+    res = executeFile("testNoProjectionJoinQual.sql");
     System.out.println(resultSetToString(res));
     res.close();
   }

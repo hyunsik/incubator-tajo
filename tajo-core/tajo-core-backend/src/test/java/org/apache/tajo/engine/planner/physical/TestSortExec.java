@@ -100,11 +100,6 @@ public class TestSortExec {
     optimizer = new LogicalOptimizer(conf);
   }
 
-  @After
-  public void tearDown() throws Exception {
-    util.shutdownCatalogCluster();
-  }
-
   public static String[] QUERIES = {
       "select managerId, empId, deptName from employee order by managerId, empId desc" };
 
