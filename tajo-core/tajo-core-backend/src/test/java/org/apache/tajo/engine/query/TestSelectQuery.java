@@ -67,6 +67,22 @@ public class TestSelectQuery extends QueryTestCaseBase {
   }
 
   @Test
+  public final void testSelectSameConstantsWithDifferentAliases() throws Exception {
+    // select l_orderkey, '20130819' as date1, '20130819' as date2 from lineitem where l_orderkey > -1;
+    ResultSet res = executeQuery();
+    assertResultSet(res);
+    cleanupQuery(res);
+  }
+
+  @Test
+  public final void testSelectSameExprsWithDifferentAliases() throws Exception {
+    // select l_orderkey, l_partkey + 1 as plus1, l_partkey + 1 as plus2 from lineitem where l_orderkey > -1;
+    ResultSet res = executeQuery();
+    assertResultSet(res);
+    cleanupQuery(res);
+  }
+
+  @Test
   public final void testWhereCond1() throws Exception {
     ResultSet res = executeQuery();
     assertResultSet(res);
@@ -106,6 +122,14 @@ public class TestSelectQuery extends QueryTestCaseBase {
   @Test
   public final void testSelectAsterisk3() throws Exception {
     // select * from lineitem where l_orderkey % 2 = 0;
+    ResultSet res = executeQuery();
+    assertResultSet(res);
+    cleanupQuery(res);
+  }
+
+  @Test
+  public final void testSelectAsterisk4() throws Exception {
+    // select * from (select l_orderkey, 1 from lineitem where l_orderkey % 2 = 0) t1;
     ResultSet res = executeQuery();
     assertResultSet(res);
     cleanupQuery(res);

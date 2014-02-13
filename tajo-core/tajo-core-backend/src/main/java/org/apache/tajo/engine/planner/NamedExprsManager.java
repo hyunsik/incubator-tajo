@@ -20,6 +20,8 @@ package org.apache.tajo.engine.planner;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import org.apache.tajo.algebra.ColumnReferenceExpr;
 import org.apache.tajo.algebra.Expr;
 import org.apache.tajo.algebra.NamedExpr;
@@ -32,31 +34,47 @@ import org.apache.tajo.util.TUtil;
 
 import java.util.*;
 
-import static java.util.Map.Entry;
-
 /**
  * NamedExprsManager manages an expressions to be evaluated in a query block.
  * NamedExprsManager uses a reference name to identify one expression or one
  * EvalNode (annotated expression).
+ *
+ * It keeps a map from an unique integer id to both unique Expr and EvalNode.
  */
 public class NamedExprsManager {
-  /** Map; Reference name -> EvalNode */
-  private Map<String, EvalNode> nameToEvalMap = new LinkedHashMap<String, EvalNode>();
-  /** Map: EvalNode -> String */
-  private Map<EvalNode, String> evalToNameMap = new LinkedHashMap<EvalNode, String>();
-  /** Map; Reference name -> Expr */
-  private LinkedHashMap<String, Expr> nameToExprMap = new LinkedHashMap<String, Expr>();
-  /** Map; Expr -> Reference Name */
-  private LinkedHashMap<Expr, String> exprToNameMap = new LinkedHashMap<Expr, String>();
-  /** Map; Reference Name -> Boolean (if it is resolved or not) */
-  private LinkedHashMap<String, Boolean> resolvedFlags = new LinkedHashMap<String, Boolean>();
+  /** a sequence id */
+  private int sequenceId = 0;
 
+  /** Map: Name -> ID. Two or more different names can indicates the same id. */
+  private LinkedHashMap<String, Integer> nameToIdMap = Maps.newLinkedHashMap();
+
+  /** Map; ID <-> EvalNode */
+  private BiMap<Integer, EvalNode> idToEvalMap = HashBiMap.create();
+
+  /** Map: ID -> Names */
+  private LinkedHashMap<Integer, List<String>> idToNamesMap = Maps.newLinkedHashMap();
+
+  /** Map: ID -> Expr */
+  private BiMap<Integer, Expr> idToExprBiMap = HashBiMap.create();
+
+  /** Map; Name -> Boolean (if it is resolved or not) */
+  private LinkedHashMap<Integer, Boolean> evaluationStateMap = Maps.newLinkedHashMap();
+
+  /** Map: Alias Name <-> Original Name */
   private BiMap<String, String> aliasedColumnMap = HashBiMap.create();
 
   private LogicalPlan plan;
 
   public NamedExprsManager(LogicalPlan plan) {
     this.plan = plan;
+  }
+
+  private int getNextId() {
+    return sequenceId++;
+  }
+
+  private static String normalizeName(String name) {
+    return name.toLowerCase();
   }
 
   /**
@@ -66,25 +84,45 @@ public class NamedExprsManager {
    * @return true if resolved. Otherwise, false.
    */
   public boolean isResolved(String name) {
-    String normalized = name.toLowerCase();
-    return resolvedFlags.containsKey(normalized) && resolvedFlags.get(normalized);
+    String normalized = normalizeName(name);
+    if (nameToIdMap.containsKey(normalized)) {
+      int refId = nameToIdMap.get(normalized);
+      return evaluationStateMap.containsKey(refId) && evaluationStateMap.get(refId);
+    } else {
+      return false;
+    }
+  }
+
+  /**
+   * Check whether the expression corresponding to a given name was resolved.
+   *
+   * @param evalNode The EvalNode of a certain expression to be checked
+   * @return true if resolved. Otherwise, false.
+   */
+  public boolean isResolved(EvalNode evalNode) {
+    if (idToEvalMap.inverse().containsKey(evalNode)) {
+      int refId = idToEvalMap.inverse().get(evalNode);
+      return evaluationStateMap.containsKey(refId) && evaluationStateMap.get(refId);
+    } else {
+      return false;
+    }
   }
 
   public boolean contains(String name) {
-    return nameToExprMap.containsKey(name);
+    return nameToIdMap.containsKey(name);
   }
 
   public boolean contains(Expr expr) {
-    return exprToNameMap.containsKey(expr);
+    return idToExprBiMap.inverse().containsKey(expr);
   }
 
-  public String getName(Expr expr) {
-    return exprToNameMap.get(expr);
+  private Expr getExpr(String name) {
+    return idToExprBiMap.get(nameToIdMap.get(name));
   }
 
   public NamedExpr getNamedExpr(String name) {
     String normalized = name.toLowerCase();
-    return new NamedExpr(nameToExprMap.get(normalized), normalized);
+    return new NamedExpr(getExpr(name), normalized);
   }
 
   public boolean isAliased(String name) {
@@ -103,16 +141,38 @@ public class NamedExprsManager {
     return aliasedColumnMap.inverse().get(aliasName);
   }
 
-  public String addExpr(Expr expr, String alias) {
-    if (exprToNameMap.containsKey(expr)) {
-      return exprToNameMap.get(expr);
-    } else {
-      String normalized = alias.toLowerCase();
-      nameToExprMap.put(normalized, expr);
-      exprToNameMap.put(expr, normalized);
-      resolvedFlags.put(normalized, false);
+  public String addExpr(Expr expr) throws PlanningException {
+    if (idToExprBiMap.inverse().containsKey(expr)) {
+      int refId = idToExprBiMap.inverse().get(expr);
+      return idToNamesMap.get(refId).get(0);
+    }
+
+    String generatedName = plan.newGeneratedFieldName(expr);
+    return addExpr(expr, generatedName);
+  }
+
+  public String addExpr(Expr expr, String specifiedName) throws PlanningException {
+    String normalized = normalizeName(specifiedName);
+
+    // if this name already exists, just returns the name.
+    if (nameToIdMap.containsKey(normalized)) {
       return normalized;
     }
+
+    // if the name is first
+    int refId;
+    if (idToExprBiMap.inverse().containsKey(expr)) {
+      refId = idToExprBiMap.inverse().get(expr);
+    } else {
+      refId = getNextId();
+      idToExprBiMap.put(refId, expr);
+    }
+
+    nameToIdMap.put(normalized, refId);
+    TUtil.putToNestedList(idToNamesMap, refId, normalized);
+    evaluationStateMap.put(refId, false);
+
+    return normalized;
   }
 
   public String [] addReferences(Expr expr) throws PlanningException {
@@ -126,22 +186,7 @@ public class NamedExprsManager {
     return names;
   }
 
-  public String addExpr(Expr expr) {
-    String name;
-
-    // all columns are projected automatically. BTW, should we add column reference to this list?
-    if (expr.getType() == OpType.Column) {
-      name = ((ColumnReferenceExpr)expr).getCanonicalName();
-      if (nameToExprMap.containsKey(name)) { // if it is column and another one already exists, skip.
-        return name;
-      }
-    } else {
-      name = plan.newGeneratedFieldName(expr);
-    }
-    return addExpr(expr, name);
-  }
-
-  public String addNamedExpr(NamedExpr namedExpr) {
+  public String addNamedExpr(NamedExpr namedExpr) throws PlanningException {
     if (namedExpr.hasAlias()) {
       return addExpr(namedExpr.getExpr(), namedExpr.getAlias());
     } else {
@@ -149,7 +194,7 @@ public class NamedExprsManager {
     }
   }
 
-  public String [] addNamedExprArray(@Nullable Collection<NamedExpr> targets) {
+  public String [] addNamedExprArray(@Nullable Collection<NamedExpr> targets) throws PlanningException {
     if (targets != null || targets.size() > 0) {
       String [] names = new String[targets.size()];
       int i = 0;
@@ -163,9 +208,9 @@ public class NamedExprsManager {
   }
 
   public Collection<NamedExpr> getAllNamedExprs() {
-    List<NamedExpr> namedExprList = new ArrayList<NamedExpr>();
-    for (Entry<String, Expr> entry: nameToExprMap.entrySet()) {
-      namedExprList.add(new NamedExpr(entry.getValue(), entry.getKey()));
+    List<NamedExpr> namedExprList = Lists.newArrayList();
+    for (Map.Entry<Integer, Expr> entry: idToExprBiMap.entrySet()) {
+      namedExprList.add(new NamedExpr(entry.getValue(), idToNamesMap.get(entry.getKey()).get(0)));
     }
     return namedExprList;
   }
@@ -173,13 +218,9 @@ public class NamedExprsManager {
   public void resolveExpr(String name, EvalNode evalNode) throws PlanningException {
     String normalized = name.toLowerCase();
 
-    if (evalNode.getType() == EvalType.CONST) {
-      resolvedFlags.put(normalized, true);
-    }
-
-    nameToEvalMap.put(normalized, evalNode);
-    evalToNameMap.put(evalNode, normalized);
-    resolvedFlags.put(normalized, true);
+    int refId = nameToIdMap.get(normalized);
+    evaluationStateMap.put(refId, true);
+    idToEvalMap.put(refId, evalNode);
 
     String originalName = checkAndGetIfAliasedColumn(normalized);
     if (originalName != null) {
@@ -191,9 +232,9 @@ public class NamedExprsManager {
    * It returns an original column name if it is aliased column reference.
    * Otherwise, it will return NULL.
    */
-  private String checkAndGetIfAliasedColumn(String name) {
-    Expr expr = nameToExprMap.get(name);
-    if (expr.getType() == OpType.Column) {
+  public String checkAndGetIfAliasedColumn(String name) {
+    Expr expr = getExpr(name);
+    if (expr != null && expr.getType() == OpType.Column) {
       ColumnReferenceExpr column = (ColumnReferenceExpr) expr;
       if (!column.getCanonicalName().equals(name)) {
         return column.getCanonicalName();
@@ -202,29 +243,40 @@ public class NamedExprsManager {
     return null;
   }
 
-  public Target getTarget(Expr expr, boolean unresolved) {
-    String name = exprToNameMap.get(expr);
-    return getTarget(name, unresolved);
-  }
-
   public Target getTarget(String name) {
     return getTarget(name, false);
   }
 
-  public Target getTarget(String name, boolean unresolved) {
+  private boolean isFirstName(int id, String name) {
+    return idToNamesMap.get(id).get(0).equals(name);
+  }
+
+  private String getFirstName(int id) {
+    return idToNamesMap.get(id).get(0);
+  }
+
+  public Target getTarget(String name, boolean raw) {
     String normalized = name;
-    if (!unresolved && resolvedFlags.containsKey(normalized) && resolvedFlags.get(normalized)) {
-      EvalNode evalNode = nameToEvalMap.get(normalized);
+    int refId = nameToIdMap.get(normalized);
+
+    if (!raw && evaluationStateMap.containsKey(refId) && evaluationStateMap.get(refId)) {
+      EvalNode evalNode = idToEvalMap.get(refId);
+
+      if (!isFirstName(refId, name) && isResolved(normalized)) {
+        return new Target(new FieldEval(getFirstName(refId),evalNode.getValueType()), name);
+      }
+
       EvalNode referredEval;
       if (evalNode.getType() == EvalType.CONST) {
         referredEval = evalNode;
       } else {
-        referredEval = new FieldEval(normalized, evalNode.getValueType());
+        referredEval = new FieldEval(idToNamesMap.get(refId).get(0), evalNode.getValueType());
       }
       return new Target(referredEval, name);
+
     } else {
-      if (nameToEvalMap.containsKey(normalized)) {
-        return new Target(nameToEvalMap.get(normalized), name);
+      if (idToEvalMap.containsKey(refId)) {
+        return new Target(idToEvalMap.get(refId), name);
       } else {
         return null;
       }
@@ -232,7 +284,7 @@ public class NamedExprsManager {
   }
 
   public String toString() {
-    return "unresolved=" + nameToExprMap.size() + ", resolved=" + nameToEvalMap.size()
+    return "unresolved=" + nameToIdMap.size() + ", resolved=" + idToEvalMap.size()
         + ", renamed=" + aliasedColumnMap.size();
   }
 
@@ -248,9 +300,11 @@ public class NamedExprsManager {
 
     public UnresolvedIterator() {
       List<NamedExpr> unresolvedList = TUtil.newList();
-      for (Entry<String,Expr> entry : nameToExprMap.entrySet()) {
-        if (!isResolved(entry.getKey())) {
-          unresolvedList.add(new NamedExpr(entry.getValue(), entry.getKey()));
+      for (Integer refId: idToNamesMap.keySet()) {
+        String name = idToNamesMap.get(refId).get(0);
+        if (!isResolved(name)) {
+          Expr expr = idToExprBiMap.get(refId);
+          unresolvedList.add(new NamedExpr(expr, name));
         }
       }
       if (unresolvedList.size() == 0) {
@@ -259,7 +313,6 @@ public class NamedExprsManager {
         iterator = unresolvedList.iterator();
       }
     }
-
 
     @Override
     public boolean hasNext() {
@@ -273,12 +326,6 @@ public class NamedExprsManager {
 
     @Override
     public void remove() {
-    }
-  }
-
-  public void reset() {
-    for (String name : resolvedFlags.keySet()) {
-      resolvedFlags.put(name, false);
     }
   }
 }

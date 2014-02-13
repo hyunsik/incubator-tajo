@@ -502,13 +502,9 @@ public class PlannerUtil {
     List<Target> targets = TUtil.newList();
 
     FieldEval eval;
-    Column column;
     for (int i = 0; i < schema.getColumnNum(); i++) {
-      column = schema.getColumn(i);
-      if (column.getColumnName().charAt(0) != LogicalPlan.NONAMED_COLUMN_PREFIX) {
-        eval = new FieldEval(schema.getColumn(i));
-        targets.add(new Target(eval));
-      }
+      eval = new FieldEval(schema.getColumn(i));
+      targets.add(new Target(eval));
     }
     return targets.toArray(new Target[targets.size()]);
   }

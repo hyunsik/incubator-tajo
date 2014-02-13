@@ -439,7 +439,8 @@ public class GlobalPlanner {
 
       secondPhaseGroupBy.setAggFunctions(secondPhaseEvals);
       firstPhaseGroupBy.setAggFunctions(firstPhaseEvals);
-      Target [] firstPhaseTargets = ProjectionPushDownRule.buildGroupByTarget(firstPhaseGroupBy, firstPhaseEvalNames);
+      Target [] firstPhaseTargets = ProjectionPushDownRule.buildGroupByTarget(firstPhaseGroupBy, null,
+          firstPhaseEvalNames);
       firstPhaseGroupBy.setTargets(firstPhaseTargets);
       secondPhaseGroupBy.setInSchema(PlannerUtil.targetToSchema(firstPhaseTargets));
     }

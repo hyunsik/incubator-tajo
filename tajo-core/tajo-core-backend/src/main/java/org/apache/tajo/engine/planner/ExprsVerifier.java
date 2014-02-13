@@ -18,25 +18,56 @@
 
 package org.apache.tajo.engine.planner;
 
+import org.apache.tajo.catalog.Column;
 import org.apache.tajo.engine.eval.*;
+import org.apache.tajo.engine.planner.logical.LogicalNode;
 
+import java.util.Set;
 import java.util.Stack;
 
 import static org.apache.tajo.common.TajoDataTypes.DataType;
 import static org.apache.tajo.common.TajoDataTypes.Type;
 
-public class ExprsVerifier extends BasicEvalNodeVisitor<VerificationState, EvalNode> {
+/**
+ * It verifies one predicate or expression with the semantic and data type checks as follows:
+ * <ul>
+ *   <ul>Both expressions in a binary expression are compatible to each other</ul>
+ *   <ul>All column references of one expression are avilable at this node</ul>
+ * </ul>
+ */
+public class ExprsVerifier extends BasicEvalNodeVisitor<ExprsVerifier.ExprVerifierContext, EvalNode> {
   private static final ExprsVerifier instance;
 
   static {
     instance = new ExprsVerifier();
   }
 
-  public static VerificationState verify(VerificationState state, EvalNode expression) {
-    instance.visitChild(state, expression, new Stack<EvalNode>());
+  static class ExprVerifierContext {
+    VerificationState state;
+    LogicalNode currentNode;
+
+    public ExprVerifierContext(VerificationState state, LogicalNode currentNode) {
+      this.state = state;
+      this.currentNode = currentNode;
+    }
+  }
+
+  public static VerificationState verify(VerificationState state, LogicalNode currentNode, EvalNode expression)
+      throws PlanningException {
+    instance.visitChild(new ExprVerifierContext(state, currentNode), expression, new Stack<EvalNode>());
+    Set<Column> referredColumns = EvalTreeUtil.findDistinctRefColumns(expression);
+    for (Column referredColumn : referredColumns) {
+      if (!currentNode.getInSchema().contains(referredColumn)) {
+        throw new PlanningException("Invalid State: " + referredColumn + " cannot be referred at Node ("
+            + currentNode.getPID() + ")");
+      }
+    }
     return state;
   }
 
+  /**
+   * It checks the compatibility of two data types.
+   */
   private static boolean isCompatibleType(DataType dataType1, DataType dataType2) {
     if (checkNumericType(dataType1) && checkNumericType(dataType2)) {
       return true;
@@ -53,6 +84,9 @@ public class ExprsVerifier extends BasicEvalNodeVisitor<VerificationState, EvalN
     return false;
   }
 
+  /**
+   * It checks both expressions in a comparison operator are compatible to each other.
+   */
   private static void verifyComparisonOperator(VerificationState state, BinaryEval expr) {
     DataType leftType = expr.getLeftExpr().getValueType();
     DataType rightType = expr.getRightExpr().getValueType();
@@ -61,43 +95,43 @@ public class ExprsVerifier extends BasicEvalNodeVisitor<VerificationState, EvalN
     }
   }
 
-  public EvalNode visitEqual(VerificationState state, BinaryEval expr, Stack<EvalNode> stack) {
-    super.visitEqual(state, expr, stack);
-    verifyComparisonOperator(state, expr);
+  public EvalNode visitEqual(ExprVerifierContext context, BinaryEval expr, Stack<EvalNode> stack) {
+    super.visitEqual(context, expr, stack);
+    verifyComparisonOperator(context.state, expr);
     return expr;
   }
 
-  public EvalNode visitNotEqual(VerificationState state, BinaryEval expr, Stack<EvalNode> stack) {
-    super.visitNotEqual(state, expr, stack);
-    verifyComparisonOperator(state, expr);
-    return expr;
-  }
-
-  @Override
-  public EvalNode visitLessThan(VerificationState state, BinaryEval expr, Stack<EvalNode> stack) {
-    super.visitLessThan(state, expr, stack);
-    verifyComparisonOperator(state, expr);
+  public EvalNode visitNotEqual(ExprVerifierContext context, BinaryEval expr, Stack<EvalNode> stack) {
+    super.visitNotEqual(context, expr, stack);
+    verifyComparisonOperator(context.state, expr);
     return expr;
   }
 
   @Override
-  public EvalNode visitLessThanOrEqual(VerificationState state, BinaryEval expr, Stack<EvalNode> stack) {
-    super.visitLessThanOrEqual(state, expr, stack);
-    verifyComparisonOperator(state, expr);
+  public EvalNode visitLessThan(ExprVerifierContext context, BinaryEval expr, Stack<EvalNode> stack) {
+    super.visitLessThan(context, expr, stack);
+    verifyComparisonOperator(context.state, expr);
     return expr;
   }
 
   @Override
-  public EvalNode visitGreaterThan(VerificationState state, BinaryEval expr, Stack<EvalNode> stack) {
-    super.visitGreaterThan(state, expr, stack);
-    verifyComparisonOperator(state, expr);
+  public EvalNode visitLessThanOrEqual(ExprVerifierContext context, BinaryEval expr, Stack<EvalNode> stack) {
+    super.visitLessThanOrEqual(context, expr, stack);
+    verifyComparisonOperator(context.state, expr);
     return expr;
   }
 
   @Override
-  public EvalNode visitGreaterThanOrEqual(VerificationState state, BinaryEval expr, Stack<EvalNode> stack) {
-    super.visitGreaterThanOrEqual(state, expr, stack);
-    verifyComparisonOperator(state, expr);
+  public EvalNode visitGreaterThan(ExprVerifierContext context, BinaryEval expr, Stack<EvalNode> stack) {
+    super.visitGreaterThan(context, expr, stack);
+    verifyComparisonOperator(context.state, expr);
+    return expr;
+  }
+
+  @Override
+  public EvalNode visitGreaterThanOrEqual(ExprVerifierContext context, BinaryEval expr, Stack<EvalNode> stack) {
+    super.visitGreaterThanOrEqual(context, expr, stack);
+    verifyComparisonOperator(context.state, expr);
     return expr;
   }
 
@@ -135,39 +169,39 @@ public class ExprsVerifier extends BasicEvalNodeVisitor<VerificationState, EvalN
   }
 
   @Override
-  public EvalNode visitPlus(VerificationState state, BinaryEval evalNode, Stack<EvalNode> stack) {
-    super.visitDivide(state, evalNode, stack);
-    checkArithmeticOperand(state, evalNode);
+  public EvalNode visitPlus(ExprVerifierContext context, BinaryEval evalNode, Stack<EvalNode> stack) {
+    super.visitPlus(context, evalNode, stack);
+    checkArithmeticOperand(context.state, evalNode);
     return evalNode;
   }
 
   @Override
-  public EvalNode visitMinus(VerificationState state, BinaryEval evalNode, Stack<EvalNode> stack) {
-    super.visitDivide(state, evalNode, stack);
-    checkArithmeticOperand(state, evalNode);
+  public EvalNode visitMinus(ExprVerifierContext context, BinaryEval evalNode, Stack<EvalNode> stack) {
+    super.visitMinus(context, evalNode, stack);
+    checkArithmeticOperand(context.state, evalNode);
     return evalNode;
   }
 
   @Override
-  public EvalNode visitMultiply(VerificationState state, BinaryEval evalNode, Stack<EvalNode> stack) {
-    super.visitDivide(state, evalNode, stack);
-    checkArithmeticOperand(state, evalNode);
+  public EvalNode visitMultiply(ExprVerifierContext context, BinaryEval evalNode, Stack<EvalNode> stack) {
+    super.visitMultiply(context, evalNode, stack);
+    checkArithmeticOperand(context.state, evalNode);
     return evalNode;
   }
 
   @Override
-  public EvalNode visitDivide(VerificationState state, BinaryEval evalNode, Stack<EvalNode> stack) {
-    super.visitDivide(state, evalNode, stack);
-    checkArithmeticOperand(state, evalNode);
-    checkDivisionByZero(state, evalNode);
+  public EvalNode visitDivide(ExprVerifierContext context, BinaryEval evalNode, Stack<EvalNode> stack) {
+    super.visitDivide(context, evalNode, stack);
+    checkArithmeticOperand(context.state, evalNode);
+    checkDivisionByZero(context.state, evalNode);
     return evalNode;
   }
 
   @Override
-  public EvalNode visitModular(VerificationState state, BinaryEval evalNode, Stack<EvalNode> stack) {
-    super.visitDivide(state, evalNode, stack);
-    checkArithmeticOperand(state, evalNode);
-    checkDivisionByZero(state, evalNode);
+  public EvalNode visitModular(ExprVerifierContext context, BinaryEval evalNode, Stack<EvalNode> stack) {
+    super.visitDivide(context, evalNode, stack);
+    checkArithmeticOperand(context.state, evalNode);
+    checkDivisionByZero(context.state, evalNode);
     return evalNode;
   }
 }

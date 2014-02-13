@@ -21,6 +21,7 @@ package org.apache.tajo.engine.planner;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -368,7 +369,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         for (Column c : columns) {
           if (!projectable.getInSchema().contains(c)) {
             throw new PlanningException(c.getQualifiedName()
-                + " must appear in the GROUP BY clause or be used in an aggregate function");
+                + " must appear in the GROUP BY clause or be used in an aggregate function at node ("
+                + projectable.getPID() + ")" );
           }
         }
       }
@@ -376,14 +378,18 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       GroupbyNode groupbyNode = (GroupbyNode) projectable;
       for (Column c : groupbyNode.getGroupingColumns()) {
         if (!projectable.getInSchema().contains(c)) {
-          throw new PlanningException("Cannot get such a field: " + c);
+          throw new PlanningException(String.format("Cannot get the field \"%s\" at node (%d)",
+              c, projectable.getPID()));
         }
       }
-      for (AggregationFunctionCallEval f : groupbyNode.getAggFunctions()) {
-        Set<Column> columns = EvalTreeUtil.findDistinctRefColumns(f);
-        for (Column c : columns) {
-          if (!projectable.getInSchema().contains(c)) {
-            throw new PlanningException("Cannot get such a field: " + c);
+      if (groupbyNode.hasAggFunctions()) {
+        for (AggregationFunctionCallEval f : groupbyNode.getAggFunctions()) {
+          Set<Column> columns = EvalTreeUtil.findDistinctRefColumns(f);
+          for (Column c : columns) {
+            if (!projectable.getInSchema().contains(c)) {
+              throw new PlanningException(String.format("Cannot get the field \"%s\" at node (%d)",
+                  c, projectable.getPID()));
+            }
           }
         }
       }
@@ -393,7 +399,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         Set<Column> columns = EvalTreeUtil.findDistinctRefColumns(target.getEvalTree());
         for (Column c : columns) {
           if (!relationNode.getTableSchema().contains(c)) {
-            throw new PlanningException("Cannot get such a field: " + c);
+            throw new PlanningException(String.format("Cannot get the field \"%s\" at node (%d)",
+                c, projectable.getPID()));
           }
         }
       }
@@ -402,7 +409,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
         Set<Column> columns = EvalTreeUtil.findDistinctRefColumns(target.getEvalTree());
         for (Column c : columns) {
           if (!projectable.getInSchema().contains(c)) {
-            throw new PlanningException("Cannot get such a field: " + c);
+            throw new PlanningException(String.format("Cannot get the field \"%s\" at node (%d)",
+                c, projectable.getPID()));
           }
         }
       }
@@ -443,7 +451,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
     groupbyNode.setDistinct(includeDistinctFunction);
     groupbyNode.setAggFunctions(aggEvals.toArray(new AggregationFunctionCallEval[aggEvals.size()]));
-    Target [] targets = ProjectionPushDownRule.buildGroupByTarget(groupbyNode, aggEvalNames.toArray(new String[aggEvalNames.size()]));
+    Target [] targets = ProjectionPushDownRule.buildGroupByTarget(groupbyNode, null,
+        aggEvalNames.toArray(new String[aggEvalNames.size()]));
     groupbyNode.setTargets(targets);
 
     // this inserted group-by node doesn't pass through preprocessor. So manually added.
@@ -794,10 +803,10 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       joinCondition = AlgebraicUtil.eliminateConstantExprs(evalNode);
     }
 
-    List<Expr> newlyEvaluatedExprs = getNewlyEvaluatedExprsForJoin(plan, block, joinNode, stack);
+    List<String> newlyEvaluatedExprs = getNewlyEvaluatedExprsForJoin(plan, block, joinNode, stack);
     List<Target> targets = TUtil.newList(PlannerUtil.schemaToTargets(merged));
 
-    for (Expr newAddedExpr : newlyEvaluatedExprs) {
+    for (String newAddedExpr : newlyEvaluatedExprs) {
       targets.add(block.namedExprsMgr.getTarget(newAddedExpr, true));
     }
     joinNode.setTargets(targets.toArray(new Target[targets.size()]));
@@ -813,17 +822,17 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     return joinNode;
   }
 
-  private List<Expr> getNewlyEvaluatedExprsForJoin(LogicalPlan plan, QueryBlock block, JoinNode joinNode,
+  private List<String> getNewlyEvaluatedExprsForJoin(LogicalPlan plan, QueryBlock block, JoinNode joinNode,
                                                    Stack<Expr> stack) {
     EvalNode evalNode;
-    List<Expr> newlyEvaluatedExprs = TUtil.newList();
+    List<String> newlyEvaluatedExprs = TUtil.newList();
     for (Iterator<NamedExpr> it = block.namedExprsMgr.getUnresolvedExprs(); it.hasNext();) {
       NamedExpr namedExpr = it.next();
       try {
         evalNode = exprAnnotator.createEvalNode(plan, block, namedExpr.getExpr());
         if (LogicalPlanner.checkIfBeEvaluatedAtJoin(block, evalNode, joinNode, stack.peek().getType() != OpType.Join)) {
           block.namedExprsMgr.resolveExpr(namedExpr.getAlias(), evalNode);
-          newlyEvaluatedExprs.add(namedExpr.getExpr());
+          newlyEvaluatedExprs.add(namedExpr.getAlias());
         }
       } catch (VerifyException ve) {} catch (PlanningException e) {
         e.printStackTrace();
@@ -885,20 +894,20 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     join.setInSchema(merged);
 
     EvalNode evalNode;
-    List<Expr> newlyEvaluatedExprs = TUtil.newList();
+    List<String> newlyEvaluatedExprs = TUtil.newList();
     for (Iterator<NamedExpr> it = block.namedExprsMgr.getUnresolvedExprs(); it.hasNext();) {
       NamedExpr namedExpr = it.next();
       try {
         evalNode = exprAnnotator.createEvalNode(plan, block, namedExpr.getExpr());
         if (EvalTreeUtil.findDistinctAggFunction(evalNode).size() == 0) {
           block.namedExprsMgr.resolveExpr(namedExpr.getAlias(), evalNode);
-          newlyEvaluatedExprs.add(namedExpr.getExpr());
+          newlyEvaluatedExprs.add(namedExpr.getAlias());
         }
       } catch (VerifyException ve) {}
     }
 
     List<Target> targets = TUtil.newList(PlannerUtil.schemaToTargets(merged));
-    for (Expr newAddedExpr : newlyEvaluatedExprs) {
+    for (String newAddedExpr : newlyEvaluatedExprs) {
       targets.add(block.namedExprsMgr.getTarget(newAddedExpr, true));
     }
     join.setTargets(targets.toArray(new Target[targets.size()]));
@@ -951,17 +960,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     }
 
     // Assume that each unique expr is evaluated once.
-    List<Target> targets = new ArrayList<Target>();
-    for (Column column : scanNode.getTableSchema().getColumns()) {
-      ColumnReferenceExpr columnRef = new ColumnReferenceExpr(column.getQualifier(), column.getColumnName());
-      if (block.namedExprsMgr.contains(columnRef)) {
-        String referenceName = block.namedExprsMgr.getName(columnRef);
-        targets.add(new Target(new FieldEval(column), referenceName));
-        newlyEvaluatedExprsReferences.remove(column.getQualifiedName());
-      } else {
-        targets.add(new Target(new FieldEval(column)));
-      }
-    }
+    LinkedHashSet<Target> targets = createFieldTargetsFromRelation(block, scanNode, newlyEvaluatedExprsReferences);
 
     // The fact the some expr is included in newlyEvaluatedExprsReferences means that it is already resolved.
     // So, we get a raw expression and then creates a target.
@@ -975,6 +974,21 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
     verifyProjectedFields(block, scanNode);
     return scanNode;
+  }
+
+  private static LinkedHashSet<Target> createFieldTargetsFromRelation(QueryBlock block, RelationNode relationNode,
+                                                      Set<String> newlyEvaluatedRefNames) {
+    LinkedHashSet<Target> targets = Sets.newLinkedHashSet();
+    for (Column column : relationNode.getTableSchema().getColumns()) {
+      String aliasName = block.namedExprsMgr.checkAndGetIfAliasedColumn(column.getQualifiedName());
+      if (aliasName != null) {
+        targets.add(new Target(new FieldEval(column), aliasName));
+        newlyEvaluatedRefNames.remove(aliasName);
+      } else {
+        targets.add(new Target(new FieldEval(column)));
+      }
+    }
+    return targets;
   }
 
   private void updatePhysicalInfo(TableDesc desc) {
@@ -1007,32 +1021,22 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     subQueryNode.setSubQuery(child);
 
     // Add additional expressions required in upper nodes.
-    Set<Expr> newlyEvaluatedExprs = new LinkedHashSet<Expr>();
+    Set<String> newlyEvaluatedExprs = TUtil.newHashSet();
     for (NamedExpr rawTarget : block.namedExprsMgr.getAllNamedExprs()) {
       try {
         EvalNode evalNode = exprAnnotator.createEvalNode(context.plan, context.queryBlock, rawTarget.getExpr());
         if (checkIfBeEvaluatedAtRelation(block, evalNode, subQueryNode)) {
           block.namedExprsMgr.resolveExpr(rawTarget.getAlias(), evalNode);
-          newlyEvaluatedExprs.add(rawTarget.getExpr()); // newly added exr
+          newlyEvaluatedExprs.add(rawTarget.getAlias()); // newly added exr
         }
       } catch (VerifyException ve) {
       }
     }
 
     // Assume that each unique expr is evaluated once.
-    List<Target> targets = new ArrayList<Target>();
-    for (Column column : subQueryNode.getInSchema().getColumns()) {
-      ColumnReferenceExpr columnRef = new ColumnReferenceExpr(column.getQualifier(), column.getColumnName());
-      if (block.namedExprsMgr.contains(columnRef)) {
-        String referenceName = block.namedExprsMgr.getName(columnRef);
-        targets.add(new Target(new FieldEval(column), referenceName));
-        newlyEvaluatedExprs.remove(columnRef);
-      } else {
-        targets.add(new Target(new FieldEval(column)));
-      }
-    }
+    LinkedHashSet<Target> targets = createFieldTargetsFromRelation(block, subQueryNode, newlyEvaluatedExprs);
 
-    for (Expr newAddedExpr : newlyEvaluatedExprs) {
+    for (String newAddedExpr : newlyEvaluatedExprs) {
       targets.add(block.namedExprsMgr.getTarget(newAddedExpr, true));
     }
 

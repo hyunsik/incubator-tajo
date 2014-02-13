@@ -94,13 +94,19 @@ public class LogicalPlan {
 
   public String newGeneratedFieldName(EvalNode evalNode) {
     String prefix = evalNode.getName();
-    return generateFieldName(prefix);
+    return generateFieldName(prefix).toLowerCase();
   }
 
+  /**
+   * It generates a column name. It is usually used for an expression or predicate without a specified name
+   * (i.e., alias). For example, a predicate in WHERE clause uses this method for making its reference name.
+   */
   public String newGeneratedFieldName(Expr expr) {
     String prefix;
 
     switch (expr.getType()) {
+    case Column:
+      return ((ColumnReferenceExpr) expr).getCanonicalName();
     case CountRowsFunction:
       prefix = "count";
       break;
@@ -115,7 +121,7 @@ public class LogicalPlan {
     default:
       prefix = expr.getType().name();
     }
-    return generateFieldName(prefix);
+    return generateFieldName(prefix).toLowerCase();
   }
 
   public QueryBlock getRootBlock() {
