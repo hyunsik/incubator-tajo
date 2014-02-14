@@ -106,23 +106,28 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
 
           // Transitions from NEW state
           .addTransition(SubQueryState.NEW,
-              EnumSet.of(SubQueryState.INIT, SubQueryState.ERROR, SubQueryState.SUCCEEDED),
-              SubQueryEventType.SQ_INIT, new InitAndRequestContainer())
+              EnumSet.of(SubQueryState.INITED, SubQueryState.ERROR, SubQueryState.SUCCEEDED),
+              SubQueryEventType.SQ_INIT,
+              new InitAndRequestContainer())
           .addTransition(SubQueryState.NEW, SubQueryState.NEW,
               SubQueryEventType.SQ_DIAGNOSTIC_UPDATE,
               DIAGNOSTIC_UPDATE_TRANSITION)
+          .addTransition(SubQueryState.NEW, SubQueryState.KILL_WAIT,
+              SubQueryEventType.SQ_KILL)
           .addTransition(SubQueryState.NEW, SubQueryState.ERROR,
               SubQueryEventType.SQ_INTERNAL_ERROR,
               INTERNAL_ERROR_TRANSITION)
 
-          // Transitions from INIT state
-          .addTransition(SubQueryState.INIT, SubQueryState.CONTAINER_ALLOCATED,
+          // Transitions from INITED state
+          .addTransition(SubQueryState.INITED, SubQueryState.CONTAINER_ALLOCATED,
               SubQueryEventType.SQ_CONTAINER_ALLOCATED,
               CONTAINER_LAUNCH_TRANSITION)
-          .addTransition(SubQueryState.INIT, SubQueryState.INIT,
+          .addTransition(SubQueryState.INITED, SubQueryState.INITED,
               SubQueryEventType.SQ_DIAGNOSTIC_UPDATE,
               DIAGNOSTIC_UPDATE_TRANSITION)
-          .addTransition(SubQueryState.NEW, SubQueryState.ERROR,
+          .addTransition(SubQueryState.INITED, SubQueryState.KILL_WAIT,
+              SubQueryEventType.SQ_KILL)
+          .addTransition(SubQueryState.INITED, SubQueryState.ERROR,
               SubQueryEventType.SQ_INTERNAL_ERROR,
               INTERNAL_ERROR_TRANSITION)
 
@@ -150,12 +155,16 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
           .addTransition(SubQueryState.RUNNING, SubQueryState.RUNNING,
               SubQueryEventType.SQ_TASK_COMPLETED,
               new TaskCompletedTransition())
-          .addTransition(SubQueryState.RUNNING, SubQueryState.SUCCEEDED,
+          .addTransition(SubQueryState.RUNNING,
+              EnumSet.of(SubQueryState.SUCCEEDED, SubQueryState.KILLED, SubQueryState.FAILED, SubQueryState.ERROR),
               SubQueryEventType.SQ_SUBQUERY_COMPLETED,
               new SubQueryCompleteTransition())
           .addTransition(SubQueryState.RUNNING, SubQueryState.RUNNING,
               SubQueryEventType.SQ_DIAGNOSTIC_UPDATE,
               DIAGNOSTIC_UPDATE_TRANSITION)
+          .addTransition(SubQueryState.RUNNING, SubQueryState.RUNNING,
+              SubQueryEventType.SQ_KILL,
+              new KillTasksTransition())
           .addTransition(SubQueryState.RUNNING, SubQueryState.FAILED,
               SubQueryEventType.SQ_FAILED,
               FAILED_TRANSITION)
@@ -174,6 +183,9 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
           .addTransition(SubQueryState.SUCCEEDED, SubQueryState.ERROR,
               SubQueryEventType.SQ_INTERNAL_ERROR,
               INTERNAL_ERROR_TRANSITION)
+          // Ignore-able events
+          .addTransition(SubQueryState.SUCCEEDED, SubQueryState.SUCCEEDED,
+              SubQueryEventType.SQ_KILL)
 
           // Transitions from FAILED state
           .addTransition(SubQueryState.FAILED, SubQueryState.FAILED,
@@ -205,8 +217,10 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
   private final Lock writeLock;
 
   private int totalScheduledObjectsCount;
-  private int completedObjectCount = 0;
+  private int succeededObjectCount = 0;
   private int completedTaskCount = 0;
+  private int succeededTaskCount = 0;
+  private int killedObjectCount = 0;
   private TaskSchedulerContext schedulerContext;
 
   public SubQuery(QueryMasterTask.QueryMasterTaskContext context, MasterPlan masterPlan, ExecutionBlock block, AbstractStorageManager sm) {
@@ -223,7 +237,7 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
   }
 
   public static boolean isRunningState(SubQueryState state) {
-    return state == SubQueryState.INIT || state == SubQueryState.NEW ||
+    return state == SubQueryState.INITED || state == SubQueryState.NEW ||
         state == SubQueryState.CONTAINER_ALLOCATED || state == SubQueryState.RUNNING;
   }
 
@@ -271,15 +285,15 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
       if (getState() == SubQueryState.NEW) {
         return 0;
       } else {
-        return (float)(completedObjectCount) / (float)totalScheduledObjectsCount;
+        return (float)(succeededObjectCount) / (float)totalScheduledObjectsCount;
       }
     } finally {
       readLock.unlock();
     }
   }
 
-  public int getCompletedObjectCount() {
-    return completedObjectCount;
+  public int getSucceededObjectCount() {
+    return succeededObjectCount;
   }
 
   public int getTotalScheduledObjectsCount() {
@@ -300,7 +314,6 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
     // - record SubQuery Finish Time
     // - CleanUp Tasks
     // - Record History
-
     stopScheduler();
     releaseContainers();
     setFinishTime();
@@ -467,8 +480,6 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
     meta = CatalogUtil.newTableMeta(storeType, new Options());
     statistics = stats;
     setFinishTime();
-
-    eventHandler.handle(new SubQuerySucceeEvent(getId()));
   }
 
   @Override
@@ -530,11 +541,12 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
           if (subQuery.getTaskScheduler().remainingScheduledObjectNum() == 0) { // if there is no tasks
             subQuery.stopScheduler();
             subQuery.finish();
+            subQuery.eventHandler.handle(new SubQueryCompletedEvent(subQuery.getId(), SubQueryState.SUCCEEDED));
             return SubQueryState.SUCCEEDED;
           } else {
             subQuery.taskScheduler.start();
             allocateContainers(subQuery);
-            return SubQueryState.INIT;
+            return SubQueryState.INITED;
           }
         }
       } catch (Exception e) {
@@ -872,8 +884,7 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
     }
   }
 
-  private static class TaskCompletedTransition
-      implements SingleArcTransition<SubQuery, SubQueryEvent> {
+  private static class TaskCompletedTransition implements SingleArcTransition<SubQuery, SubQueryEvent> {
 
     @Override
     public void transition(SubQuery subQuery,
@@ -883,38 +894,81 @@ public class SubQuery implements EventHandler<SubQueryEvent> {
 
       if (task == null) { // task failed
         subQuery.eventHandler.handle(new SubQueryEvent(subQuery.getId(), SubQueryEventType.SQ_FAILED));
+
       } else {
-        QueryUnitAttempt taskAttempt = task.getSuccessfulAttempt();
-        if (task.isLeafTask()) {
-          subQuery.completedObjectCount += task.getTotalFragmentNum();
-        } else {
-          subQuery.completedObjectCount++;
-        }
         subQuery.completedTaskCount++;
 
-        LOG.info(subQuery.getId() + " SubQuery Succeeded " + subQuery.completedTaskCount + "/"
-            + subQuery.schedulerContext.getEstimatedTaskNum() + " on " + taskAttempt.getHost() + ":" + taskAttempt.getPort());
-        if (subQuery.taskScheduler.remainingScheduledObjectNum() == 0
-            && subQuery.totalScheduledObjectsCount == subQuery.completedObjectCount) {
-          subQuery.eventHandler.handle(new SubQueryEvent(subQuery.getId(),
-              SubQueryEventType.SQ_SUBQUERY_COMPLETED));
+        if (taskEvent.getState() == TaskState.SUCCEEDED) {
+          QueryUnitAttempt taskAttempt = task.getSuccessfulAttempt();
+          if (task.isLeafTask()) {
+            subQuery.succeededObjectCount += task.getTotalFragmentNum();
+          } else {
+            subQuery.succeededObjectCount++;
+          }
+
+          LOG.info(subQuery.getId() + " SubQuery Succeeded Event: " + subQuery.succeededObjectCount + "/"
+              + subQuery.schedulerContext.getEstimatedTaskNum() + " on "
+              + taskAttempt.getHost() + ":" + taskAttempt.getPort());
+        } else if (task.getState() == TaskState.KILLED) {
+          if (task.isLeafTask()) {
+            subQuery.killedObjectCount += task.getTotalFragmentNum();
+          } else {
+            subQuery.killedObjectCount++;
+          }
+          LOG.info(subQuery.getId() + " SubQuery Killed Event: " + subQuery.killedObjectCount+ "/"
+              + subQuery.schedulerContext.getEstimatedTaskNum());
+        }
+
+        if (subQuery.totalScheduledObjectsCount == subQuery.succeededObjectCount + subQuery.killedObjectCount) {
+          subQuery.eventHandler.handle(new SubQueryEvent(subQuery.getId(), SubQueryEventType.SQ_SUBQUERY_COMPLETED));
         }
       }
     }
   }
 
-  private static class SubQueryCompleteTransition
-      implements SingleArcTransition<SubQuery, SubQueryEvent> {
+  private static class KillTasksTransition implements SingleArcTransition<SubQuery, SubQueryEvent> {
 
     @Override
     public void transition(SubQuery subQuery, SubQueryEvent subQueryEvent) {
+      LOG.info(">>> KillTasksTransition Enter");
+      subQuery.getTaskScheduler().stop();
+      for (QueryUnit queryUnit : subQuery.getQueryUnits()) {
+        subQuery.eventHandler.handle(new TaskEvent(queryUnit.getId(), TaskEventType.T_KILL));
+      }
+      LOG.info(">>> KillTasksTransition Leave");
+    }
+  }
+
+  private static class SubQueryCompleteTransition
+      implements MultipleArcTransition<SubQuery, SubQueryEvent, SubQueryState> {
+
+    @Override
+    public SubQueryState transition(SubQuery subQuery, SubQueryEvent subQueryEvent) {
       // TODO - Commit subQuery & do cleanup
       // TODO - records succeeded, failed, killed completed task
       // TODO - records metrics
-      LOG.info("SubQuery finished:" + subQuery.getId());
-      subQuery.stopScheduler();
-      subQuery.releaseContainers();
-      subQuery.finish();
+      try {
+        LOG.info(String.format("subQuery completed - %s (total=%d, success=%d, killed=%d)",
+            subQuery.getId().toString(),
+            subQuery.getTotalScheduledObjectsCount(),
+            subQuery.getSucceededObjectCount(),
+            subQuery.killedObjectCount));
+
+        if (subQuery.killedObjectCount > 0) {
+          subQuery.abortSubQuery(SubQueryState.KILLED);
+          return SubQueryState.KILLED;
+        } else {
+          subQuery.stopScheduler();
+          subQuery.releaseContainers();
+          subQuery.finish();
+          subQuery.eventHandler.handle(new SubQueryCompletedEvent(subQuery.getId(), SubQueryState.SUCCEEDED));
+          return SubQueryState.SUCCEEDED;
+        }
+      } catch (Throwable t) {
+        LOG.error(t);
+        subQuery.abortSubQuery(SubQueryState.ERROR);
+        return SubQueryState.ERROR;
+      }
     }
   }
 

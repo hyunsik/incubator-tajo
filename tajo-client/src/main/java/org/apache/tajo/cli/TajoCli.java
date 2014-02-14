@@ -299,7 +299,7 @@ public class TajoCli {
             if (queryId.equals(QueryIdFactory.NULL_QUERY_ID)) {
               sout.println("OK");
             } else {
-              getQueryResult(queryId);
+              waitForQueryCompleted(queryId);
             }
           } finally {
             if(queryId != null) {
@@ -320,7 +320,7 @@ public class TajoCli {
     return state == QueryState.QUERY_ERROR || state == QueryState.QUERY_FAILED;
   }
 
-  private void getQueryResult(QueryId queryId) {
+  private void waitForQueryCompleted(QueryId queryId) {
     // if query is empty string
     if (queryId.equals(QueryIdFactory.NULL_QUERY_ID)) {
       return;
@@ -338,14 +338,15 @@ public class TajoCli {
           continue;
         }
 
-        if (status.getState() == QueryState.QUERY_RUNNING ||
-            status.getState() == QueryState.QUERY_SUCCEEDED) {
+        if (status.getState() == QueryState.QUERY_RUNNING || status.getState() == QueryState.QUERY_SUCCEEDED) {
           sout.println("Progress: " + (int)(status.getProgress() * 100.0f)
               + "%, response time: " + ((float)(status.getFinishTime() - status.getSubmitTime()) / 1000.0) + " sec");
           sout.flush();
         }
 
-        if (status.getState() != QueryState.QUERY_RUNNING && status.getState() != QueryState.QUERY_NOT_ASSIGNED) {
+        if (status.getState() != QueryState.QUERY_RUNNING &&
+            status.getState() != QueryState.QUERY_NOT_ASSIGNED &&
+            status.getState() != QueryState.QUERY_KILL_WAIT) {
           break;
         }
       }

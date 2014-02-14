@@ -219,6 +219,12 @@ public class DefaultTaskScheduler extends AbstractTaskScheduler {
           scheduledRequests.addNonLeafTask(castEvent);
         }
       }
+    } else if (event.getType() == EventType.T_SCHEDULE_CANCEL) {
+      QueryUnitAttemptScheduleEvent castedEvent = (QueryUnitAttemptScheduleEvent) event;
+      scheduledRequests.leafTasks.remove(castedEvent.getQueryUnitAttempt().getId());
+      LOG.info(castedEvent.getQueryUnitAttempt().getId() + " is canceled from " + this.getClass().getSimpleName());
+      ((QueryUnitAttemptScheduleEvent) event).getQueryUnitAttempt().handle(
+          new TaskAttemptEvent(castedEvent.getQueryUnitAttempt().getId(), TaskAttemptEventType.TA_SCHEDULE_CANCELED));
     }
   }
 
@@ -356,6 +362,9 @@ public class DefaultTaskScheduler extends AbstractTaskScheduler {
   }
 
   private class ScheduledRequests {
+    // two list leafTasks and nonLeafTasks keep all tasks to be scheduled. Even though some task is included in
+    // leafTaskHostMapping or leafTasksRackMapping, some task T will not be sent to a task runner
+    // if the task is not included in leafTasks and nonLeafTasks.
     private final Set<QueryUnitAttemptId> leafTasks = Collections.synchronizedSet(new HashSet<QueryUnitAttemptId>());
     private final Set<QueryUnitAttemptId> nonLeafTasks = Collections.synchronizedSet(new HashSet<QueryUnitAttemptId>());
     private Map<String, TaskBlockLocation> leafTaskHostMapping = new HashMap<String, TaskBlockLocation>();

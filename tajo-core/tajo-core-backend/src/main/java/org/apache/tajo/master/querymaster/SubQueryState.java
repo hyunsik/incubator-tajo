@@ -21,9 +21,11 @@ package org.apache.tajo.master.querymaster;
 public enum SubQueryState {
   NEW,
   CONTAINER_ALLOCATED,
-  INIT,
+  INITED,
   RUNNING,
   SUCCEEDED,
   FAILED,
+  KILL_WAIT,
+  KILLED,
   ERROR
 }
