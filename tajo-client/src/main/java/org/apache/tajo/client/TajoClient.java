@@ -475,12 +475,10 @@ public class TajoClient {
 
       long currentTimeMillis = System.currentTimeMillis();
       long timeKillIssued = currentTimeMillis;
-      while ((currentTimeMillis < timeKillIssued + 10000L) && (status.getState()
-          != QueryState.QUERY_KILLED)) {
+      while ((currentTimeMillis < timeKillIssued + 10000L) && (status.getState() != QueryState.QUERY_KILLED)) {
         try {
-          Thread.sleep(1000L);
+          Thread.sleep(100L);
         } catch(InterruptedException ie) {
-          /** interrupted, just break */
           break;
         }
         currentTimeMillis = System.currentTimeMillis();
