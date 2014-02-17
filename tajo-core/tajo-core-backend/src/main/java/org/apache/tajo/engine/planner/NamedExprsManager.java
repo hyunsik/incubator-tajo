@@ -290,19 +290,22 @@ public class NamedExprsManager {
    * If the expression corresponding to the reference name is evaluated, it just returns {@link FieldEval}
    * (i.e., a column reference). Otherwise, it returns the original EvalNode of the expression.
    *
-   * @param name The reference name of an EvalNode.
+   * @param referenceName The reference name to get EvalNode
    * @param unevaluatedForm If TRUE, it always return the annotated EvalNode of the expression.
    * @return
    */
-  public Target getTarget(String name, boolean unevaluatedForm) {
-    String normalized = name;
+  public Target getTarget(String referenceName, boolean unevaluatedForm) {
+    String normalized = referenceName;
     int refId = nameToIdMap.get(normalized);
 
     if (!unevaluatedForm && evaluationStateMap.containsKey(refId) && evaluationStateMap.get(refId)) {
       EvalNode evalNode = idToEvalMap.get(refId);
 
-      if (!isPrimaryName(refId, name) && isEvaluated(normalized)) {
-        return new Target(new FieldEval(getPrimaryName(refId),evalNode.getValueType()), name);
+      // If the expression is already evaluated, it should use the FieldEval to access a field value.
+      // But, if this reference name is not primary name, it cannot use the reference name.
+      // It changes the given reference name to the primary name.
+      if (isEvaluated(normalized) && !isPrimaryName(refId, referenceName)) {
+        return new Target(new FieldEval(getPrimaryName(refId),evalNode.getValueType()), referenceName);
       }
 
       EvalNode referredEval;
@@ -311,11 +314,11 @@ public class NamedExprsManager {
       } else {
         referredEval = new FieldEval(idToNamesMap.get(refId).get(0), evalNode.getValueType());
       }
-      return new Target(referredEval, name);
+      return new Target(referredEval, referenceName);
 
     } else {
       if (idToEvalMap.containsKey(refId)) {
-        return new Target(idToEvalMap.get(refId), name);
+        return new Target(idToEvalMap.get(refId), referenceName);
       } else {
         return null;
       }
