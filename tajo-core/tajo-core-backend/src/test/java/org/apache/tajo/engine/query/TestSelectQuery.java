@@ -129,6 +129,14 @@ public class TestSelectQuery extends QueryTestCaseBase {
 
   @Test
   public final void testSelectAsterisk4() throws Exception {
+    // select length(l_comment), l_extendedprice * l_discount, *, l_tax * 10 from lineitem;
+    ResultSet res = executeQuery();
+    assertResultSet(res);
+    cleanupQuery(res);
+  }
+
+  @Test
+  public final void testSelectAsterisk5() throws Exception {
     // select * from (select l_orderkey, 1 from lineitem where l_orderkey % 2 = 0) t1;
     ResultSet res = executeQuery();
     assertResultSet(res);
