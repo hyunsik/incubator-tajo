@@ -164,10 +164,10 @@ public class QueryMasterTask extends CompositeService {
 
   @Override
   public void stop() {
-    if(stopped.get()) {
+
+    if(stopped.getAndSet(true)) {
       return;
     }
-    stopped.set(true);
 
     LOG.info("Stopping QueryMasterTask:" + queryId);
 
@@ -181,8 +181,6 @@ public class QueryMasterTask extends CompositeService {
       TajoMasterProtocol.TajoMasterProtocolService masterClientService = tmClient.getStub();
       masterClientService.stopQueryMaster(null, queryId.getProto(), future);
     } catch (Exception e) {
-      connPool.closeConnection(tmClient);
-      tmClient = null;
       LOG.error(e.getMessage(), e);
     } finally {
       connPool.releaseConnection(tmClient);

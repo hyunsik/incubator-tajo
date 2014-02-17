@@ -22,7 +22,6 @@ import com.google.common.base.Objects;
 import org.apache.tajo.util.TUtil;
 
 public class Projection extends UnaryOperator implements Cloneable {
-  private boolean all;
   private boolean distinct = false;
 
   private NamedExpr[] targets;
@@ -43,14 +42,6 @@ public class Projection extends UnaryOperator implements Cloneable {
     distinct = true;
   }
 
-  public void setAll() {
-    all = true;
-  }
-
-  public boolean isAllProjected() {
-    return all;
-  }
-	
 	public NamedExpr[] getNamedExprs() {
 	  return this.targets;
 	}
@@ -60,13 +51,13 @@ public class Projection extends UnaryOperator implements Cloneable {
   }
 
   public int hashCode() {
-    return Objects.hashCode(all, distinct, Objects.hashCode(targets), getChild());
+    return Objects.hashCode(distinct, Objects.hashCode(targets), getChild());
   }
 
   @Override
   boolean equalsTo(Expr expr) {
     Projection another = (Projection) expr;
-    return TUtil.checkEquals(all, another.all) && distinct == another.distinct &&
+    return distinct == another.distinct &&
         TUtil.checkEquals(targets, another.targets);
   }
 
