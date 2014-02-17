@@ -74,9 +74,6 @@ public class TajoContainerProxy extends ContainerProxy {
       TajoWorkerProtocol.TajoWorkerProtocolService tajoWorkerRpcClient = tajoWorkerRpc.getStub();
       tajoWorkerRpcClient.killTaskAttempt(null, taskAttemptId.getProto(), NullCallback.get());
     } catch (Exception e) {
-      //TODO retry
-      RpcConnectionPool.getPool(context.getConf()).closeConnection(tajoWorkerRpc);
-      tajoWorkerRpc = null;
       LOG.error(e.getMessage(), e);
     } finally {
       RpcConnectionPool.getPool(context.getConf()).releaseConnection(tajoWorkerRpc);
