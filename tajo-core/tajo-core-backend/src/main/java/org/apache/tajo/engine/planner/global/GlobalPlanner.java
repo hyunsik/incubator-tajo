@@ -432,7 +432,7 @@ public class GlobalPlanner {
         }
 
         firstPhaseEvals[i].setFirstPhase();
-        firstPhaseEvalNames[i] = plan.newGeneratedFieldName(firstPhaseEvals[i]);
+        firstPhaseEvalNames[i] = plan.newUniqueGeneratedColumnName(firstPhaseEvals[i]);
         FieldEval param = new FieldEval(firstPhaseEvalNames[i], firstPhaseEvals[i].getValueType());
         secondPhaseEvals[i].setArgs(new EvalNode[] {param});
       }

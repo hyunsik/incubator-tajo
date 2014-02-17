@@ -35,11 +35,24 @@ import org.apache.tajo.util.TUtil;
 import java.util.*;
 
 /**
- * NamedExprsManager manages an expressions to be evaluated in a query block.
- * NamedExprsManager uses a reference name to identify one expression or one
- * EvalNode (annotated expression).
+ * NamedExprsManager manages an expressions used in a query block. All expressions used in a query block must be
+ * added to NamedExprsManager. When an expression is added to NamedExprsManager, NamedExprsManager gives a reference
+ * to the expression. If the expression already has an alias name, it gives the alias name as the reference
+ * to the expression. If the expression does not have any alias, it gives a generated name as the reference to the
+ * expression. Usually, predicates in WHERE clause, expressions in GROUP-BY, ORDER-BY, LIMIT clauses are not given
+ * any alias name. Those reference names are used to identify an individual expression.
  *
- * It keeps a map from an unique integer id to both unique Expr and EvalNode.
+ * NamedExprsManager only keeps unique expressions. Since expressions in a query block can be duplicated,
+ * one or more reference names can point one expressions. Due to this process, it naturally removes duplicated
+ * expression.
+ *
+ * As we mentioned above, one or more reference names can indicate one expression. Primary names are used for
+ * representing expressions. A primary name of an expression indicates the reference obtained when
+ * the expression is added firstly. All output schemas uses only primary names of expressions.
+ *
+ * Each expression that NamedExprsManager keeps has an boolean state to indicate whether the expression is evaluated
+ * or not. The <code>evaluated</code> state means that upper logical operators can access this expression like a column
+ * reference. For it, the reference name is used to access this expression like a column reference,
  */
 public class NamedExprsManager {
   /** a sequence id */
@@ -78,30 +91,15 @@ public class NamedExprsManager {
   }
 
   /**
-   * Check whether the expression corresponding to a given name was resolved.
+   * Check whether the expression corresponding to a given name was evaluated.
    *
    * @param name The name of a certain expression to be checked
    * @return true if resolved. Otherwise, false.
    */
-  public boolean isResolved(String name) {
+  public boolean isEvaluated(String name) {
     String normalized = normalizeName(name);
     if (nameToIdMap.containsKey(normalized)) {
       int refId = nameToIdMap.get(normalized);
-      return evaluationStateMap.containsKey(refId) && evaluationStateMap.get(refId);
-    } else {
-      return false;
-    }
-  }
-
-  /**
-   * Check whether the expression corresponding to a given name was resolved.
-   *
-   * @param evalNode The EvalNode of a certain expression to be checked
-   * @return true if resolved. Otherwise, false.
-   */
-  public boolean isResolved(EvalNode evalNode) {
-    if (idToEvalMap.inverse().containsKey(evalNode)) {
-      int refId = idToEvalMap.inverse().get(evalNode);
       return evaluationStateMap.containsKey(refId) && evaluationStateMap.get(refId);
     } else {
       return false;
@@ -141,18 +139,25 @@ public class NamedExprsManager {
     return aliasedColumnMap.inverse().get(aliasName);
   }
 
+  /**
+   * Adds an expression and returns a reference name.
+   */
   public String addExpr(Expr expr) throws PlanningException {
     if (idToExprBiMap.inverse().containsKey(expr)) {
       int refId = idToExprBiMap.inverse().get(expr);
       return idToNamesMap.get(refId).get(0);
     }
 
-    String generatedName = plan.newGeneratedFieldName(expr);
+    String generatedName = plan.generateNewUniqueColumnName(expr);
     return addExpr(expr, generatedName);
   }
 
-  public String addExpr(Expr expr, String specifiedName) throws PlanningException {
-    String normalized = normalizeName(specifiedName);
+  /**
+   * Adds an expression with an alias name and returns a reference name.
+   * NamedExprsManager uses the alias as the reference name of a given expression.
+   */
+  public String addExpr(Expr expr, String alias) throws PlanningException {
+    String normalized = normalizeName(alias);
 
     // if this name already exists, just returns the name.
     if (nameToIdMap.containsKey(normalized)) {
@@ -173,17 +178,6 @@ public class NamedExprsManager {
     evaluationStateMap.put(refId, false);
 
     return normalized;
-  }
-
-  public String [] addReferences(Expr expr) throws PlanningException {
-    Set<ColumnReferenceExpr> foundSet = ExprFinder.finds(expr, OpType.Column);
-    String [] names = new String[foundSet.size()];
-    int i = 0;
-    for (ColumnReferenceExpr column : foundSet) {
-      addExpr(column);
-      names[i++] = column.getCanonicalName();
-    }
-    return names;
   }
 
   public String addNamedExpr(NamedExpr namedExpr) throws PlanningException {
@@ -215,7 +209,7 @@ public class NamedExprsManager {
     return namedExprList;
   }
 
-  public void resolveExpr(String name, EvalNode evalNode) throws PlanningException {
+  public void markAsEvaluated(String name, EvalNode evalNode) throws PlanningException {
     String normalized = name.toLowerCase();
 
     int refId = nameToIdMap.get(normalized);
@@ -247,23 +241,51 @@ public class NamedExprsManager {
     return getTarget(name, false);
   }
 
-  private boolean isFirstName(int id, String name) {
+  /**
+   * It checks if a given name is the primary name.
+   *
+   * @See {@link NamedExprsManager}
+   * @see {@link NamedExprsManager#getPrimaryName}
+   *
+   * @param id The expression id
+   * @param name The name to be checked if it is primary name.
+   * @return The primary name
+   */
+  private boolean isPrimaryName(int id, String name) {
     return idToNamesMap.get(id).get(0).equals(name);
   }
 
-  private String getFirstName(int id) {
+  /**
+   * One or more reference names can indicate one expression. Primary names are used for
+   * representing expressions. A primary name of an expression indicates the reference obtained when
+   * the expression is added firstly. All output schemas uses only primary names of expressions.
+   *
+   * @param id The expression id
+   * @return The primary name
+   */
+  private String getPrimaryName(int id) {
     return idToNamesMap.get(id).get(0);
   }
 
-  public Target getTarget(String name, boolean raw) {
+  /**
+   * get a Target instance. A target consists of a reference name and an EvalNode corresponding to the reference name.
+   * According to evaluation state, it returns different EvalNodes.
+   * If the expression corresponding to the reference name is evaluated, it just returns {@link FieldEval}
+   * (i.e., a column reference). Otherwise, it returns the original EvalNode of the expression.
+   *
+   * @param name The reference name of an EvalNode.
+   * @param unevaluatedForm If TRUE, it always return the annotated EvalNode of the expression.
+   * @return
+   */
+  public Target getTarget(String name, boolean unevaluatedForm) {
     String normalized = name;
     int refId = nameToIdMap.get(normalized);
 
-    if (!raw && evaluationStateMap.containsKey(refId) && evaluationStateMap.get(refId)) {
+    if (!unevaluatedForm && evaluationStateMap.containsKey(refId) && evaluationStateMap.get(refId)) {
       EvalNode evalNode = idToEvalMap.get(refId);
 
-      if (!isFirstName(refId, name) && isResolved(normalized)) {
-        return new Target(new FieldEval(getFirstName(refId),evalNode.getValueType()), name);
+      if (!isPrimaryName(refId, name) && isEvaluated(normalized)) {
+        return new Target(new FieldEval(getPrimaryName(refId),evalNode.getValueType()), name);
       }
 
       EvalNode referredEval;
@@ -284,33 +306,33 @@ public class NamedExprsManager {
   }
 
   public String toString() {
-    return "unresolved=" + nameToIdMap.size() + ", resolved=" + idToEvalMap.size()
+    return "unevaluated=" + nameToIdMap.size() + ", evaluated=" + idToEvalMap.size()
         + ", renamed=" + aliasedColumnMap.size();
   }
 
   /**
-   * It returns an iterator for unresolved NamedExprs.
+   * It returns an iterator for unevaluated NamedExprs.
    */
-  public Iterator<NamedExpr> getUnresolvedExprs() {
-    return new UnresolvedIterator();
+  public Iterator<NamedExpr> getIteratorForUnevaluatedExprs() {
+    return new UnevaluatedIterator();
   }
 
-  public class UnresolvedIterator implements Iterator<NamedExpr> {
+  public class UnevaluatedIterator implements Iterator<NamedExpr> {
     private final Iterator<NamedExpr> iterator;
 
-    public UnresolvedIterator() {
-      List<NamedExpr> unresolvedList = TUtil.newList();
+    public UnevaluatedIterator() {
+      List<NamedExpr> unEvaluatedList = TUtil.newList();
       for (Integer refId: idToNamesMap.keySet()) {
         String name = idToNamesMap.get(refId).get(0);
-        if (!isResolved(name)) {
+        if (!isEvaluated(name)) {
           Expr expr = idToExprBiMap.get(refId);
-          unresolvedList.add(new NamedExpr(expr, name));
+          unEvaluatedList.add(new NamedExpr(expr, name));
         }
       }
-      if (unresolvedList.size() == 0) {
+      if (unEvaluatedList.size() == 0) {
         iterator = null;
       } else {
-        iterator = unresolvedList.iterator();
+        iterator = unEvaluatedList.iterator();
       }
     }
 

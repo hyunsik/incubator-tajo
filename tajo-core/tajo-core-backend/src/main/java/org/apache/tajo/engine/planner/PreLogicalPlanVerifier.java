@@ -34,14 +34,12 @@ public class PreLogicalPlanVerifier extends BaseAlgebraVisitor <VerificationStat
 
   public Expr visitProjection(VerificationState state, Stack<Expr> stack, Projection expr) throws PlanningException {
     Set<String> names = TUtil.newHashSet();
-    if (!expr.isAllProjected()) {
-      for (NamedExpr namedExpr : expr.getNamedExprs()) {
-        if (namedExpr.hasAlias()) {
-          if (names.contains(namedExpr.getAlias())) {
-            state.addVerification(String.format("column name \"%s\" specified more than once", namedExpr.getAlias()));
-          } else {
-            names.add(namedExpr.getAlias());
-          }
+    for (NamedExpr namedExpr : expr.getNamedExprs()) {
+      if (namedExpr.hasAlias()) {
+        if (names.contains(namedExpr.getAlias())) {
+          state.addVerification(String.format("column name \"%s\" specified more than once", namedExpr.getAlias()));
+        } else {
+          names.add(namedExpr.getAlias());
         }
       }
     }

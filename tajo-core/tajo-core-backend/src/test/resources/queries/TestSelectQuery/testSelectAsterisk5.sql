@@ -1,1 +1,1 @@
-select length(l_comment), l_extendedprice * l_discount, *, l_tax * 10 from lineitem;
+select * from (select l_orderkey, 1 from lineitem where l_orderkey % 2 = 0) t1;

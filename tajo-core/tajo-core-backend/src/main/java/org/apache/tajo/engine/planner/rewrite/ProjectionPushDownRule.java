@@ -209,7 +209,7 @@ public class ProjectionPushDownRule extends
         FieldEval fieldEval = (FieldEval) evalNode;
         name = fieldEval.getName();
       } else {
-        name = plan.newGeneratedFieldName(evalNode);
+        name = plan.newUniqueGeneratedColumnName(evalNode);
       }
 
       return add(name, evalNode);
@@ -264,7 +264,7 @@ public class ProjectionPushDownRule extends
       //
       // In this case, total2 will meet the following condition. Then, total2 can
       // just refer the result of total1 rather than calculating l_orderkey + 1.
-      if (!isPrimaryName(id, name) && isResolved(getPrimaryName(id))) {
+      if (!isPrimaryName(id, name) && isEvaluated(getPrimaryName(id))) {
         evalNode = new FieldEval(getPrimaryName(id), evalNode.getValueType());
       }
 
@@ -276,14 +276,14 @@ public class ProjectionPushDownRule extends
       }
     }
 
-    public boolean isResolved(String name) {
+    public boolean isEvaluated(String name) {
       if (!nameToIdBiMap.containsKey(name)) {
         throw new RuntimeException("No Such target name: " + name);
       }
       return evaluationStateMap.get(name);
     }
 
-    public void resolve(Target target) {
+    public void markAsEvaluated(Target target) {
       int refId = nameToIdBiMap.get(target.getCanonicalName());
       EvalNode evalNode = target.getEvalTree();
       if (!idToNamesMap.containsKey(refId)) {
@@ -323,13 +323,13 @@ public class ProjectionPushDownRule extends
     }
 
     public String toString() {
-      int resolved = 0;
+      int evaluated = 0;
       for (Boolean flag: evaluationStateMap.values()) {
         if (flag) {
-          resolved++;
+          evaluated++;
         }
       }
-      return "eval=" + evaluationStateMap.size() + ", resolved=" + resolved;
+      return "eval=" + evaluationStateMap.size() + ", evaluated=" + evaluated;
     }
   }
 
@@ -400,17 +400,17 @@ public class ProjectionPushDownRule extends
 
     node.setInSchema(child.getOutSchema());
 
-    int resolvingCount = 0;
+    int evaluationCount = 0;
     List<Target> finalTargets = TUtil.newList();
     for (String referenceName : referenceNames) {
       Target target = context.targetListMgr.getTarget(referenceName);
 
-      if (context.targetListMgr.isResolved(referenceName)) {
+      if (context.targetListMgr.isEvaluated(referenceName)) {
         finalTargets.add(new Target(new FieldEval(target.getNamedColumn())));
       } else if (LogicalPlanner.checkIfBeEvaluatedAtThis(target.getEvalTree(), node)) {
         finalTargets.add(target);
-        context.targetListMgr.resolve(target);
-        resolvingCount++;
+        context.targetListMgr.markAsEvaluated(target);
+        evaluationCount++;
       }
     }
 
@@ -419,7 +419,7 @@ public class ProjectionPushDownRule extends
 
     // Removing ProjectionNode
     // TODO - Consider INSERT and CTAS statement, and then remove the check of stack.empty.
-    if (resolvingCount == 0 && PlannerUtil.targetToSchema(finalTargets).equals(child.getOutSchema())) {
+    if (evaluationCount == 0 && PlannerUtil.targetToSchema(finalTargets).equals(child.getOutSchema())) {
       if (stack.empty()) {
         // if it is topmost, set it as the root of this block.
         block.setRoot(child);
@@ -504,11 +504,11 @@ public class ProjectionPushDownRule extends
     node.setOutSchema(child.getOutSchema());
 
     Target target = context.targetListMgr.getTarget(referenceName);
-    if (newContext.targetListMgr.isResolved(referenceName)) {
+    if (newContext.targetListMgr.isEvaluated(referenceName)) {
       node.setQual(new FieldEval(target.getNamedColumn()));
     } else {
       node.setQual(target.getEvalTree());
-      newContext.targetListMgr.resolve(target);
+      newContext.targetListMgr.markAsEvaluated(target);
     }
 
     return node;
@@ -557,14 +557,14 @@ public class ProjectionPushDownRule extends
         String groupingKey = groupingKeyNames[i];
 
         Target target = context.targetListMgr.getTarget(groupingKey);
-        if (context.targetListMgr.isResolved(groupingKey)) {
+        if (context.targetListMgr.isEvaluated(groupingKey)) {
           groupingColumns[i] = target.getNamedColumn();
           targets.add(new Target(new FieldEval(target.getNamedColumn())));
         } else {
           if (target.getEvalTree().getType() == EvalType.FIELD) {
             groupingColumns[i] = ((FieldEval)target.getEvalTree()).getColumnRef();
             targets.add(target);
-            context.targetListMgr.resolve(target);
+            context.targetListMgr.markAsEvaluated(target);
           } else {
             throw new PlanningException("Cannot evaluate this expression in grouping keys: " + target.getEvalTree());
           }
@@ -584,7 +584,7 @@ public class ProjectionPushDownRule extends
 
         if (LogicalPlanner.checkIfBeEvaluatedAtGroupBy(target.getEvalTree(), node)) {
           aggEvals[i++] = target.getEvalTree();
-          context.targetListMgr.resolve(target);
+          context.targetListMgr.markAsEvaluated(target);
         }
       }
       if (aggEvals.length > 0) {
@@ -639,11 +639,11 @@ public class ProjectionPushDownRule extends
     node.setOutSchema(child.getOutSchema());
 
     Target target = context.targetListMgr.getTarget(referenceName);
-    if (newContext.targetListMgr.isResolved(referenceName)) {
+    if (newContext.targetListMgr.isEvaluated(referenceName)) {
       node.setQual(new FieldEval(target.getNamedColumn()));
     } else {
       node.setQual(target.getEvalTree());
-      newContext.targetListMgr.resolve(target);
+      newContext.targetListMgr.markAsEvaluated(target);
     }
 
     return node;
@@ -680,11 +680,11 @@ public class ProjectionPushDownRule extends
 
     if (node.hasJoinQual()) {
       Target target = context.targetListMgr.getTarget(joinQualReference);
-      if (newContext.targetListMgr.isResolved(joinQualReference)) {
+      if (newContext.targetListMgr.isEvaluated(joinQualReference)) {
         throw new PlanningException("Join condition must be evaluated in the proper Join Node: " + joinQualReference);
       } else {
         node.setJoinQual(target.getEvalTree());
-        newContext.targetListMgr.resolve(target);
+        newContext.targetListMgr.markAsEvaluated(target);
       }
     }
 
@@ -694,7 +694,7 @@ public class ProjectionPushDownRule extends
       String referenceName = it.next();
       Target target = context.targetListMgr.getTarget(referenceName);
 
-      if (context.targetListMgr.isResolved(referenceName)) {
+      if (context.targetListMgr.isEvaluated(referenceName)) {
         Target fieldReference = new Target(new FieldEval(target.getNamedColumn()));
         if (LogicalPlanner.checkIfBeEvaluatedAtJoin(block, fieldReference.getEvalTree(), node,
             stack.peek().getType() != NodeType.JOIN)) {
@@ -703,7 +703,7 @@ public class ProjectionPushDownRule extends
       } else if (LogicalPlanner.checkIfBeEvaluatedAtJoin(block, target.getEvalTree(), node,
           stack.peek().getType() != NodeType.JOIN)) {
         projectedTargets.add(target);
-        context.targetListMgr.resolve(target);
+        context.targetListMgr.markAsEvaluated(target);
       }
     }
 
@@ -841,7 +841,7 @@ public class ProjectionPushDownRule extends
 
       if (LogicalPlanner.checkIfBeEvaluatedAtRelation(block, target.getEvalTree(), node)) {
         projectedTargets.add(target);
-        newContext.targetListMgr.resolve(target);
+        newContext.targetListMgr.markAsEvaluated(target);
       }
     }
 
@@ -875,7 +875,7 @@ public class ProjectionPushDownRule extends
 
       if (LogicalPlanner.checkIfBeEvaluatedAtRelation(block, target.getEvalTree(), node)) {
         projectedTargets.add(target);
-        newContext.targetListMgr.resolve(target);
+        newContext.targetListMgr.markAsEvaluated(target);
       }
     }
 
@@ -913,7 +913,7 @@ public class ProjectionPushDownRule extends
 
       if (LogicalPlanner.checkIfBeEvaluatedAtRelation(block, target.getEvalTree(), node)) {
         projectedTargets.add(target);
-        childContext.targetListMgr.resolve(target);
+        childContext.targetListMgr.markAsEvaluated(target);
       }
     }
 

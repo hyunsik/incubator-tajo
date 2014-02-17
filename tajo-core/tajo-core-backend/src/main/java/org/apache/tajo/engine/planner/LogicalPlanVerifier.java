@@ -36,8 +36,10 @@ public class LogicalPlanVerifier extends BasicLogicalPlanVisitor<VerificationSta
     this.catalog = catalog;
   }
 
-  private static void verifyProjectableOutputSchema(VerificationState state, Projectable node)
-      throws PlanningException {
+  /**
+   * It checks if an output schema of a projectable node and target's output data types are equivalent to each other.
+   */
+  private static void verifyProjectableOutputSchema(Projectable node) throws PlanningException {
 
     Schema outputSchema = node.getOutSchema();
     Schema targetSchema = PlannerUtil.targetToSchema(node.getTargets());
@@ -68,7 +70,7 @@ public class LogicalPlanVerifier extends BasicLogicalPlanVisitor<VerificationSta
       ExprsVerifier.verify(state, node, target.getEvalTree());
     }
 
-    verifyProjectableOutputSchema(state, node);
+    verifyProjectableOutputSchema(node);
 
     return node;
   }
@@ -90,7 +92,7 @@ public class LogicalPlanVerifier extends BasicLogicalPlanVisitor<VerificationSta
                                   GroupbyNode node, Stack<LogicalNode> stack) throws PlanningException {
     super.visitGroupBy(state, plan, block, node, stack);
 
-    verifyProjectableOutputSchema(state, node);
+    verifyProjectableOutputSchema(node);
     return node;
   }
 
@@ -112,7 +114,7 @@ public class LogicalPlanVerifier extends BasicLogicalPlanVisitor<VerificationSta
       ExprsVerifier.verify(state, node, node.getJoinQual());
     }
 
-    verifyProjectableOutputSchema(state, node);
+    verifyProjectableOutputSchema(node);
 
     return node;
   }
@@ -177,7 +179,7 @@ public class LogicalPlanVerifier extends BasicLogicalPlanVisitor<VerificationSta
       ExprsVerifier.verify(state, node, node.getQual());
     }
 
-    verifyProjectableOutputSchema(state, node);
+    verifyProjectableOutputSchema(node);
 
     return node;
   }
