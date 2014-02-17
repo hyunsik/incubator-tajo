@@ -209,7 +209,7 @@ public class ProjectionPushDownRule extends
         FieldEval fieldEval = (FieldEval) evalNode;
         name = fieldEval.getName();
       } else {
-        name = plan.newUniqueGeneratedColumnName(evalNode);
+        name = plan.generateUniqueColumnName(evalNode);
       }
 
       return add(name, evalNode);

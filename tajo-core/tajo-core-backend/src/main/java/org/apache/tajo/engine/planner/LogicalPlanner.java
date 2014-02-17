@@ -321,7 +321,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       if (namedExpr.hasAlias()) {
         targets[i] = new Target(evalNode, namedExpr.getAlias());
       } else {
-        targets[i] = new Target(evalNode, context.plan.generateNewUniqueColumnName(namedExpr.getExpr()));
+        targets[i] = new Target(evalNode, context.plan.generateUniqueColumnName(namedExpr.getExpr()));
       }
     }
     EvalExprNode evalExprNode = context.queryBlock.getNodeFromExpr(projection);

@@ -53,6 +53,8 @@ import java.util.*;
  * Each expression that NamedExprsManager keeps has an boolean state to indicate whether the expression is evaluated
  * or not. The <code>evaluated</code> state means that upper logical operators can access this expression like a column
  * reference. For it, the reference name is used to access this expression like a column reference,
+ * The evaluated state is set with an EvalNode which is an annotated expression.
+ * {@link #getTarget(String)} returns EvalNodes by a reference name.
  */
 public class NamedExprsManager {
   /** a sequence id */
@@ -148,13 +150,13 @@ public class NamedExprsManager {
       return idToNamesMap.get(refId).get(0);
     }
 
-    String generatedName = plan.generateNewUniqueColumnName(expr);
+    String generatedName = plan.generateUniqueColumnName(expr);
     return addExpr(expr, generatedName);
   }
 
   /**
    * Adds an expression with an alias name and returns a reference name.
-   * NamedExprsManager uses the alias as the reference name of a given expression.
+   * It specifies the alias as an reference name.
    */
   public String addExpr(Expr expr, String alias) throws PlanningException {
     String normalized = normalizeName(alias);
@@ -180,6 +182,10 @@ public class NamedExprsManager {
     return normalized;
   }
 
+  /**
+   * Adds an expression and returns a reference name.
+   * If an alias is given, it specifies the alias as an reference name.
+   */
   public String addNamedExpr(NamedExpr namedExpr) throws PlanningException {
     if (namedExpr.hasAlias()) {
       return addExpr(namedExpr.getExpr(), namedExpr.getAlias());
@@ -188,11 +194,15 @@ public class NamedExprsManager {
     }
   }
 
-  public String [] addNamedExprArray(@Nullable Collection<NamedExpr> targets) throws PlanningException {
-    if (targets != null || targets.size() > 0) {
-      String [] names = new String[targets.size()];
+  /**
+   * Adds a list of expressions and returns a list of reference names.
+   * If some NamedExpr has an alias, NamedExprsManager specifies the alias for the NamedExpr.
+   */
+  public String [] addNamedExprArray(@Nullable Collection<NamedExpr> namedExprs) throws PlanningException {
+    if (namedExprs != null || namedExprs.size() > 0) {
+      String [] names = new String[namedExprs.size()];
       int i = 0;
-      for (NamedExpr target : targets) {
+      for (NamedExpr target : namedExprs) {
         names[i++] = addNamedExpr(target);
       }
       return names;
@@ -209,8 +219,15 @@ public class NamedExprsManager {
     return namedExprList;
   }
 
-  public void markAsEvaluated(String name, EvalNode evalNode) throws PlanningException {
-    String normalized = name.toLowerCase();
+  /**
+   * It marks the expression identified by the reference name as <code>evaluated</code>.
+   * In addition, it adds an EvanNode for the expression identified by the reference.
+   *
+   * @param referenceName The reference name to be marked as 'evaluated'.
+   * @param evalNode EvalNode to be added.
+   */
+  public void markAsEvaluated(String referenceName, EvalNode evalNode) throws PlanningException {
+    String normalized = referenceName.toLowerCase();
 
     int refId = nameToIdMap.get(normalized);
     evaluationStateMap.put(refId, true);

@@ -91,7 +91,7 @@ public class LogicalPlan {
    * It generates an unique column name from EvalNode. It is usually used for an expression or predicate without
    * a specified name (i.e., alias).
    */
-  public String newUniqueGeneratedColumnName(EvalNode evalNode) {
+  public String generateUniqueColumnName(EvalNode evalNode) {
     String prefix = evalNode.getName();
     return attachSeqIdToGeneratedColumnName(prefix).toLowerCase();
   }
@@ -100,7 +100,7 @@ public class LogicalPlan {
    * It generates an unique column name from Expr. It is usually used for an expression or predicate without
    * a specified name (i.e., alias).
    */
-  public String generateNewUniqueColumnName(Expr expr) {
+  public String generateUniqueColumnName(Expr expr) {
     String generatedName;
     if (expr.getType() == OpType.Column) {
       generatedName = ((ColumnReferenceExpr) expr).getCanonicalName();

@@ -203,7 +203,7 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
       } else if (evalNode.getType() == EvalType.FIELD) {
         targets[i] = new Target((FieldEval) evalNode);
       } else {
-        String generatedName = ctx.plan.generateNewUniqueColumnName(namedExpr.getExpr());
+        String generatedName = ctx.plan.generateUniqueColumnName(namedExpr.getExpr());
         targets[i] = new Target(evalNode, generatedName);
         namedExpr.setAlias(generatedName);
       }
