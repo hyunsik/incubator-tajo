@@ -485,14 +485,13 @@ public class TajoClient {
         currentTimeMillis = System.currentTimeMillis();
         status = getQueryStatus(queryId);
       }
+      return status.getState() == QueryState.QUERY_KILLED;
     } catch(Exception e) {
       LOG.debug("Error when checking for application status", e);
       return false;
     } finally {
       connPool.releaseConnection(tmClient);
     }
-
-    return true;
   }
 
   public List<CatalogProtos.FunctionDescProto> getFunctions(final String functionName) throws ServiceException {

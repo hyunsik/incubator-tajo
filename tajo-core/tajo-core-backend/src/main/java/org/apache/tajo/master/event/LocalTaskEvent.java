@@ -22,6 +22,9 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.event.AbstractEvent;
 import org.apache.tajo.QueryUnitAttemptId;
 
+/**
+ * This event is sent to a running TaskAttempt on a worker.
+ */
 public class LocalTaskEvent extends AbstractEvent<LocalTaskEventType> {
   private final QueryUnitAttemptId taskAttemptId;
   private final ContainerId containerId;

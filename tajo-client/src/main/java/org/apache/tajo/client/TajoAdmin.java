@@ -399,7 +399,11 @@ public class TajoAdmin {
 
   public static void processKill(Writer writer, TajoClient client, String queryIdStr)
       throws IOException, ServiceException {
-    client.killQuery(TajoIdUtils.parseQueryId(queryIdStr));
-    writer.write(queryIdStr + " is killed.\n");
+    boolean killedSuccessfully = client.killQuery(TajoIdUtils.parseQueryId(queryIdStr));
+    if (killedSuccessfully) {
+      writer.write(queryIdStr + " is killed successfully.\n");
+    } else {
+      writer.write("killing query is failed.");
+    }
   }
 }
