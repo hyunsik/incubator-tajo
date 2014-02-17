@@ -199,7 +199,7 @@ public class NamedExprsManager {
    * If some NamedExpr has an alias, NamedExprsManager specifies the alias for the NamedExpr.
    */
   public String [] addNamedExprArray(@Nullable Collection<NamedExpr> namedExprs) throws PlanningException {
-    if (namedExprs != null || namedExprs.size() > 0) {
+    if (namedExprs != null && namedExprs.size() > 0) {
       String [] names = new String[namedExprs.size()];
       int i = 0;
       for (NamedExpr target : namedExprs) {
