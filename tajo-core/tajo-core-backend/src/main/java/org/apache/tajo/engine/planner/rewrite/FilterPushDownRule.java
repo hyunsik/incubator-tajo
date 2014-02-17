@@ -158,7 +158,7 @@ public class FilterPushDownRule extends BasicLogicalPlanVisitor<Set<EvalNode>, L
          List<EvalNode> matched2 = Lists.newArrayList();
          for (EvalNode eval : cnf) {
 
-            Set<Column> columnRefs = EvalTreeUtil.findDistinctRefColumns(eval);
+            Set<Column> columnRefs = EvalTreeUtil.findUniqueColumns(eval);
             Set<String> tableNames = Sets.newHashSet();
             // getting distinct table references
             for (Column col : columnRefs) {

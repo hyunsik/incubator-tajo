@@ -18,6 +18,7 @@
 
 package org.apache.tajo.engine.eval;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import org.apache.tajo.catalog.Column;
@@ -68,7 +69,7 @@ public class EvalTreeUtil {
     }
   }
   
-  public static Set<Column> findDistinctRefColumns(EvalNode node) {
+  public static LinkedHashSet<Column> findUniqueColumns(EvalNode node) {
     DistinctColumnRefFinder finder = new DistinctColumnRefFinder();
     node.postOrder(finder);
     return finder.getColumnRefs();
@@ -237,7 +238,7 @@ public class EvalTreeUtil {
   }
   
   public static class DistinctColumnRefFinder implements EvalNodeVisitor {
-    private Set<Column> colList = new HashSet<Column>(); 
+    private LinkedHashSet<Column> colList = Sets.newLinkedHashSet();
     private FieldEval field = null;
     
     @Override
@@ -248,7 +249,7 @@ public class EvalTreeUtil {
       }
     }
     
-    public Set<Column> getColumnRefs() {
+    public LinkedHashSet<Column> getColumnRefs() {
       return this.colList;
     }
   }
