@@ -29,6 +29,7 @@ import org.apache.tajo.algebra.JoinType;
 import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.partition.PartitionMethodDesc;
 import org.apache.tajo.catalog.proto.CatalogProtos;
+import org.apache.tajo.common.TajoDataTypes;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.engine.eval.*;
 import org.apache.tajo.engine.function.AggFunction;
@@ -274,6 +275,12 @@ public class GlobalPlanner {
     return new AggregationFunctionCallEval(functionDesc, (AggFunction) functionDesc.newInstance(), args);
   }
 
+  private AggregationFunctionCallEval createCountRowFunction(EvalNode[] args) throws InternalException {
+    FunctionDesc functionDesc = getCatalog().getFunction("count", CatalogProtos.FunctionType.AGGREGATION,
+        new TajoDataTypes.DataType [] {});
+    return new AggregationFunctionCallEval(functionDesc, (AggFunction) functionDesc.newInstance(), args);
+  }
+
   private AggregationFunctionCallEval createMaxFunction(EvalNode [] args) throws InternalException {
     FunctionDesc functionDesc = getCatalog().getFunction("max", CatalogProtos.FunctionType.AGGREGATION,
         args[0].getValueType());
@@ -308,7 +315,11 @@ public class GlobalPlanner {
       if (function.getName().equalsIgnoreCase("count")) {
         rewritten = new RewrittenFunctions(1);
 
-        rewritten.firstStageEvals[0] = createCountFunction(function.getArgs());
+        if (function.getArgs().length == 0) {
+          rewritten.firstStageEvals[0] = createCountRowFunction(function.getArgs());
+        } else {
+          rewritten.firstStageEvals[0] = createCountFunction(function.getArgs());
+        }
         String referenceName = plan.generateUniqueColumnName(rewritten.firstStageEvals[0]);
         FieldEval fieldEval = new FieldEval(referenceName, rewritten.firstStageEvals[0].getValueType());
         rewritten.firstStageTargets[0] = new Target(fieldEval);
@@ -418,6 +429,7 @@ public class GlobalPlanner {
     }
     firstStageGroupby.setTargets(firstStageTargets);
     firstStageGroupby.setChild(groupbyNode.getChild());
+    firstStageGroupby.setInSchema(groupbyNode.getInSchema());
 
     ExecutionBlock firstStage = buildGroupBy(context, childBlock, firstStageGroupby);
 
@@ -430,7 +442,7 @@ public class GlobalPlanner {
     secondStage.setPlan(secondPhaseGroupby);
 
     SortSpec [] sortSpecs = PlannerUtil.columnsToSortSpec(Lists.newArrayList(secondPhaseGroupby.getGroupingColumns()));
-    secondStage.getEnforcer().enforceSortAggregation(groupbyNode.getPID(), sortSpecs);
+    secondStage.getEnforcer().enforceSortAggregation(secondPhaseGroupby.getPID(), sortSpecs);
 
     // setup channel
     DataChannel channel;

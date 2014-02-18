@@ -1,0 +1,1 @@
+select count(*), count(distinct l_orderkey), count(distinct l_linenumber) from lineitem;
