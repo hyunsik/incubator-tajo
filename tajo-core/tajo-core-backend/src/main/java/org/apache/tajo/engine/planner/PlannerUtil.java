@@ -21,12 +21,14 @@ package org.apache.tajo.engine.planner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import org.apache.tajo.algebra.*;
+import org.apache.tajo.algebra.CountRowsFunctionExpr;
+import org.apache.tajo.algebra.Expr;
+import org.apache.tajo.algebra.GeneralSetFunctionExpr;
+import org.apache.tajo.algebra.JoinType;
 import org.apache.tajo.annotation.Nullable;
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.catalog.SortSpec;
-import org.apache.tajo.catalog.partition.PartitionMethodDesc;
 import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.common.TajoDataTypes.DataType;
 import org.apache.tajo.engine.eval.*;
@@ -39,9 +41,6 @@ import org.apache.tajo.util.TUtil;
 import java.util.*;
 
 public class PlannerUtil {
-  public static String normalizeTableName(String tableName) {
-    return tableName.toLowerCase();
-  }
 
   public static boolean checkIfDDLPlan(LogicalNode node) {
     LogicalNode baseNode = node;
@@ -331,82 +330,6 @@ public class PlannerUtil {
     return (T) finder.getFoundNodes().get(0);
   }
 
-  public static boolean canBeEvaluated(EvalNode eval, LogicalNode node) {
-    Set<Column> columnRefs = EvalTreeUtil.findDistinctRefColumns(eval);
-
-    if (node.getType() == NodeType.JOIN) {
-      JoinNode joinNode = (JoinNode) node;
-      Set<String> tableIds = Sets.newHashSet();
-      // getting distinct table references
-      for (Column col : columnRefs) {
-        if (!tableIds.contains(col.getQualifier())) {
-          tableIds.add(col.getQualifier());
-        }
-      }
-
-      // if the references only indicate two relation, the condition can be
-      // pushed into a join operator.
-      if (tableIds.size() != 2) {
-        return false;
-      }
-
-      String [] outer = getRelationLineage(joinNode.getLeftChild());
-      String [] inner = getRelationLineage(joinNode.getRightChild());
-
-      Set<String> o = Sets.newHashSet(outer);
-      Set<String> i = Sets.newHashSet(inner);
-      if (outer == null || inner == null) {
-        throw new InvalidQueryException("ERROR: Unexpected logical plan");
-      }
-      Iterator<String> it = tableIds.iterator();
-      if (o.contains(it.next()) && i.contains(it.next())) {
-        return true;
-      }
-
-      it = tableIds.iterator();
-
-      return i.contains(it.next()) && o.contains(it.next());
-
-    } else if (node instanceof ScanNode) {
-
-      RelationNode scan = (RelationNode) node;
-
-      for (Column col : columnRefs) {
-        if (scan.getCanonicalName().equals(col.getQualifier())) {
-          Column found = scan.getTableSchema().getColumnByName(col.getColumnName());
-          if (found == null) {
-            return false;
-          }
-        } else {
-          return false;
-        }
-      }
-
-    } else if (node instanceof TableSubQueryNode) {
-      TableSubQueryNode subQueryNode = (TableSubQueryNode) node;
-      for (Column col : columnRefs) {
-        if (subQueryNode.getCanonicalName().equals(col.getQualifier())) {
-          Column found = node.getOutSchema().getColumnByName(col.getColumnName());
-          if (found == null) {
-            return false;
-          }
-        } else {
-          return false;
-        }
-      }
-
-    } else {
-
-      for (Column col : columnRefs) {
-        if (!node.getInSchema().containsByQualifiedName(col.getQualifiedName())) {
-          return false;
-        }
-      }
-    }
-
-    return true;
-  }
-
   private static class LogicalNodeFinder implements LogicalNodeVisitor {
     private List<LogicalNode> list = new ArrayList<LogicalNode>();
     private final NodeType[] tofind;
@@ -478,17 +401,17 @@ public class PlannerUtil {
    */
   public static void schemaToTargets(Schema schema, Target [] targets) {
     FieldEval eval;
-    for (int i = 0; i < schema.getColumnNum(); i++) {
+    for (int i = 0; i < schema.size(); i++) {
       eval = new FieldEval(schema.getColumn(i));
       targets[i] = new Target(eval);
     }
   }
 
   public static Target[] schemaToTargets(Schema schema) {
-    Target[] targets = new Target[schema.getColumnNum()];
+    Target[] targets = new Target[schema.size()];
 
     FieldEval eval;
-    for (int i = 0; i < schema.getColumnNum(); i++) {
+    for (int i = 0; i < schema.size(); i++) {
       eval = new FieldEval(schema.getColumn(i));
       targets[i] = new Target(eval);
     }
@@ -499,7 +422,7 @@ public class PlannerUtil {
     List<Target> targets = TUtil.newList();
 
     FieldEval eval;
-    for (int i = 0; i < schema.getColumnNum(); i++) {
+    for (int i = 0; i < schema.size(); i++) {
       eval = new FieldEval(schema.getColumn(i));
       targets.add(new Target(eval));
     }
@@ -676,7 +599,7 @@ public class PlannerUtil {
       if (copy[i].getEvalTree().getType() == EvalType.FIELD) {
         FieldEval fieldEval = copy[i].getEvalTree();
         if (fieldEval.getColumnRef().hasQualifier()) {
-          fieldEval.getColumnRef().setName(fieldEval.getColumnName());
+          fieldEval.replaceColumnRef(fieldEval.getColumnName());
         }
       }
     }
@@ -700,20 +623,6 @@ public class PlannerUtil {
 
   public static boolean isCommutativeJoin(JoinType joinType) {
     return joinType == JoinType.INNER;
-  }
-
-  public static Schema rewriteColumnPartitionedTableSchema(
-                               PartitionMethodDesc partitionDesc,
-                               Schema columnPartitionSchema,
-                               Schema sourceSchema,
-                               String qualifier) {
-    Schema schema = new Schema();
-    for (Column column : sourceSchema.toArray()) {
-      if (columnPartitionSchema.getColumnByName(column.getColumnName()) == null) {
-        schema.addColumn(column);
-      }
-    }
-    return schema;
   }
 
   public static boolean existsAggregationFunction(Expr expr) throws PlanningException {

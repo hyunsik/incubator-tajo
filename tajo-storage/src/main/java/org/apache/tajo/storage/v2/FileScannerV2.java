@@ -78,7 +78,7 @@ public abstract class FileScannerV2 implements Scanner {
     this.meta = meta;
     this.schema = schema;
     this.fragment = fragment;
-    this.columnNum = this.schema.getColumnNum();
+    this.columnNum = this.schema.size();
 
     this.fs = fragment.getPath().getFileSystem(conf);
 	}

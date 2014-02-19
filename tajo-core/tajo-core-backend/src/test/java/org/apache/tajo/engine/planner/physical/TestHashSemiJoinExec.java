@@ -80,7 +80,7 @@ public class TestHashSemiJoinExec {
     Appender appender = StorageManagerFactory.getStorageManager(conf).getAppender(employeeMeta, employeeSchema,
         employeePath);
     appender.init();
-    Tuple tuple = new VTuple(employeeSchema.getColumnNum());
+    Tuple tuple = new VTuple(employeeSchema.size());
 
     for (int i = 0; i < 10; i++) {
       tuple.put(new Datum[] {
@@ -105,7 +105,7 @@ public class TestHashSemiJoinExec {
     Path peoplePath = new Path(testDir, "people.csv");
     appender = StorageManagerFactory.getStorageManager(conf).getAppender(peopleMeta, peopleSchema, peoplePath);
     appender.init();
-    tuple = new VTuple(peopleSchema.getColumnNum());
+    tuple = new VTuple(peopleSchema.size());
     // make 27 tuples
     for (int i = 1; i < 10; i += 2) {
       // make three duplicated tuples for each tuples

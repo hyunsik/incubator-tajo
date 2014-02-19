@@ -106,9 +106,9 @@ public class RCFileScanner extends FileScannerV2 {
   }
 
   private Tuple makeTuple() throws IOException {
-    Tuple tuple = new VTuple(schema.getColumnNum());
+    Tuple tuple = new VTuple(schema.size());
     synchronized (lock) {
-      column.resetValid(schema.getColumnNum());
+      column.resetValid(schema.size());
       int tid; // target column id
       for (int i = 0; i < projectionMap.length; i++) {
         tid = projectionMap[i];
@@ -136,7 +136,7 @@ public class RCFileScanner extends FileScannerV2 {
     projectionMap = new Integer[targets.length];
     int tid;
     for (int i = 0; i < targets.length; i++) {
-      tid = schema.getColumnIdByName(targets[i].getColumnName());
+      tid = schema.getColumnIdByName(targets[i].getSimpleName());
       projectionMap[i] = tid;
     }
     ArrayList<Integer> projectionIdList = new ArrayList<Integer>(TUtil.newList(projectionMap));

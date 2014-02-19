@@ -102,9 +102,9 @@ public class TestResultSet {
     ResultSetMetaData meta = rs.getMetaData();
     assertNotNull(meta);
     Schema schema = scoreSchema;
-    assertEquals(schema.getColumnNum(), meta.getColumnCount());
+    assertEquals(schema.size(), meta.getColumnCount());
     for (int i = 0; i < meta.getColumnCount(); i++) {
-      assertEquals(schema.getColumn(i).getColumnName(), meta.getColumnName(i + 1));
+      assertEquals(schema.getColumn(i).getSimpleName(), meta.getColumnName(i + 1));
       assertEquals(schema.getColumn(i).getQualifier(), meta.getTableName(i + 1));
     }
 

@@ -71,14 +71,14 @@ public class TrevniScanner extends FileScanner {
     projectionMap = new int[targets.length];
     int tid;
     for (int i = 0; i < targets.length; i++) {
-      tid = schema.getColumnIdByName(targets[i].getColumnName());
+      tid = schema.getColumnIdByName(targets[i].getSimpleName());
       projectionMap[i] = tid;
     }
   }
 
   @Override
   public Tuple next() throws IOException {
-    Tuple tuple = new VTuple(schema.getColumnNum());
+    Tuple tuple = new VTuple(schema.size());
 
     if (!columns[0].hasNext()) {
       return null;

@@ -197,7 +197,7 @@ public class DataChannel {
         } else {
           sb.append(",");
         }
-        sb.append(column.getColumnName());
+        sb.append(column.getSimpleName());
       }
       sb.append(", num=").append(numOutputs);
     }
