@@ -40,9 +40,11 @@ public class LocalTajoTestingUtility {
   private TajoConf conf;
   private TajoClient client;
 
+  private static int taskAttemptId;
+
   public static QueryUnitAttemptId newQueryUnitAttemptId() {
     return QueryIdFactory.newQueryUnitAttemptId(
-        QueryIdFactory.newQueryUnitId(new MasterPlan(newQueryId(), null, null).newExecutionBlockId()), 0);
+        QueryIdFactory.newQueryUnitId(new MasterPlan(newQueryId(), null, null).newExecutionBlockId()), taskAttemptId++);
   }
   public static QueryUnitAttemptId newQueryUnitAttemptId(MasterPlan plan) {
     return QueryIdFactory.newQueryUnitAttemptId(QueryIdFactory.newQueryUnitId(plan.newExecutionBlockId()), 0);
