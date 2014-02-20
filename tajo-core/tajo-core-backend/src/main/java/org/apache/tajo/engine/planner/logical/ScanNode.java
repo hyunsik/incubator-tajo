@@ -20,6 +20,7 @@ package org.apache.tajo.engine.planner.logical;
 
 import com.google.common.base.Objects;
 import com.google.gson.annotations.Expose;
+import org.apache.tajo.catalog.CatalogUtil;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.catalog.TableDesc;
 import org.apache.tajo.engine.eval.EvalNode;
@@ -53,7 +54,7 @@ public class ScanNode extends RelationNode implements Projectable {
   
 	public void init(TableDesc desc, String alias) {
     this.tableDesc = desc;
-    this.alias = PlannerUtil.normalizeTableName(alias);
+    this.alias = CatalogUtil.normalizeIdentifier(alias);
     this.setInSchema(tableDesc.getSchema());
     this.getInSchema().setQualifier(alias);
     this.setOutSchema(new Schema(getInSchema()));

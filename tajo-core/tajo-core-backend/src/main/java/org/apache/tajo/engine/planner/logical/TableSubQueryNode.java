@@ -20,6 +20,7 @@ package org.apache.tajo.engine.planner.logical;
 
 import com.google.common.base.Objects;
 import com.google.gson.annotations.Expose;
+import org.apache.tajo.catalog.CatalogUtil;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.engine.planner.PlanString;
 import org.apache.tajo.engine.planner.PlannerUtil;
@@ -37,7 +38,7 @@ public class TableSubQueryNode extends RelationNode implements Projectable {
   }
 
   public void init(String tableName, LogicalNode subQuery) {
-    this.tableName = PlannerUtil.normalizeTableName(tableName);
+    this.tableName = CatalogUtil.normalizeIdentifier(tableName);
     if (subQuery != null) {
       this.subQuery = subQuery;
       setOutSchema(SchemaUtil.clone(this.subQuery.getOutSchema()));
