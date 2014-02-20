@@ -258,6 +258,8 @@ Release 0.8.0 - unreleased
 
   BUG FIXES
 
+    TAJO-575: Worker's env.jsp has wrong URL which go to worker's index.jsp. (hyoungjunkim via jaehwa)
+
     TAJO-609: PlannerUtil::getRelationLineage ignores PartitionedTableScanNode.
     (hyunsik)
 
@@ -453,6 +455,8 @@ Release 0.8.0 - unreleased
     TAJO-293: querymasters directory not found in single node setup. (hyunsik)
 
   TASKS
+
+    TAJO-578: Update configuration for tajo-site.xml. (jaehwa)
 
     TAJO-530: Fix warnings in tajo-catalog. (jaehwa)
 
