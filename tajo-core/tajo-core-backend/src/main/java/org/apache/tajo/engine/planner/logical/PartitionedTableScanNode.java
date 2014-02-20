@@ -25,17 +25,20 @@ import org.apache.tajo.catalog.TableDesc;
 import org.apache.tajo.engine.eval.EvalNode;
 import org.apache.tajo.engine.planner.PlanString;
 import org.apache.tajo.engine.planner.Target;
+import org.apache.tajo.engine.utils.SchemaUtil;
 import org.apache.tajo.util.TUtil;
 
 public class PartitionedTableScanNode extends ScanNode {
   @Expose Path [] inputPaths;
 
-  public PartitionedTableScanNode(int pid, ScanNode scanNode, Path[] inputPaths) {
-    super(pid, NodeType.PARTITIONS_SCAN, scanNode.getTableDesc());
-    this.setInSchema(scanNode.getInSchema());
-    this.setOutSchema(scanNode.getOutSchema());
-    this.alias = scanNode.alias;
-    this.logicalSchema = scanNode.logicalSchema;
+  public PartitionedTableScanNode(int pid) {
+    super(pid, NodeType.PARTITIONS_SCAN);
+  }
+
+  public void init(ScanNode scanNode, Path[] inputPaths) {
+    tableDesc = scanNode.tableDesc;
+    setInSchema(scanNode.getInSchema());
+    setOutSchema(scanNode.getOutSchema());
     this.qual = scanNode.qual;
     this.targets = scanNode.targets;
     this.inputPaths = inputPaths;
@@ -163,16 +166,16 @@ public class PartitionedTableScanNode extends ScanNode {
       }
     }
 
-    if (inputPaths != null) {
-      planStr.addExplan("Path list: ");
-      int i = 0;
-      for (Path path : inputPaths) {
-        planStr.addExplan((i++) + ": ").appendExplain(path.toString());
-      }
-    }
-
     planStr.addDetail("out schema: ").appendDetail(getOutSchema().toString());
     planStr.addDetail("in schema: ").appendDetail(getInSchema().toString());
+
+    if (inputPaths != null) {
+      planStr.addExplan("num of filtered paths: ").appendExplain(""+ inputPaths.length);
+      int i = 0;
+      for (Path path : inputPaths) {
+        planStr.addDetail((i++) + ": ").appendDetail(path.toString());
+      }
+    }
 
     return planStr;
   }

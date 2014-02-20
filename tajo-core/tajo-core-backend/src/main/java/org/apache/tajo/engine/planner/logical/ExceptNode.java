@@ -25,10 +25,13 @@ import org.apache.tajo.engine.planner.PlanString;
 
 public class ExceptNode extends BinaryNode {
 
-  public ExceptNode(int pid, LogicalNode outer, LogicalNode inner) {
+  public ExceptNode(int pid) {
     super(pid, NodeType.EXCEPT);
-    setLeftChild(outer);
-    setRightChild(inner);
+  }
+
+  public void init(LogicalNode left, LogicalNode right) {
+    setLeftChild(left);
+    setRightChild(right);
   }
 
   @Override

@@ -38,18 +38,7 @@ public class JoinNode extends BinaryNode implements Projectable, Cloneable {
     super(pid, NodeType.JOIN);
   }
 
-  public JoinNode(int pid, JoinType joinType) {
-    this(pid);
-    this.joinType = joinType;
-  }
-
-  public JoinNode(int pid, JoinType joinType, LogicalNode left) {
-    this(pid, joinType);
-    setLeftChild(left);
-  }
-
-  public JoinNode(int pid, JoinType joinType, LogicalNode left, LogicalNode right) {
-    super(pid, NodeType.JOIN);
+  public void init(JoinType joinType, LogicalNode left, LogicalNode right) {
     this.joinType = joinType;
     setLeftChild(left);
     setRightChild(right);

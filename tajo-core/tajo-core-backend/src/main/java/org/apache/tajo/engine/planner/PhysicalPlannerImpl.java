@@ -94,7 +94,7 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
   private PhysicalExec buildOutputOperator(TaskAttemptContext context, LogicalNode plan,
                                            PhysicalExec execPlan) throws IOException {
     DataChannel channel = context.getDataChannel();
-    ShuffleFileWriteNode shuffleFileWriteNode = new ShuffleFileWriteNode(UNGENERATED_PID);
+    ShuffleFileWriteNode shuffleFileWriteNode = LogicalPlan.createNodeWithoutPID(ShuffleFileWriteNode.class);
     shuffleFileWriteNode.setStorageType(context.getDataChannel().getStoreType());
     shuffleFileWriteNode.setInSchema(plan.getOutSchema());
     shuffleFileWriteNode.setOutSchema(plan.getOutSchema());
@@ -364,13 +364,13 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
     SortSpec[][] sortSpecs = PlannerUtil.getSortKeysFromJoinQual(
         plan.getJoinQual(), leftExec.getSchema(), rightExec.getSchema());
 
-    SortNode leftSortNode = new SortNode(UNGENERATED_PID);
+    SortNode leftSortNode = LogicalPlan.createNodeWithoutPID(SortNode.class);
     leftSortNode.setSortSpecs(sortSpecs[0]);
     leftSortNode.setInSchema(leftExec.getSchema());
     leftSortNode.setOutSchema(leftExec.getSchema());
     ExternalSortExec outerSort = new ExternalSortExec(context, sm, leftSortNode, leftExec);
 
-    SortNode rightSortNode = new SortNode(UNGENERATED_PID);
+    SortNode rightSortNode = LogicalPlan.createNodeWithoutPID(SortNode.class);
     rightSortNode.setSortSpecs(sortSpecs[1]);
     rightSortNode.setInSchema(rightExec.getSchema());
     rightSortNode.setOutSchema(rightExec.getSchema());
@@ -442,13 +442,13 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
     SortSpec[][] sortSpecs2 = PlannerUtil.getSortKeysFromJoinQual(
         plan.getJoinQual(), leftExec.getSchema(), rightExec.getSchema());
 
-    SortNode leftSortNode2 = new SortNode(UNGENERATED_PID);
+    SortNode leftSortNode2 = LogicalPlan.createNodeWithoutPID(SortNode.class);
     leftSortNode2.setSortSpecs(sortSpecs2[0]);
     leftSortNode2.setInSchema(leftExec.getSchema());
     leftSortNode2.setOutSchema(leftExec.getSchema());
     ExternalSortExec outerSort2 = new ExternalSortExec(context, sm, leftSortNode2, leftExec);
 
-    SortNode rightSortNode2 = new SortNode(UNGENERATED_PID);
+    SortNode rightSortNode2 = LogicalPlan.createNodeWithoutPID(SortNode.class);
     rightSortNode2.setSortSpecs(sortSpecs2[1]);
     rightSortNode2.setInSchema(rightExec.getSchema());
     rightSortNode2.setOutSchema(rightExec.getSchema());
@@ -533,13 +533,13 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
     SortSpec[][] sortSpecs3 = PlannerUtil.getSortKeysFromJoinQual(plan.getJoinQual(),
         leftExec.getSchema(), rightExec.getSchema());
 
-    SortNode leftSortNode = new SortNode(UNGENERATED_PID);
+    SortNode leftSortNode = LogicalPlan.createNodeWithoutPID(SortNode.class);
     leftSortNode.setSortSpecs(sortSpecs3[0]);
     leftSortNode.setInSchema(leftExec.getSchema());
     leftSortNode.setOutSchema(leftExec.getSchema());
     ExternalSortExec outerSort3 = new ExternalSortExec(context, sm, leftSortNode, leftExec);
 
-    SortNode rightSortNode = new SortNode(UNGENERATED_PID);
+    SortNode rightSortNode = LogicalPlan.createNodeWithoutPID(SortNode.class);
     rightSortNode.setSortSpecs(sortSpecs3[1]);
     rightSortNode.setInSchema(rightExec.getSchema());
     rightSortNode.setOutSchema(rightExec.getSchema());
@@ -761,7 +761,7 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
       }
     }
 
-    SortNode sortNode = new SortNode(-1);
+    SortNode sortNode = LogicalPlan.createNodeWithoutPID(SortNode.class);
     sortNode.setSortSpecs(sortSpecs);
     sortNode.setInSchema(child.getSchema());
     sortNode.setOutSchema(child.getSchema());
@@ -875,7 +875,7 @@ public class PhysicalPlannerImpl implements PhysicalPlanner {
       sortSpecs = ObjectArrays.concat(sortSpecs, enforcedSortSpecs, SortSpec.class);
     }
 
-    SortNode sortNode = new SortNode(-1);
+    SortNode sortNode = LogicalPlan.createNodeWithoutPID(SortNode.class);
     sortNode.setSortSpecs(sortSpecs);
     sortNode.setInSchema(subOp.getSchema());
     sortNode.setOutSchema(subOp.getSchema());

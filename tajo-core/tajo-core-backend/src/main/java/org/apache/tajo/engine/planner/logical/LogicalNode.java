@@ -36,7 +36,7 @@ public abstract class LogicalNode implements Cloneable, GsonObject {
 
 	@Expose	private double cost = 0;
 
-	public LogicalNode(int pid, NodeType type) {
+	protected LogicalNode(int pid, NodeType type) {
     this.pid = pid;
     this.type = type;
 	}

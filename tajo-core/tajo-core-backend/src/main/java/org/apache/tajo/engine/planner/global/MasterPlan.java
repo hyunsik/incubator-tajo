@@ -24,6 +24,7 @@ package org.apache.tajo.engine.planner.global;
 import org.apache.tajo.ExecutionBlockId;
 import org.apache.tajo.QueryId;
 import org.apache.tajo.engine.planner.LogicalPlan;
+import org.apache.tajo.engine.planner.PlannerUtil;
 import org.apache.tajo.engine.planner.graph.SimpleDirectedGraph;
 import org.apache.tajo.engine.query.QueryContext;
 import org.apache.tajo.ipc.TajoWorkerProtocol;
@@ -253,10 +254,9 @@ public class MasterPlan {
           sb.append("\n");
         }
       }
-      sb.append("\n").append(block.getPlan());
+      sb.append("\n").append(PlannerUtil.buildExplainString(block.getPlan()));
     }
 
     return sb.toString();
   }
-
 }
