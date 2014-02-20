@@ -766,6 +766,12 @@ public class PlannerUtil {
     return sortSpecs;
   }
 
+  /**
+   * Generate an explain string of a LogicalNode and its descendant nodes.
+   *
+   * @param node The LogicalNode instance to be started
+   * @return A pretty print explain string
+   */
   public static String buildExplainString(LogicalNode node) {
     ExplainLogicalPlanVisitor explain = new ExplainLogicalPlanVisitor();
 
