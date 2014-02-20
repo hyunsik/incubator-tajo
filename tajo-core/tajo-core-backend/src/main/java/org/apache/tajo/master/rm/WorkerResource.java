@@ -25,6 +25,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+/**
+ * Describe current resources of a worker.
+ *
+ * It includes total resources of a worker as follows:
+ * <ul>
+ *   <li>used and total disk slots</li>
+ *   <li>used and total core slots</li>
+ *   <li>used and total memory</li>
+ *   <li>the number of running tasks</li>
+ * </ul>
+ */
 public class WorkerResource implements Comparable<WorkerResource> {
   private static final Log LOG = LogFactory.getLog(WorkerResource.class);
 

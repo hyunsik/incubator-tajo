@@ -41,6 +41,10 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+
+/**
+ * It manages all resources of tajo workers.
+ */
 public class TajoWorkerResourceManager implements WorkerResourceManager {
   private static final Log LOG = LogFactory.getLog(TajoWorkerResourceManager.class);
 
@@ -249,6 +253,10 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
         new QueryJobEvent(QueryJobEvent.Type.QUERY_JOB_START, queryInProgress.getQueryInfo()));
   }
 
+  /**
+   *
+   * @return The prefix of queryId. It is generated when a TajoMaster starts up.
+   */
   @Override
   public String getSeedQueryId() throws IOException {
     return queryIdSeed;
@@ -267,6 +275,9 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
     }
   }
 
+  /**
+   * It checks the heartbeat timeout. If some workers are expired, it moves them into the list of dead workers.
+   */
   class WorkerMonitorThread extends Thread {
     int heartbeatTimeout;
 
