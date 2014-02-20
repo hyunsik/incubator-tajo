@@ -236,11 +236,6 @@ public class MasterPlan {
         continue;
       }
 
-      if (block.getBroadcastTables().size() > 0) {
-        sb.append("[Broadcasted Tables]: ").append(TUtil.collectionToString(block.getBroadcastTables()));
-        sb.append("\n");
-      }
-
       if (!isLeaf(block)) {
         sb.append("\n[Incoming]\n");
         for (DataChannel channel : getIncomingChannels(block.getId())) {

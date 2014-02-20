@@ -41,8 +41,4 @@ public class IntersectNode extends BinaryNode {
     planStr.appendTitle(")");
     return planStr;
   }
-
-  public String toString() {
-    return getLeftChild().toString() + "\n INTERSECT \n" + getRightChild().toString();
-  }
 }

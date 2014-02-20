@@ -53,40 +53,14 @@ public class PartitionedTableScanNode extends ScanNode {
   }
 	
 	public String toString() {
-	  StringBuilder sb = new StringBuilder();	  
-	  sb.append("\"Partitions Scan\" : {\"table\":\"")
-	  .append(getTableName()).append("\"");
-	  if (hasAlias()) {
-	    sb.append(",\"alias\": \"").append(alias);
-	  }
-	  
-	  if (hasQual()) {
-	    sb.append(", \"qual\": \"").append(this.qual).append("\"");
-	  }
-	  
-	  if (hasTargets()) {
-	    sb.append(", \"target list\": ");
-      boolean first = true;
-      for (Target target : targets) {
-        if (!first) {
-          sb.append(", ");
-        }
-        sb.append(target);
-        first = false;
-      }
-	  }
-
-    if (inputPaths != null) {
-      sb.append(", \"Partition paths\": ");
-      for (Path path : inputPaths) {
-        sb.append("\n ");
-        sb.append(path);
-      }
-      sb.append("\n");
+    StringBuilder sb = new StringBuilder("Partitions Scan (table=").append(getTableName());
+    if (hasAlias()) {
+      sb.append(", alias=").append(alias);
     }
-
-	  sb.append("\n  \"out schema\": ").append(getOutSchema());
-	  sb.append("\n  \"in schema\": ").append(getInSchema());
+    if (hasQual()) {
+      sb.append(", filter=").append(qual);
+    }
+    sb.append(", path=").append(getTableDesc().getPath()).append(")");
 	  return sb.toString();
 	}
 

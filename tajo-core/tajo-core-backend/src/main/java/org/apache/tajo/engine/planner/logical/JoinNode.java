@@ -133,26 +133,11 @@ public class JoinNode extends BinaryNode implements Projectable, Cloneable {
   }
 
   public String toString() {
-    StringBuilder sb = new StringBuilder();
-    sb.append("\"Join\": \"joinType\": \" ").append(joinType).append("\"");
-    if (joinQual != null) {
-      sb.append(", \"qual\": ").append(joinQual);
+    StringBuilder sb = new StringBuilder("Join (type").append(joinType);
+    if (hasJoinQual()) {
+      sb.append(",filter=").append(joinQual);
     }
-    if (targets != null) {
-      sb.append(", \"target list\": ");
-      boolean first = true;
-      for (Target target : targets) {
-        if (!first) {
-          sb.append(", ");
-        }
-        sb.append(target);
-        first = false;
-      }
-    }
-
-    sb.append("\n\"out schema: ").append(getOutSchema());
-    sb.append("\n\"in schema: ").append(getInSchema());
-    sb.append("\n" + getLeftChild().toString()).append(" and ").append(getRightChild());
+    sb.append(")");
     return sb.toString();
   }
 }

@@ -42,8 +42,4 @@ public class ExceptNode extends BinaryNode {
     planStr.appendTitle(")");
     return planStr;
   }
-
-  public String toString() {
-    return getLeftChild().toString() + "\n EXCEPT \n" + getRightChild().toString();
-  }
 }

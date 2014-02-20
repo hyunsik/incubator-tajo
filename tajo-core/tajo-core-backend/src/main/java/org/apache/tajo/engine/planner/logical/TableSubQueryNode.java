@@ -167,14 +167,6 @@ public class TableSubQueryNode extends RelationNode implements Projectable {
   }
 
   public String toString() {
-    StringBuilder sb = new StringBuilder();
-    sb.append("(").append(getPID()).append(") Table Subquery (alias=").append(tableName).append(")\n");
-    if (hasTargets()) {
-      sb.append("  targets: ").append(TUtil.arrayToString(targets)).append("\n");
-    }
-    sb.append("  out schema:").append(getOutSchema()).append("\n");
-    sb.append("  input schema:").append(getInSchema()).append("\n");
-    sb.append(subQuery.toString());
-    return sb.toString();
+    return "Inline view (name=" + tableName + ")";
   }
 }

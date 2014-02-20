@@ -24,7 +24,9 @@ package org.apache.tajo.engine.planner.logical;
 import com.google.gson.annotations.Expose;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.engine.json.CoreGsonHelper;
+import org.apache.tajo.engine.planner.ExplainLogicalPlanVisitor;
 import org.apache.tajo.engine.planner.PlanString;
+import org.apache.tajo.engine.planner.PlannerUtil;
 import org.apache.tajo.json.GsonObject;
 import org.apache.tajo.util.TUtil;
 
@@ -120,4 +122,8 @@ public abstract class LogicalNode implements Cloneable, GsonObject {
   public abstract void postOrder(LogicalNodeVisitor visitor);
 
   public abstract PlanString getPlanString();
+
+  public String toString() {
+    return PlannerUtil.buildExplainString(this);
+  }
 }
