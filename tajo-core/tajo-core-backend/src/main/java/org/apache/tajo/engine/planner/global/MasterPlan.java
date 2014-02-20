@@ -25,6 +25,7 @@ import org.apache.tajo.ExecutionBlockId;
 import org.apache.tajo.QueryId;
 import org.apache.tajo.engine.planner.LogicalPlan;
 import org.apache.tajo.engine.planner.PlannerUtil;
+import org.apache.tajo.engine.planner.enforce.Enforcer;
 import org.apache.tajo.engine.planner.graph.SimpleDirectedGraph;
 import org.apache.tajo.engine.query.QueryContext;
 import org.apache.tajo.ipc.TajoWorkerProtocol;
@@ -236,7 +237,7 @@ public class MasterPlan {
       }
 
       if (block.getBroadcastTables().size() > 0) {
-        sb.append("\nBroadcasted Tables: ").append(TUtil.collectionToString(block.getBroadcastTables()));
+        sb.append("[Broadcasted Tables]: ").append(TUtil.collectionToString(block.getBroadcastTables()));
         sb.append("\n");
       }
 
@@ -254,6 +255,17 @@ public class MasterPlan {
           sb.append("\n");
         }
       }
+
+      if (block.getEnforcer().getProperties().size() > 0) {
+        sb.append("\n[Enforcers]\n");
+        int i = 0;
+        for (TajoWorkerProtocol.EnforceProperty enforce : block.getEnforcer().getProperties()) {
+          sb.append(" ").append(i++).append(": ");
+          sb.append(Enforcer.toString(enforce));
+          sb.append("\n");
+        }
+      }
+
       sb.append("\n").append(PlannerUtil.buildExplainString(block.getPlan()));
     }
 
