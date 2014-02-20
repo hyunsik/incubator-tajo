@@ -256,6 +256,11 @@ Release 0.8.0 - unreleased
 
   BUG FIXES
 
+    TAJO-609: PlannerUtil::getRelationLineage ignores PartitionedTableScanNode.
+    (hyunsik)
+
+    TAJO-606: Statemachine visualization fails. (Min Zhou via hyunsik)
+
     TAJO-595: The same expressions without different alias are not allowed.
     (hyunsik)
 
@@ -446,6 +451,8 @@ Release 0.8.0 - unreleased
     TAJO-293: querymasters directory not found in single node setup. (hyunsik)
 
   TASKS
+
+    TAJO-530: Fix warnings in tajo-catalog. (jaehwa)
 
     TAJO-532: Fix warnings in tajo-common. (jinho)
 
