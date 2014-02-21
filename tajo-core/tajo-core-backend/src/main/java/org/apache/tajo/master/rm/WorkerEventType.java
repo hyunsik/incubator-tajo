@@ -18,12 +18,9 @@
 
 package org.apache.tajo.master.rm;
 
-import org.apache.hadoop.yarn.event.EventHandler;
+public enum WorkerEventType {
+  STATE_UPDATE,
+  RECONNECTED,
 
-public class Node implements EventHandler<NodeEvent> {
-
-  @Override
-  public void handle(NodeEvent event) {
-
-  }
+  EXPIRE,
 }

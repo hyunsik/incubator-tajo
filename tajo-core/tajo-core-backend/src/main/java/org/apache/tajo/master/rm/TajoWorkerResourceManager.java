@@ -18,6 +18,7 @@
 
 package org.apache.tajo.master.rm;
 
+import com.google.common.collect.Maps;
 import com.google.protobuf.RpcCallback;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -52,8 +53,10 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
 
   private TajoMaster.MasterContext masterContext;
 
+  private Map<String, Worker> workers = new HashMap<String, Worker>();
+
   //all workers(include querymaster)
-  private Map<String, WorkerResource> allWorkerResourceMap = new HashMap<String, WorkerResource>();
+//  private Map<String, WorkerResource> allWorkerResourceMap = new HashMap<String, WorkerResource>();
 
   //all workers(include querymaster)
   private Set<String> deadWorkerResources = new HashSet<String>();
@@ -86,8 +89,7 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
 
   private TajoConf tajoConf;
 
-  private Map<YarnProtos.ContainerIdProto, AllocatedWorkerResource> allocatedResourceMap =
-      new HashMap<YarnProtos.ContainerIdProto, AllocatedWorkerResource>();
+  private Map<YarnProtos.ContainerIdProto, AllocatedWorkerResource> allocatedResourceMap = new HashMap<YarnProtos.ContainerIdProto, AllocatedWorkerResource>();
 
   public TajoWorkerResourceManager(TajoMaster.MasterContext masterContext) {
     this.masterContext = masterContext;
@@ -119,7 +121,11 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
   }
 
   public Map<String, WorkerResource> getWorkers() {
-    return Collections.unmodifiableMap(allWorkerResourceMap);
+    Map<String, WorkerResource> map = Maps.newHashMap();
+    for (Map.Entry<String, Worker> entry : workers.entrySet()) {
+      map.put(entry.getKey(), entry.getValue().getResource());
+    }
+    return map;
   }
 
   public Collection<String> getQueryMasters() {
@@ -138,16 +144,17 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
 
     synchronized(workerResourceLock) {
       for(String eachWorker: liveWorkerResources) {
-        WorkerResource worker = allWorkerResourceMap.get(eachWorker);
+        Worker worker = workers.get(eachWorker);
+        WorkerResource resource = worker.getResource();
         if(worker != null) {
-          totalMemoryMB += worker.getMemoryMB();
-          totalAvailableMemoryMB += worker.getAvailableMemoryMB();
+          totalMemoryMB += resource.getMemoryMB();
+          totalAvailableMemoryMB += resource.getAvailableMemoryMB();
 
-          totalDiskSlots += worker.getDiskSlots();
-          totalAvailableDiskSlots += worker.getAvailableDiskSlots();
+          totalDiskSlots += resource.getDiskSlots();
+          totalAvailableDiskSlots += resource.getAvailableDiskSlots();
 
-          totalCpuCoreSlots += worker.getCpuCoreSlots();
-          totalAvailableCpuCoreSlots += worker.getAvailableCpuCoreSlots();
+          totalCpuCoreSlots += resource.getCpuCoreSlots();
+          totalAvailableCpuCoreSlots += resource.getAvailableCpuCoreSlots();
         }
       }
     }
@@ -191,10 +198,11 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
       WorkerResource queryMasterWorker = null;
       int minTasks = Integer.MAX_VALUE;
       for(String eachQueryMaster: liveQueryMasterWorkerResources) {
-        WorkerResource queryMaster = allWorkerResourceMap.get(eachQueryMaster);
-        if(queryMaster != null && queryMaster.getNumQueryMasterTasks() < minTasks) {
-          queryMasterWorker = queryMaster;
-          minTasks = queryMaster.getNumQueryMasterTasks();
+        Worker worker = workers.get(eachQueryMaster);
+        WorkerResource resourceOfQueryMaster = worker.getResource();
+        if(resourceOfQueryMaster != null && resourceOfQueryMaster.getNumQueryMasterTasks() < minTasks) {
+          queryMasterWorker = resourceOfQueryMaster;
+          minTasks = resourceOfQueryMaster.getNumQueryMasterTasks();
         }
       }
       if(queryMasterWorker == null) {
@@ -297,16 +305,19 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
           Set<String> workerHolders = new HashSet<String>();
           workerHolders.addAll(liveWorkerResources);
           for(String eachLiveWorker: workerHolders) {
-            WorkerResource worker = allWorkerResourceMap.get(eachLiveWorker);
+            Worker worker = workers.get(eachLiveWorker);
+
             if(worker == null) {
               LOG.warn(eachLiveWorker + " not in WorkerReosurceMap");
               continue;
             }
 
-            if(System.currentTimeMillis() - worker.getLastHeartbeat() >= heartbeatTimeout) {
+            WorkerResource resource = worker.getResource();
+
+            if(System.currentTimeMillis() - resource.getLastHeartbeat() >= heartbeatTimeout) {
               liveWorkerResources.remove(eachLiveWorker);
               deadWorkerResources.add(eachLiveWorker);
-              worker.setWorkerStatus(WorkerStatus.DEAD);
+              resource.setWorkerStatus(WorkerStatus.DEAD);
               LOG.warn("Worker [" + eachLiveWorker + "] is dead.");
             }
           }
@@ -316,16 +327,18 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
 
           workerHolders.addAll(liveQueryMasterWorkerResources);
           for(String eachLiveWorker: workerHolders) {
-            WorkerResource worker = allWorkerResourceMap.get(eachLiveWorker);
+            Worker worker = workers.get(eachLiveWorker);
+
             if(worker == null) {
               LOG.warn(eachLiveWorker + " not in WorkerResourceMap");
               continue;
             }
 
-            if(System.currentTimeMillis() - worker.getLastHeartbeat() >= heartbeatTimeout) {
+            WorkerResource resource = worker.getResource();
+            if(System.currentTimeMillis() - resource.getLastHeartbeat() >= heartbeatTimeout) {
               liveQueryMasterWorkerResources.remove(eachLiveWorker);
               deadWorkerResources.add(eachLiveWorker);
-              worker.setWorkerStatus(WorkerStatus.DEAD);
+              resource.setWorkerStatus(WorkerStatus.DEAD);
               LOG.warn("QueryMaster [" + eachLiveWorker + "] is dead.");
             }
           }
@@ -423,7 +436,7 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
               LOG.debug("=========================================");
               LOG.debug("Available Workers");
               for(String liveWorker: liveWorkerResources) {
-                LOG.debug(allWorkerResourceMap.get(liveWorker).toString());
+                LOG.debug(workers.get(liveWorker).toString());
               }
               LOG.debug("=========================================");
             }
@@ -497,7 +510,8 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
               break;
             }
 
-            WorkerResource workerResource = allWorkerResourceMap.get(eachWorker);
+            Worker worker = workers.get(eachWorker);
+            WorkerResource workerResource = worker.getResource();
             if(workerResource.getAvailableMemoryMB() >= compareAvailableMemory) {
               int workerMemory;
               if(workerResource.getAvailableMemoryMB() >= maxMemoryMB) {
@@ -565,7 +579,8 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
               break;
             }
 
-            WorkerResource workerResource = allWorkerResourceMap.get(eachWorker);
+            Worker worker = workers.get(eachWorker);
+            WorkerResource workerResource = worker.getResource();
             if(workerResource.getAvailableDiskSlots() >= compareAvailableDisk) {
               float workerDiskSlots;
               if(workerResource.getAvailableDiskSlots() >= maxDiskSlots) {
@@ -652,8 +667,9 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
       boolean queryMasterMode = request.getServerStatus().getQueryMasterMode().getValue();
       boolean taskRunnerMode = request.getServerStatus().getTaskRunnerMode().getValue();
 
-      if(allWorkerResourceMap.containsKey(workerKey)) {
-        WorkerResource workerResource = allWorkerResourceMap.get(workerKey);
+      if(workers.containsKey(workerKey)) {
+        Worker worker = workers.get(workerKey);
+        WorkerResource workerResource = worker.getResource();
 
         if(deadWorkerResources.contains(workerKey)) {
           deadWorkerResources.remove(workerKey);
@@ -702,7 +718,8 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
           workerResource.setCpuCoreSlots(4);
         }
 
-        allWorkerResourceMap.put(workerResource.getId(), workerResource);
+        Worker newWorker = new Worker(workerResource);
+        workers.put(workerResource.getId(), newWorker);
         if(queryMasterMode) {
           liveQueryMasterWorkerResources.add(workerKey);
         }
