@@ -23,11 +23,10 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.tajo.catalog.CatalogUtil;
-import org.apache.tajo.catalog.Options;
-import org.apache.tajo.catalog.Schema;
-import org.apache.tajo.catalog.TableMeta;
+import org.apache.tajo.benchmark.TPCH;
+import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.proto.CatalogProtos;
+import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.client.TajoClient;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.engine.planner.global.MasterPlan;
@@ -87,13 +86,13 @@ public class LocalTajoTestingUtility {
 
       // Enable this if you want to set pseudo stats. But, it will causes errors in some unit tests.
       // So, you just use manually it for certain unit tests.
-//      TableStats stats = new TableStats();
-//      stats.setNumBytes(TPCH.tableVolumes.get(names[i]));
-//      TableDesc tableDesc = new TableDesc(names[i], schemas[i], meta, tablePath);
-//      tableDesc.setStats(stats);
-//      util.getMaster().getCatalog().addTable(tableDesc);
+      TableStats stats = new TableStats();
+      stats.setNumBytes(TPCH.tableVolumes.get(names[i]));
+      TableDesc tableDesc = new TableDesc(names[i], schemas[i], meta, tablePath);
+      tableDesc.setStats(stats);
+      util.getMaster().getCatalog().addTable(tableDesc);
 
-      client.createExternalTable(names[i], schemas[i], tablePath, meta);
+      //client.createExternalTable(names[i], schemas[i], tablePath, meta);
     }
 
     LOG.info("===================================================");
