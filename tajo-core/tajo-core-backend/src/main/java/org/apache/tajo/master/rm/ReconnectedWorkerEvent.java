@@ -18,13 +18,8 @@
 
 package org.apache.tajo.master.rm;
 
-public enum WorkerEventType {
-  STARTED,
-
-  STATE_UPDATE,
-  RECONNECTED,
-
-
-  // Source : WorkerLivelinessMonitor
-  EXPIRE,
+public class ReconnectedWorkerEvent extends WorkerEvent {
+  public ReconnectedWorkerEvent(String workerId, Worker worker) {
+    super(workerId, workerEventType);
+  }
 }

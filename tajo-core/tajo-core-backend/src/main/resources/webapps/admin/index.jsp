@@ -33,7 +33,7 @@
 
 <%
   TajoMaster master = (TajoMaster) StaticHttpServer.getInstance().getAttribute("tajo.info.server.object");
-  Map<String, WorkerResource> workers = master.getContext().getResourceManager().getWorkers();
+  Map<String, Worker> workers = master.getContext().getResourceManager().getWorkers2();
 
   int numWorkers = 0;
   int numLiveWorkers = 0;
@@ -49,27 +49,27 @@
   TajoMasterProtocol.ClusterResourceSummary clusterResourceSummary =
           master.getContext().getResourceManager().getClusterResourceSummary();
 
-  for(WorkerResource eachWorker: workers.values()) {
-    if(eachWorker.getWorkerStatus() == WorkerStatus.LIVE) {
-      if(eachWorker.isQueryMasterMode()) {
+  for(Worker eachWorker: workers.values()) {
+    if(eachWorker.getState() == WorkerState.RUNNING) {
+      if(eachWorker.getResource().isQueryMasterMode()) {
         numQueryMasters++;
         numLiveQueryMasters++;
-        runningQueryMasterTask += eachWorker.getNumQueryMasterTasks();
+        runningQueryMasterTask += eachWorker.getResource().getNumQueryMasterTasks();
       }
-      if(eachWorker.isTaskRunnerMode()) {
+      if(eachWorker.getResource().isTaskRunnerMode()) {
         numWorkers++;
         numLiveWorkers++;
       }
-    } else if(eachWorker.getWorkerStatus() == WorkerStatus.DEAD) {
-      if(eachWorker.isQueryMasterMode()) {
+    } else if(eachWorker.getState() == WorkerState.LOST) {
+      if(eachWorker.getResource().isQueryMasterMode()) {
         numQueryMasters++;
         numDeadQueryMasters++;
       }
-      if(eachWorker.isTaskRunnerMode()) {
+      if(eachWorker.getResource().isTaskRunnerMode()) {
         numWorkers++;
         numDeadWorkers++;
       }
-    } else if(eachWorker.getWorkerStatus() == WorkerStatus.DECOMMISSION) {
+    } else if(eachWorker.getState() == WorkerState.DECOMMISSIONED) {
       numDecommissionWorkers++;
     }
   }

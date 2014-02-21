@@ -28,7 +28,7 @@ import org.apache.hadoop.yarn.util.SystemClock;
 import org.apache.tajo.master.rm.WorkerEventType;
 import org.apache.tajo.master.rm.WorkerEvent;
 
-public class WorkerLivelinessMonitor extends AbstractLivelinessMonitor<NodeId> {
+public class WorkerLivelinessMonitor extends AbstractLivelinessMonitor<String> {
 
   private EventHandler dispatcher;
 
@@ -46,7 +46,7 @@ public class WorkerLivelinessMonitor extends AbstractLivelinessMonitor<NodeId> {
   }
 
   @Override
-  protected void expire(NodeId id) {
+  protected void expire(String id) {
     dispatcher.handle(new WorkerEvent(id, WorkerEventType.EXPIRE));
   }
 }

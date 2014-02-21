@@ -20,6 +20,7 @@ package org.apache.tajo.master.rm;
 
 import com.google.protobuf.RpcCallback;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.service.Service;
 import org.apache.hadoop.yarn.proto.YarnProtos.*;
 import org.apache.tajo.ExecutionBlockId;
 import org.apache.tajo.QueryId;
@@ -30,7 +31,7 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Map;
 
-public interface WorkerResourceManager {
+public interface WorkerResourceManager extends Service {
 
   /**
    * select Worker for QueryMaster
@@ -52,8 +53,6 @@ public interface WorkerResourceManager {
 
   public boolean isQueryMasterStopped(QueryId queryId);
 
-  public void init(Configuration conf);
-
   public void stopQueryMaster(QueryId queryId);
 
   public void workerHeartbeat(TajoMasterProtocol.TajoHeartbeat request);
@@ -61,6 +60,8 @@ public interface WorkerResourceManager {
   public void releaseWorkerResource(ExecutionBlockId ebId, ContainerIdProto containerId);
 
   public Map<String, WorkerResource> getWorkers();
+
+  public Map<String, Worker> getWorkers2();
 
   public void stop();
 

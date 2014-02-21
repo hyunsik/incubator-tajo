@@ -23,6 +23,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.ApplicationMasterProtocol;
 import org.apache.hadoop.yarn.api.protocolrecords.FinishApplicationMasterRequest;
@@ -57,7 +58,7 @@ import java.nio.ByteBuffer;
 import java.security.PrivilegedAction;
 import java.util.*;
 
-public class YarnTajoResourceManager implements WorkerResourceManager {
+public class YarnTajoResourceManager extends AbstractService implements WorkerResourceManager {
   private static final Log LOG = LogFactory.getLog(YarnTajoResourceManager.class);
 
   private YarnClient yarnClient;
@@ -67,10 +68,11 @@ public class YarnTajoResourceManager implements WorkerResourceManager {
   private TajoMaster.MasterContext masterContext;
 
   public YarnTajoResourceManager() {
-
+    super(YarnTajoResourceManager.class.getSimpleName());
   }
 
   public YarnTajoResourceManager(TajoMaster.MasterContext masterContext) {
+    super(YarnTajoResourceManager.class.getSimpleName());
     this.masterContext = masterContext;
   }
 
@@ -80,6 +82,11 @@ public class YarnTajoResourceManager implements WorkerResourceManager {
 
   public Map<String, WorkerResource> getWorkers() {
     return new HashMap<String, WorkerResource>();
+  }
+
+  @Override
+  public Map<String, Worker> getWorkers2() {
+    return new HashMap<String, Worker>();
   }
 
   public Collection<String> getQueryMasters() {

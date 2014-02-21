@@ -18,12 +18,18 @@
 
 package org.apache.tajo.master.rm;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.protobuf.RpcCallback;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.yarn.api.records.NodeId;
+import org.apache.hadoop.yarn.event.AsyncDispatcher;
+import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.proto.YarnProtos;
 import org.apache.tajo.ExecutionBlockId;
 import org.apache.tajo.QueryId;
@@ -31,6 +37,7 @@ import org.apache.tajo.QueryIdFactory;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.ipc.TajoMasterProtocol;
 import org.apache.tajo.master.TajoMaster;
+import org.apache.tajo.master.WorkerLivelinessMonitor;
 import org.apache.tajo.master.querymaster.QueryInProgress;
 import org.apache.tajo.master.querymaster.QueryJobEvent;
 import org.apache.tajo.util.ApplicationIdUtils;
@@ -46,26 +53,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * It manages all resources of tajo workers.
  */
-public class TajoWorkerResourceManager implements WorkerResourceManager {
+public class TajoWorkerResourceManager extends CompositeService implements WorkerResourceManager {
   private static final Log LOG = LogFactory.getLog(TajoWorkerResourceManager.class);
 
   static AtomicInteger containerIdSeq = new AtomicInteger(0);
 
   private TajoMaster.MasterContext masterContext;
 
-  private Map<String, Worker> workers = new HashMap<String, Worker>();
-
-  //all workers(include querymaster)
-//  private Map<String, WorkerResource> allWorkerResourceMap = new HashMap<String, WorkerResource>();
-
-  //all workers(include querymaster)
-  private Set<String> deadWorkerResources = new HashSet<String>();
-
-  //worker only
-  private Set<String> liveWorkerResources = new HashSet<String>();
-
-  //querymaster only
-  private Set<String> liveQueryMasterWorkerResources = new HashSet<String>();
+  private WorkerRMContext rmContext;
 
   private Map<QueryId, WorkerResource> queryMasterMap = new HashMap<QueryId, WorkerResource>();
 
@@ -75,7 +70,7 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
 
   private WorkerResourceAllocationThread workerResourceAllocator;
 
-  private WorkerMonitorThread workerMonitor;
+  private WorkerLivelinessMonitor workerLivelinessMonitor;
 
   private BlockingQueue<WorkerResourceRequest> requestQueue;
 
@@ -87,28 +82,34 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
 
   private int queryMasterDefaultMemoryMB;
 
-  private TajoConf tajoConf;
+  private TajoConf systemConf;
 
   private Map<YarnProtos.ContainerIdProto, AllocatedWorkerResource> allocatedResourceMap = new HashMap<YarnProtos.ContainerIdProto, AllocatedWorkerResource>();
 
   public TajoWorkerResourceManager(TajoMaster.MasterContext masterContext) {
+    super(TajoWorkerResourceManager.class.getSimpleName());
     this.masterContext = masterContext;
-    init(masterContext.getConf());
   }
 
-  public TajoWorkerResourceManager(TajoConf tajoConf) {
-    init(tajoConf);
+  public TajoWorkerResourceManager(TajoConf systemConf) {
+    super(TajoWorkerResourceManager.class.getSimpleName());
   }
 
-  private void init(TajoConf tajoConf) {
-    this.tajoConf = tajoConf;
+  @Override
+  public void serviceInit(Configuration conf) throws Exception {
+    Preconditions.checkArgument(conf instanceof TajoConf);
+    this.systemConf = (TajoConf) conf;
+
+    AsyncDispatcher dispatcher = new AsyncDispatcher();
+    addIfService(dispatcher);
+
+    rmContext = new WorkerRMContext(dispatcher);
+
     this.queryIdSeed = String.valueOf(System.currentTimeMillis());
 
-    this.queryMasterDefaultDiskSlot =
-        tajoConf.getFloatVar(TajoConf.ConfVars.TAJO_QUERYMASTER_DISK_SLOT);
+    this.queryMasterDefaultDiskSlot = systemConf.getFloatVar(TajoConf.ConfVars.TAJO_QUERYMASTER_DISK_SLOT);
 
-    this.queryMasterDefaultMemoryMB =
-        tajoConf.getIntVar(TajoConf.ConfVars.TAJO_QUERYMASTER_MEMORY_MB);
+    this.queryMasterDefaultMemoryMB = systemConf.getIntVar(TajoConf.ConfVars.TAJO_QUERYMASTER_MEMORY_MB);
 
     requestQueue = new LinkedBlockingDeque<WorkerResourceRequest>();
     reAllocationList = new ArrayList<WorkerResourceRequest>();
@@ -116,20 +117,53 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
     workerResourceAllocator = new WorkerResourceAllocationThread();
     workerResourceAllocator.start();
 
-    workerMonitor = new WorkerMonitorThread();
-    workerMonitor.start();
+    this.workerLivelinessMonitor = new WorkerLivelinessMonitor(this.rmContext.getDispatcher());
+    addIfService(this.workerLivelinessMonitor);
+
+    // Register event handler for Workers
+    rmContext.getDispatcher().register(WorkerEventType.class, new WorkerEventDispatcher(rmContext));
+
+    super.serviceInit(systemConf);
+  }
+
+  @InterfaceAudience.Private
+  public static final class WorkerEventDispatcher implements EventHandler<WorkerEvent> {
+
+    private final WorkerRMContext rmContext;
+
+    public WorkerEventDispatcher(WorkerRMContext rmContext) {
+      this.rmContext = rmContext;
+    }
+
+    @Override
+    public void handle(WorkerEvent event) {
+      String workerId = event.getWorkerId();
+      Worker node = this.rmContext.getWorkers().get(workerId);
+      if (node != null) {
+        try {
+          node.handle(event);
+        } catch (Throwable t) {
+          LOG.error("Error in handling event type " + event.getType() + " for node " + workerId, t);
+        }
+      }
+    }
   }
 
   public Map<String, WorkerResource> getWorkers() {
     Map<String, WorkerResource> map = Maps.newHashMap();
-    for (Map.Entry<String, Worker> entry : workers.entrySet()) {
+    for (Map.Entry<String, Worker> entry : rmContext.getWorkers().entrySet()) {
       map.put(entry.getKey(), entry.getValue().getResource());
     }
     return map;
   }
 
+  @Override
+  public Map<String, Worker> getWorkers2() {
+    return ImmutableMap.copyOf(rmContext.getWorkers());
+  }
+
   public Collection<String> getQueryMasters() {
-    return Collections.unmodifiableSet(liveQueryMasterWorkerResources);
+    return Collections.unmodifiableSet(rmContext.getQueryMasterWorker());
   }
 
   @Override
@@ -143,8 +177,8 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
     int totalAvailableMemoryMB = 0;
 
     synchronized(workerResourceLock) {
-      for(String eachWorker: liveWorkerResources) {
-        Worker worker = workers.get(eachWorker);
+      for(String eachWorker: rmContext.getWorkers().keySet()) {
+        Worker worker = rmContext.getWorkers().get(eachWorker);
         WorkerResource resource = worker.getResource();
         if(worker != null) {
           totalMemoryMB += resource.getMemoryMB();
@@ -160,7 +194,7 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
     }
 
     return TajoMasterProtocol.ClusterResourceSummary.newBuilder()
-            .setNumWorkers(liveWorkerResources.size())
+            .setNumWorkers(rmContext.getWorkers().size())
             .setTotalCpuCoreSlots(totalCpuCoreSlots)
             .setTotalDiskSlots(totalDiskSlots)
             .setTotalMemoryMB(totalMemoryMB)
@@ -171,7 +205,7 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
   }
 
   @Override
-  public void stop() {
+  public void serviceStop() throws Exception {
     if(stopped.get()) {
       return;
     }
@@ -179,9 +213,8 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
     if(workerResourceAllocator != null) {
       workerResourceAllocator.interrupt();
     }
-    if(workerMonitor != null) {
-      workerMonitor.interrupt();
-    }
+
+    super.serviceStop();
   }
 
   @Override
@@ -191,14 +224,14 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
 
   public WorkerResource allocateQueryMaster(QueryId queryId) {
     synchronized(workerResourceLock) {
-      if(liveQueryMasterWorkerResources.size() == 0) {
+      if(rmContext.getQueryMasterWorker().size() == 0) {
         LOG.warn("No available resource for querymaster:" + queryId);
         return null;
       }
       WorkerResource queryMasterWorker = null;
       int minTasks = Integer.MAX_VALUE;
-      for(String eachQueryMaster: liveQueryMasterWorkerResources) {
-        Worker worker = workers.get(eachQueryMaster);
+      for(String eachQueryMaster: rmContext.getQueryMasterWorker()) {
+        Worker worker = rmContext.getWorkers().get(eachQueryMaster);
         WorkerResource resourceOfQueryMaster = worker.getResource();
         if(resourceOfQueryMaster != null && resourceOfQueryMaster.getNumQueryMasterTasks() < minTasks) {
           queryMasterWorker = resourceOfQueryMaster;
@@ -283,69 +316,75 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
     }
   }
 
-  /**
-   * It checks the heartbeat timeout. If some workers are expired, it moves them into the list of dead workers.
-   */
-  class WorkerMonitorThread extends Thread {
-    int heartbeatTimeout;
-
-    @Override
-    public void run() {
-      heartbeatTimeout = tajoConf.getIntVar(TajoConf.ConfVars.WORKER_HEARTBEAT_TIMEOUT);
-      LOG.info("WorkerMonitor start");
-      while(!stopped.get()) {
-        try {
-          Thread.sleep(10 * 1000);
-        } catch (InterruptedException e) {
-          if(stopped.get()) {
-            break;
-          }
-        }
-        synchronized(workerResourceLock) {
-          Set<String> workerHolders = new HashSet<String>();
-          workerHolders.addAll(liveWorkerResources);
-          for(String eachLiveWorker: workerHolders) {
-            Worker worker = workers.get(eachLiveWorker);
-
-            if(worker == null) {
-              LOG.warn(eachLiveWorker + " not in WorkerReosurceMap");
-              continue;
-            }
-
-            WorkerResource resource = worker.getResource();
-
-            if(System.currentTimeMillis() - resource.getLastHeartbeat() >= heartbeatTimeout) {
-              liveWorkerResources.remove(eachLiveWorker);
-              deadWorkerResources.add(eachLiveWorker);
-              resource.setWorkerStatus(WorkerStatus.DEAD);
-              LOG.warn("Worker [" + eachLiveWorker + "] is dead.");
-            }
-          }
-
-          //QueryMaster
-          workerHolders.clear();
-
-          workerHolders.addAll(liveQueryMasterWorkerResources);
-          for(String eachLiveWorker: workerHolders) {
-            Worker worker = workers.get(eachLiveWorker);
-
-            if(worker == null) {
-              LOG.warn(eachLiveWorker + " not in WorkerResourceMap");
-              continue;
-            }
-
-            WorkerResource resource = worker.getResource();
-            if(System.currentTimeMillis() - resource.getLastHeartbeat() >= heartbeatTimeout) {
-              liveQueryMasterWorkerResources.remove(eachLiveWorker);
-              deadWorkerResources.add(eachLiveWorker);
-              resource.setWorkerStatus(WorkerStatus.DEAD);
-              LOG.warn("QueryMaster [" + eachLiveWorker + "] is dead.");
-            }
-          }
-        }
-      }
-    }
-  }
+//  /**
+//   * It checks the heartbeat timeout. If some workers are expired, it moves them into the list of dead workers.
+//   */
+//  class WorkerMonitorThread extends Thread {
+//    int heartbeatTimeout;
+//
+//    @Override
+//    public void run() {
+//      heartbeatTimeout = systemConf.getIntVar(TajoConf.ConfVars.WORKER_HEARTBEAT_TIMEOUT);
+//      LOG.info("WorkerMonitor start");
+//      while(!stopped.get()) {
+//        try {
+//          Thread.sleep(10 * 1000);
+//        } catch (InterruptedException e) {
+//          if(stopped.get()) {
+//            break;
+//          }
+//        }
+//
+//        synchronized(workerResourceLock) {
+//          Set<String> workerHolders = new HashSet<String>();
+//          workerHolders.addAll(rmContext.getWorkers().keySet());
+//          for(String eachLiveWorker: workerHolders) {
+//            Worker worker = rmContext.getWorkers().get(eachLiveWorker);
+//
+//            if(worker == null) {
+//              LOG.warn(eachLiveWorker + " not in WorkerReosurceMap");
+//              continue;
+//            }
+//
+//            WorkerResource resource = worker.getResource();
+//
+//            if(System.currentTimeMillis() - resource.getLastHeartbeat() >= heartbeatTimeout) {
+//              rmContext.getWorkers().remove(eachLiveWorker);
+//              rmContext.getInactiveWorkers().put(eachLiveWorker, worker);
+//              resource.setWorkerStatus(WorkerStatus.DEAD);
+//              if (resource.isQueryMasterMode()) {
+//                rmContext.getQueryMasterWorker().remove(resource);
+//              }
+//              LOG.warn("Worker [" + eachLiveWorker + "] is dead.");
+//            }
+//          }
+//
+//          //QueryMaster
+//          workerHolders.clear();
+//
+//          workerHolders.addAll(rmContext.getQueryMasterWorker());
+//          for(String eachLiveWorker: workerHolders) {
+//            Worker worker = rmContext.getWorkers().get(eachLiveWorker);
+//
+//            if(worker == null) {
+//              LOG.warn(eachLiveWorker + " not in WorkerResourceMap");
+//              rmContext.getQueryMasterWorker().remove(eachLiveWorker);
+//              continue;
+//            }
+//
+//            WorkerResource resource = worker.getResource();
+//            if(System.currentTimeMillis() - resource.getLastHeartbeat() >= heartbeatTimeout) {
+//              rmContext.getQueryMasterWorker().remove(eachLiveWorker);
+//              rmContext.getWorkers().remove(eachLiveWorker);
+//              rmContext.getInactiveWorkers().put(eachLiveWorker, worker);
+//              resource.setWorkerStatus(WorkerStatus.DEAD);
+//              LOG.warn("QueryMaster [" + eachLiveWorker + "] is dead.");
+//            }
+//          }
+//        }
+//      }
+//    }
+//  }
 
   static class WorkerResourceRequest {
     boolean queryMasterRequest;
@@ -386,7 +425,7 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
                 ", requiredDiskSlots:" + resourceRequest.request.getMinDiskSlotPerContainer() +
                 "~" + resourceRequest.request.getMaxDiskSlotPerContainer() +
                 ", queryMasterRequest=" + resourceRequest.queryMasterRequest +
-                ", liveWorkers=" + liveWorkerResources.size());
+                ", liveWorkers=" + rmContext.getWorkers().size());
           }
 
           List<AllocatedWorkerResource> allocatedWorkerResources = chooseWorkers(resourceRequest);
@@ -435,8 +474,8 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
             if(LOG.isDebugEnabled()) {
               LOG.debug("=========================================");
               LOG.debug("Available Workers");
-              for(String liveWorker: liveWorkerResources) {
-                LOG.debug(workers.get(liveWorker).toString());
+              for(String liveWorker: rmContext.getWorkers().keySet()) {
+                LOG.debug(rmContext.getWorkers().get(liveWorker).toString());
               }
               LOG.debug("=========================================");
             }
@@ -473,7 +512,7 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
 
     if(resourceRequestPriority == TajoMasterProtocol.ResourceRequestPriority.MEMORY) {
       synchronized(workerResourceLock) {
-        List<String> randomWorkers = new ArrayList<String>(liveWorkerResources);
+        List<String> randomWorkers = new ArrayList<String>(rmContext.getWorkers().keySet());
         Collections.shuffle(randomWorkers);
 
         int numContainers = resourceRequest.request.getNumContainers();
@@ -510,7 +549,7 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
               break;
             }
 
-            Worker worker = workers.get(eachWorker);
+            Worker worker = rmContext.getWorkers().get(eachWorker);
             WorkerResource workerResource = worker.getResource();
             if(workerResource.getAvailableMemoryMB() >= compareAvailableMemory) {
               int workerMemory;
@@ -542,7 +581,7 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
       }
     } else {
       synchronized(workerResourceLock) {
-        List<String> randomWorkers = new ArrayList<String>(liveWorkerResources);
+        List<String> randomWorkers = new ArrayList<String>(rmContext.getWorkers().keySet());
         Collections.shuffle(randomWorkers);
 
         int numContainers = resourceRequest.request.getNumContainers();
@@ -579,7 +618,7 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
               break;
             }
 
-            Worker worker = workers.get(eachWorker);
+            Worker worker = rmContext.getWorkers().get(eachWorker);
             WorkerResource workerResource = worker.getResource();
             if(workerResource.getAvailableDiskSlots() >= compareAvailableDisk) {
               float workerDiskSlots;
@@ -641,10 +680,6 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
   }
 
   @Override
-  public void init(Configuration conf) {
-  }
-
-  @Override
   public void stopQueryMaster(QueryId queryId) {
     WorkerResource queryMasterWorkerResource = null;
     synchronized(workerResourceLock) {
@@ -667,71 +702,89 @@ public class TajoWorkerResourceManager implements WorkerResourceManager {
       boolean queryMasterMode = request.getServerStatus().getQueryMasterMode().getValue();
       boolean taskRunnerMode = request.getServerStatus().getTaskRunnerMode().getValue();
 
-      if(workers.containsKey(workerKey)) {
-        Worker worker = workers.get(workerKey);
+      if(rmContext.getWorkers().containsKey(workerKey)) { // worker is running
+        Worker worker = rmContext.getWorkers().get(workerKey);
+        WorkerResource workerResource = worker.getResource();
+        updateWorkerResource(workerResource, request);
+        workerLivelinessMonitor.receivedPing(workerKey);
+
+      } else if (rmContext.getInactiveWorkers().containsKey(workerKey)) { // worker is dead
+        Worker worker = rmContext.getInactiveWorkers().remove(workerKey);
+        rmContext.getWorkers().put(workerKey, worker);
         WorkerResource workerResource = worker.getResource();
 
-        if(deadWorkerResources.contains(workerKey)) {
-          deadWorkerResources.remove(workerKey);
-          if(queryMasterMode) {
-            liveQueryMasterWorkerResources.add(workerKey);
-            workerResource.setNumRunningTasks(0);
-            LOG.info("Heartbeat received from QueryMaster [" + workerKey + "] again.");
-          }
-          if(taskRunnerMode) {
-            liveWorkerResources.add(workerKey);
-            LOG.info("Heartbeat received from Worker [" + workerKey + "] again.");
-          }
-        }
-        workerResource.setLastHeartbeat(System.currentTimeMillis());
-        workerResource.setWorkerStatus(WorkerStatus.LIVE);
-        workerResource.setNumRunningTasks(request.getServerStatus().getRunningTaskNum());
-        workerResource.setMaxHeap(request.getServerStatus().getJvmHeap().getMaxHeap());
-        workerResource.setFreeHeap(request.getServerStatus().getJvmHeap().getFreeHeap());
-        workerResource.setTotalHeap(request.getServerStatus().getJvmHeap().getTotalHeap());
-      } else {
-        //initial connection
-        WorkerResource workerResource = new WorkerResource();
-        workerResource.setAllocatedHost(request.getTajoWorkerHost());
-        workerResource.setQueryMasterMode(queryMasterMode);
-        workerResource.setTaskRunnerMode(taskRunnerMode);
-
-        workerResource.setQueryMasterPort(request.getTajoQueryMasterPort());
-        workerResource.setPeerRpcPort(request.getPeerRpcPort());
-        workerResource.setClientPort(request.getTajoWorkerClientPort());
-        workerResource.setPullServerPort(request.getTajoWorkerPullServerPort());
-        workerResource.setHttpPort(request.getTajoWorkerHttpPort());
-
-        workerResource.setLastHeartbeat(System.currentTimeMillis());
-        workerResource.setWorkerStatus(WorkerStatus.LIVE);
-        if(request.getServerStatus() != null) {
-          workerResource.setMemoryMB(request.getServerStatus().getMemoryResourceMB());
-          workerResource.setCpuCoreSlots(request.getServerStatus().getSystem().getAvailableProcessors());
-          workerResource.setDiskSlots(request.getServerStatus().getDiskSlots());
-          workerResource.setNumRunningTasks(request.getServerStatus().getRunningTaskNum());
-          workerResource.setMaxHeap(request.getServerStatus().getJvmHeap().getMaxHeap());
-          workerResource.setFreeHeap(request.getServerStatus().getJvmHeap().getFreeHeap());
-          workerResource.setTotalHeap(request.getServerStatus().getJvmHeap().getTotalHeap());
-        } else {
-          workerResource.setMemoryMB(4096);
-          workerResource.setDiskSlots(4);
-          workerResource.setCpuCoreSlots(4);
-        }
-
-        Worker newWorker = new Worker(workerResource);
-        workers.put(workerResource.getId(), newWorker);
         if(queryMasterMode) {
-          liveQueryMasterWorkerResources.add(workerKey);
+          rmContext.getQueryMasterWorker().add(workerKey);
+          workerResource.setNumRunningTasks(0);
+          LOG.info("Heartbeat received from QueryMaster [" + workerKey + "] again.");
         }
-
         if(taskRunnerMode) {
-          liveWorkerResources.add(workerKey);
+          LOG.info("Heartbeat received from Worker [" + workerKey + "] again.");
+        }
+        updateWorkerResource(workerResource, request);
+      } else { // new worker
+        WorkerResource resource = createWorkerResource(request);
+
+        String workerId = resource.getId();
+
+        Worker newWorker = new Worker(workerId, rmContext, resource);
+        Worker oldWorker = rmContext.getWorkers().putIfAbsent(workerId, newWorker);
+
+        if (oldWorker == null) {
+          rmContext.rmDispatcher.getEventHandler().handle(new WorkerEvent(workerId, WorkerEventType.STARTED));
+        } else {
+          LOG.info("Reconnect from the node at: " + workerId);
+          workerLivelinessMonitor.unregister(workerId);
+          this.rmContext.getDispatcher().getEventHandler().handle(new RMNodeReconnectEvent(nodeId, rmNode));
         }
 
-        LOG.info("TajoWorker:" + workerResource + " added in live TajoWorker list");
+        workerLivelinessMonitor.register(workerKey);
 
         workerResourceLock.notifyAll();
       }
     }
+  }
+
+  private void updateWorkerResource(WorkerResource resource, TajoMasterProtocol.TajoHeartbeat request) {
+    resource.setLastHeartbeat(System.currentTimeMillis());
+    resource.setWorkerStatus(WorkerStatus.LIVE);
+    resource.setNumRunningTasks(request.getServerStatus().getRunningTaskNum());
+    resource.setMaxHeap(request.getServerStatus().getJvmHeap().getMaxHeap());
+    resource.setFreeHeap(request.getServerStatus().getJvmHeap().getFreeHeap());
+    resource.setTotalHeap(request.getServerStatus().getJvmHeap().getTotalHeap());
+  }
+
+  private WorkerResource createWorkerResource(TajoMasterProtocol.TajoHeartbeat request) {
+    boolean queryMasterMode = request.getServerStatus().getQueryMasterMode().getValue();
+    boolean taskRunnerMode = request.getServerStatus().getTaskRunnerMode().getValue();
+
+    WorkerResource workerResource = new WorkerResource();
+    workerResource.setAllocatedHost(request.getTajoWorkerHost());
+    workerResource.setQueryMasterMode(queryMasterMode);
+    workerResource.setTaskRunnerMode(taskRunnerMode);
+
+    workerResource.setQueryMasterPort(request.getTajoQueryMasterPort());
+    workerResource.setPeerRpcPort(request.getPeerRpcPort());
+    workerResource.setClientPort(request.getTajoWorkerClientPort());
+    workerResource.setPullServerPort(request.getTajoWorkerPullServerPort());
+    workerResource.setHttpPort(request.getTajoWorkerHttpPort());
+
+    workerResource.setLastHeartbeat(System.currentTimeMillis());
+    workerResource.setWorkerStatus(WorkerStatus.LIVE);
+    if(request.getServerStatus() != null) {
+      workerResource.setMemoryMB(request.getServerStatus().getMemoryResourceMB());
+      workerResource.setCpuCoreSlots(request.getServerStatus().getSystem().getAvailableProcessors());
+      workerResource.setDiskSlots(request.getServerStatus().getDiskSlots());
+      workerResource.setNumRunningTasks(request.getServerStatus().getRunningTaskNum());
+      workerResource.setMaxHeap(request.getServerStatus().getJvmHeap().getMaxHeap());
+      workerResource.setFreeHeap(request.getServerStatus().getJvmHeap().getFreeHeap());
+      workerResource.setTotalHeap(request.getServerStatus().getJvmHeap().getTotalHeap());
+    } else {
+      workerResource.setMemoryMB(4096);
+      workerResource.setDiskSlots(4);
+      workerResource.setCpuCoreSlots(4);
+    }
+
+    return workerResource;
   }
 }

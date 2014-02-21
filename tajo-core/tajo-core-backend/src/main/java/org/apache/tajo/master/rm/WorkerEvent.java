@@ -18,18 +18,17 @@
 
 package org.apache.tajo.master.rm;
 
-import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.event.AbstractEvent;
 
 public class WorkerEvent extends AbstractEvent<WorkerEventType> {
-  private final NodeId nodeId;
+  private final String workerId;
 
-  public WorkerEvent(NodeId nodeId, WorkerEventType workerEventType) {
+  public WorkerEvent(String workerId, WorkerEventType workerEventType) {
     super(workerEventType);
-    this.nodeId = nodeId;
+    this.workerId = workerId;
   }
 
-  public NodeId getNodeId() {
-    return nodeId;
+  public String getWorkerId() {
+    return workerId;
   }
 }

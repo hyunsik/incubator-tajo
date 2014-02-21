@@ -19,15 +19,17 @@
 %>
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 
-<%@ page import="java.util.*" %>
-<%@ page import="org.apache.tajo.webapp.StaticHttpServer" %>
-<%@ page import="org.apache.tajo.master.*" %>
-<%@ page import="org.apache.tajo.master.rm.*" %>
+<%@ page import="org.apache.tajo.master.TajoMaster" %>
+<%@ page import="org.apache.tajo.master.rm.Worker" %>
+<%@ page import="org.apache.tajo.master.rm.WorkerResource" %>
+<%@ page import="org.apache.tajo.master.rm.WorkerState" %>
 <%@ page import="org.apache.tajo.util.JSPUtil" %>
+<%@ page import="org.apache.tajo.webapp.StaticHttpServer" %>
+<%@ page import="java.util.*" %>
 
 <%
   TajoMaster master = (TajoMaster) StaticHttpServer.getInstance().getAttribute("tajo.info.server.object");
-  Map<String, WorkerResource> workers = master.getContext().getResourceManager().getWorkers();
+  Map<String, Worker> workers = master.getContext().getResourceManager().getWorkers2();
   List<String> wokerKeys = new ArrayList<String>(workers.keySet());
   Collections.sort(wokerKeys);
 
@@ -40,24 +42,25 @@
   Set<WorkerResource> liveQueryMasters = new TreeSet<WorkerResource>();
   Set<WorkerResource> deadQueryMasters = new TreeSet<WorkerResource>();
 
-  for(WorkerResource eachWorker: workers.values()) {
-    if(eachWorker.isQueryMasterMode()) {
-      if(eachWorker.getWorkerStatus() == WorkerStatus.LIVE) {
-        liveQueryMasters.add(eachWorker);
-        runningQueryMasterTasks += eachWorker.getNumQueryMasterTasks();
+  for(Worker eachWorker: workers.values()) {
+    WorkerResource resource = eachWorker.getResource();
+    if(resource.isQueryMasterMode()) {
+      if(eachWorker.getState() == WorkerState.RUNNING) {
+        liveQueryMasters.add(resource);
+        runningQueryMasterTasks += eachWorker.getResource().getNumQueryMasterTasks();
       }
-      if(eachWorker.getWorkerStatus() == WorkerStatus.DEAD) {
-        deadQueryMasters.add(eachWorker);
+      if(eachWorker.getState() == WorkerState.LOST) {
+        deadQueryMasters.add(resource);
       }
     }
 
-    if(eachWorker.isTaskRunnerMode()) {
-      if(eachWorker.getWorkerStatus() == WorkerStatus.LIVE) {
-        liveWorkers.add(eachWorker);
-      } else if(eachWorker.getWorkerStatus() == WorkerStatus.DEAD) {
-        deadWorkers.add(eachWorker);
-      } else if(eachWorker.getWorkerStatus() == WorkerStatus.DECOMMISSION) {
-        decommissionWorkers.add(eachWorker);
+    if(eachWorker.getResource().isTaskRunnerMode()) {
+      if(eachWorker.getState() == WorkerState.RUNNING) {
+        liveWorkers.add(resource);
+      } else if(eachWorker.getState()== WorkerState.LOST) {
+        deadWorkers.add(resource);
+      } else if(eachWorker.getState() == WorkerState.DECOMMISSIONED) {
+        decommissionWorkers.add(resource);
       }
     }
   }

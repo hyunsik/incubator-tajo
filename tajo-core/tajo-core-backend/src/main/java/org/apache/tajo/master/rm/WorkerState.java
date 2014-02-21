@@ -28,10 +28,13 @@ public enum WorkerState {
   /** Node is unhealthy */
   UNHEALTHY,
 
+  /** Node is out of service */
+  DECOMMISSIONED,
+
   /** Node has not sent a heartbeat for some configured time threshold*/
   LOST;
 
   public boolean isUnusable() {
-    return (this == UNHEALTHY || this == LOST);
+    return (this == UNHEALTHY || this == DECOMMISSIONED || this == LOST);
   }
 }

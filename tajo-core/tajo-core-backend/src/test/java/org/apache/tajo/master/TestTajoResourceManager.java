@@ -56,6 +56,7 @@ public class TestTajoResourceManager {
     tajoConf.setIntVar(TajoConf.ConfVars.TAJO_QUERYMASTER_MEMORY_MB, 512);
 
     tajoWorkerResourceManager = new TajoWorkerResourceManager(tajoConf);
+    tajoWorkerResourceManager.init(tajoConf);
 
     for(int i = 0; i < numWorkers; i++) {
       ServerStatusProto.System system = ServerStatusProto.System.newBuilder()
@@ -386,5 +387,7 @@ public class TestTajoResourceManager {
       totalUsedMemory += eachWorker.getUsedMemoryMB();
       totalUsedDisks += eachWorker.getUsedDiskSlots();
     }
+
+    tajoWorkerResourceManager.stop();
   }
 }
