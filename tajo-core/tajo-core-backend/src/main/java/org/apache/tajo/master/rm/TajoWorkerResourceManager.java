@@ -86,6 +86,8 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
 
   private Map<YarnProtos.ContainerIdProto, AllocatedWorkerResource> allocatedResourceMap = new HashMap<YarnProtos.ContainerIdProto, AllocatedWorkerResource>();
 
+  private WorkerTrackerService workerTrackerService;
+
   public TajoWorkerResourceManager(TajoMaster.MasterContext masterContext) {
     super(TajoWorkerResourceManager.class.getSimpleName());
     this.masterContext = masterContext;
@@ -122,6 +124,9 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
 
     // Register event handler for Workers
     rmContext.getDispatcher().register(WorkerEventType.class, new WorkerEventDispatcher(rmContext));
+
+    workerTrackerService = new WorkerTrackerService(rmContext);
+    addIfService(workerTrackerService);
 
     super.serviceInit(systemConf);
   }
