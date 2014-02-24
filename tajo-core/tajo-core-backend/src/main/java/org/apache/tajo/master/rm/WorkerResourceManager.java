@@ -59,9 +59,9 @@ public interface WorkerResourceManager extends Service {
 
   public void releaseWorkerResource(ExecutionBlockId ebId, ContainerIdProto containerId);
 
-  public Map<String, WorkerResource> getWorkers();
-
   public Map<String, Worker> getWorkers2();
+
+  public Map<String, Worker> getInactiveWorkers();
 
   public void stop();
 

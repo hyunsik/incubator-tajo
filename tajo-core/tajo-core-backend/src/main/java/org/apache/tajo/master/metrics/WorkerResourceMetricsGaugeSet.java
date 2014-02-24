@@ -42,7 +42,7 @@ public class WorkerResourceMetricsGaugeSet implements MetricSet {
     metricsMap.put("totalWorkers", new Gauge<Integer>() {
       @Override
       public Integer getValue() {
-        return tajoMasterContext.getResourceManager().getWorkers().size();
+        return tajoMasterContext.getResourceManager().getWorkers2().size();
       }
     });
 

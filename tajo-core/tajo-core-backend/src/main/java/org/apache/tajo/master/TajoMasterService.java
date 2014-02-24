@@ -30,6 +30,7 @@ import org.apache.tajo.TajoIdProtos;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.ipc.TajoMasterProtocol;
 import org.apache.tajo.master.querymaster.QueryJobManager;
+import org.apache.tajo.master.rm.Worker;
 import org.apache.tajo.master.rm.WorkerResource;
 import org.apache.tajo.rpc.AsyncRpcServer;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos;
@@ -37,7 +38,7 @@ import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.BoolProto;
 import org.apache.tajo.util.NetUtils;
 
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 public class TajoMasterService extends AbstractService {
@@ -160,21 +161,21 @@ public class TajoMasterService extends AbstractService {
 
       TajoMasterProtocol.WorkerResourcesRequest.Builder builder =
           TajoMasterProtocol.WorkerResourcesRequest.newBuilder();
-      List<WorkerResource> workerResources =
-          new ArrayList<WorkerResource>(context.getResourceManager().getWorkers().values());
+      Collection<Worker> workers = context.getResourceManager().getWorkers2().values();
 
-      for(WorkerResource worker: workerResources) {
+      for(Worker worker: workers) {
+        WorkerResource resource = worker.getResource();
 
         TajoMasterProtocol.WorkerResourceProto.Builder workerResource =
             TajoMasterProtocol.WorkerResourceProto.newBuilder();
 
-        workerResource.setHost(worker.getAllocatedHost());
-        workerResource.setPeerRpcPort(worker.getPeerRpcPort());
+        workerResource.setHost(resource.getAllocatedHost());
+        workerResource.setPeerRpcPort(resource.getPeerRpcPort());
         workerResource.setInfoPort(worker.getHttpPort());
-        workerResource.setQueryMasterPort(worker.getQueryMasterPort());
-        workerResource.setMemoryMB(worker.getMemoryMB());
-        workerResource.setDiskSlots(worker.getDiskSlots());
-        workerResource.setQueryMasterPort(worker.getQueryMasterPort());
+        workerResource.setQueryMasterPort(resource.getQueryMasterPort());
+        workerResource.setMemoryMB(resource.getMemoryMB());
+        workerResource.setDiskSlots(resource.getDiskSlots());
+        workerResource.setQueryMasterPort(resource.getQueryMasterPort());
 
         builder.addWorkerResources(workerResource);
       }

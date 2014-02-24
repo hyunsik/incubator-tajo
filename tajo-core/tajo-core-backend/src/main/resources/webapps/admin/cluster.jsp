@@ -35,33 +35,35 @@
 
   int runningQueryMasterTasks = 0;
 
-  Set<WorkerResource> liveWorkers = new TreeSet<WorkerResource>();
-  Set<WorkerResource> deadWorkers = new TreeSet<WorkerResource>();
-  Set<WorkerResource> decommissionWorkers = new TreeSet<WorkerResource>();
+  Set<Worker> liveWorkers = new TreeSet<Worker>();
+  Set<Worker> deadWorkers = new TreeSet<Worker>();
+  Set<Worker> decommissionWorkers = new TreeSet<Worker>();
 
-  Set<WorkerResource> liveQueryMasters = new TreeSet<WorkerResource>();
-  Set<WorkerResource> deadQueryMasters = new TreeSet<WorkerResource>();
+  Set<Worker> liveQueryMasters = new TreeSet<Worker>();
+  Set<Worker> deadQueryMasters = new TreeSet<Worker>();
 
   for(Worker eachWorker: workers.values()) {
-    WorkerResource resource = eachWorker.getResource();
-    if(resource.isQueryMasterMode()) {
-      if(eachWorker.getState() == WorkerState.RUNNING) {
-        liveQueryMasters.add(resource);
-        runningQueryMasterTasks += eachWorker.getResource().getNumQueryMasterTasks();
-      }
-      if(eachWorker.getState() == WorkerState.LOST) {
-        deadQueryMasters.add(resource);
-      }
+    if(eachWorker.getResource().isQueryMasterMode()) {
+      liveQueryMasters.add(eachWorker);
+      runningQueryMasterTasks += eachWorker.getResource().getNumQueryMasterTasks();
     }
 
     if(eachWorker.getResource().isTaskRunnerMode()) {
-      if(eachWorker.getState() == WorkerState.RUNNING) {
-        liveWorkers.add(resource);
-      } else if(eachWorker.getState()== WorkerState.LOST) {
-        deadWorkers.add(resource);
-      } else if(eachWorker.getState() == WorkerState.DECOMMISSIONED) {
-        decommissionWorkers.add(resource);
+      liveWorkers.add(eachWorker);
+    }
+  }
+
+  for (Worker inactiveWorker : master.getContext().getResourceManager().getInactiveWorkers().values()) {
+    WorkerState state = inactiveWorker.getState();
+
+    if (state == WorkerState.LOST) {
+      if (inactiveWorker.getResource().isQueryMasterMode()) {
+        deadQueryMasters.add(inactiveWorker);
+      } else {
+        deadWorkers.add(inactiveWorker);
       }
+    } else if (state == WorkerState.DECOMMISSIONED) {
+      decommissionWorkers.add(inactiveWorker);
     }
   }
 
@@ -94,17 +96,18 @@
 
 <%
     int no = 1;
-    for(WorkerResource queryMaster: liveQueryMasters) {
-          String queryMasterHttp = "http://" + queryMaster.getAllocatedHost() + ":" + queryMaster.getHttpPort() + "/index.jsp";
+    for(Worker queryMaster: liveQueryMasters) {
+      WorkerResource resource = queryMaster.getResource();
+          String queryMasterHttp = "http://" + resource.getAllocatedHost() + ":" + queryMaster.getHttpPort() + "/index.jsp";
 %>
     <tr>
       <td width='30' align='right'><%=no++%></td>
-      <td><a href='<%=queryMasterHttp%>'><%=queryMaster.getAllocatedHost() + ":" + queryMaster.getQueryMasterPort()%></a></td>
-      <td width='100' align='center'><%=queryMaster.getClientPort()%></td>
-      <td width='200' align='right'><%=queryMaster.getNumQueryMasterTasks()%></td>
-      <td width='200' align='center'><%=queryMaster.getFreeHeap()/1024/1024%>/<%=queryMaster.getMaxHeap()/1024/1024%> MB</td>
-      <td width='100' align='right'><%=JSPUtil.getElapsedTime(queryMaster.getLastHeartbeat(), System.currentTimeMillis())%></td>
-      <td width='100' align='center'><%=queryMaster.getWorkerStatus()%></td>
+      <td><a href='<%=queryMasterHttp%>'><%=resource.getAllocatedHost() + ":" + resource.getQueryMasterPort()%></a></td>
+      <td width='100' align='center'><%=resource.getClientPort()%></td>
+      <td width='200' align='right'><%=resource.getNumQueryMasterTasks()%></td>
+      <td width='200' align='center'><%=resource.getFreeHeap()/1024/1024%>/<%=resource.getMaxHeap()/1024/1024%> MB</td>
+      <td width='100' align='right'><%=JSPUtil.getElapsedTime(resource.getLastHeartbeat(), System.currentTimeMillis())%></td>
+      <td width='100' align='center'><%=resource.getWorkerStatus()%></td>
     </tr>
 <%
     } //end fo for
@@ -125,13 +128,14 @@
     <tr><th>No</th><th>QueryMaster</th><th>Client Port</th><th>Status</th></tr>
 <%
       int no = 1;
-      for(WorkerResource queryMaster: deadQueryMasters) {
+      for(Worker queryMaster: deadQueryMasters) {
+        WorkerResource resource = queryMaster.getResource();
 %>
     <tr>
       <td width='30' align='right'><%=no++%></td>
-      <td><%=queryMaster.getAllocatedHost() + ":" + queryMaster.getQueryMasterPort()%></td>
-      <td><%=queryMaster.getClientPort()%></td>
-      <td align='center'><%=queryMaster.getWorkerStatus()%></td>
+      <td><%=resource.getAllocatedHost() + ":" + resource.getQueryMasterPort()%></td>
+      <td><%=resource.getClientPort()%></td>
+      <td align='center'><%=queryMaster.getState()%></td>
     </tr>
 <%
       } //end fo for
@@ -156,19 +160,20 @@
     <tr><th>No</th><th>Worker</th><th>PullServer<br/>Port</th><th>Running Tasks</th><th>Memory Resource<br/>(used/total)</th><th>Disk Resource<br/>(used/total)</th></th><th>Heap(free/max)</th><th>Heartbeat</th><th>Status</th></tr>
 <%
     int no = 1;
-    for(WorkerResource worker: liveWorkers) {
-          String workerHttp = "http://" + worker.getAllocatedHost() + ":" + worker.getHttpPort() + "/index.jsp";
+    for(Worker worker: liveWorkers) {
+      WorkerResource resource = worker.getResource();
+          String workerHttp = "http://" + resource.getAllocatedHost() + ":" + worker.getHttpPort() + "/index.jsp";
 %>
     <tr>
       <td width='30' align='right'><%=no++%></td>
-      <td><a href='<%=workerHttp%>'><%=worker.getAllocatedHost() + ":" + worker.getPeerRpcPort()%></a></td>
-      <td width='80' align='center'><%=worker.getPullServerPort()%></td>
-      <td width='100' align='right'><%=worker.getNumRunningTasks()%></td>
-      <td width='150' align='center'><%=worker.getUsedMemoryMB()%>/<%=worker.getMemoryMB()%></td>
-      <td width='100' align='center'><%=worker.getUsedDiskSlots()%>/<%=worker.getDiskSlots()%></td>
-      <td width='100' align='center'><%=worker.getFreeHeap()/1024/1024%>/<%=worker.getMaxHeap()/1024/1024%> MB</td>
-      <td width='100' align='right'><%=JSPUtil.getElapsedTime(worker.getLastHeartbeat(), System.currentTimeMillis())%></td>
-      <td width='100' align='center'><%=worker.getWorkerStatus()%></td>
+      <td><a href='<%=workerHttp%>'><%=resource.getAllocatedHost() + ":" + resource.getPeerRpcPort()%></a></td>
+      <td width='80' align='center'><%=resource.getPullServerPort()%></td>
+      <td width='100' align='right'><%=resource.getNumRunningTasks()%></td>
+      <td width='150' align='center'><%=resource.getUsedMemoryMB()%>/<%=resource.getMemoryMB()%></td>
+      <td width='100' align='center'><%=resource.getUsedDiskSlots()%>/<%=resource.getDiskSlots()%></td>
+      <td width='100' align='center'><%=resource.getFreeHeap()/1024/1024%>/<%=resource.getMaxHeap()/1024/1024%> MB</td>
+      <td width='100' align='right'><%=JSPUtil.getElapsedTime(resource.getLastHeartbeat(), System.currentTimeMillis())%></td>
+      <td width='100' align='center'><%=resource.getWorkerStatus()%></td>
     </tr>
 <%
     } //end fo for
@@ -194,16 +199,17 @@
     <tr><th>No</th><th>Worker</th><th>PullServer Port</th><th>Running Tasks</th><th>Memory Resource</th><th>Disk Resource</th></th><th>Heap(free/max)</th><th>Heartbeat</th><th>Status</th></tr>
 <%
       int no = 1;
-      for(WorkerResource worker: deadWorkers) {
+      for(Worker worker: deadWorkers) {
+        WorkerResource resource = worker.getResource();
 %>
     <tr>
       <td width='30' align='right'><%=no++%></td>
-      <td><%=worker.getAllocatedHost() + ":" + worker.getPeerRpcPort()%></td>
-      <td width='150' align='center'><%=worker.getPullServerPort()%></td>
-      <td width='100' align='right'><%=worker.getUsedMemoryMB()%>/<%=worker.getMemoryMB()%></td>
-      <td width='100' align='right'><%=worker.getUsedDiskSlots()%>/<%=worker.getDiskSlots()%></td>
-      <td width='100' align='left'><%=worker.getFreeHeap()/1024/1024%>/<%=worker.getMaxHeap()/1024/1024%> MB</td>
-      <td width='100' align='center'><%=worker.getWorkerStatus()%></td>
+      <td><%=resource.getAllocatedHost() + ":" + resource.getPeerRpcPort()%></td>
+      <td width='150' align='center'><%=resource.getPullServerPort()%></td>
+      <td width='100' align='right'><%=resource.getUsedMemoryMB()%>/<%=resource.getMemoryMB()%></td>
+      <td width='100' align='right'><%=resource.getUsedDiskSlots()%>/<%=resource.getDiskSlots()%></td>
+      <td width='100' align='left'><%=resource.getFreeHeap()/1024/1024%>/<%=resource.getMaxHeap()/1024/1024%> MB</td>
+      <td width='100' align='center'><%=worker.getState()%></td>
     </tr>
 <%
       } //end fo for

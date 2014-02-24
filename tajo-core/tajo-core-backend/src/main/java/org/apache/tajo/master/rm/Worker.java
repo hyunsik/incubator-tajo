@@ -29,7 +29,7 @@ import org.apache.hadoop.yarn.state.StateMachineFactory;
 import java.util.EnumSet;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-public class Worker implements EventHandler<WorkerEvent> {
+public class Worker implements EventHandler<WorkerEvent>, Comparable<Worker> {
 
   private static final Log LOG = LogFactory.getLog(Worker.class);
 
@@ -37,8 +37,11 @@ public class Worker implements EventHandler<WorkerEvent> {
   private final ReentrantReadWriteLock.WriteLock writeLock;
 
   private final String workerId;
+  private int httpPort;
 
   private WorkerResource resource;
+
+  private static final ReconnectNodeTransition RECONNECT_NODE_TRANSITION = new ReconnectNodeTransition();
 
   private static final StateMachineFactory<Worker,
       WorkerState,
@@ -59,7 +62,7 @@ public class Worker implements EventHandler<WorkerEvent> {
       .addTransition(WorkerState.RUNNING, WorkerState.LOST,
           WorkerEventType.EXPIRE, new DeactivateNodeTransition(WorkerState.LOST))
       .addTransition(WorkerState.RUNNING, WorkerState.RUNNING,
-          WorkerEventType.RECONNECTED, null)
+          WorkerEventType.RECONNECTED, RECONNECT_NODE_TRANSITION)
 
       // Transitions from UNHEALTHY state
       .addTransition(WorkerState.UNHEALTHY, EnumSet.of(WorkerState.RUNNING, WorkerState.UNHEALTHY),
@@ -67,7 +70,7 @@ public class Worker implements EventHandler<WorkerEvent> {
       .addTransition(WorkerState.UNHEALTHY, WorkerState.LOST,
           WorkerEventType.EXPIRE, new DeactivateNodeTransition(WorkerState.LOST))
       .addTransition(WorkerState.UNHEALTHY, WorkerState.UNHEALTHY,
-          WorkerEventType.RECONNECTED, null);
+          WorkerEventType.RECONNECTED, RECONNECT_NODE_TRANSITION);
 
   private final StateMachine<WorkerState, WorkerEventType, WorkerEvent> stateMachine =
       stateMachineFactory.make(this, WorkerState.NEW);
@@ -89,6 +92,14 @@ public class Worker implements EventHandler<WorkerEvent> {
     return workerId;
   }
 
+  public int getHttpPort() {
+    return httpPort;
+  }
+
+  public void setHttpPort(int port) {
+    this.httpPort = port;
+  }
+
   public WorkerState getState() {
     this.readLock.lock();
 
@@ -101,6 +112,14 @@ public class Worker implements EventHandler<WorkerEvent> {
 
   public WorkerResource getResource() {
     return this.resource;
+  }
+
+  @Override
+  public int compareTo(Worker o) {
+    if(o == null) {
+      return 1;
+    }
+    return getWorkerId().compareTo(o.getWorkerId());
   }
 
   public static class AddNodeTransition implements SingleArcTransition<Worker, WorkerEvent> {
@@ -124,21 +143,22 @@ public class Worker implements EventHandler<WorkerEvent> {
     @Override
     public void transition(Worker worker, WorkerEvent workerEvent) {
 
-      worker.rmContext.getWorkers().remove(worker);
+      worker.rmContext.getWorkers().remove(worker.getWorkerId());
       LOG.info("Deactivating Node " + worker.getWorkerId() + " as it is now " + finalState);
       worker.rmContext.getInactiveWorkers().putIfAbsent(worker.getWorkerId(), worker);
     }
   }
 
-  public static class ReconnectedNodeTransition implements SingleArcTransition<Worker, WorkerEvent> {
+  public static class ReconnectNodeTransition implements SingleArcTransition<Worker, WorkerEvent> {
 
     @Override
-    public void transition(Worker worker, ReconnectedWorkerEvent workerEvent) {
+    public void transition(Worker worker, WorkerEvent workerEvent) {
+      WorkerReconnectEvent castedEvent = (WorkerReconnectEvent) workerEvent;
 
-      worker.rmContext.getWorkers().remove(worker.getWorkerId());
-      worker.rmContext.getWorkers().put(worker.getWorkerId(), )
-      LOG.info("Deactivating Node " + worker.getWorkerId() + " as it is now " + finalState);
-      worker.rmContext.getInactiveWorkers().putIfAbsent(worker.getWorkerId(), worker);
+      Worker newWorker = castedEvent.getWorker();
+      worker.rmContext.getWorkers().put(castedEvent.getWorkerId(), newWorker);
+      worker.rmContext.getDispatcher().getEventHandler().handle(
+          new WorkerEvent(worker.getWorkerId(), WorkerEventType.STARTED));
     }
   }
 

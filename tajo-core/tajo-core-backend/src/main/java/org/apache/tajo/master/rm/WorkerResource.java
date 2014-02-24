@@ -44,7 +44,6 @@ public class WorkerResource implements Comparable<WorkerResource> {
   private int queryMasterPort;
   private int clientPort;
   private int pullServerPort;
-  private int httpPort;
 
   private float diskSlots;
   private int cpuCoreSlots;
@@ -274,14 +273,6 @@ public class WorkerResource implements Comparable<WorkerResource> {
 
   public void setPullServerPort(int pullServerPort) {
     this.pullServerPort = pullServerPort;
-  }
-
-  public int getHttpPort() {
-    return httpPort;
-  }
-
-  public void setHttpPort(int httpPort) {
-    this.httpPort = httpPort;
   }
 
   public long getMaxHeap() {

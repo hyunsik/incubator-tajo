@@ -89,6 +89,11 @@ public class YarnTajoResourceManager extends AbstractService implements WorkerRe
     return new HashMap<String, Worker>();
   }
 
+  @Override
+  public Map<String, Worker> getInactiveWorkers() {
+    return new HashMap<String, Worker>();
+  }
+
   public Collection<String> getQueryMasters() {
     return new ArrayList<String>();
   }

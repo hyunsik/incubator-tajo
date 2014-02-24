@@ -109,7 +109,7 @@ public class TajoConf extends Configuration {
     // Tajo Worker History
     WORKER_HISTORY_EXPIRE_PERIOD("tajo.worker.history.expire-interval-minutes", 12 * 60), // 12 hours
 
-    WORKER_HEARTBEAT_TIMEOUT("tajo.worker.heartbeat.timeout", 120 * 1000),  //120 sec
+    WORKER_HEARTBEAT_TIMEOUT("tajo.worker.heartbeat.timeout", 30 * 1000),  //120 sec
 
     // Resource Manager
     RESOURCE_MANAGER_CLASS("tajo.resource.manager", "org.apache.tajo.master.rm.TajoWorkerResourceManager"),

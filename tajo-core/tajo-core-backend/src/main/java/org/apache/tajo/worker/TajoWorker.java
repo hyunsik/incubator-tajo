@@ -63,6 +63,7 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -629,6 +630,8 @@ public class TajoWorker extends CompositeService {
           }
         } catch (InterruptedException e) {
           break;
+        } catch (TimeoutException te) {
+          LOG.warn("Heartbeat response is being delayed.");
         } catch (Exception e) {
           LOG.error(e.getMessage(), e);
         } finally {

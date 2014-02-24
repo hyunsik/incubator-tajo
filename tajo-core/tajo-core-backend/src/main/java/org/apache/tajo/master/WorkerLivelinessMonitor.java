@@ -18,6 +18,7 @@
 
 package org.apache.tajo.master;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
@@ -25,6 +26,7 @@ import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.util.AbstractLivelinessMonitor;
 import org.apache.hadoop.yarn.util.SystemClock;
+import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.master.rm.WorkerEventType;
 import org.apache.tajo.master.rm.WorkerEvent;
 
@@ -38,8 +40,9 @@ public class WorkerLivelinessMonitor extends AbstractLivelinessMonitor<String> {
   }
 
   public void serviceInit(Configuration conf) throws Exception {
-    int expireIntvl = conf.getInt(YarnConfiguration.RM_NM_EXPIRY_INTERVAL_MS,
-        YarnConfiguration.DEFAULT_RM_NM_EXPIRY_INTERVAL_MS);
+    Preconditions.checkArgument(conf instanceof TajoConf);
+    TajoConf systemConf = (TajoConf) conf;
+    int expireIntvl = systemConf.getIntVar(TajoConf.ConfVars.WORKER_HEARTBEAT_TIMEOUT);
     setExpireInterval(expireIntvl);
     setMonitorInterval(expireIntvl/3);
     super.serviceInit(conf);

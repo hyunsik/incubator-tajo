@@ -34,6 +34,7 @@
 <%
   TajoMaster master = (TajoMaster) StaticHttpServer.getInstance().getAttribute("tajo.info.server.object");
   Map<String, Worker> workers = master.getContext().getResourceManager().getWorkers2();
+  Map<String, Worker> inactiveWorkers = master.getContext().getResourceManager().getInactiveWorkers();
 
   int numWorkers = 0;
   int numLiveWorkers = 0;
@@ -50,17 +51,19 @@
           master.getContext().getResourceManager().getClusterResourceSummary();
 
   for(Worker eachWorker: workers.values()) {
-    if(eachWorker.getState() == WorkerState.RUNNING) {
-      if(eachWorker.getResource().isQueryMasterMode()) {
-        numQueryMasters++;
-        numLiveQueryMasters++;
-        runningQueryMasterTask += eachWorker.getResource().getNumQueryMasterTasks();
-      }
-      if(eachWorker.getResource().isTaskRunnerMode()) {
-        numWorkers++;
-        numLiveWorkers++;
-      }
-    } else if(eachWorker.getState() == WorkerState.LOST) {
+    if(eachWorker.getResource().isQueryMasterMode()) {
+      numQueryMasters++;
+      numLiveQueryMasters++;
+      runningQueryMasterTask += eachWorker.getResource().getNumQueryMasterTasks();
+    }
+    if(eachWorker.getResource().isTaskRunnerMode()) {
+      numWorkers++;
+      numLiveWorkers++;
+    }
+  }
+
+  for (Worker eachWorker : inactiveWorkers.values()) {
+    if (eachWorker.getState() == WorkerState.LOST) {
       if(eachWorker.getResource().isQueryMasterMode()) {
         numQueryMasters++;
         numDeadQueryMasters++;

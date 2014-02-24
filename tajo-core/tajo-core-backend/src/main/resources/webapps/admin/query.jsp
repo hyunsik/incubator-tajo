@@ -26,6 +26,7 @@
 <%@ page import="org.apache.tajo.master.querymaster.QueryInProgress" %>
 <%@ page import="java.text.SimpleDateFormat" %>
 <%@ page import="org.apache.tajo.master.rm.WorkerResource" %>
+<%@ page import="org.apache.tajo.master.rm.Worker" %>
 
 <%
   TajoMaster master = (TajoMaster) StaticHttpServer.getInstance().getAttribute("tajo.info.server.object");
@@ -38,14 +39,15 @@
 
   SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
-  Map<String, WorkerResource> workers = master.getContext().getResourceManager().getWorkers();
+  Map<String, Worker> workers = master.getContext().getResourceManager().getWorkers2();
   Map<String, Integer> portMap = new HashMap<String, Integer>();
 
   Collection<String> queryMasters = master.getContext().getResourceManager().getQueryMasters();
   for(String eachQueryMasterKey: queryMasters) {
-    WorkerResource queryMaster = workers.get(eachQueryMasterKey);
+    Worker queryMaster = workers.get(eachQueryMasterKey);
     if(queryMaster != null) {
-      portMap.put(queryMaster.getAllocatedHost(), queryMaster.getHttpPort());
+      WorkerResource resource = queryMaster.getResource();
+      portMap.put(resource.getAllocatedHost(), queryMaster.getHttpPort());
     }
   }
 %>

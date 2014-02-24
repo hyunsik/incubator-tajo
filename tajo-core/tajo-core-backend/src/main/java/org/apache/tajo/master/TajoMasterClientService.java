@@ -335,14 +335,14 @@ public class TajoMasterClientService extends AbstractService {
         workerBuilder.setUsedMemoryMB(workerResource.getUsedMemoryMB());
         workerBuilder.setUsedCpuCoreSlots(workerResource.getUsedCpuCoreSlots());
         workerBuilder.setUsedDiskSlots(workerResource.getUsedDiskSlots());
-        workerBuilder.setWorkerStatus(workerResource.getWorkerStatus().toString());
+        workerBuilder.setWorkerStatus(worker.getState().toString());
         workerBuilder.setQueryMasterMode(workerResource.isQueryMasterMode());
         workerBuilder.setTaskRunnerMode(workerResource.isTaskRunnerMode());
         workerBuilder.setPeerRpcPort(workerResource.getPeerRpcPort());
         workerBuilder.setQueryMasterPort(workerResource.getQueryMasterPort());
         workerBuilder.setClientPort(workerResource.getClientPort());
         workerBuilder.setPullServerPort(workerResource.getPullServerPort());
-        workerBuilder.setHttpPort(workerResource.getHttpPort());
+        workerBuilder.setHttpPort(worker.getHttpPort());
         workerBuilder.setMaxHeap(workerResource.getMaxHeap());
         workerBuilder.setFreeHeap(workerResource.getFreeHeap());
         workerBuilder.setTotalHeap(workerResource.getTotalHeap());
