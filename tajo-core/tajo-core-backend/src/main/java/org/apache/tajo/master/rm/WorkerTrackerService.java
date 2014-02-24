@@ -31,6 +31,7 @@ import org.apache.tajo.ipc.TajoMasterProtocol;
 import org.apache.tajo.rpc.AsyncRpcServer;
 import org.apache.tajo.util.NetUtils;
 
+import java.io.IOError;
 import java.net.InetSocketAddress;
 
 import static org.apache.tajo.ipc.NodeResourceTracker.NodeResourceTrackerService;
@@ -63,6 +64,7 @@ public class WorkerTrackerService extends AbstractService {
       server = new AsyncRpcServer(NodeResourceTracker.class, heartbeatService, initIsa, 3);
     } catch (Exception e) {
       LOG.error(e);
+      throw new IOError(e);
     }
     server.start();
     bindAddress = NetUtils.getConnectAddress(server.getListenAddress());
