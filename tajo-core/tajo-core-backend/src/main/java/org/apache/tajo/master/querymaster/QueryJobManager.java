@@ -30,6 +30,7 @@ import org.apache.tajo.engine.planner.logical.LogicalRootNode;
 import org.apache.tajo.engine.query.QueryContext;
 import org.apache.tajo.ipc.TajoMasterProtocol;
 import org.apache.tajo.master.TajoMaster;
+import org.apache.tajo.master.rm.Worker;
 import org.apache.tajo.master.rm.WorkerResource;
 
 import java.util.Collection;
@@ -171,13 +172,14 @@ public class QueryJobManager extends CompositeService {
   private QueryInfo makeQueryInfoFromHeartbeat(TajoMasterProtocol.TajoHeartbeat queryHeartbeat) {
     QueryInfo queryInfo = new QueryInfo(new QueryId(queryHeartbeat.getQueryId()));
     if(queryHeartbeat.getTajoWorkerHost() != null) {
-      WorkerResource queryMasterResource = new WorkerResource();
-      queryMasterResource.setAllocatedHost(queryHeartbeat.getTajoWorkerHost());
-      queryMasterResource.setPeerRpcPort(queryHeartbeat.getPeerRpcPort());
-      queryMasterResource.setQueryMasterPort(queryHeartbeat.getTajoQueryMasterPort());
-      queryMasterResource.setClientPort(queryHeartbeat.getTajoWorkerClientPort());
-      queryMasterResource.setPullServerPort(queryHeartbeat.getTajoWorkerPullServerPort());
-      queryInfo.setQueryMasterResource(queryMasterResource);
+
+      Worker worker = new Worker(null, null);
+      worker.setAllocatedHost(queryHeartbeat.getTajoWorkerHost());
+      worker.setPeerRpcPort(queryHeartbeat.getPeerRpcPort());
+      worker.setQueryMasterPort(queryHeartbeat.getTajoQueryMasterPort());
+      worker.setClientPort(queryHeartbeat.getTajoWorkerClientPort());
+      worker.setPullServerPort(queryHeartbeat.getTajoWorkerPullServerPort());
+      queryInfo.setQueryMasterResource(worker);
     }
     queryInfo.setLastMessage(queryHeartbeat.getStatusMessage());
     queryInfo.setQueryState(queryHeartbeat.getState());

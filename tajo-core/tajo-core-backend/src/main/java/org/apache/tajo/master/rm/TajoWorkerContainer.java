@@ -23,13 +23,13 @@ import org.apache.hadoop.yarn.api.records.*;
 public class TajoWorkerContainer extends Container {
   ContainerId id;
   NodeId nodeId;
-  WorkerResource workerResource;
+  Worker workerResource;
 
-  public WorkerResource getWorkerResource() {
+  public Worker getWorkerResource() {
     return workerResource;
   }
 
-  public void setWorkerResource(WorkerResource workerResource) {
+  public void setWorkerResource(Worker workerResource) {
     this.workerResource = workerResource;
   }
 
@@ -55,12 +55,12 @@ public class TajoWorkerContainer extends Container {
 
   @Override
   public String getNodeHttpAddress() {
-    return null;  //To change body of implemented methods use File | Settings | File Templates.
+    return null;
   }
 
   @Override
   public void setNodeHttpAddress(String nodeHttpAddress) {
-    //To change body of implemented methods use File | Settings | File Templates.
+
   }
 
   @Override

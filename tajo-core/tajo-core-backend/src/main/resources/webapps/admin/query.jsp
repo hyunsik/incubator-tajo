@@ -39,15 +39,14 @@
 
   SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
-  Map<String, Worker> workers = master.getContext().getResourceManager().getWorkers2();
+  Map<String, Worker> workers = master.getContext().getResourceManager().getWorkers();
   Map<String, Integer> portMap = new HashMap<String, Integer>();
 
   Collection<String> queryMasters = master.getContext().getResourceManager().getQueryMasters();
   for(String eachQueryMasterKey: queryMasters) {
     Worker queryMaster = workers.get(eachQueryMasterKey);
     if(queryMaster != null) {
-      WorkerResource resource = queryMaster.getResource();
-      portMap.put(resource.getAllocatedHost(), queryMaster.getHttpPort());
+      portMap.put(queryMaster.getAllocatedHost(), queryMaster.getHttpPort());
     }
   }
 %>

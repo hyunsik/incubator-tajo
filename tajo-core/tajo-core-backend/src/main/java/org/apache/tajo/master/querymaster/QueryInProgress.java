@@ -35,6 +35,7 @@ import org.apache.tajo.ipc.QueryMasterProtocol.QueryMasterProtocolService;
 import org.apache.tajo.ipc.TajoWorkerProtocol;
 import org.apache.tajo.master.TajoAsyncDispatcher;
 import org.apache.tajo.master.TajoMaster;
+import org.apache.tajo.master.rm.Worker;
 import org.apache.tajo.master.rm.WorkerResource;
 import org.apache.tajo.master.rm.WorkerResourceManager;
 import org.apache.tajo.rpc.NettyClientBase;
@@ -150,12 +151,12 @@ public class QueryInProgress extends CompositeService {
     try {
       LOG.info("Initializing QueryInProgress for QueryID=" + queryId);
       WorkerResourceManager resourceManager = masterContext.getResourceManager();
-      WorkerResource queryMasterResource = resourceManager.allocateQueryMaster(this);
+      Worker worker = resourceManager.allocateQueryMaster(this);
 
-      if(queryMasterResource == null) {
+      if(worker == null) {
         return false;
       }
-      queryInfo.setQueryMasterResource(queryMasterResource);
+      queryInfo.setQueryMasterResource(worker);
       getEventHandler().handle(new QueryJobEvent(QueryJobEvent.Type.QUERY_MASTER_START, queryInfo));
 
       return true;

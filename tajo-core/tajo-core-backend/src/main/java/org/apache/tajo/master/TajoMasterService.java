@@ -161,7 +161,7 @@ public class TajoMasterService extends AbstractService {
 
       TajoMasterProtocol.WorkerResourcesRequest.Builder builder =
           TajoMasterProtocol.WorkerResourcesRequest.newBuilder();
-      Collection<Worker> workers = context.getResourceManager().getWorkers2().values();
+      Collection<Worker> workers = context.getResourceManager().getWorkers().values();
 
       for(Worker worker: workers) {
         WorkerResource resource = worker.getResource();
@@ -169,13 +169,13 @@ public class TajoMasterService extends AbstractService {
         TajoMasterProtocol.WorkerResourceProto.Builder workerResource =
             TajoMasterProtocol.WorkerResourceProto.newBuilder();
 
-        workerResource.setHost(resource.getAllocatedHost());
-        workerResource.setPeerRpcPort(resource.getPeerRpcPort());
+        workerResource.setHost(worker.getAllocatedHost());
+        workerResource.setPeerRpcPort(worker.getPeerRpcPort());
         workerResource.setInfoPort(worker.getHttpPort());
-        workerResource.setQueryMasterPort(resource.getQueryMasterPort());
+        workerResource.setQueryMasterPort(worker.getQueryMasterPort());
         workerResource.setMemoryMB(resource.getMemoryMB());
         workerResource.setDiskSlots(resource.getDiskSlots());
-        workerResource.setQueryMasterPort(resource.getQueryMasterPort());
+        workerResource.setQueryMasterPort(worker.getQueryMasterPort());
 
         builder.addWorkerResources(workerResource);
       }

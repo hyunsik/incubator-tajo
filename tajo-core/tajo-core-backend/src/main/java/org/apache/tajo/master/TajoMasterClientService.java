@@ -317,7 +317,7 @@ public class TajoMasterClientService extends AbstractService {
       GetClusterInfoResponse.Builder builder
         = GetClusterInfoResponse.newBuilder(); 
        
-      Map<String, Worker> workers = context.getResourceManager().getWorkers2();
+      Map<String, Worker> workers = context.getResourceManager().getWorkers();
 
       List<String> wokerKeys = new ArrayList<String>(workers.keySet());
       Collections.sort(wokerKeys);
@@ -327,7 +327,7 @@ public class TajoMasterClientService extends AbstractService {
 
       for(Worker worker: workers.values()) {
         WorkerResource workerResource = worker.getResource();
-        workerBuilder.setAllocatedHost(workerResource.getAllocatedHost());
+        workerBuilder.setAllocatedHost(worker.getAllocatedHost());
         workerBuilder.setDiskSlots(workerResource.getDiskSlots());
         workerBuilder.setCpuCoreSlots(workerResource.getCpuCoreSlots());
         workerBuilder.setMemoryMB(workerResource.getMemoryMB());
@@ -338,10 +338,10 @@ public class TajoMasterClientService extends AbstractService {
         workerBuilder.setWorkerStatus(worker.getState().toString());
         workerBuilder.setQueryMasterMode(workerResource.isQueryMasterMode());
         workerBuilder.setTaskRunnerMode(workerResource.isTaskRunnerMode());
-        workerBuilder.setPeerRpcPort(workerResource.getPeerRpcPort());
-        workerBuilder.setQueryMasterPort(workerResource.getQueryMasterPort());
-        workerBuilder.setClientPort(workerResource.getClientPort());
-        workerBuilder.setPullServerPort(workerResource.getPullServerPort());
+        workerBuilder.setPeerRpcPort(worker.getPeerRpcPort());
+        workerBuilder.setQueryMasterPort(worker.getQueryMasterPort());
+        workerBuilder.setClientPort(worker.getClientPort());
+        workerBuilder.setPullServerPort(worker.getPullServerPort());
         workerBuilder.setHttpPort(worker.getHttpPort());
         workerBuilder.setMaxHeap(workerResource.getMaxHeap());
         workerBuilder.setFreeHeap(workerResource.getFreeHeap());

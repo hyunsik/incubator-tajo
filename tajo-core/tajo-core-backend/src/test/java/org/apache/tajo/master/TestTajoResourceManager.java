@@ -42,21 +42,22 @@ public class TestTajoResourceManager {
   private final PrimitiveProtos.BoolProto BOOL_FALSE = PrimitiveProtos.BoolProto.newBuilder().setValue(false).build();
 
   TajoConf tajoConf;
-  TajoWorkerResourceManager tajoWorkerResourceManager;
+
   long queryIdTime = System.currentTimeMillis();
   int numWorkers = 5;
   float workerDiskSlots = 5.0f;
   int workerMemoryMB = 512 * 10;
   WorkerResourceAllocationResponse response;
 
-  private void initResourceManager(boolean queryMasterMode) throws Exception {
+  private TajoWorkerResourceManager initResourceManager(boolean queryMasterMode) throws Exception {
     tajoConf = new org.apache.tajo.conf.TajoConf();
 
     tajoConf.setFloatVar(TajoConf.ConfVars.TAJO_QUERYMASTER_DISK_SLOT, 0.0f);
     tajoConf.setIntVar(TajoConf.ConfVars.TAJO_QUERYMASTER_MEMORY_MB, 512);
 
-    tajoWorkerResourceManager = new TajoWorkerResourceManager(tajoConf);
+    TajoWorkerResourceManager tajoWorkerResourceManager = new TajoWorkerResourceManager(tajoConf);
     tajoWorkerResourceManager.init(tajoConf);
+    tajoWorkerResourceManager.start();
 
     for(int i = 0; i < numWorkers; i++) {
       ServerStatusProto.System system = ServerStatusProto.System.newBuilder()
@@ -105,23 +106,26 @@ public class TestTajoResourceManager {
 
       tajoWorkerResourceManager.workerHeartbeat(tajoHeartbeat);
     }
+
+    return tajoWorkerResourceManager;
   }
 
 
   @Test
   public void testHeartbeat() throws Exception {
-    initResourceManager(false);
-    assertEquals(numWorkers, tajoWorkerResourceManager.getWorkers2().size());
-    for(Worker worker: tajoWorkerResourceManager.getWorkers2().values()) {
+    TajoWorkerResourceManager tajoWorkerResourceManager = initResourceManager(false);
+    assertEquals(numWorkers, tajoWorkerResourceManager.getWorkers().size());
+    for(Worker worker: tajoWorkerResourceManager.getWorkers().values()) {
       WorkerResource resource = worker.getResource();
       assertEquals(workerMemoryMB, resource.getAvailableMemoryMB());
       assertEquals(workerDiskSlots, resource.getAvailableDiskSlots(), 0);
     }
+    tajoWorkerResourceManager.stop();
   }
 
   @Test
   public void testMemoryResource() throws Exception {
-    initResourceManager(false);
+    TajoWorkerResourceManager tajoWorkerResourceManager = initResourceManager(false);
 
     final int minMemory = 256;
     final int maxMemory = 512;
@@ -165,7 +169,7 @@ public class TestTajoResourceManager {
     int totalUsedMemory = 0;
     int totalUsedDisks = 0;
 
-    for(Worker worker: tajoWorkerResourceManager.getWorkers2().values()) {
+    for(Worker worker: tajoWorkerResourceManager.getWorkers().values()) {
       WorkerResource resource = worker.getResource();
       assertEquals(0, resource.getAvailableMemoryMB());
       assertEquals(0, resource.getAvailableDiskSlots(), 0);
@@ -190,7 +194,7 @@ public class TestTajoResourceManager {
       tajoWorkerResourceManager.releaseWorkerResource(ebId, eachContainerId);
     }
 
-    for(Worker worker: tajoWorkerResourceManager.getWorkers2().values()) {
+    for(Worker worker: tajoWorkerResourceManager.getWorkers().values()) {
       WorkerResource resource = worker.getResource();
       assertEquals(workerMemoryMB, resource.getAvailableMemoryMB());
       assertEquals(0, resource.getUsedMemoryMB());
@@ -198,11 +202,13 @@ public class TestTajoResourceManager {
       assertEquals(workerDiskSlots, resource.getAvailableDiskSlots(), 0);
       assertEquals(0.0f, resource.getUsedDiskSlots(), 0);
     }
+
+    tajoWorkerResourceManager.stop();
   }
 
   @Test
   public void testMemoryNotCommensurable() throws Exception {
-    initResourceManager(false);
+    TajoWorkerResourceManager tajoWorkerResourceManager = initResourceManager(false);
 
     final int minMemory = 200;
     final int maxMemory = 500;
@@ -253,7 +259,7 @@ public class TestTajoResourceManager {
         tajoWorkerResourceManager.releaseWorkerResource(ebId, eachResource.getContainerId());
       }
 
-      for(Worker worker: tajoWorkerResourceManager.getWorkers2().values()) {
+      for(Worker worker: tajoWorkerResourceManager.getWorkers().values()) {
         WorkerResource resource = worker.getResource();
         assertEquals(0, resource.getUsedMemoryMB());
         assertEquals(workerMemoryMB, resource.getAvailableMemoryMB());
@@ -270,7 +276,7 @@ public class TestTajoResourceManager {
       }
     }
 
-    for(Worker worker: tajoWorkerResourceManager.getWorkers2().values()) {
+    for(Worker worker: tajoWorkerResourceManager.getWorkers().values()) {
       WorkerResource resource = worker.getResource();
       assertEquals(0, resource.getUsedMemoryMB());
       assertEquals(workerMemoryMB, resource.getAvailableMemoryMB());
@@ -278,11 +284,13 @@ public class TestTajoResourceManager {
       assertEquals(0.0f, resource.getUsedDiskSlots(), 0);
       assertEquals(workerDiskSlots, resource.getAvailableDiskSlots(), 0);
     }
+
+    tajoWorkerResourceManager.stop();
   }
 
   @Test
   public void testDiskResource() throws Exception {
-    initResourceManager(false);
+    TajoWorkerResourceManager tajoWorkerResourceManager = initResourceManager(false);
     final float minDiskSlots = 1.0f;
     final float maxDiskSlots = 2.0f;
     int memoryMB = 256;
@@ -328,7 +336,7 @@ public class TestTajoResourceManager {
 
     // assert after callback
     int totalUsedDisks = 0;
-    for(Worker worker: tajoWorkerResourceManager.getWorkers2().values()) {
+    for(Worker worker: tajoWorkerResourceManager.getWorkers().values()) {
       WorkerResource resource = worker.getResource();
       //each worker allocated 3 container (2 disk slot = 2, 1 disk slot = 1)
       assertEquals(0, resource.getAvailableDiskSlots(), 0);
@@ -346,7 +354,7 @@ public class TestTajoResourceManager {
       tajoWorkerResourceManager.releaseWorkerResource(ebId, eachContainerId);
     }
 
-    for(Worker worker: tajoWorkerResourceManager.getWorkers2().values()) {
+    for(Worker worker: tajoWorkerResourceManager.getWorkers().values()) {
       WorkerResource resource = worker.getResource();
       assertEquals(workerMemoryMB, resource.getAvailableMemoryMB());
       assertEquals(0, resource.getUsedMemoryMB());
@@ -354,11 +362,13 @@ public class TestTajoResourceManager {
       assertEquals(workerDiskSlots, resource.getAvailableDiskSlots(), 0);
       assertEquals(0.0f, resource.getUsedDiskSlots(), 0);
     }
+
+    tajoWorkerResourceManager.stop();
   }
 
   @Test
   public void testQueryMasterResource() throws Exception {
-    initResourceManager(true);
+    TajoWorkerResourceManager tajoWorkerResourceManager = initResourceManager(true);
 
     int qmDefaultMemoryMB = tajoConf.getIntVar(TajoConf.ConfVars.TAJO_QUERYMASTER_MEMORY_MB);
     float qmDefaultDiskSlots = tajoConf.getFloatVar(TajoConf.ConfVars.TAJO_QUERYMASTER_DISK_SLOT);
@@ -370,7 +380,7 @@ public class TestTajoResourceManager {
     // assert after callback
     int totalUsedMemory = 0;
     int totalUsedDisks = 0;
-    for(Worker worker: tajoWorkerResourceManager.getWorkers2().values()) {
+    for(Worker worker: tajoWorkerResourceManager.getWorkers().values()) {
       WorkerResource resource = worker.getResource();
       if(resource.getUsedMemoryMB() > 0) {
         //worker which allocated querymaster
@@ -390,7 +400,7 @@ public class TestTajoResourceManager {
 
     //release
     tajoWorkerResourceManager.stopQueryMaster(queryId);
-    for(Worker worker: tajoWorkerResourceManager.getWorkers2().values()) {
+    for(Worker worker: tajoWorkerResourceManager.getWorkers().values()) {
       WorkerResource resource = worker.getResource();
       assertEquals(0, resource.getUsedMemoryMB());
       assertEquals(0, resource.getUsedDiskSlots(), 0);

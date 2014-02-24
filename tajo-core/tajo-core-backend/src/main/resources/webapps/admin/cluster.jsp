@@ -29,7 +29,7 @@
 
 <%
   TajoMaster master = (TajoMaster) StaticHttpServer.getInstance().getAttribute("tajo.info.server.object");
-  Map<String, Worker> workers = master.getContext().getResourceManager().getWorkers2();
+  Map<String, Worker> workers = master.getContext().getResourceManager().getWorkers();
   List<String> wokerKeys = new ArrayList<String>(workers.keySet());
   Collections.sort(wokerKeys);
 
@@ -98,16 +98,16 @@
     int no = 1;
     for(Worker queryMaster: liveQueryMasters) {
       WorkerResource resource = queryMaster.getResource();
-          String queryMasterHttp = "http://" + resource.getAllocatedHost() + ":" + queryMaster.getHttpPort() + "/index.jsp";
+          String queryMasterHttp = "http://" + queryMaster.getAllocatedHost() + ":" + queryMaster.getHttpPort() + "/index.jsp";
 %>
     <tr>
       <td width='30' align='right'><%=no++%></td>
-      <td><a href='<%=queryMasterHttp%>'><%=resource.getAllocatedHost() + ":" + resource.getQueryMasterPort()%></a></td>
-      <td width='100' align='center'><%=resource.getClientPort()%></td>
+      <td><a href='<%=queryMasterHttp%>'><%=queryMaster.getAllocatedHost() + ":" + queryMaster.getQueryMasterPort()%></a></td>
+      <td width='100' align='center'><%=queryMaster.getClientPort()%></td>
       <td width='200' align='right'><%=resource.getNumQueryMasterTasks()%></td>
       <td width='200' align='center'><%=resource.getFreeHeap()/1024/1024%>/<%=resource.getMaxHeap()/1024/1024%> MB</td>
       <td width='100' align='right'><%=JSPUtil.getElapsedTime(resource.getLastHeartbeat(), System.currentTimeMillis())%></td>
-      <td width='100' align='center'><%=resource.getWorkerStatus()%></td>
+      <td width='100' align='center'><%=queryMaster.getState()%></td>
     </tr>
 <%
     } //end fo for
@@ -133,8 +133,8 @@
 %>
     <tr>
       <td width='30' align='right'><%=no++%></td>
-      <td><%=resource.getAllocatedHost() + ":" + resource.getQueryMasterPort()%></td>
-      <td><%=resource.getClientPort()%></td>
+      <td><%=queryMaster.getAllocatedHost() + ":" + queryMaster.getQueryMasterPort()%></td>
+      <td><%=queryMaster.getClientPort()%></td>
       <td align='center'><%=queryMaster.getState()%></td>
     </tr>
 <%
@@ -162,18 +162,18 @@
     int no = 1;
     for(Worker worker: liveWorkers) {
       WorkerResource resource = worker.getResource();
-          String workerHttp = "http://" + resource.getAllocatedHost() + ":" + worker.getHttpPort() + "/index.jsp";
+          String workerHttp = "http://" + worker.getAllocatedHost() + ":" + worker.getHttpPort() + "/index.jsp";
 %>
     <tr>
       <td width='30' align='right'><%=no++%></td>
-      <td><a href='<%=workerHttp%>'><%=resource.getAllocatedHost() + ":" + resource.getPeerRpcPort()%></a></td>
-      <td width='80' align='center'><%=resource.getPullServerPort()%></td>
+      <td><a href='<%=workerHttp%>'><%=worker.getAllocatedHost() + ":" + worker.getPeerRpcPort()%></a></td>
+      <td width='80' align='center'><%=worker.getPullServerPort()%></td>
       <td width='100' align='right'><%=resource.getNumRunningTasks()%></td>
       <td width='150' align='center'><%=resource.getUsedMemoryMB()%>/<%=resource.getMemoryMB()%></td>
       <td width='100' align='center'><%=resource.getUsedDiskSlots()%>/<%=resource.getDiskSlots()%></td>
       <td width='100' align='center'><%=resource.getFreeHeap()/1024/1024%>/<%=resource.getMaxHeap()/1024/1024%> MB</td>
       <td width='100' align='right'><%=JSPUtil.getElapsedTime(resource.getLastHeartbeat(), System.currentTimeMillis())%></td>
-      <td width='100' align='center'><%=resource.getWorkerStatus()%></td>
+      <td width='100' align='center'><%=worker.getState()%></td>
     </tr>
 <%
     } //end fo for
@@ -204,8 +204,8 @@
 %>
     <tr>
       <td width='30' align='right'><%=no++%></td>
-      <td><%=resource.getAllocatedHost() + ":" + resource.getPeerRpcPort()%></td>
-      <td width='150' align='center'><%=resource.getPullServerPort()%></td>
+      <td><%=worker.getAllocatedHost() + ":" + worker.getPeerRpcPort()%></td>
+      <td width='150' align='center'><%=worker.getPullServerPort()%></td>
       <td width='100' align='right'><%=resource.getUsedMemoryMB()%>/<%=resource.getMemoryMB()%></td>
       <td width='100' align='right'><%=resource.getUsedDiskSlots()%>/<%=resource.getDiskSlots()%></td>
       <td width='100' align='left'><%=resource.getFreeHeap()/1024/1024%>/<%=resource.getMaxHeap()/1024/1024%> MB</td>

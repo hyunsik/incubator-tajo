@@ -62,7 +62,7 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
 
   private WorkerRMContext rmContext;
 
-  private Map<QueryId, WorkerResource> queryMasterMap = new HashMap<QueryId, WorkerResource>();
+  private Map<QueryId, Worker> queryMasterMap = Maps.newHashMap();
 
   private final Object workerResourceLock = new Object();
 
@@ -149,16 +149,8 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
     }
   }
 
-  public Map<String, WorkerResource> getWorkers() {
-    Map<String, WorkerResource> map = Maps.newHashMap();
-    for (Map.Entry<String, Worker> entry : rmContext.getWorkers().entrySet()) {
-      map.put(entry.getKey(), entry.getValue().getResource());
-    }
-    return map;
-  }
-
   @Override
-  public Map<String, Worker> getWorkers2() {
+  public Map<String, Worker> getWorkers() {
     return ImmutableMap.copyOf(rmContext.getWorkers());
   }
 
@@ -223,46 +215,46 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
   }
 
   @Override
-  public WorkerResource allocateQueryMaster(QueryInProgress queryInProgress) {
+  public Worker allocateQueryMaster(QueryInProgress queryInProgress) {
     return allocateQueryMaster(queryInProgress.getQueryId());
   }
 
-  public WorkerResource allocateQueryMaster(QueryId queryId) {
+  public Worker allocateQueryMaster(QueryId queryId) {
     synchronized(workerResourceLock) {
       if(rmContext.getQueryMasterWorker().size() == 0) {
         LOG.warn("No available resource for querymaster:" + queryId);
         return null;
       }
-      WorkerResource queryMasterWorker = null;
+      Worker chosen = null;
       int minTasks = Integer.MAX_VALUE;
       for(String eachQueryMaster: rmContext.getQueryMasterWorker()) {
         Worker worker = rmContext.getWorkers().get(eachQueryMaster);
         WorkerResource resourceOfQueryMaster = worker.getResource();
         if(resourceOfQueryMaster != null && resourceOfQueryMaster.getNumQueryMasterTasks() < minTasks) {
-          queryMasterWorker = resourceOfQueryMaster;
+          chosen = worker;
           minTasks = resourceOfQueryMaster.getNumQueryMasterTasks();
         }
       }
-      if(queryMasterWorker == null) {
+      if(chosen == null) {
         return null;
       }
-      queryMasterWorker.addNumQueryMasterTask(queryMasterDefaultDiskSlot, queryMasterDefaultMemoryMB);
-      queryMasterMap.put(queryId, queryMasterWorker);
-      LOG.info(queryId + "'s QueryMaster is " + queryMasterWorker);
-      return queryMasterWorker;
+      chosen.getResource().addNumQueryMasterTask(queryMasterDefaultDiskSlot, queryMasterDefaultMemoryMB);
+      queryMasterMap.put(queryId, chosen);
+      LOG.info(queryId + "'s QueryMaster is " + chosen.getResource());
+      return chosen;
     }
   }
 
   @Override
   public void startQueryMaster(QueryInProgress queryInProgress) {
-    WorkerResource queryMasterWorkerResource = null;
+    Worker queryMasterWorker = null;
     synchronized(workerResourceLock) {
-      queryMasterWorkerResource = queryMasterMap.get(queryInProgress.getQueryId());
+      queryMasterWorker = queryMasterMap.get(queryInProgress.getQueryId());
     }
 
-    if(queryMasterWorkerResource != null) {
+    if(queryMasterWorker != null) {
       AllocatedWorkerResource allocatedWorkerResource = new AllocatedWorkerResource();
-      allocatedWorkerResource.workerResource = queryMasterWorkerResource;
+      allocatedWorkerResource.worker = queryMasterWorker;
       allocatedWorkerResource.allocatedMemoryMB = queryMasterDefaultMemoryMB;
       allocatedWorkerResource.allocatedDiskSlots = queryMasterDefaultDiskSlot;
 
@@ -292,7 +284,7 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
       LOG.warn("No QueryInProgress while starting  QueryMaster:" + queryId);
       return;
     }
-    queryInProgress.getQueryInfo().setQueryMasterResource(workResource.workerResource);
+    queryInProgress.getQueryInfo().setQueryMasterResource(workResource.worker);
 
     //fire QueryJobStart event
     queryInProgress.getEventHandler().handle(
@@ -338,7 +330,7 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
   }
 
   static class AllocatedWorkerResource {
-    WorkerResource workerResource;
+    Worker worker;
     int allocatedMemoryMB;
     float allocatedDiskSlots;
   }
@@ -373,8 +365,8 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
                   new ArrayList<TajoMasterProtocol.WorkerAllocatedResource>();
 
               for(AllocatedWorkerResource eachWorker: allocatedWorkerResources) {
-                NodeId nodeId = NodeId.newInstance(eachWorker.workerResource.getAllocatedHost(),
-                    eachWorker.workerResource.getPeerRpcPort());
+                NodeId nodeId = NodeId.newInstance(eachWorker.worker.getAllocatedHost(),
+                    eachWorker.worker.getPeerRpcPort());
 
                 TajoWorkerContainerId containerId = new TajoWorkerContainerId();
 
@@ -386,10 +378,10 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
                 allocatedResources.add(TajoMasterProtocol.WorkerAllocatedResource.newBuilder()
                     .setContainerId(containerIdProto)
                     .setNodeId(nodeId.toString())
-                    .setWorkerHost(eachWorker.workerResource.getAllocatedHost())
-                    .setQueryMasterPort(eachWorker.workerResource.getQueryMasterPort())
-                    .setPeerRpcPort(eachWorker.workerResource.getPeerRpcPort())
-                    .setWorkerPullServerPort(eachWorker.workerResource.getPullServerPort())
+                    .setWorkerHost(eachWorker.worker.getAllocatedHost())
+                    .setQueryMasterPort(eachWorker.worker.getQueryMasterPort())
+                    .setPeerRpcPort(eachWorker.worker.getPeerRpcPort())
+                    .setWorkerPullServerPort(eachWorker.worker.getPullServerPort())
                     .setAllocatedMemoryMB(eachWorker.allocatedMemoryMB)
                     .setAllocatedDiskSlots(eachWorker.allocatedDiskSlots)
                     .build());
@@ -430,10 +422,10 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
     int allocatedResources = 0;
 
     if(resourceRequest.queryMasterRequest) {
-      WorkerResource worker = allocateQueryMaster(resourceRequest.queryId);
+      Worker worker = allocateQueryMaster(resourceRequest.queryId);
       if(worker != null) {
         AllocatedWorkerResource allocatedWorkerResource = new AllocatedWorkerResource();
-        allocatedWorkerResource.workerResource = worker;
+        allocatedWorkerResource.worker = worker;
         allocatedWorkerResource.allocatedDiskSlots = queryMasterDefaultDiskSlot;
         allocatedWorkerResource.allocatedMemoryMB = queryMasterDefaultMemoryMB;
         selectedWorkers.add(allocatedWorkerResource);
@@ -494,7 +486,7 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
                 workerMemory = workerResource.getAvailableMemoryMB();
               }
               AllocatedWorkerResource allocatedWorkerResource = new AllocatedWorkerResource();
-              allocatedWorkerResource.workerResource = workerResource;
+              allocatedWorkerResource.worker = worker;
               allocatedWorkerResource.allocatedMemoryMB = workerMemory;
               if(workerResource.getAvailableDiskSlots() >= diskSlot) {
                 allocatedWorkerResource.allocatedDiskSlots = diskSlot;
@@ -563,7 +555,7 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
                 workerDiskSlots = workerResource.getAvailableDiskSlots();
               }
               AllocatedWorkerResource allocatedWorkerResource = new AllocatedWorkerResource();
-              allocatedWorkerResource.workerResource = workerResource;
+              allocatedWorkerResource.worker = worker;
               allocatedWorkerResource.allocatedDiskSlots = workerDiskSlots;
 
               if(workerResource.getAvailableMemoryMB() >= memoryMB) {
@@ -594,7 +586,7 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
       if(allocatedWorkerResource != null) {
         LOG.info("Release Resource:" + ebId + "," +
             allocatedWorkerResource.allocatedDiskSlots + "," + allocatedWorkerResource.allocatedMemoryMB);
-        allocatedWorkerResource.workerResource.releaseResource(
+        allocatedWorkerResource.worker.getResource().releaseResource(
             allocatedWorkerResource.allocatedDiskSlots, allocatedWorkerResource.allocatedMemoryMB);
       } else {
         LOG.warn("No AllocatedWorkerResource data for [" + ebId + "," + containerId + "]");
@@ -622,8 +614,8 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
         LOG.warn("No QueryMaster resource info for " + queryId);
         return;
       } else {
-        queryMasterWorkerResource = queryMasterMap.remove(queryId);
-        queryMasterWorkerResource.releaseQueryMasterTask(queryMasterDefaultDiskSlot, queryMasterDefaultMemoryMB);
+        Worker worker = queryMasterMap.remove(queryId);
+        worker.getResource().releaseQueryMasterTask(queryMasterDefaultDiskSlot, queryMasterDefaultMemoryMB);
       }
     }
 
@@ -678,7 +670,6 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
 
   private void updateWorkerResource(WorkerResource resource, TajoMasterProtocol.TajoHeartbeat request) {
     resource.setLastHeartbeat(System.currentTimeMillis());
-    resource.setWorkerStatus(WorkerStatus.LIVE);
     resource.setNumRunningTasks(request.getServerStatus().getRunningTaskNum());
     resource.setMaxHeap(request.getServerStatus().getJvmHeap().getMaxHeap());
     resource.setFreeHeap(request.getServerStatus().getJvmHeap().getFreeHeap());
@@ -690,17 +681,10 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
     boolean taskRunnerMode = request.getServerStatus().getTaskRunnerMode().getValue();
 
     WorkerResource workerResource = new WorkerResource();
-    workerResource.setAllocatedHost(request.getTajoWorkerHost());
     workerResource.setQueryMasterMode(queryMasterMode);
     workerResource.setTaskRunnerMode(taskRunnerMode);
 
-    workerResource.setQueryMasterPort(request.getTajoQueryMasterPort());
-    workerResource.setPeerRpcPort(request.getPeerRpcPort());
-    workerResource.setClientPort(request.getTajoWorkerClientPort());
-    workerResource.setPullServerPort(request.getTajoWorkerPullServerPort());
-
     workerResource.setLastHeartbeat(System.currentTimeMillis());
-    workerResource.setWorkerStatus(WorkerStatus.LIVE);
     if(request.getServerStatus() != null) {
       workerResource.setMemoryMB(request.getServerStatus().getMemoryResourceMB());
       workerResource.setCpuCoreSlots(request.getServerStatus().getSystem().getAvailableProcessors());
@@ -715,8 +699,13 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
       workerResource.setCpuCoreSlots(4);
     }
 
-    Worker worker = new Worker(workerResource.getId(), rmContext, workerResource);
+    Worker worker = new Worker(rmContext, workerResource);
+    worker.setAllocatedHost(request.getTajoWorkerHost());
     worker.setHttpPort(request.getTajoWorkerHttpPort());
+    worker.setPeerRpcPort(request.getPeerRpcPort());
+    worker.setQueryMasterPort(request.getTajoQueryMasterPort());
+    worker.setClientPort(request.getTajoWorkerClientPort());
+    worker.setPullServerPort(request.getTajoWorkerPullServerPort());
     return worker;
   }
 }

@@ -21,6 +21,7 @@ package org.apache.tajo.master.querymaster;
 
 import org.apache.tajo.QueryId;
 import org.apache.tajo.TajoProtos;
+import org.apache.tajo.master.rm.Worker;
 import org.apache.tajo.master.rm.WorkerResource;
 
 public class QueryInfo {
@@ -31,7 +32,7 @@ public class QueryInfo {
   private long startTime;
   private long finishTime;
   private String lastMessage;
-  private WorkerResource queryMasterResource;
+  private Worker queryMaster;
 
   public QueryInfo(QueryId queryId) {
     this(queryId, null);
@@ -52,28 +53,28 @@ public class QueryInfo {
   }
 
   public String getQueryMasterHost() {
-    if(queryMasterResource == null) {
+    if(queryMaster == null) {
       return null;
     }
-    return queryMasterResource.getAllocatedHost();
+    return queryMaster.getAllocatedHost();
   }
 
-  public void setQueryMasterResource(WorkerResource queryMasterResource) {
-    this.queryMasterResource = queryMasterResource;
+  public void setQueryMasterResource(Worker worker) {
+    this.queryMaster = worker;
   }
 
   public int getQueryMasterPort() {
-    if(queryMasterResource == null) {
+    if(queryMaster == null) {
       return 0;
     }
-    return queryMasterResource.getQueryMasterPort();
+    return queryMaster.getQueryMasterPort();
   }
 
   public int getQueryMasterClientPort() {
-    if(queryMasterResource == null) {
+    if(queryMaster == null) {
       return 0;
     }
-    return queryMasterResource.getClientPort();
+    return queryMaster.getClientPort();
   }
 
   public TajoProtos.QueryState getQueryState() {
@@ -108,8 +109,8 @@ public class QueryInfo {
     this.lastMessage = lastMessage;
   }
 
-  public WorkerResource getQueryMasterResource() {
-    return queryMasterResource;
+  public Worker getQueryMasterResource() {
+    return queryMaster;
   }
 
   public float getProgress() {
@@ -122,6 +123,6 @@ public class QueryInfo {
 
   @Override
   public String toString() {
-    return queryId.toString() + "state=" + queryState +",progress=" + progress + ", queryMaster=" + queryMasterResource;
+    return queryId.toString() + "state=" + queryState +",progress=" + progress + ", queryMaster=" + queryMaster;
   }
 }

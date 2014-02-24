@@ -23,9 +23,7 @@ import com.codahale.metrics.Metric;
 import com.codahale.metrics.MetricSet;
 import org.apache.tajo.master.TajoMaster;
 import org.apache.tajo.master.rm.Worker;
-import org.apache.tajo.master.rm.WorkerResource;
 import org.apache.tajo.master.rm.WorkerState;
-import org.apache.tajo.master.rm.WorkerStatus;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -42,7 +40,7 @@ public class WorkerResourceMetricsGaugeSet implements MetricSet {
     metricsMap.put("totalWorkers", new Gauge<Integer>() {
       @Override
       public Integer getValue() {
-        return tajoMasterContext.getResourceManager().getWorkers2().size();
+        return tajoMasterContext.getResourceManager().getWorkers().size();
       }
     });
 
@@ -65,7 +63,7 @@ public class WorkerResourceMetricsGaugeSet implements MetricSet {
 
   protected int getNumWorkers(WorkerState status) {
     int numWorkers = 0;
-    for(Worker eachWorker: tajoMasterContext.getResourceManager().getWorkers2().values()) {
+    for(Worker eachWorker: tajoMasterContext.getResourceManager().getWorkers().values()) {
       if(eachWorker.getState() == status) {
         numWorkers++;
       }

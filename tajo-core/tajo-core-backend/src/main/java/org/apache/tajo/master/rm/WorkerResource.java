@@ -36,14 +36,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  *   <li>the number of running tasks</li>
  * </ul>
  */
-public class WorkerResource implements Comparable<WorkerResource> {
+public class WorkerResource {
   private static final Log LOG = LogFactory.getLog(WorkerResource.class);
-
-  private String allocatedHost;
-  private int peerRpcPort;
-  private int queryMasterPort;
-  private int clientPort;
-  private int pullServerPort;
 
   private float diskSlots;
   private int cpuCoreSlots;
@@ -63,8 +57,6 @@ public class WorkerResource implements Comparable<WorkerResource> {
   private final Lock rlock = lock.readLock();
   private final Lock wlock = lock.writeLock();
 
-  private WorkerStatus workerStatus;
-
   private long lastHeartbeat;
 
   private boolean queryMasterMode;
@@ -72,18 +64,6 @@ public class WorkerResource implements Comparable<WorkerResource> {
   private boolean taskRunnerMode;
 
   private AtomicInteger numQueryMasterTasks = new AtomicInteger(0);
-
-  public String getId() {
-    return allocatedHost + ":" + queryMasterPort + ":" + peerRpcPort;
-  }
-
-  public String getAllocatedHost() {
-    return allocatedHost;
-  }
-
-  public void setAllocatedHost(String allocatedHost) {
-    this.allocatedHost = allocatedHost;
-  }
 
   public float getDiskSlots() {
     return diskSlots;
@@ -133,12 +113,8 @@ public class WorkerResource implements Comparable<WorkerResource> {
 
   @Override
   public String toString() {
-    return "host:" + allocatedHost + ", port=" + portsToStr() + ", slots=m:" + memoryMB + ",d:" + diskSlots +
+    return "slots=m:" + memoryMB + ",d:" + diskSlots +
         ",c:" + cpuCoreSlots + ", used=m:" + usedMemoryMB + ",d:" + usedDiskSlots + ",c:" + usedCpuCoreSlots;
-  }
-
-  public String portsToStr() {
-    return queryMasterPort + "," + peerRpcPort + "," + clientPort + "," + pullServerPort;
   }
 
   public void setLastHeartbeat(long heartbeatTime) {
@@ -173,18 +149,6 @@ public class WorkerResource implements Comparable<WorkerResource> {
 
   public float getUsedDiskSlots() {
     return usedDiskSlots;
-  }
-
-  public void setUsedDiskSlots(int usedDiskSlots) {
-    this.usedDiskSlots = usedDiskSlots;
-  }
-
-  public WorkerStatus getWorkerStatus() {
-    return workerStatus;
-  }
-
-  public void setWorkerStatus(WorkerStatus workerStatus) {
-    this.workerStatus = workerStatus;
   }
 
   public long getLastHeartbeat() {
@@ -243,38 +207,6 @@ public class WorkerResource implements Comparable<WorkerResource> {
     }
   }
 
-  public int getPeerRpcPort() {
-    return peerRpcPort;
-  }
-
-  public void setPeerRpcPort(int peerRpcPort) {
-    this.peerRpcPort = peerRpcPort;
-  }
-
-  public int getQueryMasterPort() {
-    return queryMasterPort;
-  }
-
-  public void setQueryMasterPort(int queryMasterPort) {
-    this.queryMasterPort = queryMasterPort;
-  }
-  
-  public int getClientPort() {
-    return clientPort;
-  }
-
-  public void setClientPort(int clientPort) {
-    this.clientPort = clientPort;
-  }
-
-  public int getPullServerPort() {
-    return pullServerPort;
-  }
-
-  public void setPullServerPort(int pullServerPort) {
-    this.pullServerPort = pullServerPort;
-  }
-
   public long getMaxHeap() {
     return maxHeap;
   }
@@ -319,13 +251,5 @@ public class WorkerResource implements Comparable<WorkerResource> {
   public void releaseQueryMasterTask(float diskSlots, int memoryMB) {
     numQueryMasterTasks.getAndDecrement();
     releaseResource(diskSlots, memoryMB);
-  }
-
-  @Override
-  public int compareTo(WorkerResource workerResource) {
-    if(workerResource == null) {
-      return 1;
-    }
-    return getId().compareTo(workerResource.getId());
   }
 }

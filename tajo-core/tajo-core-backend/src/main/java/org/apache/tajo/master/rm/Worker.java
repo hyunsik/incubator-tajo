@@ -36,8 +36,12 @@ public class Worker implements EventHandler<WorkerEvent>, Comparable<Worker> {
   private final ReentrantReadWriteLock.ReadLock readLock;
   private final ReentrantReadWriteLock.WriteLock writeLock;
 
-  private final String workerId;
+  private String allocatedHost;
+  private int queryMasterPort;
+  private int peerRpcPort;
   private int httpPort;
+  private int clientPort;
+  private int pullServerPort;
 
   private WorkerResource resource;
 
@@ -77,8 +81,7 @@ public class Worker implements EventHandler<WorkerEvent>, Comparable<Worker> {
 
   private final WorkerRMContext rmContext;
 
-  public Worker(String workerId, WorkerRMContext rmContext, WorkerResource resource) {
-    this.workerId = workerId;
+  public Worker(WorkerRMContext rmContext, WorkerResource resource) {
     this.rmContext = rmContext;
 
     ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
@@ -89,7 +92,47 @@ public class Worker implements EventHandler<WorkerEvent>, Comparable<Worker> {
   }
 
   public String getWorkerId() {
-    return workerId;
+    return allocatedHost + ":" + queryMasterPort + ":" + peerRpcPort;
+  }
+
+  public String getAllocatedHost() {
+    return allocatedHost;
+  }
+
+  public void setAllocatedHost(String allocatedHost) {
+    this.allocatedHost = allocatedHost;
+  }
+
+  public int getPeerRpcPort() {
+    return peerRpcPort;
+  }
+
+  public void setPeerRpcPort(int peerRpcPort) {
+    this.peerRpcPort = peerRpcPort;
+  }
+
+  public int getQueryMasterPort() {
+    return queryMasterPort;
+  }
+
+  public void setQueryMasterPort(int queryMasterPort) {
+    this.queryMasterPort = queryMasterPort;
+  }
+
+  public int getClientPort() {
+    return clientPort;
+  }
+
+  public void setClientPort(int clientPort) {
+    this.clientPort = clientPort;
+  }
+
+  public int getPullServerPort() {
+    return pullServerPort;
+  }
+
+  public void setPullServerPort(int pullServerPort) {
+    this.pullServerPort = pullServerPort;
   }
 
   public int getHttpPort() {
@@ -172,10 +215,10 @@ public class Worker implements EventHandler<WorkerEvent>, Comparable<Worker> {
         stateMachine.doTransition(event.getType(), event);
       } catch (InvalidStateTransitonException e) {
         LOG.error("Can't handle this event at current state", e);
-        LOG.error("Invalid event " + event.getType() + " on Worker  " + this.workerId);
+        LOG.error("Invalid event " + event.getType() + " on Worker  " + getWorkerId());
       }
       if (oldState != getState()) {
-        LOG.info(workerId + " Node Transitioned from " + oldState + " to " + getState());
+        LOG.info(getWorkerId() + " Node Transitioned from " + oldState + " to " + getState());
       }
     }
 

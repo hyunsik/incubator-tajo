@@ -80,12 +80,8 @@ public class YarnTajoResourceManager extends AbstractService implements WorkerRe
   public void stop() {
   }
 
-  public Map<String, WorkerResource> getWorkers() {
-    return new HashMap<String, WorkerResource>();
-  }
-
   @Override
-  public Map<String, Worker> getWorkers2() {
+  public Map<String, Worker> getWorkers() {
     return new HashMap<String, Worker>();
   }
 
@@ -121,7 +117,7 @@ public class YarnTajoResourceManager extends AbstractService implements WorkerRe
   }
 
   @Override
-  public WorkerResource allocateQueryMaster(QueryInProgress queryInProgress) {
+  public Worker allocateQueryMaster(QueryInProgress queryInProgress) {
     throw new UnimplementedException("allocateQueryMaster");
   }
 

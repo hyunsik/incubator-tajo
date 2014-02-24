@@ -38,7 +38,7 @@ public interface WorkerResourceManager extends Service {
    * @param queryInProgress
    * @return
    */
-  public WorkerResource allocateQueryMaster(QueryInProgress queryInProgress);
+  public Worker allocateQueryMaster(QueryInProgress queryInProgress);
 
   public void allocateWorkerResources(TajoMasterProtocol.WorkerResourceAllocationRequest request,
       RpcCallback<TajoMasterProtocol.WorkerResourceAllocationResponse> rpcCallBack);
@@ -59,7 +59,7 @@ public interface WorkerResourceManager extends Service {
 
   public void releaseWorkerResource(ExecutionBlockId ebId, ContainerIdProto containerId);
 
-  public Map<String, Worker> getWorkers2();
+  public Map<String, Worker> getWorkers();
 
   public Map<String, Worker> getInactiveWorkers();
 

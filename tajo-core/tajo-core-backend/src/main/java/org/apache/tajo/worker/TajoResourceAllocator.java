@@ -43,6 +43,7 @@ import org.apache.tajo.master.querymaster.SubQuery;
 import org.apache.tajo.master.querymaster.SubQueryState;
 import org.apache.tajo.master.rm.TajoWorkerContainer;
 import org.apache.tajo.master.rm.TajoWorkerContainerId;
+import org.apache.tajo.master.rm.Worker;
 import org.apache.tajo.master.rm.WorkerResource;
 import org.apache.tajo.rpc.CallFuture;
 import org.apache.tajo.rpc.NettyClientBase;
@@ -274,15 +275,18 @@ public class TajoResourceAllocator extends AbstractResourceAllocator {
           container.setId(containerId);
           container.setNodeId(nodeId);
 
+
           WorkerResource workerResource = new WorkerResource();
-          workerResource.setAllocatedHost(nodeId.getHost());
-          workerResource.setPeerRpcPort(nodeId.getPort());
-          workerResource.setQueryMasterPort(eachAllocatedResource.getQueryMasterPort());
-          workerResource.setPullServerPort(eachAllocatedResource.getWorkerPullServerPort());
           workerResource.setMemoryMB(eachAllocatedResource.getAllocatedMemoryMB());
           workerResource.setDiskSlots(eachAllocatedResource.getAllocatedDiskSlots());
 
-          container.setWorkerResource(workerResource);
+          Worker worker = new Worker(null, workerResource);
+          worker.setAllocatedHost(nodeId.getHost());
+          worker.setPeerRpcPort(nodeId.getPort());
+          worker.setQueryMasterPort(eachAllocatedResource.getQueryMasterPort());
+          worker.setPullServerPort(eachAllocatedResource.getWorkerPullServerPort());
+
+          container.setWorkerResource(worker);
 
           containers.add(container);
         }
