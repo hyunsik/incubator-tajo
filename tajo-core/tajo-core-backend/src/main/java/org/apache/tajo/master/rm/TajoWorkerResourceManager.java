@@ -263,7 +263,7 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
       //add queue
       TajoMasterProtocol.WorkerResourceAllocationRequest request =
           TajoMasterProtocol.WorkerResourceAllocationRequest.newBuilder()
-            .setExecutionBlockId(QueryIdFactory.newExecutionBlockId(QueryIdFactory.NULL_QUERY_ID, 0).getProto())
+            .setQueryId(QueryIdFactory.NULL_QUERY_ID.getProto())
             .setNumContainers(1)
             .setMinMemoryMBPerContainer(queryMasterDefaultMemoryMB)
             .setMaxMemoryMBPerContainer(queryMasterDefaultMemoryMB)
@@ -307,7 +307,7 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
     try {
       //TODO checking queue size
       requestQueue.put(new WorkerResourceRequest(
-          new QueryId(request.getExecutionBlockId().getQueryId()), false, request, callBack));
+          new QueryId(request.getQueryId()), false, request, callBack));
     } catch (InterruptedException e) {
       LOG.error(e.getMessage(), e);
     }
