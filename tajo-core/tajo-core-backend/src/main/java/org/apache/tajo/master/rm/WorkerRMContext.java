@@ -21,6 +21,7 @@ package org.apache.tajo.master.rm;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import org.apache.hadoop.yarn.event.Dispatcher;
+import org.apache.tajo.ipc.TajoMasterProtocol;
 
 import java.util.HashSet;
 import java.util.Set;

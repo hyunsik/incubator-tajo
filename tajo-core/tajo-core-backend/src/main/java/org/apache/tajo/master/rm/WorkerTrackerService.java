@@ -31,19 +31,20 @@ import org.apache.tajo.ipc.TajoMasterProtocol;
 import org.apache.tajo.master.WorkerLivelinessMonitor;
 import org.apache.tajo.rpc.AsyncRpcServer;
 import org.apache.tajo.util.NetUtils;
+import org.apache.tajo.util.ProtoBufUtil;
 
 import java.io.IOError;
 import java.net.InetSocketAddress;
 
 import static org.apache.tajo.ipc.NodeResourceTracker.NodeResourceTrackerService;
+import static org.apache.tajo.ipc.TajoMasterProtocol.TajoHeartbeatResponse;
 
-public class WorkerTrackerService extends AbstractService {
+public class WorkerTrackerService extends AbstractService implements NodeResourceTrackerService.Interface {
   private Log LOG = LogFactory.getLog(WorkerTrackerService.class);
 
   private final WorkerRMContext rmContext;
   private final WorkerLivelinessMonitor workerLivelinessMonitor;
 
-  private HeartbeatService heartbeatService;
   private AsyncRpcServer server;
   private InetSocketAddress bindAddress;
 
@@ -58,13 +59,11 @@ public class WorkerTrackerService extends AbstractService {
     Preconditions.checkArgument(conf instanceof TajoConf, "conf must be a TajoConf instance");
     TajoConf systemConf = (TajoConf) conf;
 
-    heartbeatService = new HeartbeatService();
-
     String confMasterServiceAddr = systemConf.getVar(TajoConf.ConfVars.RESOURCE_TRACKER_RPC_ADDRESS);
     InetSocketAddress initIsa = NetUtils.createSocketAddr(confMasterServiceAddr);
 
     try {
-      server = new AsyncRpcServer(NodeResourceTracker.class, heartbeatService, initIsa, 3);
+      server = new AsyncRpcServer(NodeResourceTracker.class, this, initIsa, 3);
     } catch (Exception e) {
       LOG.error(e);
       throw new IOError(e);
@@ -87,12 +86,13 @@ public class WorkerTrackerService extends AbstractService {
     super.stop();
   }
 
-  private class HeartbeatService implements NodeResourceTrackerService.Interface {
+  @Override
+  public void heartbeat(
+      RpcController controller,
+      TajoMasterProtocol.TajoHeartbeat heartbeat,
+      RpcCallback<TajoHeartbeatResponse> done) {
 
-    @Override
-    public void heartbeat(RpcController controller,
-                          TajoMasterProtocol.TajoHeartbeat heartbeat,
-                          RpcCallback<TajoMasterProtocol.TajoHeartbeatResponse> done) {
+    try {
       synchronized (this) {
         String workerKey = createWorkerId(heartbeat);
         LOG.info("Heartbeat from " + workerKey);
@@ -135,6 +135,10 @@ public class WorkerTrackerService extends AbstractService {
 
         notifyAll();
       }
+    } finally {
+      TajoHeartbeatResponse.Builder builder = TajoHeartbeatResponse.newBuilder().setHeartbeatResult(ProtoBufUtil.TRUE);
+      builder.setClusterResourceSummary(getClusterResourceSummary());
+      done.run(builder.build());
     }
   }
 
@@ -182,5 +186,42 @@ public class WorkerTrackerService extends AbstractService {
     resource.setMaxHeap(request.getServerStatus().getJvmHeap().getMaxHeap());
     resource.setFreeHeap(request.getServerStatus().getJvmHeap().getFreeHeap());
     resource.setTotalHeap(request.getServerStatus().getJvmHeap().getTotalHeap());
+  }
+
+  public TajoMasterProtocol.ClusterResourceSummary getClusterResourceSummary() {
+    int totalDiskSlots = 0;
+    int totalCpuCoreSlots = 0;
+    int totalMemoryMB = 0;
+
+    int totalAvailableDiskSlots = 0;
+    int totalAvailableCpuCoreSlots = 0;
+    int totalAvailableMemoryMB = 0;
+
+    synchronized(rmContext) {
+      for(String eachWorker: rmContext.getWorkers().keySet()) {
+        Worker worker = rmContext.getWorkers().get(eachWorker);
+        WorkerResource resource = worker.getResource();
+        if(worker != null) {
+          totalMemoryMB += resource.getMemoryMB();
+          totalAvailableMemoryMB += resource.getAvailableMemoryMB();
+
+          totalDiskSlots += resource.getDiskSlots();
+          totalAvailableDiskSlots += resource.getAvailableDiskSlots();
+
+          totalCpuCoreSlots += resource.getCpuCoreSlots();
+          totalAvailableCpuCoreSlots += resource.getAvailableCpuCoreSlots();
+        }
+      }
+    }
+
+    return TajoMasterProtocol.ClusterResourceSummary.newBuilder()
+        .setNumWorkers(rmContext.getWorkers().size())
+        .setTotalCpuCoreSlots(totalCpuCoreSlots)
+        .setTotalDiskSlots(totalDiskSlots)
+        .setTotalMemoryMB(totalMemoryMB)
+        .setTotalAvailableCpuCoreSlots(totalAvailableCpuCoreSlots)
+        .setTotalAvailableDiskSlots(totalAvailableDiskSlots)
+        .setTotalAvailableMemoryMB(totalAvailableMemoryMB)
+        .build();
   }
 }

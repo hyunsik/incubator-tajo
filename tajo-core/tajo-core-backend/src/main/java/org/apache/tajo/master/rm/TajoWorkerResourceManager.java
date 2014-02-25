@@ -65,8 +65,6 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
 
   private Map<QueryId, Worker> queryMasterMap = Maps.newHashMap();
 
-  private final Object workerResourceLock = new Object();
-
   private String queryIdSeed;
 
   private WorkerResourceAllocationThread workerResourceAllocator;
@@ -179,7 +177,7 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
     int totalAvailableCpuCoreSlots = 0;
     int totalAvailableMemoryMB = 0;
 
-    synchronized(workerResourceLock) {
+    synchronized(rmContext) {
       for(String eachWorker: rmContext.getWorkers().keySet()) {
         Worker worker = rmContext.getWorkers().get(eachWorker);
         WorkerResource resource = worker.getResource();
@@ -226,7 +224,7 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
   }
 
   public Worker allocateQueryMaster(QueryId queryId) {
-    synchronized(workerResourceLock) {
+    synchronized(rmContext) {
       if(rmContext.getQueryMasterWorker().size() == 0) {
         LOG.warn("No available resource for querymaster:" + queryId);
         return null;
@@ -254,7 +252,7 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
   @Override
   public void startQueryMaster(QueryInProgress queryInProgress) {
     Worker queryMasterWorker = null;
-    synchronized(workerResourceLock) {
+    synchronized(rmContext) {
       queryMasterWorker = queryMasterMap.get(queryInProgress.getQueryId());
     }
 
@@ -307,7 +305,7 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
   }
 
   @VisibleForTesting
-  public WorkerTrackerService getWorkerTrackerService() {
+  WorkerTrackerService getWorkerTrackerService() {
     return workerTrackerService;
   }
 
@@ -397,7 +395,7 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
                     .setAllocatedDiskSlots(eachWorker.allocatedDiskSlots)
                     .build());
 
-                synchronized(workerResourceLock) {
+                synchronized(rmContext) {
                   allocatedResourceMap.put(containerIdProto, eachWorker);
                 }
               }
@@ -449,7 +447,7 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
         = resourceRequest.request.getResourceRequestPriority();
 
     if(resourceRequestPriority == TajoMasterProtocol.ResourceRequestPriority.MEMORY) {
-      synchronized(workerResourceLock) {
+      synchronized(rmContext) {
         List<String> randomWorkers = new ArrayList<String>(rmContext.getWorkers().keySet());
         Collections.shuffle(randomWorkers);
 
@@ -518,7 +516,7 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
         }
       }
     } else {
-      synchronized(workerResourceLock) {
+      synchronized(rmContext) {
         List<String> randomWorkers = new ArrayList<String>(rmContext.getWorkers().keySet());
         Collections.shuffle(randomWorkers);
 
@@ -592,7 +590,7 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
 
   @Override
   public void releaseWorkerResource(ExecutionBlockId ebId, YarnProtos.ContainerIdProto containerId) {
-    synchronized(workerResourceLock) {
+    synchronized(rmContext) {
       AllocatedWorkerResource allocatedWorkerResource = allocatedResourceMap.get(containerId);
       if(allocatedWorkerResource != null) {
         LOG.info("Release Resource:" + ebId + "," +
@@ -612,7 +610,7 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
 
   @Override
   public boolean isQueryMasterStopped(QueryId queryId) {
-    synchronized(workerResourceLock) {
+    synchronized(rmContext) {
       return !queryMasterMap.containsKey(queryId);
     }
   }
@@ -620,7 +618,7 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
   @Override
   public void stopQueryMaster(QueryId queryId) {
     WorkerResource queryMasterWorkerResource = null;
-    synchronized(workerResourceLock) {
+    synchronized(rmContext) {
       if(!queryMasterMap.containsKey(queryId)) {
         LOG.warn("No QueryMaster resource info for " + queryId);
         return;

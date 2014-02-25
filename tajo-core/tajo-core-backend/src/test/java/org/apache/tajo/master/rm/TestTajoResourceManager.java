@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.tajo.master;
+package org.apache.tajo.master.rm;
 
 import com.google.protobuf.RpcCallback;
 import org.apache.hadoop.yarn.proto.YarnProtos;
@@ -25,9 +25,7 @@ import org.apache.tajo.QueryId;
 import org.apache.tajo.QueryIdFactory;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.ipc.TajoMasterProtocol.*;
-import org.apache.tajo.master.rm.TajoWorkerResourceManager;
-import org.apache.tajo.master.rm.Worker;
-import org.apache.tajo.master.rm.WorkerResource;
+import org.apache.tajo.rpc.NullCallback;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos;
 import org.junit.Test;
 
@@ -104,7 +102,7 @@ public class TestTajoResourceManager {
           .setServerStatus(serverStatus)
           .build();
 
-      tajoWorkerResourceManager.workerHeartbeat(tajoHeartbeat);
+      tajoWorkerResourceManager.getWorkerTrackerService().heartbeat(null, tajoHeartbeat, NullCallback.get());
     }
 
     return tajoWorkerResourceManager;
@@ -123,7 +121,9 @@ public class TestTajoResourceManager {
         assertEquals(workerDiskSlots, resource.getAvailableDiskSlots(), 0);
       }
     } finally {
-      tajoWorkerResourceManager.stop();
+      if (tajoWorkerResourceManager != null) {
+        tajoWorkerResourceManager.stop();
+      }
     }
   }
 
