@@ -21,8 +21,6 @@ package org.apache.tajo.master.querymaster;
 
 import org.apache.tajo.QueryId;
 import org.apache.tajo.TajoProtos;
-import org.apache.tajo.master.rm.Worker;
-import org.apache.tajo.master.rm.WorkerResource;
 
 public class QueryInfo {
   private QueryId queryId;
@@ -32,7 +30,9 @@ public class QueryInfo {
   private long startTime;
   private long finishTime;
   private String lastMessage;
-  private Worker queryMaster;
+  private String hostNameOfQM;
+  private int queryMasterPort;
+  private int queryMasterClientPort;
 
   public QueryInfo(QueryId queryId) {
     this(queryId, null);
@@ -53,28 +53,28 @@ public class QueryInfo {
   }
 
   public String getQueryMasterHost() {
-    if(queryMaster == null) {
-      return null;
-    }
-    return queryMaster.getAllocatedHost();
+    return hostNameOfQM;
   }
 
-  public void setQueryMasterResource(Worker worker) {
-    this.queryMaster = worker;
+  public void setQueryMaster(String hostName) {
+    this.hostNameOfQM = hostName;
+
+  }
+
+  public void setQueryMasterPort(int port) {
+    this.queryMasterPort = port;
   }
 
   public int getQueryMasterPort() {
-    if(queryMaster == null) {
-      return 0;
-    }
-    return queryMaster.getQueryMasterPort();
+    return queryMasterPort;
+  }
+
+  public void setQueryMasterclientPort(int port) {
+    queryMasterClientPort = port;
   }
 
   public int getQueryMasterClientPort() {
-    if(queryMaster == null) {
-      return 0;
-    }
-    return queryMaster.getClientPort();
+    return queryMasterClientPort;
   }
 
   public TajoProtos.QueryState getQueryState() {
@@ -109,10 +109,6 @@ public class QueryInfo {
     this.lastMessage = lastMessage;
   }
 
-  public Worker getQueryMasterResource() {
-    return queryMaster;
-  }
-
   public float getProgress() {
     return progress;
   }
@@ -123,6 +119,6 @@ public class QueryInfo {
 
   @Override
   public String toString() {
-    return queryId.toString() + "state=" + queryState +",progress=" + progress + ", queryMaster=" + queryMaster;
+    return queryId.toString() + "state=" + queryState +",progress=" + progress + ", queryMaster=" + getQueryMasterHost();
   }
 }

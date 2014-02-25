@@ -28,7 +28,6 @@ import org.apache.hadoop.service.AbstractService;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.ipc.NodeResourceTracker;
 import org.apache.tajo.ipc.TajoMasterProtocol;
-import org.apache.tajo.master.WorkerLivelinessMonitor;
 import org.apache.tajo.rpc.AsyncRpcServer;
 import org.apache.tajo.util.NetUtils;
 import org.apache.tajo.util.ProtoBufUtil;
@@ -36,9 +35,21 @@ import org.apache.tajo.util.ProtoBufUtil;
 import java.io.IOError;
 import java.net.InetSocketAddress;
 
+import static org.apache.tajo.ipc.NodeResourceTracker.NodeHeartbeat;
 import static org.apache.tajo.ipc.NodeResourceTracker.NodeResourceTrackerService;
 import static org.apache.tajo.ipc.TajoMasterProtocol.TajoHeartbeatResponse;
 
+/**
+ * It tracks worker and their status. Its has two main roles as follows:
+ * <ul>
+ *   <li>Membership management for nodes which join to a Tajo cluster</li>
+ *   <ul>
+ *    <li>Register - It receives the ping from a new worker. It registers the worker.</li>
+ *    <li>Unregister - It unregisters a worker who does not send ping for some expiry time.</li>
+ *   <ul>
+ *   <li>Status Update - It updates the status of all participating workers</li>
+ * </ul>
+ */
 public class WorkerTrackerService extends AbstractService implements NodeResourceTrackerService.Interface {
   private Log LOG = LogFactory.getLog(WorkerTrackerService.class);
 
@@ -89,7 +100,7 @@ public class WorkerTrackerService extends AbstractService implements NodeResourc
   @Override
   public void heartbeat(
       RpcController controller,
-      TajoMasterProtocol.TajoHeartbeat heartbeat,
+      NodeHeartbeat heartbeat,
       RpcCallback<TajoHeartbeatResponse> done) {
 
     try {
@@ -99,9 +110,13 @@ public class WorkerTrackerService extends AbstractService implements NodeResourc
 
         if(rmContext.getWorkers().containsKey(workerKey)) { // worker is running
           LOG.info("Worker is running");
-          Worker worker = rmContext.getWorkers().get(workerKey);
-          WorkerResource workerResource = worker.getResource();
-          updateWorkerResource(workerResource, heartbeat);
+          rmContext.getDispatcher().getEventHandler().handle(
+              new WorkerStatusEvent(
+                  workerKey,
+                  heartbeat.getServerStatus().getRunningTaskNum(),
+                  heartbeat.getServerStatus().getJvmHeap().getMaxHeap(),
+                  heartbeat.getServerStatus().getJvmHeap().getFreeHeap(),
+                  heartbeat.getServerStatus().getJvmHeap().getTotalHeap()));
           workerLivelinessMonitor.receivedPing(workerKey);
         } else if (rmContext.getInactiveWorkers().containsKey(workerKey)) { // worker is dead
           LOG.info("Worker is inactive");
@@ -142,12 +157,12 @@ public class WorkerTrackerService extends AbstractService implements NodeResourc
     }
   }
 
-  private static final String createWorkerId(TajoMasterProtocol.TajoHeartbeat heartbeat) {
+  private static final String createWorkerId(NodeHeartbeat heartbeat) {
     return heartbeat.getTajoWorkerHost() + ":" + heartbeat.getTajoQueryMasterPort() + ":"
         + heartbeat.getPeerRpcPort();
   }
 
-  private Worker createWorkerResource(TajoMasterProtocol.TajoHeartbeat request) {
+  private Worker createWorkerResource(NodeHeartbeat request) {
     boolean queryMasterMode = request.getServerStatus().getQueryMasterMode().getValue();
     boolean taskRunnerMode = request.getServerStatus().getTaskRunnerMode().getValue();
 
@@ -178,14 +193,6 @@ public class WorkerTrackerService extends AbstractService implements NodeResourc
     worker.setClientPort(request.getTajoWorkerClientPort());
     worker.setPullServerPort(request.getTajoWorkerPullServerPort());
     return worker;
-  }
-
-  private void updateWorkerResource(WorkerResource resource, TajoMasterProtocol.TajoHeartbeat request) {
-    resource.setLastHeartbeat(System.currentTimeMillis());
-    resource.setNumRunningTasks(request.getServerStatus().getRunningTaskNum());
-    resource.setMaxHeap(request.getServerStatus().getJvmHeap().getMaxHeap());
-    resource.setFreeHeap(request.getServerStatus().getJvmHeap().getFreeHeap());
-    resource.setTotalHeap(request.getServerStatus().getJvmHeap().getTotalHeap());
   }
 
   public TajoMasterProtocol.ClusterResourceSummary getClusterResourceSummary() {

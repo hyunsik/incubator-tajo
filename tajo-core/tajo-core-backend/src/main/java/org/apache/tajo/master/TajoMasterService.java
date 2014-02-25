@@ -98,25 +98,14 @@ public class TajoMasterService extends AbstractService {
         RpcController controller,
         TajoMasterProtocol.TajoHeartbeat request, RpcCallback<TajoMasterProtocol.TajoHeartbeatResponse> done) {
       if(LOG.isDebugEnabled()) {
-        LOG.debug("Received QueryHeartbeat:" + request.getTajoWorkerHost() + ":" +
-            request.getTajoQueryMasterPort() + ":" + request.getPeerRpcPort());
+        LOG.debug("Received QueryHeartbeat:" + request.getTajoWorkerHost() + ":" + request.getTajoQueryMasterPort());
       }
 
       TajoMasterProtocol.TajoHeartbeatResponse.ResponseCommand command = null;
-      if(request.hasQueryId()) {
-        QueryId queryId = new QueryId(request.getQueryId());
 
-        //heartbeat from querymaster
-        //LOG.info("Received QueryHeartbeat:" + queryId + "," + request);
-        QueryJobManager queryJobManager = context.getQueryJobManager();
-        command = queryJobManager.queryHeartbeat(request);
-      } else {
-        //heartbeat from TajoWorker
-        context.getResourceManager().workerHeartbeat(request);
-      }
+      QueryJobManager queryJobManager = context.getQueryJobManager();
+      command = queryJobManager.queryHeartbeat(request);
 
-      //ApplicationAttemptId attemptId = queryJobManager.getAppAttemptId();
-      //String attemptIdStr = attemptId == null ? null : attemptId.toString();
       TajoMasterProtocol.TajoHeartbeatResponse.Builder builder = TajoMasterProtocol.TajoHeartbeatResponse.newBuilder();
       builder.setHeartbeatResult(BOOL_TRUE);
       if(command != null) {

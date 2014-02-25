@@ -61,15 +61,15 @@ message ServerStatusProto {
 
 message TajoHeartbeat {
   required string tajoWorkerHost = 1;
-  required int32 peerRpcPort = 2;
+  //required int32 peerRpcPort = 2;
   required int32 tajoQueryMasterPort = 3;
-  optional ServerStatusProto serverStatus = 4;
+  //optional ServerStatusProto serverStatus = 4;
   optional int32 tajoWorkerClientPort = 5;
   optional QueryIdProto queryId = 6;
   optional QueryState state = 7;
   optional string statusMessage = 8;
-  optional int32 tajoWorkerPullServerPort = 9;
-  optional int32 tajoWorkerHttpPort = 10;
+//  optional int32 tajoWorkerPullServerPort = 9;
+//  optional int32 tajoWorkerHttpPort = 10;
   optional float queryProgress = 11;
   optional int64 queryFinishTime = 12;
 }

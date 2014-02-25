@@ -22,9 +22,10 @@ public enum WorkerEventType {
   STARTED,
 
   STATE_UPDATE,
+  /** Source : {@link WorkerTrackerService}, Destination: {@link Worker} */
   RECONNECTED,
 
 
-  // Source : WorkerLivelinessMonitor
+  /** Source : {@link WorkerLivelinessMonitor}, Destination: {@link Worker} */
   EXPIRE,
 }

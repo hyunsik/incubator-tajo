@@ -21,14 +21,14 @@ package org.apache.tajo.master.rm;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.yarn.event.EventHandler;
-import org.apache.hadoop.yarn.state.InvalidStateTransitonException;
-import org.apache.hadoop.yarn.state.SingleArcTransition;
-import org.apache.hadoop.yarn.state.StateMachine;
-import org.apache.hadoop.yarn.state.StateMachineFactory;
+import org.apache.hadoop.yarn.state.*;
 
 import java.util.EnumSet;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+/**
+ *
+ */
 public class Worker implements EventHandler<WorkerEvent>, Comparable<Worker> {
 
   private static final Log LOG = LogFactory.getLog(Worker.class);
@@ -46,6 +46,7 @@ public class Worker implements EventHandler<WorkerEvent>, Comparable<Worker> {
   private WorkerResource resource;
 
   private static final ReconnectNodeTransition RECONNECT_NODE_TRANSITION = new ReconnectNodeTransition();
+  private static final StatusUpdateTransition STATUS_UPDATE_TRANSITION = new StatusUpdateTransition();
 
   private static final StateMachineFactory<Worker,
       WorkerState,
@@ -58,23 +59,30 @@ public class Worker implements EventHandler<WorkerEvent>, Comparable<Worker> {
 
       // Transition from NEW
       .addTransition(WorkerState.NEW, WorkerState.RUNNING,
-      WorkerEventType.STARTED, new AddNodeTransition())
+          WorkerEventType.STARTED,
+          new AddNodeTransition())
 
       // Transition from RUNNING
       .addTransition(WorkerState.RUNNING, EnumSet.of(WorkerState.RUNNING, WorkerState.UNHEALTHY),
-          WorkerEventType.STATE_UPDATE, null)
+          WorkerEventType.STATE_UPDATE,
+          STATUS_UPDATE_TRANSITION)
       .addTransition(WorkerState.RUNNING, WorkerState.LOST,
-          WorkerEventType.EXPIRE, new DeactivateNodeTransition(WorkerState.LOST))
+          WorkerEventType.EXPIRE,
+          new DeactivateNodeTransition(WorkerState.LOST))
       .addTransition(WorkerState.RUNNING, WorkerState.RUNNING,
-          WorkerEventType.RECONNECTED, RECONNECT_NODE_TRANSITION)
+          WorkerEventType.RECONNECTED,
+          RECONNECT_NODE_TRANSITION)
 
       // Transitions from UNHEALTHY state
       .addTransition(WorkerState.UNHEALTHY, EnumSet.of(WorkerState.RUNNING, WorkerState.UNHEALTHY),
-          WorkerEventType.STATE_UPDATE, null)
+          WorkerEventType.STATE_UPDATE,
+          STATUS_UPDATE_TRANSITION)
       .addTransition(WorkerState.UNHEALTHY, WorkerState.LOST,
-          WorkerEventType.EXPIRE, new DeactivateNodeTransition(WorkerState.LOST))
+          WorkerEventType.EXPIRE,
+          new DeactivateNodeTransition(WorkerState.LOST))
       .addTransition(WorkerState.UNHEALTHY, WorkerState.UNHEALTHY,
-          WorkerEventType.RECONNECTED, RECONNECT_NODE_TRANSITION);
+          WorkerEventType.RECONNECTED,
+          RECONNECT_NODE_TRANSITION);
 
   private final StateMachine<WorkerState, WorkerEventType, WorkerEvent> stateMachine =
       stateMachineFactory.make(this, WorkerState.NEW);
@@ -173,6 +181,22 @@ public class Worker implements EventHandler<WorkerEvent>, Comparable<Worker> {
         worker.rmContext.getQueryMasterWorker().add(worker.getWorkerId());
       }
       LOG.info("Worker with " + worker.getResource() + " is joined to Tajo cluster");
+    }
+  }
+
+  public static class StatusUpdateTransition implements
+      MultipleArcTransition<Worker, WorkerEvent, WorkerState> {
+
+    @Override
+    public WorkerState transition(Worker worker, WorkerEvent event) {
+      WorkerStatusEvent statusEvent = (WorkerStatusEvent) event;
+
+      worker.getResource().setNumRunningTasks(statusEvent.getRunningTaskNum());
+      worker.getResource().setMaxHeap(statusEvent.maxHeap());
+      worker.getResource().setFreeHeap(statusEvent.getFreeHeap());
+      worker.getResource().setTotalHeap(statusEvent.getTotalHeap());
+
+      return WorkerState.RUNNING;
     }
   }
 

@@ -42,6 +42,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static org.apache.tajo.ipc.NodeResourceTracker.NodeHeartbeat;
+
 public class ResourceHeartbeatService extends AbstractService {
   private final static Log LOG = LogFactory.getLog(ResourceHeartbeatService.class);
 
@@ -185,7 +187,7 @@ public class ResourceHeartbeatService extends AbstractService {
             .setTaskRunnerMode(PrimitiveProtos.BoolProto.newBuilder().setValue(context.isTaskRunnerMode()))
             .build();
 
-        TajoMasterProtocol.TajoHeartbeat heartbeatProto = TajoMasterProtocol.TajoHeartbeat.newBuilder()
+        NodeHeartbeat heartbeatProto = NodeHeartbeat.newBuilder()
             .setTajoWorkerHost(hostName)
             .setTajoQueryMasterPort(queryMasterPort)
             .setPeerRpcPort(peerRpcPort)

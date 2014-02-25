@@ -172,14 +172,9 @@ public class QueryJobManager extends CompositeService {
   private QueryInfo makeQueryInfoFromHeartbeat(TajoMasterProtocol.TajoHeartbeat queryHeartbeat) {
     QueryInfo queryInfo = new QueryInfo(new QueryId(queryHeartbeat.getQueryId()));
     if(queryHeartbeat.getTajoWorkerHost() != null) {
-
-      Worker worker = new Worker(null, null);
-      worker.setAllocatedHost(queryHeartbeat.getTajoWorkerHost());
-      worker.setPeerRpcPort(queryHeartbeat.getPeerRpcPort());
-      worker.setQueryMasterPort(queryHeartbeat.getTajoQueryMasterPort());
-      worker.setClientPort(queryHeartbeat.getTajoWorkerClientPort());
-      worker.setPullServerPort(queryHeartbeat.getTajoWorkerPullServerPort());
-      queryInfo.setQueryMasterResource(worker);
+      queryInfo.setQueryMaster(queryHeartbeat.getTajoWorkerHost());
+      queryInfo.setQueryMasterPort(queryHeartbeat.getTajoQueryMasterPort());
+      queryInfo.setQueryMasterclientPort(queryHeartbeat.getTajoWorkerClientPort());
     }
     queryInfo.setLastMessage(queryHeartbeat.getStatusMessage());
     queryInfo.setQueryState(queryHeartbeat.getState());

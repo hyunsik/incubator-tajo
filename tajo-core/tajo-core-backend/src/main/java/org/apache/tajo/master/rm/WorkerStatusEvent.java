@@ -18,5 +18,33 @@
 
 package org.apache.tajo.master.rm;
 
-public class WorkerStatusEvent {
+public class WorkerStatusEvent extends WorkerEvent {
+  private final int runningTaskNum;
+  private final long maxHeap;
+  private final long freeHeap;
+  private final long totalHeap;
+
+  public WorkerStatusEvent(String workerId, int runningTaskNum, long maxHeap, long freeHeap, long totalHeap) {
+    super(workerId, WorkerEventType.STATE_UPDATE);
+    this.runningTaskNum = runningTaskNum;
+    this.maxHeap = maxHeap;
+    this.freeHeap = freeHeap;
+    this.totalHeap = totalHeap;
+  }
+
+  public int getRunningTaskNum() {
+    return runningTaskNum;
+  }
+
+  public long maxHeap() {
+    return maxHeap;
+  }
+
+  public long getFreeHeap() {
+    return freeHeap;
+  }
+
+  public long getTotalHeap() {
+    return totalHeap;
+  }
 }

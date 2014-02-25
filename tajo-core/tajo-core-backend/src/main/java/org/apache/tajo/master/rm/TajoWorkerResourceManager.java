@@ -38,8 +38,8 @@ import org.apache.tajo.QueryIdFactory;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.ipc.TajoMasterProtocol;
 import org.apache.tajo.master.TajoMaster;
-import org.apache.tajo.master.WorkerLivelinessMonitor;
 import org.apache.tajo.master.querymaster.QueryInProgress;
+import org.apache.tajo.master.querymaster.QueryInfo;
 import org.apache.tajo.master.querymaster.QueryJobEvent;
 import org.apache.tajo.util.ApplicationIdUtils;
 
@@ -69,6 +69,9 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
 
   private WorkerResourceAllocationThread workerResourceAllocator;
 
+  /**
+   * Worker Liveliness monitor
+   */
   private WorkerLivelinessMonitor workerLivelinessMonitor;
 
   private BlockingQueue<WorkerResourceRequest> requestQueue;
@@ -83,7 +86,8 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
 
   private TajoConf systemConf;
 
-  private Map<YarnProtos.ContainerIdProto, AllocatedWorkerResource> allocatedResourceMap = new HashMap<YarnProtos.ContainerIdProto, AllocatedWorkerResource>();
+  private Map<YarnProtos.ContainerIdProto, AllocatedWorkerResource> allocatedResourceMap =
+      new HashMap<YarnProtos.ContainerIdProto, AllocatedWorkerResource>();
 
   private WorkerTrackerService workerTrackerService;
 
@@ -288,7 +292,10 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
       LOG.warn("No QueryInProgress while starting  QueryMaster:" + queryId);
       return;
     }
-    queryInProgress.getQueryInfo().setQueryMasterResource(workResource.worker);
+    QueryInfo info = queryInProgress.getQueryInfo();
+    info.setQueryMaster(workResource.worker.getAllocatedHost());
+    info.setQueryMasterPort(workResource.worker.getQueryMasterPort());
+    info.setQueryMasterclientPort(workResource.worker.getClientPort());
 
     //fire QueryJobStart event
     queryInProgress.getEventHandler().handle(

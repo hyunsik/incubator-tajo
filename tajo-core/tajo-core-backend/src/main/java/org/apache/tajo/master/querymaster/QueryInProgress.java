@@ -156,7 +156,10 @@ public class QueryInProgress extends CompositeService {
       if(worker == null) {
         return false;
       }
-      queryInfo.setQueryMasterResource(worker);
+
+      queryInfo.setQueryMaster(worker.getAllocatedHost());
+      queryInfo.setQueryMasterPort(worker.getQueryMasterPort());
+      queryInfo.setQueryMasterclientPort(worker.getClientPort());
       getEventHandler().handle(new QueryJobEvent(QueryJobEvent.Type.QUERY_MASTER_START, queryInfo));
 
       return true;
@@ -188,15 +191,12 @@ public class QueryInProgress extends CompositeService {
   }
 
   private void connectQueryMaster() throws Exception {
-    if(queryInfo.getQueryMasterResource() != null &&
-        queryInfo.getQueryMasterResource().getAllocatedHost() != null) {
-      InetSocketAddress addr = NetUtils.createSocketAddr(
-          queryInfo.getQueryMasterHost() + ":" + queryInfo.getQueryMasterPort());
-      LOG.info("Connect to QueryMaster:" + addr);
-      queryMasterRpc =
-          RpcConnectionPool.getPool((TajoConf) getConfig()).getConnection(addr, QueryMasterProtocol.class, true);
-      queryMasterRpcClient = queryMasterRpc.getStub();
-    }
+    InetSocketAddress addr = NetUtils.createSocketAddr(
+        queryInfo.getQueryMasterHost() + ":" + queryInfo.getQueryMasterPort());
+    LOG.info("Connect to QueryMaster:" + addr);
+    queryMasterRpc =
+        RpcConnectionPool.getPool((TajoConf) getConfig()).getConnection(addr, QueryMasterProtocol.class, true);
+    queryMasterRpcClient = queryMasterRpc.getStub();
   }
 
   private synchronized void submmitQueryToMaster() {
@@ -245,9 +245,6 @@ public class QueryInProgress extends CompositeService {
 
   private void heartbeat(QueryInfo queryInfo) {
     LOG.info("Received QueryMaster heartbeat:" + queryInfo);
-    if(queryInfo.getQueryMasterResource() != null) {
-      this.queryInfo.setQueryMasterResource(queryInfo.getQueryMasterResource());
-    }
     this.queryInfo.setQueryState(queryInfo.getQueryState());
     this.queryInfo.setProgress(queryInfo.getProgress());
     this.queryInfo.setFinishTime(queryInfo.getFinishTime());
