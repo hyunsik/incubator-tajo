@@ -113,14 +113,18 @@ public class TestTajoResourceManager {
 
   @Test
   public void testHeartbeat() throws Exception {
-    TajoWorkerResourceManager tajoWorkerResourceManager = initResourceManager(false);
-    assertEquals(numWorkers, tajoWorkerResourceManager.getWorkers().size());
-    for(Worker worker: tajoWorkerResourceManager.getWorkers().values()) {
-      WorkerResource resource = worker.getResource();
-      assertEquals(workerMemoryMB, resource.getAvailableMemoryMB());
-      assertEquals(workerDiskSlots, resource.getAvailableDiskSlots(), 0);
+    TajoWorkerResourceManager tajoWorkerResourceManager = null;
+    try {
+      tajoWorkerResourceManager = initResourceManager(false);
+      assertEquals(numWorkers, tajoWorkerResourceManager.getWorkers().size());
+      for(Worker worker: tajoWorkerResourceManager.getWorkers().values()) {
+        WorkerResource resource = worker.getResource();
+        assertEquals(workerMemoryMB, resource.getAvailableMemoryMB());
+        assertEquals(workerDiskSlots, resource.getAvailableDiskSlots(), 0);
+      }
+    } finally {
+      tajoWorkerResourceManager.stop();
     }
-    tajoWorkerResourceManager.stop();
   }
 
   @Test

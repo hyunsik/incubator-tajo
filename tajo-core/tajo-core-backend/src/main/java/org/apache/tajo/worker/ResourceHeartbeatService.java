@@ -25,6 +25,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.tajo.conf.TajoConf;
+import org.apache.tajo.ipc.NodeResourceTracker;
 import org.apache.tajo.ipc.TajoMasterProtocol;
 import org.apache.tajo.rpc.CallFuture;
 import org.apache.tajo.rpc.NettyClientBase;
@@ -194,14 +195,14 @@ public class ResourceHeartbeatService extends AbstractService {
             .setServerStatus(serverStatus)
             .build();
 
-        NettyClientBase tmClient = null;
+        NettyClientBase rmClient = null;
         try {
           CallFuture<TajoMasterProtocol.TajoHeartbeatResponse> callBack =
               new CallFuture<TajoMasterProtocol.TajoHeartbeatResponse>();
 
-          tmClient = connectionPool.getConnection(context.getTajoMasterAddress(), TajoMasterProtocol.class, true);
-          TajoMasterProtocol.TajoMasterProtocolService masterClientService = tmClient.getStub();
-          masterClientService.heartbeat(callBack.getController(), heartbeatProto, callBack);
+          rmClient = connectionPool.getConnection(context.getResourceTrackerAddress(), NodeResourceTracker.class, true);
+          NodeResourceTracker.NodeResourceTrackerService resourceTracker = rmClient.getStub();
+          resourceTracker.heartbeat(callBack.getController(), heartbeatProto, callBack);
 
           TajoMasterProtocol.TajoHeartbeatResponse response = callBack.get(2, TimeUnit.SECONDS);
           if(response != null) {
@@ -222,7 +223,7 @@ public class ResourceHeartbeatService extends AbstractService {
         } catch (Exception e) {
           LOG.error(e.getMessage(), e);
         } finally {
-          connectionPool.releaseConnection(tmClient);
+          connectionPool.releaseConnection(rmClient);
         }
 
         try {

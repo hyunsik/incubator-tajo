@@ -93,6 +93,8 @@ public class TajoWorker extends CompositeService {
 
   private InetSocketAddress tajoMasterAddress;
 
+  private InetSocketAddress workerResourceTrackerAddr;
+
   private CatalogClient catalogClient;
 
   private WorkerContext workerContext;
@@ -260,6 +262,7 @@ public class TajoWorker extends CompositeService {
       taskRunnerManager.startTask(cmdArgs);
     } else {
       tajoMasterAddress = NetUtils.createSocketAddr(systemConf.getVar(ConfVars.TAJO_MASTER_UMBILICAL_RPC_ADDRESS));
+      workerResourceTrackerAddr = NetUtils.createSocketAddr(systemConf.getVar(ConfVars.RESOURCE_TRACKER_RPC_ADDRESS));
       connectToCatalog();
     }
 
@@ -456,6 +459,10 @@ public class TajoWorker extends CompositeService {
 
     public InetSocketAddress getTajoMasterAddress() {
       return tajoMasterAddress;
+    }
+
+    public InetSocketAddress getResourceTrackerAddress() {
+      return workerResourceTrackerAddr;
     }
 
     public int getPeerRpcPort() {

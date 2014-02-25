@@ -28,6 +28,7 @@ import org.apache.hadoop.service.AbstractService;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.ipc.NodeResourceTracker;
 import org.apache.tajo.ipc.TajoMasterProtocol;
+import org.apache.tajo.master.WorkerLivelinessMonitor;
 import org.apache.tajo.rpc.AsyncRpcServer;
 import org.apache.tajo.util.NetUtils;
 
@@ -40,14 +41,16 @@ public class WorkerTrackerService extends AbstractService {
   private Log LOG = LogFactory.getLog(WorkerTrackerService.class);
 
   private final WorkerRMContext rmContext;
+  private final WorkerLivelinessMonitor workerLivelinessMonitor;
 
   private HeartbeatService heartbeatService;
   private AsyncRpcServer server;
   private InetSocketAddress bindAddress;
 
-  public WorkerTrackerService(WorkerRMContext rmContext) {
+  public WorkerTrackerService(WorkerRMContext rmContext, WorkerLivelinessMonitor workerLivelinessMonitor) {
     super(WorkerTrackerService.class.getSimpleName());
     this.rmContext = rmContext;
+    this.workerLivelinessMonitor = workerLivelinessMonitor;
   }
 
   @Override
@@ -84,13 +87,100 @@ public class WorkerTrackerService extends AbstractService {
     super.stop();
   }
 
-  private static class HeartbeatService implements NodeResourceTrackerService.Interface {
+  private class HeartbeatService implements NodeResourceTrackerService.Interface {
 
     @Override
     public void heartbeat(RpcController controller,
-                          TajoMasterProtocol.TajoHeartbeat request,
+                          TajoMasterProtocol.TajoHeartbeat heartbeat,
                           RpcCallback<TajoMasterProtocol.TajoHeartbeatResponse> done) {
+      synchronized (this) {
+        String workerKey = createWorkerId(heartbeat);
+        LOG.info("Heartbeat from " + workerKey);
 
+        if(rmContext.getWorkers().containsKey(workerKey)) { // worker is running
+          LOG.info("Worker is running");
+          Worker worker = rmContext.getWorkers().get(workerKey);
+          WorkerResource workerResource = worker.getResource();
+          updateWorkerResource(workerResource, heartbeat);
+          workerLivelinessMonitor.receivedPing(workerKey);
+        } else if (rmContext.getInactiveWorkers().containsKey(workerKey)) { // worker is dead
+          LOG.info("Worker is inactive");
+          Worker worker = rmContext.getInactiveWorkers().remove(workerKey);
+          workerLivelinessMonitor.unregister(worker.getWorkerId());
+
+          Worker newWorker = createWorkerResource(heartbeat);
+          String workerId = newWorker.getWorkerId();
+          rmContext.getWorkers().putIfAbsent(workerId, newWorker);
+          rmContext.getDispatcher().getEventHandler().handle(new WorkerEvent(workerId, WorkerEventType.STARTED));
+
+          workerLivelinessMonitor.register(workerId);
+
+        } else { // new worker
+          LOG.info("Worker is new");
+          Worker newWorker = createWorkerResource(heartbeat);
+
+          String workerId = newWorker.getWorkerId();
+          Worker oldWorker = rmContext.getWorkers().putIfAbsent(workerId, newWorker);
+
+          if (oldWorker == null) {
+            rmContext.rmDispatcher.getEventHandler().handle(new WorkerEvent(workerId, WorkerEventType.STARTED));
+          } else {
+            LOG.info("Reconnect from the node at: " + workerId);
+            workerLivelinessMonitor.unregister(workerId);
+            rmContext.getDispatcher().getEventHandler().handle(new WorkerReconnectEvent(workerId, newWorker));
+          }
+
+          workerLivelinessMonitor.register(workerKey);
+        }
+
+        notifyAll();
+      }
     }
+  }
+
+  private static final String createWorkerId(TajoMasterProtocol.TajoHeartbeat heartbeat) {
+    return heartbeat.getTajoWorkerHost() + ":" + heartbeat.getTajoQueryMasterPort() + ":"
+        + heartbeat.getPeerRpcPort();
+  }
+
+  private Worker createWorkerResource(TajoMasterProtocol.TajoHeartbeat request) {
+    boolean queryMasterMode = request.getServerStatus().getQueryMasterMode().getValue();
+    boolean taskRunnerMode = request.getServerStatus().getTaskRunnerMode().getValue();
+
+    WorkerResource workerResource = new WorkerResource();
+    workerResource.setQueryMasterMode(queryMasterMode);
+    workerResource.setTaskRunnerMode(taskRunnerMode);
+
+    workerResource.setLastHeartbeat(System.currentTimeMillis());
+    if(request.getServerStatus() != null) {
+      workerResource.setMemoryMB(request.getServerStatus().getMemoryResourceMB());
+      workerResource.setCpuCoreSlots(request.getServerStatus().getSystem().getAvailableProcessors());
+      workerResource.setDiskSlots(request.getServerStatus().getDiskSlots());
+      workerResource.setNumRunningTasks(request.getServerStatus().getRunningTaskNum());
+      workerResource.setMaxHeap(request.getServerStatus().getJvmHeap().getMaxHeap());
+      workerResource.setFreeHeap(request.getServerStatus().getJvmHeap().getFreeHeap());
+      workerResource.setTotalHeap(request.getServerStatus().getJvmHeap().getTotalHeap());
+    } else {
+      workerResource.setMemoryMB(4096);
+      workerResource.setDiskSlots(4);
+      workerResource.setCpuCoreSlots(4);
+    }
+
+    Worker worker = new Worker(rmContext, workerResource);
+    worker.setAllocatedHost(request.getTajoWorkerHost());
+    worker.setHttpPort(request.getTajoWorkerHttpPort());
+    worker.setPeerRpcPort(request.getPeerRpcPort());
+    worker.setQueryMasterPort(request.getTajoQueryMasterPort());
+    worker.setClientPort(request.getTajoWorkerClientPort());
+    worker.setPullServerPort(request.getTajoWorkerPullServerPort());
+    return worker;
+  }
+
+  private void updateWorkerResource(WorkerResource resource, TajoMasterProtocol.TajoHeartbeat request) {
+    resource.setLastHeartbeat(System.currentTimeMillis());
+    resource.setNumRunningTasks(request.getServerStatus().getRunningTaskNum());
+    resource.setMaxHeap(request.getServerStatus().getJvmHeap().getMaxHeap());
+    resource.setFreeHeap(request.getServerStatus().getJvmHeap().getFreeHeap());
+    resource.setTotalHeap(request.getServerStatus().getJvmHeap().getTotalHeap());
   }
 }
