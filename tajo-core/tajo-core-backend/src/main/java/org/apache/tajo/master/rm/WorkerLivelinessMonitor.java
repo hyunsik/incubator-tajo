@@ -16,26 +16,26 @@
  * limitations under the License.
  */
 
-package org.apache.tajo.master;
+package org.apache.tajo.master.rm;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.yarn.api.records.NodeId;
-import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.event.Dispatcher;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.util.AbstractLivelinessMonitor;
 import org.apache.hadoop.yarn.util.SystemClock;
 import org.apache.tajo.conf.TajoConf;
-import org.apache.tajo.master.rm.WorkerEventType;
-import org.apache.tajo.master.rm.WorkerEvent;
 
+/**
+ * It periodically checks the latest heartbeat time. If the latest heartbeat time is expired,
+ * it produces EXPIRE event to a corresponding Worker.
+ */
 public class WorkerLivelinessMonitor extends AbstractLivelinessMonitor<String> {
 
   private EventHandler dispatcher;
 
   public WorkerLivelinessMonitor(Dispatcher d) {
-    super("NMLivelinessMonitor", new SystemClock());
+    super(WorkerLivelinessMonitor.class.getSimpleName(), new SystemClock());
     this.dispatcher = d.getEventHandler();
   }
 

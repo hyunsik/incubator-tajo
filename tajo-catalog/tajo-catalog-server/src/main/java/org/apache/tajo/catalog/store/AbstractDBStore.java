@@ -65,6 +65,8 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
 
   protected abstract void createBaseTable() throws CatalogException;
 
+  protected abstract void dropBaseTable() throws CatalogException;
+
   public AbstractDBStore(Configuration conf)
       throws InternalException {
 
@@ -113,8 +115,13 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
 
     try {
       if (!isInitialized()) {
-        LOG.info("The base tables of CatalogServer are created.");
-        createBaseTable();
+        try {
+          createBaseTable();
+          LOG.info("The base tables of CatalogServer are created.");
+        } catch (CatalogException ce) {
+          dropBaseTable();
+          throw ce;
+        }
       } else {
         LOG.info("The base tables of CatalogServer already is initialized.");
       }
@@ -311,7 +318,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
         pstmt.setInt(1, tid);
         pstmt.setString(2, tableName);
         pstmt.setInt(3, i);
-        pstmt.setString(4, col.getColumnName());
+        pstmt.setString(4, CatalogUtil.extractSimpleName(col.getName()));
         pstmt.setString(5, col.getDataType().getType().name());
         pstmt.setInt(6, (col.getDataType().hasLength() ? col.getDataType().getLength() : 0));
         pstmt.addBatch();
@@ -1047,7 +1054,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       sql.append("INSERT INTO indexes (index_name, ");
       sql.append(C_TABLE_ID);
       sql.append(", column_name, ");
-      sql.append( "data_type, index_type, is_unique, is_clustered, is_ascending) VALUES ");
+      sql.append("data_type, index_type, is_unique, is_clustered, is_ascending) VALUES ");
       sql.append("(?,?,?,?,?,?,?,?)");
 
       if (LOG.isDebugEnabled()) {
@@ -1059,7 +1066,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
 
       pstmt.setString(1, proto.getName());
       pstmt.setString(2, proto.getTableId());
-      pstmt.setString(3, proto.getColumn().getColumnName());
+      pstmt.setString(3, CatalogUtil.extractSimpleName(proto.getColumn().getName()));
       pstmt.setString(4, proto.getColumn().getDataType().getType().name());
       pstmt.setString(5, proto.getIndexMethod().toString());
       pstmt.setBoolean(6, proto.hasIsUnique() && proto.getIsUnique());
@@ -1306,7 +1313,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
    */
   private ColumnProto indexResultToColumnProto(final ResultSet res) throws SQLException {
     ColumnProto.Builder builder = ColumnProto.newBuilder();
-    builder.setColumnName(res.getString("column_name").trim());
+    builder.setName(res.getString("column_name").trim());
 
     Type type = getDataType(res.getString("data_type").trim());
     builder.setDataType(CatalogUtil.newSimpleDataType(type));
@@ -1316,7 +1323,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
 
   private ColumnProto resultToColumnProto(final ResultSet res) throws SQLException {
     ColumnProto.Builder builder = ColumnProto.newBuilder();
-    builder.setColumnName(res.getString("column_name").trim());
+    builder.setName(res.getString("column_name").trim());
 
     Type type = getDataType(res.getString("data_type").trim());
     int typeLength = res.getInt("type_length");
@@ -1338,24 +1345,6 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       setBuilder.addKeyval(builder.build());
     }
     return setBuilder.build();
-  }
-
-  private ColumnProto resultToQualifiedColumnProto(String tableName, final ResultSet res) throws SQLException {
-    ColumnProto.Builder builder = ColumnProto.newBuilder();
-
-    String columnName = tableName + "."
-        + res.getString("column_name").trim();
-    builder.setColumnName(columnName);
-
-    Type type = getDataType(res.getString("data_type").trim());
-    int typeLength = res.getInt("type_length");
-    if(typeLength > 0 ) {
-      builder.setDataType(CatalogUtil.newDataTypeWithLen(type, typeLength));
-    } else {
-      builder.setDataType(CatalogUtil.newSimpleDataType(type));
-    }
-
-    return builder.build();
   }
 
   private IndexMethod getIndexMethod(final String typeStr) {

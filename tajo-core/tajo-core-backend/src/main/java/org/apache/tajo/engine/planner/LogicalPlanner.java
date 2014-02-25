@@ -117,7 +117,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     LogicalNode topMostNode = this.visit(context, new Stack<Expr>(), expr);
 
     // Add Root Node
-    LogicalRootNode root = new LogicalRootNode(plan.newPID());
+    LogicalRootNode root = plan.createNode(LogicalRootNode.class);
     root.setInSchema(topMostNode.getOutSchema());
     root.setChild(topMostNode);
     root.setOutSchema(topMostNode.getOutSchema());
@@ -251,7 +251,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     QueryBlock block = context.queryBlock;
 
     Schema outSchema = projectionNode.getOutSchema();
-    GroupbyNode dupRemoval = new GroupbyNode(plan.newPID());
+    GroupbyNode dupRemoval = context.plan.createNode(GroupbyNode.class);
     dupRemoval.setChild(child);
     dupRemoval.setInSchema(projectionNode.getInSchema());
     dupRemoval.setTargets(PlannerUtil.schemaToTargets(outSchema));
@@ -413,7 +413,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
     LogicalPlan plan = context.plan;
     QueryBlock block = context.queryBlock;
-    GroupbyNode groupbyNode = new GroupbyNode(plan.newPID());
+    GroupbyNode groupbyNode = context.plan.createNode(GroupbyNode.class);
     groupbyNode.setChild(child);
     groupbyNode.setInSchema(child.getOutSchema());
 
@@ -857,8 +857,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     Column rightJoinKey;
 
     for (Column common : commons.getColumns()) {
-      leftJoinKey = leftSchema.getColumnByName(common.getColumnName());
-      rightJoinKey = rightSchema.getColumnByName(common.getColumnName());
+      leftJoinKey = leftSchema.getColumn(common.getQualifiedName());
+      rightJoinKey = rightSchema.getColumn(common.getQualifiedName());
       equiQual = new BinaryEval(EvalType.EQUAL,
           new FieldEval(leftJoinKey), new FieldEval(rightJoinKey));
       if (njQual == null) {
@@ -877,7 +877,8 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     QueryBlock block = context.queryBlock;
 
     Schema merged = SchemaUtil.merge(left.getOutSchema(), right.getOutSchema());
-    JoinNode join = new JoinNode(plan.newPID(), JoinType.CROSS, left, right);
+    JoinNode join = plan.createNode(JoinNode.class);
+    join.init(JoinType.CROSS, left, right);
     join.setInSchema(merged);
 
     EvalNode evalNode;
@@ -930,12 +931,12 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     ScanNode scanNode = block.getNodeFromExpr(expr);
     updatePhysicalInfo(scanNode.getTableDesc());
 
-    // Add additional expressions required in upper nodes, such as sort key, grouping columns,
-    // column references included in filter condition
-    //
-    // newlyEvaluatedExprsRef keeps
+    // Find expression which can be evaluated at this relation node.
+    // Except for column references, additional expressions used in select list, where clause, order-by clauses
+    // can be evaluated here. Their reference names are kept in newlyEvaluatedExprsRef.
     Set<String> newlyEvaluatedExprsReferences = new LinkedHashSet<String>();
-    for (NamedExpr rawTarget : block.namedExprsMgr.getAllNamedExprs()) {
+    for (Iterator<NamedExpr> iterator = block.namedExprsMgr.getIteratorForUnevaluatedExprs(); iterator.hasNext();) {
+      NamedExpr rawTarget = iterator.next();
       try {
         EvalNode evalNode = exprAnnotator.createEvalNode(context.plan, context.queryBlock, rawTarget.getExpr());
         if (checkIfBeEvaluatedAtRelation(block, evalNode, scanNode)) {
@@ -1087,9 +1088,9 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     if (setOperation.getType() == OpType.Union) {
       setOp = block.getNodeFromExpr(setOperation);
     } else if (setOperation.getType() == OpType.Except) {
-      setOp = new ExceptNode(plan.newPID(), leftChild, rightChild);
+      setOp = block.getNodeFromExpr(setOperation);
     } else if (setOperation.getType() == OpType.Intersect) {
-      setOp = new IntersectNode(plan.newPID(), leftChild, rightChild);
+      setOp = block.getNodeFromExpr(setOperation);
     } else {
       throw new VerifyException("Invalid Type: " + setOperation.getType());
     }
@@ -1177,14 +1178,15 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
 
     if (expr.hasTargetColumns()) { // when a user specified target columns
 
-      if (expr.getTargetColumns().length > insertNode.getChild().getOutSchema().getColumnNum()) {
+      if (expr.getTargetColumns().length > insertNode.getChild().getOutSchema().size()) {
         throw new PlanningException("Target columns and projected columns are mismatched to each other");
       }
 
       // See PreLogicalPlanVerifier.visitInsert.
       // It guarantees that the equivalence between the numbers of target and projected columns.
-
-      context.queryBlock.addRelation(new ScanNode(context.plan.newPID(), desc));
+      ScanNode scanNode = context.plan.createNode(ScanNode.class);
+      scanNode.init(desc);
+      context.queryBlock.addRelation(scanNode);
       String [] targets = expr.getTargetColumns();
       Schema targetColumns = new Schema();
       for (int i = 0; i < targets.length; i++) {
@@ -1202,7 +1204,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       Schema projectedSchema = insertNode.getChild().getOutSchema();
 
       Schema targetColumns = new Schema();
-      for (int i = 0; i < projectedSchema.getColumnNum(); i++) {
+      for (int i = 0; i < projectedSchema.size(); i++) {
         targetColumns.addColumn(tableSchema.getColumn(i));
       }
       insertNode.setTargetSchema(targetColumns);
@@ -1224,13 +1226,13 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     // Modifying projected columns by adding NULL constants
     // It is because that table appender does not support target columns to be written.
     List<Target> targets = TUtil.newList();
-    for (int i = 0, j = 0; i < tableSchema.getColumnNum(); i++) {
+    for (int i = 0, j = 0; i < tableSchema.size(); i++) {
       Column column = tableSchema.getColumn(i);
 
       if(targetColumns.contains(column) && j < projectionNode.getTargets().length) {
         targets.add(projectionNode.getTargets()[j++]);
       } else {
-        targets.add(new Target(new ConstEval(NullDatum.get()), column.getColumnName()));
+        targets.add(new Target(new ConstEval(NullDatum.get()), column.getSimpleName()));
       }
     }
     projectionNode.setTargets(targets.toArray(new Target[targets.size()]));
@@ -1321,11 +1323,11 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
           Schema queryOutputSchema = subQuery.getOutSchema();
           Schema partitionExpressionSchema = partitionMethod.getExpressionSchema();
           if (partitionMethod.getPartitionType() == CatalogProtos.PartitionType.COLUMN &&
-              queryOutputSchema.getColumnNum() < partitionExpressionSchema.getColumnNum()) {
+              queryOutputSchema.size() < partitionExpressionSchema.size()) {
             throw new VerifyException("Partition columns cannot be more than table columns.");
           }
           Schema tableSchema = new Schema();
-          for (int i = 0; i < queryOutputSchema.getColumnNum() - partitionExpressionSchema.getColumnNum(); i++) {
+          for (int i = 0; i < queryOutputSchema.size() - partitionExpressionSchema.size(); i++) {
             tableSchema.addColumn(queryOutputSchema.getColumn(i));
           }
           createTableNode.setOutSchema(tableSchema);
@@ -1424,7 +1426,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   @Override
   public LogicalNode visitDropTable(PlanContext context, Stack<Expr> stack, DropTable dropTable) {
     DropTableNode dropTableNode = context.queryBlock.getNodeFromExpr(dropTable);
-    dropTableNode.set(dropTable.getTableName(), dropTable.isPurge());
+    dropTableNode.init(dropTable.getTableName(), dropTable.isPurge());
     return dropTableNode;
   }
 

@@ -144,7 +144,9 @@ public class GlobalPlanner {
         "Channel schema (" + channel.getSrcId().getId() + " -> " + channel.getTargetId().getId() + ") is not initialized");
     TableMeta meta = new TableMeta(channel.getStoreType(), new Options());
     TableDesc desc = new TableDesc(channel.getSrcId().toString(), channel.getSchema(), meta, new Path("/"));
-    return new ScanNode(plan.newPID(), desc);
+    ScanNode scanNode = plan.createNode(ScanNode.class);
+    scanNode.init(desc);
+    return scanNode;
   }
 
   private DataChannel createDataChannelFromJoin(ExecutionBlock leftBlock, ExecutionBlock rightBlock,
@@ -847,7 +849,7 @@ public class GlobalPlanner {
     if (node.getType() == NodeType.INSERT) {
       InsertNode insertNode = (InsertNode) node;
       channel.setSchema(((InsertNode)node).getProjectedSchema());
-      Column [] shuffleKeys = new Column[partitionMethod.getExpressionSchema().getColumnNum()];
+      Column [] shuffleKeys = new Column[partitionMethod.getExpressionSchema().size()];
       int i = 0;
       for (Column column : partitionMethod.getExpressionSchema().getColumns()) {
         int id = insertNode.getTableSchema().getColumnId(column.getQualifiedName());

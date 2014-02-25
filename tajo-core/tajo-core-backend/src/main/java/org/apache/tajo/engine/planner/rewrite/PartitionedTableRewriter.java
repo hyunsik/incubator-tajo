@@ -145,7 +145,7 @@ public class PartitionedTableRewriter implements RewriteRule {
     // loop from one to the number of partition columns
     Path [] filteredPaths = toPathArray(fs.listStatus(tablePath, filters[0]));
 
-    for (int i = 1; i < partitionColumns.getColumnNum(); i++) {
+    for (int i = 1; i < partitionColumns.size(); i++) {
       // Get all file status matched to a ith level path filter.
       filteredPaths = toPathArray(fs.listStatus(filteredPaths, filters[i]));
     }
@@ -182,9 +182,9 @@ public class PartitionedTableRewriter implements RewriteRule {
                                                      EvalNode [] conjunctiveForms) {
     // Building partition path filters for all levels
     Column target;
-    PathFilter [] filters = new PathFilter[partitionColumns.getColumnNum()];
+    PathFilter [] filters = new PathFilter[partitionColumns.size()];
     List<EvalNode> accumulatedFilters = Lists.newArrayList();
-    for (int i = 0; i < partitionColumns.getColumnNum(); i++) { // loop from one to level
+    for (int i = 0; i < partitionColumns.size(); i++) { // loop from one to level
       target = partitionColumns.getColumn(i);
 
       for (EvalNode expr : conjunctiveForms) {
@@ -212,9 +212,9 @@ public class PartitionedTableRewriter implements RewriteRule {
    */
   private static PathFilter [] buildAllAcceptingPathFilters(Schema partitionColumns) {
     Column target;
-    PathFilter [] filters = new PathFilter[partitionColumns.getColumnNum()];
+    PathFilter [] filters = new PathFilter[partitionColumns.size()];
     List<EvalNode> accumulatedFilters = Lists.newArrayList();
-    for (int i = 0; i < partitionColumns.getColumnNum(); i++) { // loop from one to level
+    for (int i = 0; i < partitionColumns.size(); i++) { // loop from one to level
       target = partitionColumns.getColumn(i);
       accumulatedFilters.add(new IsNullEval(true, new FieldEval(target)));
 
@@ -354,8 +354,8 @@ public class PartitionedTableRewriter implements RewriteRule {
       try {
         Path [] filteredPaths = findFilteredPartitionPaths(scanNode);
         plan.addHistory("PartitionTableRewriter chooses " + filteredPaths.length + " of partitions");
-        PartitionedTableScanNode rewrittenScanNode =
-            new PartitionedTableScanNode(plan.newPID(), scanNode, filteredPaths);
+        PartitionedTableScanNode rewrittenScanNode = plan.createNode(PartitionedTableScanNode.class);
+        rewrittenScanNode.init(scanNode, filteredPaths);
         updateTableStat(rewrittenScanNode);
 
         // if it is topmost node, set it as the rootnode of this block.

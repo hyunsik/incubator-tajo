@@ -20,21 +20,24 @@ package org.apache.tajo.engine.planner.logical;
 
 import com.google.common.base.Objects;
 import com.google.gson.annotations.Expose;
+import org.apache.tajo.catalog.CatalogUtil;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.engine.planner.PlanString;
 import org.apache.tajo.engine.planner.PlannerUtil;
 import org.apache.tajo.engine.planner.Target;
 import org.apache.tajo.engine.utils.SchemaUtil;
-import org.apache.tajo.util.TUtil;
 
 public class TableSubQueryNode extends RelationNode implements Projectable {
   @Expose private String tableName;
   @Expose private LogicalNode subQuery;
   @Expose private Target [] targets; // unused
 
-  public TableSubQueryNode(int pid, String tableName, LogicalNode subQuery) {
+  public TableSubQueryNode(int pid) {
     super(pid, NodeType.TABLE_SUBQUERY);
-    this.tableName = PlannerUtil.normalizeTableName(tableName);
+  }
+
+  public void init(String tableName, LogicalNode subQuery) {
+    this.tableName = CatalogUtil.normalizeIdentifier(tableName);
     if (subQuery != null) {
       this.subQuery = subQuery;
       setOutSchema(SchemaUtil.clone(this.subQuery.getOutSchema()));
@@ -164,14 +167,6 @@ public class TableSubQueryNode extends RelationNode implements Projectable {
   }
 
   public String toString() {
-    StringBuilder sb = new StringBuilder();
-    sb.append("(").append(getPID()).append(") Table Subquery (alias=").append(tableName).append(")\n");
-    if (hasTargets()) {
-      sb.append("  targets: ").append(TUtil.arrayToString(targets)).append("\n");
-    }
-    sb.append("  out schema:").append(getOutSchema()).append("\n");
-    sb.append("  input schema:").append(getInSchema()).append("\n");
-    sb.append(subQuery.toString());
-    return sb.toString();
+    return "Inline view (name=" + tableName + ")";
   }
 }

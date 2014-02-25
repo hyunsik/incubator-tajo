@@ -16,12 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.tajo.engine.planner.logical;
+package org.apache.tajo.master.rm;
 
-public class StoreIndexNode extends StoreTableNode {
-
-  public StoreIndexNode(int pid) {
-    super(pid);
-  }
-
+public class WorkerStatusEvent {
 }

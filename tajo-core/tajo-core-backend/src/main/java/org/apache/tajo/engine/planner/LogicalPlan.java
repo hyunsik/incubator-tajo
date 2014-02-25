@@ -22,6 +22,7 @@ import com.google.common.collect.Lists;
 import org.apache.commons.lang.ObjectUtils;
 import org.apache.tajo.algebra.*;
 import org.apache.tajo.annotation.NotThreadSafe;
+import org.apache.tajo.catalog.CatalogUtil;
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.engine.eval.EvalNode;
@@ -35,6 +36,7 @@ import org.apache.tajo.engine.planner.logical.NodeType;
 import org.apache.tajo.engine.planner.logical.RelationNode;
 import org.apache.tajo.util.TUtil;
 
+import java.lang.reflect.Constructor;
 import java.util.*;
 
 /**
@@ -48,6 +50,7 @@ public class LogicalPlan {
   /** it indicates the root block */
   public static final String ROOT_BLOCK = VIRTUAL_TABLE_PREFIX + "ROOT";
   public static final String NONAME_BLOCK_PREFIX = VIRTUAL_TABLE_PREFIX + "QB_";
+  private static final int NO_SEQUENCE_PID = -1;
   private int nextPid = 0;
   private Integer noNameBlockId = 0;
   private Integer noNameColumnId = 0;
@@ -65,6 +68,37 @@ public class LogicalPlan {
 
   public LogicalPlan(LogicalPlanner planner) {
     this.planner = planner;
+  }
+
+  /**
+   * Create a LogicalNode instance for a type. Each a LogicalNode instance is given an unique plan node id (PID).
+   *
+   * @param theClass The class to be created
+   * @return a LogicalNode instance identified by an unique plan node id (PID).
+   */
+  public <T extends LogicalNode> T createNode(Class<T> theClass) {
+    try {
+      Constructor<T> ctor = theClass.getConstructor(int.class);
+      return ctor.newInstance(newPID());
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * Create a LogicalNode instance for a type. Each a LogicalNode instance is not given an unique plan node id (PID).
+   * This method must be only used after all query planning and optimization phases.
+   *
+   * @param theClass The class to be created
+   * @return a LogicalNode instance
+   */
+  public static <T extends LogicalNode> T createNodeWithoutPID(Class<T> theClass) {
+    try {
+      Constructor<T> ctor = theClass.getConstructor(int.class);
+      return ctor.newInstance(NO_SEQUENCE_PID);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   /**
@@ -241,7 +275,7 @@ public class LogicalPlan {
       }
 
       Schema schema = relationOp.getTableSchema();
-      Column column = schema.getColumnByFQN(columnRef.getCanonicalName());
+      Column column = schema.getColumn(columnRef.getCanonicalName());
       if (column == null) {
         throw new NoSuchColumnException(columnRef.getCanonicalName());
       }
@@ -283,7 +317,7 @@ public class LogicalPlan {
       }
 
       if (block.getLatestNode() != null) {
-        Column found = block.getLatestNode().getOutSchema().getColumnByName(columnRef.getName());
+        Column found = block.getLatestNode().getOutSchema().getColumn(columnRef.getName());
         if (found != null) {
           return found;
         }
@@ -304,7 +338,7 @@ public class LogicalPlan {
 
       // Trying to find columns from other relations in the current block
       for (RelationNode rel : block.getRelations()) {
-        Column found = rel.getTableSchema().getColumnByName(columnRef.getName());
+        Column found = rel.getTableSchema().getColumn(columnRef.getName());
         if (found != null) {
           candidates.add(found);
         }
@@ -317,7 +351,7 @@ public class LogicalPlan {
       // Trying to find columns from other relations in other blocks
       for (QueryBlock eachBlock : queryBlocks.values()) {
         for (RelationNode rel : eachBlock.getRelations()) {
-          Column found = rel.getTableSchema().getColumnByName(columnRef.getName());
+          Column found = rel.getTableSchema().getColumn(columnRef.getName());
           if (found != null) {
             candidates.add(found);
           }
@@ -330,7 +364,7 @@ public class LogicalPlan {
 
       // Trying to find columns from schema in current block.
       if (block.getSchema() != null) {
-        Column found = block.getSchema().getColumnByName(columnRef.getName());
+        Column found = block.getSchema().getColumn(columnRef.getName());
         if (found != null) {
           candidates.add(found);
         }
@@ -398,7 +432,7 @@ public class LogicalPlan {
 
     StringBuilder explains = new StringBuilder();
     try {
-      ExplainLogicalPlanVisitor.Context explainContext = explain.getBlockPlanStrings(this, ROOT_BLOCK);
+      ExplainLogicalPlanVisitor.Context explainContext = explain.getBlockPlanStrings(this, getRootBlock().getRoot());
       while(!explainContext.explains.empty()) {
         explains.append(
             ExplainLogicalPlanVisitor.printDepthString(explainContext.getMaxDepth(), explainContext.explains.pop()));
@@ -528,15 +562,15 @@ public class LogicalPlan {
     }
 
     public boolean existsRelation(String name) {
-      return nameToRelationMap.containsKey(PlannerUtil.normalizeTableName(name));
+      return nameToRelationMap.containsKey(CatalogUtil.normalizeIdentifier(name));
     }
 
     public RelationNode getRelation(String name) {
-      return nameToRelationMap.get(PlannerUtil.normalizeTableName(name));
+      return nameToRelationMap.get(CatalogUtil.normalizeIdentifier(name));
     }
 
     public void addRelation(RelationNode relation) {
-      nameToRelationMap.put(PlannerUtil.normalizeTableName(relation.getCanonicalName()), relation);
+      nameToRelationMap.put(CatalogUtil.normalizeIdentifier(relation.getCanonicalName()), relation);
     }
 
     public Collection<RelationNode> getRelations() {
