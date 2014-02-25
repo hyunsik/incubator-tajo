@@ -224,7 +224,7 @@ public class TajoResourceAllocator extends AbstractResourceAllocator {
               .setResourceRequestPriority(TajoMasterProtocol.ResourceRequestPriority.MEMORY)
               .setMinDiskSlotPerContainer(requiredDiskSlots)
               .setMaxDiskSlotPerContainer(requiredDiskSlots)
-              .setExecutionBlockId(event.getExecutionBlockId().getProto())
+              .setQueryId(event.getExecutionBlockId().getQueryId().getProto())
               .build();
 
       RpcConnectionPool connPool = RpcConnectionPool.getPool(queryTaskContext.getConf());

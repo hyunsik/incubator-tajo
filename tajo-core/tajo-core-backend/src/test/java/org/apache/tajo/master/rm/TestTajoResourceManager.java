@@ -20,7 +20,6 @@ package org.apache.tajo.master.rm;
 
 import com.google.protobuf.RpcCallback;
 import org.apache.hadoop.yarn.proto.YarnProtos;
-import org.apache.tajo.ExecutionBlockId;
 import org.apache.tajo.QueryId;
 import org.apache.tajo.QueryIdFactory;
 import org.apache.tajo.conf.TajoConf;
@@ -138,12 +137,11 @@ public class TestTajoResourceManager {
       float diskSlots = 1.0f;
 
       QueryId queryId = QueryIdFactory.newQueryId(queryIdTime, 1);
-      ExecutionBlockId ebId = QueryIdFactory.newExecutionBlockId(queryId);
 
       WorkerResourceAllocationRequest request = WorkerResourceAllocationRequest.newBuilder()
           .setResourceRequestPriority(ResourceRequestPriority.MEMORY)
           .setNumContainers(60)
-          .setExecutionBlockId(ebId.getProto())
+          .setQueryId(queryId.getProto())
           .setMaxDiskSlotPerContainer(diskSlots)
           .setMinDiskSlotPerContainer(diskSlots)
           .setMinMemoryMBPerContainer(minMemory)
@@ -197,7 +195,7 @@ public class TestTajoResourceManager {
       }
 
       for(YarnProtos.ContainerIdProto eachContainerId: containerIds) {
-        tajoWorkerResourceManager.releaseWorkerResource(ebId, eachContainerId);
+        tajoWorkerResourceManager.releaseWorkerResource(eachContainerId);
       }
 
       for(Worker worker: tajoWorkerResourceManager.getWorkers().values()) {
@@ -227,7 +225,6 @@ public class TestTajoResourceManager {
       float diskSlots = 1.0f;
 
       QueryId queryId = QueryIdFactory.newQueryId(queryIdTime, 2);
-      ExecutionBlockId ebId = QueryIdFactory.newExecutionBlockId(queryId);
 
       int requiredContainers = 60;
 
@@ -238,7 +235,7 @@ public class TestTajoResourceManager {
         WorkerResourceAllocationRequest request = WorkerResourceAllocationRequest.newBuilder()
             .setResourceRequestPriority(ResourceRequestPriority.MEMORY)
             .setNumContainers(requiredContainers - numAllocatedContainers)
-            .setExecutionBlockId(ebId.getProto())
+            .setQueryId(queryId.getProto())
             .setMaxDiskSlotPerContainer(diskSlots)
             .setMinDiskSlotPerContainer(diskSlots)
             .setMinMemoryMBPerContainer(minMemory)
@@ -268,7 +265,7 @@ public class TestTajoResourceManager {
         for(WorkerAllocatedResource eachResource: TestTajoResourceManager.this.response.getWorkerAllocatedResourceList()) {
           assertTrue(
               eachResource.getAllocatedMemoryMB() >= minMemory &&  eachResource.getAllocatedMemoryMB() <= maxMemory);
-          tajoWorkerResourceManager.releaseWorkerResource(ebId, eachResource.getContainerId());
+          tajoWorkerResourceManager.releaseWorkerResource(eachResource.getContainerId());
         }
 
         for(Worker worker: tajoWorkerResourceManager.getWorkers().values()) {
@@ -315,12 +312,11 @@ public class TestTajoResourceManager {
       int memoryMB = 256;
 
       QueryId queryId = QueryIdFactory.newQueryId(queryIdTime, 3);
-      ExecutionBlockId ebId = QueryIdFactory.newExecutionBlockId(queryId);
 
       WorkerResourceAllocationRequest request = WorkerResourceAllocationRequest.newBuilder()
           .setResourceRequestPriority(ResourceRequestPriority.DISK)
           .setNumContainers(60)
-          .setExecutionBlockId(ebId.getProto())
+          .setQueryId(queryId.getProto())
           .setMaxDiskSlotPerContainer(maxDiskSlots)
           .setMinDiskSlotPerContainer(minDiskSlots)
           .setMinMemoryMBPerContainer(memoryMB)
@@ -370,7 +366,7 @@ public class TestTajoResourceManager {
       assertEquals(numWorkers * 3, response.getWorkerAllocatedResourceList().size());
 
       for(YarnProtos.ContainerIdProto eachContainerId: containerIds) {
-        tajoWorkerResourceManager.releaseWorkerResource(ebId, eachContainerId);
+        tajoWorkerResourceManager.releaseWorkerResource(eachContainerId);
       }
 
       for(Worker worker: tajoWorkerResourceManager.getWorkers().values()) {
@@ -381,58 +377,6 @@ public class TestTajoResourceManager {
         assertEquals(workerDiskSlots, resource.getAvailableDiskSlots(), 0);
         assertEquals(0.0f, resource.getUsedDiskSlots(), 0);
       }
-    } finally {
-      if (tajoWorkerResourceManager != null) {
-        tajoWorkerResourceManager.stop();
-      }
-    }
-  }
-
-  @Test
-  public void testQueryMasterResource() throws Exception {
-    TajoWorkerResourceManager tajoWorkerResourceManager = null;
-
-    try {
-      tajoWorkerResourceManager = initResourceManager(true);
-
-      int qmDefaultMemoryMB = tajoConf.getIntVar(TajoConf.ConfVars.TAJO_QUERYMASTER_MEMORY_MB);
-      float qmDefaultDiskSlots = tajoConf.getFloatVar(TajoConf.ConfVars.TAJO_QUERYMASTER_DISK_SLOT);
-
-      QueryId queryId = QueryIdFactory.newQueryId(queryIdTime, 4);
-
-      tajoWorkerResourceManager.allocateQueryMaster(queryId);
-
-      // assert after callback
-      int totalUsedMemory = 0;
-      int totalUsedDisks = 0;
-      for(Worker worker: tajoWorkerResourceManager.getWorkers().values()) {
-        WorkerResource resource = worker.getResource();
-        if(resource.getUsedMemoryMB() > 0) {
-          //worker which allocated querymaster
-          assertEquals(qmDefaultMemoryMB, resource.getUsedMemoryMB());
-          assertEquals(qmDefaultDiskSlots, resource.getUsedDiskSlots(), 0);
-        } else {
-          assertEquals(0, resource.getUsedMemoryMB());
-          assertEquals(0, resource.getUsedDiskSlots(), 0);
-        }
-
-        totalUsedMemory += resource.getUsedMemoryMB();
-        totalUsedDisks += resource.getUsedDiskSlots();
-      }
-
-      assertEquals(qmDefaultMemoryMB, totalUsedMemory);
-      assertEquals(qmDefaultDiskSlots, totalUsedDisks, 0);
-
-      //release
-      tajoWorkerResourceManager.stopQueryMaster(queryId);
-      for(Worker worker: tajoWorkerResourceManager.getWorkers().values()) {
-        WorkerResource resource = worker.getResource();
-        assertEquals(0, resource.getUsedMemoryMB());
-        assertEquals(0, resource.getUsedDiskSlots(), 0);
-        totalUsedMemory += resource.getUsedMemoryMB();
-        totalUsedDisks += resource.getUsedDiskSlots();
-      }
-
     } finally {
       if (tajoWorkerResourceManager != null) {
         tajoWorkerResourceManager.stop();

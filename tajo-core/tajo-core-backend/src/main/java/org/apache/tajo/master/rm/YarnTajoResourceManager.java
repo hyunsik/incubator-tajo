@@ -40,7 +40,6 @@ import org.apache.hadoop.yarn.ipc.YarnRPC;
 import org.apache.hadoop.yarn.proto.YarnProtos;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.util.Records;
-import org.apache.tajo.ExecutionBlockId;
 import org.apache.tajo.QueryId;
 import org.apache.tajo.TajoProtos;
 import org.apache.tajo.exception.UnimplementedException;
@@ -57,6 +56,9 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.security.PrivilegedAction;
 import java.util.*;
+
+import static org.apache.tajo.ipc.TajoMasterProtocol.WorkerAllocatedResource;
+import static org.apache.tajo.ipc.TajoMasterProtocol.WorkerResourceAllocationResponse;
 
 public class YarnTajoResourceManager extends AbstractService implements WorkerResourceManager {
   private static final Log LOG = LogFactory.getLog(YarnTajoResourceManager.class);
@@ -107,34 +109,20 @@ public class YarnTajoResourceManager extends AbstractService implements WorkerRe
   }
 
   @Override
-  public void releaseWorkerResource(ExecutionBlockId ebId, YarnProtos.ContainerIdProto containerId) {
+  public void releaseWorkerResource(YarnProtos.ContainerIdProto containerId) {
     throw new UnimplementedException("releaseWorkerResource");
   }
 
   @Override
-  public Worker allocateQueryMaster(QueryInProgress queryInProgress) {
+  public WorkerAllocatedResource allocateQueryMaster(QueryInProgress queryInProgress) {
     throw new UnimplementedException("allocateQueryMaster");
   }
 
   @Override
   public void allocateWorkerResources(
       TajoMasterProtocol.WorkerResourceAllocationRequest request,
-      RpcCallback<TajoMasterProtocol.WorkerResourceAllocationResponse> rpcCallBack) {
+      RpcCallback<WorkerResourceAllocationResponse> rpcCallBack) {
     throw new UnimplementedException("allocateWorkerResources");
-  }
-
-  @Override
-  public void startQueryMaster(QueryInProgress queryInProgress) {
-    try {
-      allocateAndLaunchQueryMaster(queryInProgress);
-
-      queryInProgress.getEventHandler().handle(
-          new QueryJobEvent(QueryJobEvent.Type.QUERY_JOB_START, queryInProgress.getQueryInfo()));
-    } catch (IOException e) {
-      LOG.error(e);
-    } catch (YarnException e) {
-      LOG.error(e);
-    }
   }
 
   @Override

@@ -129,10 +129,9 @@ public class TajoMasterService extends AbstractService {
                                            TajoMasterProtocol.WorkerResourceReleaseRequest request,
                                            RpcCallback<PrimitiveProtos.BoolProto> done) {
       List<YarnProtos.ContainerIdProto> containerIds = request.getContainerIdsList();
-      ExecutionBlockId ebId = new ExecutionBlockId(request.getExecutionBlockId());
 
       for(YarnProtos.ContainerIdProto eachContainer: containerIds) {
-        context.getResourceManager().releaseWorkerResource(ebId, eachContainer);
+        context.getResourceManager().releaseWorkerResource(eachContainer);
       }
       done.run(BOOL_TRUE);
     }

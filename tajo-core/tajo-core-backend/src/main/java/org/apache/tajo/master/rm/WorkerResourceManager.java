@@ -31,6 +31,9 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Map;
 
+import static org.apache.tajo.ipc.TajoMasterProtocol.WorkerAllocatedResource;
+import static org.apache.tajo.ipc.TajoMasterProtocol.WorkerResourceAllocationResponse;
+
 public interface WorkerResourceManager extends Service {
 
   /**
@@ -38,16 +41,10 @@ public interface WorkerResourceManager extends Service {
    * @param queryInProgress
    * @return
    */
-  public Worker allocateQueryMaster(QueryInProgress queryInProgress);
+  public WorkerAllocatedResource allocateQueryMaster(QueryInProgress queryInProgress);
 
   public void allocateWorkerResources(TajoMasterProtocol.WorkerResourceAllocationRequest request,
-      RpcCallback<TajoMasterProtocol.WorkerResourceAllocationResponse> rpcCallBack);
-
-  /**
-   * start Worker for query master(YARN) or assign query master role(Standby Mode)
-   * @param queryInProgress
-   */
-  public void startQueryMaster(QueryInProgress queryInProgress);
+      RpcCallback<WorkerResourceAllocationResponse> rpcCallBack);
 
   public String getSeedQueryId() throws IOException;
 
@@ -55,7 +52,7 @@ public interface WorkerResourceManager extends Service {
 
   public void stopQueryMaster(QueryId queryId);
 
-  public void releaseWorkerResource(ExecutionBlockId ebId, ContainerIdProto containerId);
+  public void releaseWorkerResource(ContainerIdProto containerId);
 
   public Map<String, Worker> getWorkers();
 
