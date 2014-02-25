@@ -27,8 +27,8 @@ import org.apache.hadoop.yarn.util.SystemClock;
 import org.apache.tajo.conf.TajoConf;
 
 /**
- * It periodically checks the latest heartbeat time. If the latest heartbeat time is expired,
- * it produces EXPIRE event to a corresponding Worker.
+ * It periodically checks the latest heartbeat time of {@link Worker}.
+ * If the latest heartbeat time is expired, it produces EXPIRE event to a corresponding {@link Worker}.
  */
 public class WorkerLivelinessMonitor extends AbstractLivelinessMonitor<String> {
 

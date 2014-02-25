@@ -20,6 +20,9 @@ package org.apache.tajo.master.rm;
 
 import org.apache.hadoop.yarn.event.AbstractEvent;
 
+/**
+ * WorkerEvent describes all kinds of events to {@link Worker}.
+ */
 public class WorkerEvent extends AbstractEvent<WorkerEventType> {
   private final String workerId;
 

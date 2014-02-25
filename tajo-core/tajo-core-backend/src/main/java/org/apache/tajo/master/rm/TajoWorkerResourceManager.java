@@ -173,40 +173,7 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
 
   @Override
   public TajoMasterProtocol.ClusterResourceSummary getClusterResourceSummary() {
-    int totalDiskSlots = 0;
-    int totalCpuCoreSlots = 0;
-    int totalMemoryMB = 0;
-
-    int totalAvailableDiskSlots = 0;
-    int totalAvailableCpuCoreSlots = 0;
-    int totalAvailableMemoryMB = 0;
-
-    synchronized(rmContext) {
-      for(String eachWorker: rmContext.getWorkers().keySet()) {
-        Worker worker = rmContext.getWorkers().get(eachWorker);
-        WorkerResource resource = worker.getResource();
-        if(worker != null) {
-          totalMemoryMB += resource.getMemoryMB();
-          totalAvailableMemoryMB += resource.getAvailableMemoryMB();
-
-          totalDiskSlots += resource.getDiskSlots();
-          totalAvailableDiskSlots += resource.getAvailableDiskSlots();
-
-          totalCpuCoreSlots += resource.getCpuCoreSlots();
-          totalAvailableCpuCoreSlots += resource.getAvailableCpuCoreSlots();
-        }
-      }
-    }
-
-    return TajoMasterProtocol.ClusterResourceSummary.newBuilder()
-            .setNumWorkers(rmContext.getWorkers().size())
-            .setTotalCpuCoreSlots(totalCpuCoreSlots)
-            .setTotalDiskSlots(totalDiskSlots)
-            .setTotalMemoryMB(totalMemoryMB)
-            .setTotalAvailableCpuCoreSlots(totalAvailableCpuCoreSlots)
-            .setTotalAvailableDiskSlots(totalAvailableDiskSlots)
-            .setTotalAvailableMemoryMB(totalAvailableMemoryMB)
-            .build();
+    return workerTrackerService.getClusterResourceSummary();
   }
 
   @Override
@@ -636,9 +603,5 @@ public class TajoWorkerResourceManager extends CompositeService implements Worke
     }
 
     LOG.info("release QueryMaster resource:" + queryId + "," + queryMasterWorkerResource);
-  }
-
-  public void workerHeartbeat(TajoMasterProtocol.TajoHeartbeat request) {
-    LOG.info("Called");
   }
 }

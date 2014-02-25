@@ -107,11 +107,6 @@ public class YarnTajoResourceManager extends AbstractService implements WorkerRe
   }
 
   @Override
-  public void workerHeartbeat(TajoMasterProtocol.TajoHeartbeat request) {
-    throw new UnimplementedException("workerHeartbeat");
-  }
-
-  @Override
   public void releaseWorkerResource(ExecutionBlockId ebId, YarnProtos.ContainerIdProto containerId) {
     throw new UnimplementedException("releaseWorkerResource");
   }

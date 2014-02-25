@@ -191,10 +191,15 @@ public class Worker implements EventHandler<WorkerEvent>, Comparable<Worker> {
     public WorkerState transition(Worker worker, WorkerEvent event) {
       WorkerStatusEvent statusEvent = (WorkerStatusEvent) event;
 
-      worker.getResource().setNumRunningTasks(statusEvent.getRunningTaskNum());
-      worker.getResource().setMaxHeap(statusEvent.maxHeap());
-      worker.getResource().setFreeHeap(statusEvent.getFreeHeap());
-      worker.getResource().setTotalHeap(statusEvent.getTotalHeap());
+      // TODO - synchronization on rmContext is too rough.
+      // But, it cannot avoid the current resource manager's approach.
+      // The main reason is that TajoWorkerResourceManager::allocation
+      synchronized (worker.rmContext) {
+        worker.getResource().setNumRunningTasks(statusEvent.getRunningTaskNum());
+        worker.getResource().setMaxHeap(statusEvent.maxHeap());
+        worker.getResource().setFreeHeap(statusEvent.getFreeHeap());
+        worker.getResource().setTotalHeap(statusEvent.getTotalHeap());
+      }
 
       return WorkerState.RUNNING;
     }

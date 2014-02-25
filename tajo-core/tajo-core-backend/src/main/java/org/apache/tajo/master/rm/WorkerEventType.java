@@ -19,13 +19,12 @@
 package org.apache.tajo.master.rm;
 
 public enum WorkerEventType {
-  STARTED,
 
-  STATE_UPDATE,
   /** Source : {@link WorkerTrackerService}, Destination: {@link Worker} */
+  STARTED,
+  STATE_UPDATE,
   RECONNECTED,
 
-
   /** Source : {@link WorkerLivelinessMonitor}, Destination: {@link Worker} */
-  EXPIRE,
+  EXPIRE
 }

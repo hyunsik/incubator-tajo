@@ -18,6 +18,9 @@
 
 package org.apache.tajo.master.rm;
 
+/**
+ * It presents the states of {@link Worker}.
+ */
 public enum WorkerState {
   /** New node */
   NEW,

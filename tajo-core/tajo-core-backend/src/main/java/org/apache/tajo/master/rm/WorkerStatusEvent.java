@@ -18,6 +18,10 @@
 
 package org.apache.tajo.master.rm;
 
+/**
+ * {@link WorkerTrackerService} produces this event, and its destination is
+ * {@link org.apache.tajo.master.rm.Worker.StatusUpdateTransition} of {@link Worker}.
+ */
 public class WorkerStatusEvent extends WorkerEvent {
   private final int runningTaskNum;
   private final long maxHeap;

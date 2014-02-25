@@ -38,9 +38,11 @@ import java.net.InetSocketAddress;
 import static org.apache.tajo.ipc.NodeResourceTracker.NodeHeartbeat;
 import static org.apache.tajo.ipc.NodeResourceTracker.NodeResourceTrackerService;
 import static org.apache.tajo.ipc.TajoMasterProtocol.TajoHeartbeatResponse;
+import static org.apache.tajo.ipc.TajoMasterProtocol.TajoHeartbeatResponse.Builder;
 
 /**
- * It tracks worker and their status. Its has two main roles as follows:
+ * It tracks all workers and their status. Its has two main roles as follows:
+ *
  * <ul>
  *   <li>Membership management for nodes which join to a Tajo cluster</li>
  *   <ul>
@@ -51,12 +53,15 @@ import static org.apache.tajo.ipc.TajoMasterProtocol.TajoHeartbeatResponse;
  * </ul>
  */
 public class WorkerTrackerService extends AbstractService implements NodeResourceTrackerService.Interface {
+  /** Class logger */
   private Log LOG = LogFactory.getLog(WorkerTrackerService.class);
 
   private final WorkerRMContext rmContext;
   private final WorkerLivelinessMonitor workerLivelinessMonitor;
 
+  /** RPC server for worker resource tracker */
   private AsyncRpcServer server;
+  /** The bind address of RPC server of worker resource tracker */
   private InetSocketAddress bindAddress;
 
   public WorkerTrackerService(WorkerRMContext rmContext, WorkerLivelinessMonitor workerLivelinessMonitor) {
@@ -67,7 +72,7 @@ public class WorkerTrackerService extends AbstractService implements NodeResourc
 
   @Override
   public void serviceInit(Configuration conf) {
-    Preconditions.checkArgument(conf instanceof TajoConf, "conf must be a TajoConf instance");
+    Preconditions.checkArgument(conf instanceof TajoConf, "Configuration must be a TajoConf instance");
     TajoConf systemConf = (TajoConf) conf;
 
     String confMasterServiceAddr = systemConf.getVar(TajoConf.ConfVars.RESOURCE_TRACKER_RPC_ADDRESS);
@@ -81,21 +86,25 @@ public class WorkerTrackerService extends AbstractService implements NodeResourc
     }
     server.start();
     bindAddress = NetUtils.getConnectAddress(server.getListenAddress());
-    systemConf.setVar(TajoConf.ConfVars.RESOURCE_TRACKER_RPC_ADDRESS,
-        NetUtils.normalizeInetSocketAddress(bindAddress));
+    // Set actual bind address to the systemConf
+    systemConf.setVar(TajoConf.ConfVars.RESOURCE_TRACKER_RPC_ADDRESS, NetUtils.normalizeInetSocketAddress(bindAddress));
 
-    LOG.info("NodeResourceTracker starts up (" + this.bindAddress + ")");
+    LOG.info("WorkerResourceTracker starts up (" + this.bindAddress + ")");
     super.start();
   }
 
   @Override
   public void serviceStop() {
+    // the variable server can be null if some exception occurs before the rpc server starts up.
     if(server != null) {
       server.shutdown();
       server = null;
     }
     super.stop();
   }
+
+  /** The response builder */
+  private static final Builder builder = TajoHeartbeatResponse.newBuilder().setHeartbeatResult(ProtoBufUtil.TRUE);
 
   @Override
   public void heartbeat(
@@ -104,54 +113,46 @@ public class WorkerTrackerService extends AbstractService implements NodeResourc
       RpcCallback<TajoHeartbeatResponse> done) {
 
     try {
-      synchronized (this) {
-        String workerKey = createWorkerId(heartbeat);
-        LOG.info("Heartbeat from " + workerKey);
+      String workerKey = createWorkerId(heartbeat);
+      LOG.info("Heartbeat from " + workerKey);
+      if(rmContext.getWorkers().containsKey(workerKey)) { // worker is running
+        LOG.info("Worker is running");
+        rmContext.getDispatcher().getEventHandler().handle(
+            new WorkerStatusEvent(
+                workerKey,
+                heartbeat.getServerStatus().getRunningTaskNum(),
+                heartbeat.getServerStatus().getJvmHeap().getMaxHeap(),
+                heartbeat.getServerStatus().getJvmHeap().getFreeHeap(),
+                heartbeat.getServerStatus().getJvmHeap().getTotalHeap()));
+        workerLivelinessMonitor.receivedPing(workerKey);
+      } else if (rmContext.getInactiveWorkers().containsKey(workerKey)) { // worker is dead
+        LOG.info("Worker is inactive");
+        Worker worker = rmContext.getInactiveWorkers().remove(workerKey);
+        workerLivelinessMonitor.unregister(worker.getWorkerId());
 
-        if(rmContext.getWorkers().containsKey(workerKey)) { // worker is running
-          LOG.info("Worker is running");
-          rmContext.getDispatcher().getEventHandler().handle(
-              new WorkerStatusEvent(
-                  workerKey,
-                  heartbeat.getServerStatus().getRunningTaskNum(),
-                  heartbeat.getServerStatus().getJvmHeap().getMaxHeap(),
-                  heartbeat.getServerStatus().getJvmHeap().getFreeHeap(),
-                  heartbeat.getServerStatus().getJvmHeap().getTotalHeap()));
-          workerLivelinessMonitor.receivedPing(workerKey);
-        } else if (rmContext.getInactiveWorkers().containsKey(workerKey)) { // worker is dead
-          LOG.info("Worker is inactive");
-          Worker worker = rmContext.getInactiveWorkers().remove(workerKey);
-          workerLivelinessMonitor.unregister(worker.getWorkerId());
+        Worker newWorker = createWorkerResource(heartbeat);
+        String workerId = newWorker.getWorkerId();
+        rmContext.getWorkers().putIfAbsent(workerId, newWorker);
+        rmContext.getDispatcher().getEventHandler().handle(new WorkerEvent(workerId, WorkerEventType.STARTED));
+        workerLivelinessMonitor.register(workerId);
 
-          Worker newWorker = createWorkerResource(heartbeat);
-          String workerId = newWorker.getWorkerId();
-          rmContext.getWorkers().putIfAbsent(workerId, newWorker);
-          rmContext.getDispatcher().getEventHandler().handle(new WorkerEvent(workerId, WorkerEventType.STARTED));
+      } else { // new worker
+        Worker newWorker = createWorkerResource(heartbeat);
 
-          workerLivelinessMonitor.register(workerId);
+        String workerId = newWorker.getWorkerId();
+        Worker oldWorker = rmContext.getWorkers().putIfAbsent(workerId, newWorker);
 
-        } else { // new worker
-          LOG.info("Worker is new");
-          Worker newWorker = createWorkerResource(heartbeat);
-
-          String workerId = newWorker.getWorkerId();
-          Worker oldWorker = rmContext.getWorkers().putIfAbsent(workerId, newWorker);
-
-          if (oldWorker == null) {
-            rmContext.rmDispatcher.getEventHandler().handle(new WorkerEvent(workerId, WorkerEventType.STARTED));
-          } else {
-            LOG.info("Reconnect from the node at: " + workerId);
-            workerLivelinessMonitor.unregister(workerId);
-            rmContext.getDispatcher().getEventHandler().handle(new WorkerReconnectEvent(workerId, newWorker));
-          }
-
-          workerLivelinessMonitor.register(workerKey);
+        if (oldWorker == null) {
+          rmContext.rmDispatcher.getEventHandler().handle(new WorkerEvent(workerId, WorkerEventType.STARTED));
+        } else {
+          LOG.info("Reconnect from the node at: " + workerId);
+          workerLivelinessMonitor.unregister(workerId);
+          rmContext.getDispatcher().getEventHandler().handle(new WorkerReconnectEvent(workerId, newWorker));
         }
-
-        notifyAll();
+        workerLivelinessMonitor.register(workerKey);
       }
+
     } finally {
-      TajoHeartbeatResponse.Builder builder = TajoHeartbeatResponse.newBuilder().setHeartbeatResult(ProtoBufUtil.TRUE);
       builder.setClusterResourceSummary(getClusterResourceSummary());
       done.run(builder.build());
     }

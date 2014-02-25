@@ -18,6 +18,10 @@
 
 package org.apache.tajo.master.rm;
 
+/**
+ * {@link WorkerTrackerService} produces this event, and it's destination is {@link Worker}.
+ * This event occurs only when an inactive worker sends a ping again.
+ */
 public class WorkerReconnectEvent extends WorkerEvent {
   private final Worker worker;
   public WorkerReconnectEvent(String workerId, Worker worker) {

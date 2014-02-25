@@ -18,24 +18,29 @@
 
 package org.apache.tajo.master.rm;
 
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 import org.apache.hadoop.yarn.event.Dispatcher;
-import org.apache.tajo.ipc.TajoMasterProtocol;
 
-import java.util.HashSet;
+import java.util.Collections;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+/**
+ * It contains all context data about TajoWorkerResourceManager.
+ * Especially, it includes all active and inactive workers.
+ */
 public class WorkerRMContext {
 
   final Dispatcher rmDispatcher;
 
-  private final ConcurrentMap<String, Worker> workers = Maps.newConcurrentMap();
+  /** map between workerIds and running workers */
+  private final ConcurrentMap<String, Worker> workers = new ConcurrentHashMap<String, Worker>();
 
-  private final ConcurrentMap<String, Worker> inactiveWorkers = Maps.newConcurrentMap();
+  /** map between workerIds and inactive workers */
+  private final ConcurrentMap<String, Worker> inactiveWorkers = new ConcurrentHashMap<String, Worker>();
 
-  private final Set<String> liveQueryMasterWorkerResources = Sets.newConcurrentHashSet();
+  private final Set<String> liveQueryMasterWorkerResources =
+      Collections.newSetFromMap(new ConcurrentHashMap<String, Boolean>());
 
   public WorkerRMContext(Dispatcher dispatcher) {
     this.rmDispatcher = dispatcher;
@@ -45,10 +50,16 @@ public class WorkerRMContext {
     return rmDispatcher;
   }
 
+  /**
+   * @return The Map for active workers
+   */
   public ConcurrentMap<String, Worker> getWorkers() {
     return workers;
   }
 
+  /**
+   * @return The Map for inactive workers
+   */
   public ConcurrentMap<String, Worker> getInactiveWorkers() {
     return inactiveWorkers;
   }

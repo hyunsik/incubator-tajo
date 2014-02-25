@@ -55,8 +55,6 @@ public interface WorkerResourceManager extends Service {
 
   public void stopQueryMaster(QueryId queryId);
 
-  public void workerHeartbeat(TajoMasterProtocol.TajoHeartbeat request);
-
   public void releaseWorkerResource(ExecutionBlockId ebId, ContainerIdProto containerId);
 
   public Map<String, Worker> getWorkers();
