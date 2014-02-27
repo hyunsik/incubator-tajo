@@ -3,6 +3,7 @@ Administration
 **************
 
 .. toctree::
-    :maxdepth: 1
+    :maxdepth: 2
 
-    administration/catalog_backup
+    administration/configuration
+    administration/upgrading

@@ -3,10 +3,11 @@ Installation
 ************
 
 .. toctree::
-    :maxdepth: 1
+		:maxdepth: 1
 
-    installation/prerequisite
-    installation/download
-    installation/build
+    installation/prerequisites
+    installation/downloading_source
+    installation/cloning_source
+    installation/building
     installation/local_setup
     installation/cluster_setup
