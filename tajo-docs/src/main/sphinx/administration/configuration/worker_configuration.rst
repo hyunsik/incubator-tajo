@@ -55,7 +55,9 @@ In order to specify the resource capacity of each worker, you should add the fol
   tajo.worker.resource.disks        the number of disks        integer               1                        
 =================================  ==========================  ===================   =========================
 
-*NOTE: Currently, QueryMaster requests 512MB memory and 1.0 disk per task for the backward compatibility.*
+.. note:: 
+  
+  Currently, QueryMaster requests 512MB memory and 1.0 disk per task for the backward compatibility.
 
 ------------
  Example

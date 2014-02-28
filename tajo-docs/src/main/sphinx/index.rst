@@ -21,15 +21,14 @@ Welcome to Apache Tajo's documentation!
 Table of Contents:
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
 
    installation
    getting_started
+   cli
    sql_language
-   configuration
-   backup_and_restore
-
-
+   functions
+   administration
 
 Indices and tables
 ==================
