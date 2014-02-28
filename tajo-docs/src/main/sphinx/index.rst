@@ -26,8 +26,8 @@ Table of Contents:
    installation
    getting_started
    sql_language
-   upgrading
-   administration
+   configuration
+   backup_and_restore
 
 
 

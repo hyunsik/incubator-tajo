@@ -5,5 +5,4 @@ Administration
 .. toctree::
     :maxdepth: 2
 
-    administration/configuration
-    administration/upgrading
+    backup_and_restore/catalog

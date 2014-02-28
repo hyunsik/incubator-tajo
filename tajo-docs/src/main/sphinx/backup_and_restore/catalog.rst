@@ -1,3 +1,3 @@
 ***************************
-Catalog Backup and Restore
+Backup and Restore Catalog
 ***************************
