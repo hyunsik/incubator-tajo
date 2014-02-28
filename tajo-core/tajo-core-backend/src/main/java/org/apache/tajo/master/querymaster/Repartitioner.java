@@ -24,6 +24,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
 import org.apache.tajo.ExecutionBlockId;
+import org.apache.tajo.algebra.JoinType;
 import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.statistics.StatisticsUtil;
 import org.apache.tajo.catalog.statistics.TableStats;
@@ -100,12 +101,29 @@ public class Repartitioner {
         } catch (PlanningException e) {
           throw new IOException(e);
         }
-        fragments[i] = storageManager.getSplits(scans[i].getCanonicalName(), tableDesc.getMeta(), tableDesc.getSchema(),
-            tablePath).get(0);
+
+        // if table has no data, storageManager will return empty FileFragment.
+        // So, we need to handle FileFragment by its size.
+        // If we don't check its size, it can cause IndexOutOfBoundsException.
+        List<FileFragment> fileFragments = storageManager.getSplits(scans[i].getCanonicalName(), tableDesc.getMeta(), tableDesc.getSchema(), tablePath);
+        if (fileFragments.size() > 0) {
+          fragments[i] = fileFragments.get(0);
+        } else {
+          fragments[i] = new FileFragment(scans[i].getCanonicalName(), tablePath, 0, 0, new String[]{UNKNOWN_HOST});
+        }
       }
     }
 
     LOG.info(String.format("Left Volume: %d, Right Volume: %d", stats[0], stats[1]));
+
+    // If one of inner join tables has no input data,
+    // it should return zero rows.
+    JoinNode joinNode = PlannerUtil.findMostBottomNode(execBlock.getPlan(), NodeType.JOIN);
+    if (joinNode != null) {
+      if ( (joinNode.getJoinType().equals(JoinType.INNER)) && (stats[0] == 0 || stats[1] == 0)) {
+        return;
+      }
+    }
 
     // Assigning either fragments or fetch urls to query units
     boolean leftSmall = execBlock.isBroadcastTable(scans[0].getCanonicalName());
@@ -274,7 +292,7 @@ public class Repartitioner {
 
   public static void scheduleFragmentsForNonLeafTasks(TaskSchedulerContext schedulerContext,
                                                       MasterPlan masterPlan, SubQuery subQuery, int maxNum)
-      throws InternalException {
+      throws InternalException, IOException {
     DataChannel channel = masterPlan.getIncomingChannels(subQuery.getBlock().getId()).get(0);
     if (channel.getShuffleType() == HASH_SHUFFLE) {
       scheduleHashShuffledFetches(schedulerContext, masterPlan, subQuery, channel, maxNum);
@@ -298,7 +316,7 @@ public class Repartitioner {
 
   public static void scheduleRangeShuffledFetches(TaskSchedulerContext schedulerContext, MasterPlan masterPlan,
                                                   SubQuery subQuery, DataChannel channel, int maxNum)
-      throws InternalException {
+      throws InternalException, IOException {
     ExecutionBlock execBlock = subQuery.getBlock();
     ScanNode scan = execBlock.getScanNodes()[0];
     Path tablePath;
@@ -311,6 +329,11 @@ public class Repartitioner {
 
     // calculate the number of maximum query ranges
     TableStats totalStat = computeChildBlocksStats(subQuery.getContext(), masterPlan, subQuery.getId());
+
+    // If there is an empty table in inner join, it should return zero rows.
+    if (totalStat.getNumBytes() == 0 && totalStat.getColumnStats().size() == 0 ) {
+      return;
+    }
     TupleRange mergedRange = TupleUtil.columnStatToRange(sortSpecs, sortSchema, totalStat.getColumnStats());
     RangePartitionAlgorithm partitioner = new UniformRangePartition(mergedRange, sortSpecs);
     BigDecimal card = partitioner.getTotalCardinality();
