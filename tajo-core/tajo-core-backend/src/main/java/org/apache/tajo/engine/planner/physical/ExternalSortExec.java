@@ -179,6 +179,7 @@ public class ExternalSortExec extends SortExec {
     tupleBlock.clear();
     long chunkWriteEnd = System.currentTimeMillis();
 
+
     info(LOG, "Chunk #" + chunkId + " sort and written (" +
         FileUtil.humanReadableByteCount(appender.getOffset(), false) + " bytes, " + rowNum + " rows, " +
         ", sort time: " + (sortEnd - sortStart) + " msec, " +
@@ -216,6 +217,8 @@ public class ExternalSortExec extends SortExec {
 
         memoryConsumption = 0;
         chunkId++;
+
+        // TODO - unreachable codes because chunkId increases rarely.
         if (chunkId % 10000 == 0) {
           progress = child.getProgress() * 0.5f;
         }
@@ -236,6 +239,7 @@ public class ExternalSortExec extends SortExec {
       }
     }
 
+    // get total loaded (or stored) bytes and total row numbers
     TableStats childTableStats = child.getInputStats();
     if (childTableStats != null) {
       sortAndStoredBytes = childTableStats.getNumBytes();
@@ -286,6 +290,7 @@ public class ExternalSortExec extends SortExec {
       sorted = true;
       result.init();
 
+      // if loaded and sorted, we assume that it proceeds the half of one entire external sort operation.
       progress = 0.5f;
     }
 
@@ -333,13 +338,15 @@ public class ExternalSortExec extends SortExec {
       int outChunkId = 0;
       int outputFileNum = 0;
       List<Future> futures = TUtil.newList();
-      List<Integer> filesInMerger = TUtil.newList();
+      // the number of files being merged in threads.
+      List<Integer> numberOfMergingFiles = TUtil.newList();
 
       for (int startIdx = 0; startIdx < inputFiles.size();) {
 
         // calculate proper fanout
         int fanout = calculateFanout(remainInputRuns, inputFiles.size(), outputFileNum, startIdx);
-        filesInMerger.add(fanout);
+        // how many files are merged in ith thread?
+        numberOfMergingFiles.add(fanout);
         // launch a merger runner
         futures.add(executorService.submit(
             new KWayMergerCaller(level, outChunkId++, inputFiles, startIdx, fanout, false)));
@@ -365,13 +372,14 @@ public class ExternalSortExec extends SortExec {
         }
       }
 
-      // progress = (# finished merger / total mergers) * 0.5;
       // wait for all sort runners
       int finishedMerger = 0;
       int index = 0;
       for (Future<Path> future : futures) {
         outputFiles.add(future.get());
-        finishedMerger += filesInMerger.get(index++);
+        // Getting the number of merged files
+        finishedMerger += numberOfMergingFiles.get(index++);
+        // progress = (# number of merged files / total number of files) * 0.5;
         progress = ((float)finishedMerger/(float)chunksSize) * 0.5f;
       }
 
@@ -435,7 +443,6 @@ public class ExternalSortExec extends SortExec {
       }
       merger.close();
       output.close();
-
       long mergeEndTime = System.currentTimeMillis();
       info(LOG, outputPath.getName() + " is written to a disk. ("
           + FileUtil.humanReadableByteCount(output.getOffset(), false)
@@ -464,8 +471,7 @@ public class ExternalSortExec extends SortExec {
   }
 
   private Scanner getFileScanner(Path path) throws IOException {
-    RawFileScanner scanner = new RawFileScanner(context.getConf(), plan.getInSchema(), meta, path);
-    return scanner;
+    return new RawFileScanner(context.getConf(), plan.getInSchema(), meta, path);
   }
 
   private Scanner createKWayMerger(List<Path> inputs, final int startChunkId, final int num) throws IOException {
@@ -491,16 +497,22 @@ public class ExternalSortExec extends SortExec {
 
   private class MemTableScanner implements Scanner {
     Iterator<Tuple> iterator;
+
+    // for input stats
     float scannerProgress;
     int numRecords;
     int totalRecords;
     TableStats scannerTableStats;
+
     @Override
     public void init() throws IOException {
       iterator = inMemoryTable.iterator();
+
       totalRecords = inMemoryTable.size();
       scannerProgress = 0.0f;
       numRecords = 0;
+
+      // it will be returned as the final stats
       scannerTableStats = new TableStats();
       scannerTableStats.setNumBytes(sortAndStoredBytes);
       scannerTableStats.setReadBytes(sortAndStoredBytes);
@@ -510,12 +522,8 @@ public class ExternalSortExec extends SortExec {
     @Override
     public Tuple next() throws IOException {
       if (iterator.hasNext()) {
-        Tuple tuple = iterator.next();
-        if (tuple != null) {
-          numRecords++;
-        }
-
-        return tuple;
+        numRecords++;
+        return iterator.next();
       } else {
         return null;
       }
@@ -563,8 +571,9 @@ public class ExternalSortExec extends SortExec {
     @Override
     public float getProgress() {
       if (iterator != null && numRecords > 0) {
-        return (float)numRecords/(float)totalRecords;
-      } else {
+        return (float)numRecords / (float)totalRecords;
+
+      } else { // if an input is empty
         return scannerProgress;
       }
     }

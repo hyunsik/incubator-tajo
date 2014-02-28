@@ -47,7 +47,7 @@ public class PartitionMergeScanExec extends PhysicalExec {
   private AbstractStorageManager sm;
 
   private float progress;
-  protected TableStats tableStats;
+  protected TableStats inputStats;
 
   public PartitionMergeScanExec(TaskAttemptContext context, AbstractStorageManager sm,
                                 ScanNode plan, CatalogProtos.FragmentProto[] fragments) throws IOException {
@@ -57,7 +57,7 @@ public class PartitionMergeScanExec extends PhysicalExec {
     this.fragments = fragments;
     this.sm = sm;
 
-    tableStats = new TableStats();
+    inputStats = new TableStats();
   }
 
   public void init() throws IOException {
@@ -107,7 +107,7 @@ public class PartitionMergeScanExec extends PhysicalExec {
       scanner.close();
       TableStats scannerTableStsts = scanner.getInputStats();
       if (scannerTableStsts != null) {
-        tableStats.merge(scannerTableStsts);
+        inputStats.merge(scannerTableStsts);
       }
     }
     iterator = null;
@@ -126,6 +126,7 @@ public class PartitionMergeScanExec extends PhysicalExec {
         progressSum += scanner.getProgress();
       }
       if (progressSum > 0) {
+        // get a average progress - divide progress summary by the number of scanners
         return progressSum / (float)(scanners.size());
       } else {
         return 0.0f;
@@ -137,6 +138,6 @@ public class PartitionMergeScanExec extends PhysicalExec {
 
   @Override
   public TableStats getInputStats() {
-    return tableStats;
+    return inputStats;
   }
 }
