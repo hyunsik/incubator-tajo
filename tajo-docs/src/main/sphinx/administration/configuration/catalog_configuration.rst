@@ -30,6 +30,7 @@ If you want to use MySQLStore, you must create database and user on mysql for ta
 And then, you need to prepare mysql jdbc driver on host which can be ran TajoMaster. If you do, you should set ``TAJO_CLASSPATH`` variable in ``conf/tajo-env.sh`` with it as follows:
 
 .. code-block:: sh
+
   export TAJO_CLASSPATH=/usr/local/mysql/lib/mysql-connector-java-x.x.x.jar
 
 Or you just can copy jdbc driver into $TAJO_HOME/lib.
@@ -82,7 +83,7 @@ Third, if you need to use jdbc to connect HiveMetaStore, you have to prepare mys
 
 .. code-block:: sh
 
-  export HIVE_JDBC_DRIVER_DIR==/path/to/your/mysql_jdbc_driver/mysql-connector-java-x.x.x-bin.jar
+  export HIVE_JDBC_DRIVER_DIR=/path/to/your/mysql_jdbc_driver/mysql-connector-java-x.x.x-bin.jar
 
 
 Lastly, you should add the following config to ``conf/catalog-site.xml`` :

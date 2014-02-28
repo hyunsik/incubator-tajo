@@ -6,7 +6,9 @@ You prepare the prerequisites and the source code, you can build the source code
 
 The first step of the installation procedure is to configure the source tree for your system and choose the options you would like. This is done by running the configure script. For a default installation simply enter:
 
-You can compile source code and get a binary archive as follows: ::
+You can compile source code and get a binary archive as follows:
+
+.. code-block:: bash
 
   $ cd tajo
   $ mvn clean package -DskipTests -Pdist -Dtar
@@ -33,16 +35,17 @@ Build options:
 
 Tests options:
   * Use -DskipTests to skip tests when running the following Maven goals:
-    'package',  'install', 'deploy' or 'verify'
-  * -Dtest=<TESTCLASSNAME>,<TESTCLASSNAME#METHODNAME>,....
-  * -Dtest.exclude=<TESTCLASSNAME>
-  * -Dtest.exclude.pattern=**/<TESTCLASSNAME1>.java,**/<TESTCLASSNAME2>.java
+    ``package``,  ``install``, ``deploy`` or ``verify``
+  * ``-Dtest=<TESTCLASSNAME>,<TESTCLASSNAME#METHODNAME>,....``
+  * ``-Dtest.exclude=<TESTCLASSNAME>``
+  * ``-Dtest.exclude.pattern=**/<TESTCLASSNAME1>.java,**/<TESTCLASSNAME2>.java``
 
---------------------------------------------------------------------------------
 Building distributions:
 
+====================================
 Create binary distribution
+====================================
 
-$ mvn package -Pdist -DskipTests -Dtar
+.. code-block:: bash
 
---------------------------------------------------------------------------------
+  $ mvn package -Pdist -DskipTests -Dtar

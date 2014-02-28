@@ -9,6 +9,7 @@ Tajo Master Configuration
 Tajo uses HDFS as a primary storage layer. So, one Tajo cluster instance should have one tajo rootdir. A user is allowed to specific your tajo rootdir as follows:
 
 .. code-block:: xml
+
   <property>
     <name>tajo.rootdir</name>
     <value>hdfs://namenode_hostname:port/path</value>

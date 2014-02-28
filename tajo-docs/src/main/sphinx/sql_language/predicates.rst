@@ -74,6 +74,7 @@ SIMILAR TO
 *Synopsis*
 
 .. code-block:: sql
+
   string SIMILAR TO pattern
   string NOT SIMILAR TO pattern
 
