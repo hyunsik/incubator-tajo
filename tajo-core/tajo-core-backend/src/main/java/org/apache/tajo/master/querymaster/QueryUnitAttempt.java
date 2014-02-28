@@ -25,6 +25,7 @@ import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.state.*;
 import org.apache.tajo.QueryUnitAttemptId;
 import org.apache.tajo.TajoProtos.TaskAttemptState;
+import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.ipc.TajoWorkerProtocol.TaskCompletionReport;
 import org.apache.tajo.master.event.*;
@@ -63,6 +64,10 @@ public class QueryUnitAttempt implements EventHandler<TaskAttemptEvent> {
   private final List<String> diagnostics = new ArrayList<String>();
 
   private final QueryUnitAttemptScheduleContext scheduleContext;
+
+  private float progress;
+  private CatalogProtos.TableStatsProto inputStats;
+  private CatalogProtos.TableStatsProto resultStats;
 
   protected static final StateMachineFactory
       <QueryUnitAttempt, TaskAttemptState, TaskAttemptEventType, TaskAttemptEvent>
@@ -235,7 +240,28 @@ public class QueryUnitAttempt implements EventHandler<TaskAttemptEvent> {
     return this.expire;
   }
 
+  public float getProgress() {
+    return progress;
+  }
+
+  public TableStats getInputStats() {
+    if (inputStats == null) {
+      return null;
+    }
+
+    return new TableStats(inputStats);
+  }
+
+  public TableStats getResultStats() {
+    if (resultStats == null) {
+      return null;
+    }
+    return new TableStats(resultStats);
+  }
+
   private void fillTaskStatistics(TaskCompletionReport report) {
+    this.progress = 1.0f;
+
     if (report.getShuffleFileOutputsCount() > 0) {
       this.getQueryUnit().setShuffleFileOutputs(report.getShuffleFileOutputsList());
 
@@ -247,8 +273,12 @@ public class QueryUnitAttempt implements EventHandler<TaskAttemptEvent> {
       }
       this.getQueryUnit().setIntermediateData(partitions);
     }
+    if (report.hasInputStats()) {
+      this.inputStats = report.getInputStats();
+    }
     if (report.hasResultStats()) {
-      this.getQueryUnit().setStats(new TableStats(report.getResultStats()));
+      this.resultStats = report.getResultStats();
+      this.getQueryUnit().setStats(new TableStats(resultStats));
     }
   }
 
@@ -308,6 +338,10 @@ public class QueryUnitAttempt implements EventHandler<TaskAttemptEvent> {
     public TaskAttemptState transition(QueryUnitAttempt taskAttempt,
                                        TaskAttemptEvent event) {
       TaskAttemptStatusUpdateEvent updateEvent = (TaskAttemptStatusUpdateEvent) event;
+
+      taskAttempt.progress = updateEvent.getStatus().getProgress();
+      taskAttempt.inputStats = updateEvent.getStatus().getInputStats();
+      taskAttempt.resultStats = updateEvent.getStatus().getResultStats();
 
       switch (updateEvent.getStatus().getState()) {
         case TA_PENDING:
@@ -389,7 +423,7 @@ public class QueryUnitAttempt implements EventHandler<TaskAttemptEvent> {
         stateMachine.doTransition(event.getType(), event);
       } catch (InvalidStateTransitonException e) {
         LOG.error("Can't handle this event at current state of "
-            + event.getTaskAttemptId() + ")", e);
+            + event.getTaskAttemptId() + "), oldState=" + oldState + ", event=" + event.getType(), e);
         eventHandler.handle(new QueryEvent(TajoIdUtils.parseQueryId(getId().toString()),
             QueryEventType.INTERNAL_ERROR));
       }

@@ -267,6 +267,7 @@ public class ClassSize {
               primitives += Bytes.SIZEOF_FLOAT;
             else if (name.equals("double") || name.equals("D"))
               primitives += Bytes.SIZEOF_DOUBLE;
+
           }
           if (debug) {
             if (LOG.isDebugEnabled()) {

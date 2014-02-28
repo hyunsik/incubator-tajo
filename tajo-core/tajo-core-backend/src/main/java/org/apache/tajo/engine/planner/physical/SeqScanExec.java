@@ -23,6 +23,7 @@ import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.catalog.partition.PartitionMethodDesc;
 import org.apache.tajo.catalog.proto.CatalogProtos;
+import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.datum.Datum;
 import org.apache.tajo.engine.eval.ConstEval;
 import org.apache.tajo.engine.eval.EvalNode;
@@ -37,6 +38,7 @@ import org.apache.tajo.storage.*;
 import org.apache.tajo.storage.fragment.FileFragment;
 import org.apache.tajo.storage.fragment.FragmentConvertor;
 import org.apache.tajo.worker.TaskAttemptContext;
+import org.apache.tajo.worker.TaskHistory;
 
 import java.io.IOException;
 import java.util.HashSet;
@@ -53,6 +55,8 @@ public class SeqScanExec extends PhysicalExec {
   private CatalogProtos.FragmentProto [] fragments;
 
   private Projector projector;
+
+  private TableStats inputStats;
 
   public SeqScanExec(TaskAttemptContext context, AbstractStorageManager sm,
                      ScanNode plan, CatalogProtos.FragmentProto [] fragments) throws IOException {
@@ -189,6 +193,16 @@ public class SeqScanExec extends PhysicalExec {
   @Override
   public void close() throws IOException {
     IOUtils.cleanup(null, scanner);
+    if (scanner != null) {
+      try {
+        TableStats stat = scanner.getInputStats();
+        if (stat != null) {
+          inputStats = (TableStats)(stat.clone());
+        }
+      } catch (CloneNotSupportedException e) {
+        e.printStackTrace();
+      }
+    }
     scanner = null;
     plan = null;
     qual = null;
@@ -197,5 +211,23 @@ public class SeqScanExec extends PhysicalExec {
 
   public String getTableName() {
     return plan.getTableName();
+  }
+
+  @Override
+  public float getProgress() {
+    if (scanner == null) {
+      return 1.0f;
+    } else {
+      return scanner.getProgress();
+    }
+  }
+
+  @Override
+  public TableStats getInputStats() {
+    if (scanner != null) {
+      return scanner.getInputStats();
+    } else {
+      return inputStats;
+    }
   }
 }
