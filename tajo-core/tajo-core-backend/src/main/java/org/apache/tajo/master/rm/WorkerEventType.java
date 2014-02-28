@@ -18,8 +18,13 @@
 
 package org.apache.tajo.master.rm;
 
-public enum WorkerStatus {
-  LIVE,
-  DEAD,
-  DECOMMISSION
+public enum WorkerEventType {
+
+  /** Source : {@link TajoResourceTracker}, Destination: {@link Worker} */
+  STARTED,
+  STATE_UPDATE,
+  RECONNECTED,
+
+  /** Source : {@link WorkerLivelinessMonitor}, Destination: {@link Worker} */
+  EXPIRE
 }
