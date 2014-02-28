@@ -106,7 +106,9 @@ In addition to these metacharacters borrowed from LIKE, 'SIMILAR TO' supports mo
 
 Note that `.`` is not used as a metacharacter in ``SIMILAR TO`` operator.
 
-##### <a name="RegularExpressions"></a>Regular expressions
+---------------------
+Regular expressions
+---------------------
 
 Regular expressions provide a very powerful means for string pattern matching. In the current Tajo, regular expressions are based on Java-style regular expressions instead of POSIX regular expression. The main difference between java-style one and POSIX's one is character class.
 

@@ -364,8 +364,7 @@
             <exclude>atlassian-ide-plugin.xml</exclude>
             <exclude>.reviewboardrc</exclude>
             <!-- tajo-doc -->
-            <exclude>tajo-docs/Makefile</exclude>
-            <exclude>tajo-docs/src/main/sphinx/*</exclude>
+            <exclude>**/*.rst</exclude>
           </excludes>
         </configuration>
       </plugin>
