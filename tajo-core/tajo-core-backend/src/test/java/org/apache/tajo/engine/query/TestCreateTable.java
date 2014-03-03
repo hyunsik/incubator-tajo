@@ -23,6 +23,8 @@ import org.apache.tajo.QueryTestCaseBase;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
+import java.sql.ResultSet;
+
 @Category(IntegrationTest.class)
 public class TestCreateTable extends QueryTestCaseBase {
 
@@ -39,8 +41,39 @@ public class TestCreateTable extends QueryTestCaseBase {
   }
 
   @Test
+  public final void testQualifiedIdentifier() throws Exception {
+    ResultSet res = null;
+
+    // SELECT "아이디", "텍스트", "숫자" FROM "테이블1";
+    try {
+      String tableName = executeDDL("quoted_ddl.sql", "table1.tbl", "\"테이블1\"");
+      assertTableExists(tableName);
+      res = executeFile("quoted_case1.sql");
+      assertResultSet(res, "quoted_case1.result");
+    } finally {
+      cleanupQuery(res);
+    }
+
+    // SELECT "아이디" as "진짜아이디", "텍스트" as text, "숫자" FROM "테이블1" as "테이블 별명"
+    try {
+      res = executeFile("quoted_case2.sql");
+      assertResultSet(res, "quoted_case2.result");
+    } finally {
+      cleanupQuery(res);
+    }
+
+    // SELECT "아이디" "진짜아이디", char_length("텍스트") as "길이", "숫자" * 2 FROM "테이블1" "테이블 별명"
+    try {
+      res = executeFile("quoted_case3.sql");
+      assertResultSet(res, "quoted_case3.result");
+    } finally {
+      cleanupQuery(res);
+    }
+  }
+
+  @Test
   public final void testNonreservedKeywordTableNames() throws Exception {
-    String tableName = null;
+    String tableName;
     tableName = executeDDL("table1_ddl.sql", "table1.tbl", "filter");
     assertTableExists(tableName);
     tableName = executeDDL("table1_ddl.sql", "table1.tbl", "first");
