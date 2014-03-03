@@ -369,11 +369,11 @@ public class Repartitioner {
     }
 
     boolean ascendingFirstKey = sortSpecs[0].isAscending();
-    SortedMap<TupleRange, Set<URI>> map;
+    SortedMap<TupleRange, Collection<URI>> map;
     if (ascendingFirstKey) {
-      map = new TreeMap<TupleRange, Set<URI>>();
+      map = new TreeMap<TupleRange, Collection<URI>>();
     } else {
-      map = new TreeMap<TupleRange, Set<URI>>(new TupleRange.DescendingTupleRangeComparator());
+      map = new TreeMap<TupleRange, Collection<URI>>(new TupleRange.DescendingTupleRangeComparator());
     }
 
     Set<URI> uris;
@@ -398,7 +398,7 @@ public class Repartitioner {
     schedulerContext.setEstimatedTaskNum(determinedTaskNum);
   }
 
-  public static void scheduleFetchesByRoundRobin(SubQuery subQuery, Map<?, Set<URI>> partitions,
+  public static void scheduleFetchesByRoundRobin(SubQuery subQuery, Map<?, Collection<URI>> partitions,
                                                    String tableName, int num) {
     int i;
     Map<String, List<URI>>[] fetchesArray = new Map[num];
@@ -406,8 +406,8 @@ public class Repartitioner {
       fetchesArray[i] = new HashMap<String, List<URI>>();
     }
     i = 0;
-    for (Entry<?, Set<URI>> entry : partitions.entrySet()) {
-      Set<URI> value = entry.getValue();
+    for (Entry<?, Collection<URI>> entry : partitions.entrySet()) {
+      Collection<URI> value = entry.getValue();
       fetchesArray[i++].put(tableName, Lists.newArrayList(value));
       if (i == num) i = 0;
     }
@@ -451,7 +451,7 @@ public class Repartitioner {
     SubQuery.scheduleFragments(subQuery, fragments);
 
     Map<String, List<IntermediateEntry>> hashedByHost;
-    Map<Integer, List<URI>> finalFetchURI = new HashMap<Integer, List<URI>>();
+    Map<Integer, Collection<URI>> finalFetchURI = new HashMap<Integer, Collection<URI>>();
 
     for (ExecutionBlock block : masterPlan.getChilds(execBlock)) {
       List<IntermediateEntry> partitions = new ArrayList<IntermediateEntry>();
@@ -485,14 +485,9 @@ public class Repartitioner {
       LOG.info("No Grouping Column - determinedTaskNum is set to 1");
     }
 
-    for (Entry<Integer, List<URI>> entry : finalFetchURI.entrySet()) {
-      List<URI> value = entry.getValue();
-      Map<String, List<URI>> fetches = new HashMap<String, List<URI>>();
-      fetches.put(scan.getTableName(), value);
-      SubQuery.scheduleFetches(subQuery, fetches);
-    }
 
     schedulerContext.setEstimatedTaskNum(determinedTaskNum);
+    scheduleFetchesByRoundRobin(subQuery, finalFetchURI, scan.getTableName(), determinedTaskNum);
     LOG.info("DeterminedTaskNum : " + determinedTaskNum);
   }
 
