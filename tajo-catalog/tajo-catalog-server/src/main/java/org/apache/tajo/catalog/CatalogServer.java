@@ -38,6 +38,7 @@ import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.BoolProto;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.NullProto;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.StringProto;
 import org.apache.tajo.util.NetUtils;
+import org.apache.tajo.util.ProtoBufUtil;
 import org.apache.tajo.util.TUtil;
 
 import java.io.IOException;
@@ -56,6 +57,9 @@ import static org.apache.tajo.catalog.proto.CatalogProtos.FunctionType.*;
  * cluster information.
  */
 public class CatalogServer extends AbstractService {
+
+  private final static String DEFAULT_NAMESPACE = "public";
+
   private final static Log LOG = LogFactory.getLog(CatalogServer.class);
   private TajoConf conf;
   private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
@@ -198,41 +202,58 @@ public class CatalogServer extends AbstractService {
 
     @Override
     public TableDescProto getTableDesc(RpcController controller,
-                                       StringProto name)
-        throws ServiceException {
+                                       TableIdentifierProto request) throws ServiceException {
+      String databaseName = CatalogUtil.normalizeIdentifier(request.getDatabaseName());
+      String namespace = request.hasNamespace() ? CatalogUtil.normalizeIdentifier(request.getNamespace())
+          : DEFAULT_NAMESPACE;
+      String tableName = CatalogUtil.normalizeIdentifier(request.getTableName());
+
       rlock.lock();
       try {
-        String tableId = name.getValue().toLowerCase();
-        if (!store.existTable(tableId)) {
-          throw new NoSuchTableException(tableId);
-        }
+        boolean contain;
 
-        return store.getTable(tableId);
+        contain = store.existDatabase(databaseName);
+
+        if (contain) {
+          contain = store.existTable(databaseName, namespace, tableName);
+          if (contain) {
+            return store.getTable(databaseName, namespace, tableName);
+          } else {
+            throw new NoSuchTableException(databaseName);
+          }
+        } else {
+          throw new NoSuchDatabaseException(databaseName);
+        }
       } catch (Exception e) {
-        // TODO - handle exception
         LOG.error(e);
-        return null;
+        throw new ServiceException(e);
       } finally {
         rlock.unlock();
       }
     }
 
     @Override
-    public GetAllTableNamesResponse getAllTableNames(RpcController controller,
-                                                     NullProto request)
+    public GetAllTableNamesResponse getAllTableNames(RpcController controller, NamespaceProto request)
         throws ServiceException {
+
+      String databaseName = CatalogUtil.normalizeIdentifier(request.getDatabaseName());
+      String namespace = request.hasNamespace() ? CatalogUtil.normalizeIdentifier(request.getNamespace())
+          : DEFAULT_NAMESPACE;
+
+      rlock.lock();
       try {
-        Iterator<String> iterator = store.getAllTableNames().iterator();
-        GetAllTableNamesResponse.Builder builder =
-            GetAllTableNamesResponse.newBuilder();
-        while (iterator.hasNext()) {
-          builder.addTableName(iterator.next());
+        if (store.existDatabase(databaseName)) {
+          GetAllTableNamesResponse.Builder builder = GetAllTableNamesResponse.newBuilder();
+          builder.addAllTableName(store.getAllTableNames(databaseName, namespace));
+          return builder.build();
+        } else {
+          throw new NoSuchDatabaseException(databaseName);
         }
-        return builder.build();
       } catch (Exception e) {
-        // TODO - handle exception
         LOG.error(e);
-        return null;
+        throw new ServiceException(e);
+      } finally {
+        rlock.unlock();
       }
     }
 
@@ -249,118 +270,193 @@ public class CatalogServer extends AbstractService {
     }
 
     @Override
-    public BoolProto addTable(RpcController controller, TableDescProto proto)
-        throws ServiceException {
+    public BoolProto addTable(RpcController controller, TableDescProto request)throws ServiceException {
+
+      String databaseName = CatalogUtil.normalizeIdentifier(request.getDatabaseName());
+      String namespace = request.hasNamespace() ? CatalogUtil.normalizeIdentifier(request.getNamespace())
+          : DEFAULT_NAMESPACE;
+      String tableName = CatalogUtil.normalizeIdentifier(request.getTableName());
 
       wlock.lock();
       try {
-        if (store.existTable(proto.getId().toLowerCase())) {
-          throw new AlreadyExistsTableException(proto.getId());
-        }
-        store.addTable(proto);
-      } catch (Exception e) {
-        LOG.error(e.getMessage(), e);
-        return BOOL_FALSE;
-      } finally {
-        wlock.unlock();
-        LOG.info("Table " + proto.getId() + " is added to the catalog ("
-            + bindAddressStr + ")");
-      }
 
-      return BOOL_TRUE;
-    }
+        boolean contain = store.existDatabase(databaseName);
 
-    @Override
-    public BoolProto deleteTable(RpcController controller, StringProto name)
-        throws ServiceException {
-      wlock.lock();
-      try {
-        String tableId = name.getValue().toLowerCase();
-        if (!store.existTable(tableId)) {
-          throw new NoSuchTableException(tableId);
-        }
-        store.deleteTable(tableId);
-      } catch (Exception e) {
-        LOG.error(e.getMessage(), e);
-        return BOOL_FALSE;
-      } finally {
-        wlock.unlock();
-      }
+        if (contain) {
+          if (store.existTable(databaseName, namespace, tableName)) {
+            throw new AlreadyExistsTableException(databaseName, namespace, tableName);
+          }
 
-      return BOOL_TRUE;
-    }
-
-    @Override
-    public BoolProto existsTable(RpcController controller, StringProto name)
-        throws ServiceException {
-      try {
-        String tableId = name.getValue().toLowerCase();
-        if (store.existTable(tableId)) {
-          return BOOL_TRUE;
+          store.addTable(request);
+          LOG.info(String.format("relation \"%s\" is added to the catalog (%s)", tableName, bindAddressStr));
         } else {
-          return BOOL_FALSE;
+          throw new NoSuchDatabaseException(databaseName);
+        }
+      } catch (Exception e) {
+        LOG.error(e.getMessage(), e);
+        return ProtoBufUtil.FALSE;
+      } finally {
+        wlock.unlock();
+      }
+
+      return ProtoBufUtil.TRUE;
+    }
+
+    @Override
+    public BoolProto deleteTable(RpcController controller, TableIdentifierProto request) throws ServiceException {
+
+      String databaseName = CatalogUtil.normalizeIdentifier(request.getDatabaseName());
+      String namespace = request.hasNamespace() ? CatalogUtil.normalizeIdentifier(request.getNamespace())
+          : DEFAULT_NAMESPACE;
+      String tableName = CatalogUtil.normalizeIdentifier(request.getTableName());
+
+      wlock.lock();
+      try {
+        boolean contain = store.existDatabase(databaseName);
+
+        if (contain) {
+          if (!store.existTable(databaseName, namespace, tableName)) {
+            throw new NoSuchTableException(databaseName, namespace, tableName);
+          }
+
+          store.deleteTable(databaseName, namespace, tableName);
+          LOG.info(String.format("relation \"%s\" is deleted from the catalog (%s)", tableName, bindAddressStr));
+        } else {
+          throw new NoSuchDatabaseException(databaseName);
+        }
+      } catch (Exception e) {
+        LOG.error(e.getMessage(), e);
+        return BOOL_FALSE;
+      } finally {
+        wlock.unlock();
+      }
+
+      return BOOL_TRUE;
+    }
+
+    @Override
+    public BoolProto existsTable(RpcController controller, TableIdentifierProto request)
+        throws ServiceException {
+      String databaseName = CatalogUtil.normalizeIdentifier(request.getDatabaseName());
+      String namespace = request.hasNamespace() ? CatalogUtil.normalizeIdentifier(request.getNamespace())
+          : DEFAULT_NAMESPACE;
+      String tableName = CatalogUtil.normalizeIdentifier(request.getTableName());
+
+      rlock.lock();
+      try {
+
+        boolean contain = store.existDatabase(databaseName);
+
+        if (contain) {
+          if (store.existTable(databaseName, namespace, tableName)) {
+            return BOOL_TRUE;
+          } else {
+            return BOOL_FALSE;
+          }
+        } else {
+          throw new NoSuchDatabaseException(databaseName);
         }
       } catch (Exception e) {
         LOG.error(e);
         throw new ServiceException(e);
+      } finally {
+        rlock.unlock();
       }
+
     }
 
     @Override
     public PartitionMethodProto getPartitionMethodByTableName(RpcController controller,
-                                                              StringProto name)
+                                                              TableIdentifierProto request)
         throws ServiceException {
+      String databaseName = CatalogUtil.normalizeIdentifier(request.getDatabaseName());
+      String namespace = request.hasNamespace() ? CatalogUtil.normalizeIdentifier(request.getNamespace())
+          : DEFAULT_NAMESPACE;
+      String tableName = CatalogUtil.normalizeIdentifier(request.getTableName());
+
       rlock.lock();
       try {
-        String tableId = name.getValue().toLowerCase();
-        return store.getPartitionMethod(tableId);
+        boolean contain;
+
+        contain = store.existDatabase(databaseName);
+
+        if (contain) {
+          contain = store.existTable(databaseName, namespace, tableName);
+          if (contain) {
+            if (store.existPartitionMethod(databaseName, namespace, tableName)) {
+              return store.getPartitionMethod(databaseName, namespace, tableName);
+            } else {
+              throw new NoPartitionedTableException(databaseName, namespace, tableName);
+            }
+          } else {
+            throw new NoSuchTableException(databaseName);
+          }
+        } else {
+          throw new NoSuchDatabaseException(databaseName);
+        }
       } catch (Exception e) {
-        // TODO - handle exception
         LOG.error(e);
-        return null;
+        throw new ServiceException(e);
       } finally {
         rlock.unlock();
       }
     }
 
     @Override
-    public BoolProto existPartitionMethod(RpcController controller, StringProto tableName)
+    public BoolProto existPartitionMethod(RpcController controller, TableIdentifierProto request)
         throws ServiceException {
+      String databaseName = CatalogUtil.normalizeIdentifier(request.getDatabaseName());
+      String namespace = request.hasNamespace() ? CatalogUtil.normalizeIdentifier(request.getNamespace())
+          : DEFAULT_NAMESPACE;
+      String tableName = CatalogUtil.normalizeIdentifier(request.getTableName());
+
       rlock.lock();
       try {
-        String tableId = tableName.getValue().toLowerCase();
-        return BoolProto.newBuilder().setValue(
-            store.existPartitionMethod(tableId)).build();
+        boolean contain;
+
+        contain = store.existDatabase(databaseName);
+
+        if (contain) {
+          contain = store.existTable(databaseName, namespace, tableName);
+          if (contain) {
+            if (store.existPartitionMethod(databaseName, namespace, tableName)) {
+              return ProtoBufUtil.TRUE;
+            } else {
+              return ProtoBufUtil.FALSE;
+            }
+          } else {
+            throw new NoSuchTableException(databaseName);
+          }
+        } else {
+          throw new NoSuchDatabaseException(databaseName);
+        }
       } catch (Exception e) {
         LOG.error(e);
-        return BoolProto.newBuilder().setValue(false).build();
+        throw new ServiceException(e);
       } finally {
         rlock.unlock();
       }
     }
 
     @Override
-    public BoolProto delPartitionMethod(RpcController controller, StringProto request)
+    public BoolProto dropPartitionMethod(RpcController controller, TableIdentifierProto request)
         throws ServiceException {
-      return null;
+      return ProtoBufUtil.TRUE;
     }
 
     @Override
-    public BoolProto addPartitions(RpcController controller, PartitionsProto request)
-        throws ServiceException {
+    public BoolProto addPartitions(RpcController controller, PartitionsProto request) throws ServiceException {
 
-      return null;
+      return ProtoBufUtil.TRUE;
     }
 
     @Override
-    public BoolProto addPartition(RpcController controller, PartitionDescProto request)
-        throws ServiceException {
-      return null;
+    public BoolProto addPartition(RpcController controller, PartitionDescProto request) throws ServiceException {
+      return ProtoBufUtil.TRUE;
     }
 
     @Override
-    public PartitionDescProto getPartitionByPartitionName(RpcController controller,
-                                                          StringProto request)
+    public PartitionDescProto getPartitionByPartitionName(RpcController controller, StringProto request)
         throws ServiceException {
       return null;
     }

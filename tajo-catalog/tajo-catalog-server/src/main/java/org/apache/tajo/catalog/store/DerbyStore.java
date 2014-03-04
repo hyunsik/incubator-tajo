@@ -22,10 +22,12 @@
 package org.apache.tajo.catalog.store;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.tajo.catalog.CatalogConstants;
 import org.apache.tajo.catalog.CatalogUtil;
 import org.apache.tajo.catalog.exception.CatalogException;
 import org.apache.tajo.exception.InternalException;
 
+import java.io.IOException;
 import java.sql.*;
 import java.util.HashMap;
 import java.util.Map;
@@ -37,8 +39,7 @@ public class DerbyStore extends AbstractDBStore {
     return CATALOG_DRIVER;
   }
 
-  public DerbyStore(final Configuration conf)
-      throws InternalException {
+  public DerbyStore(final Configuration conf) throws InternalException {
     super(conf);
   }
 
@@ -67,28 +68,39 @@ public class DerbyStore extends AbstractDBStore {
           LOG.debug(sql.toString());
         }
         stmt.executeUpdate(sql.toString());
-        LOG.info("Table '" + TB_META + " is created.");
+        LOG.info("Table '" + TB_META + "' is created.");
         baseTableMaps.put(TB_META, true);
+      }
+
+      // DATABASES
+      if (!baseTableMaps.get(TB_DATABASES)) {
+        try {
+          String ddl = readSchemaFile("derby/databases.sql");
+          stmt.addBatch(ddl);
+          ddl = readSchemaFile("derby/databases_idx.sql");
+          stmt.addBatch(ddl);
+        } catch (IOException e) {
+          throw new CatalogException(String.format("cannot read schema file \"%s\"", "derby/databases.sql"));
+        }
+
+        stmt.executeBatch();
+        LOG.info("Table '" + TB_DATABASES + "' is created.");
+        baseTableMaps.put(TB_DATABASES, true);
       }
 
       // TABLES
       if (!baseTableMaps.get(TB_TABLES)) {
-        sql.delete(0, sql.length());
-        sql.append("CREATE TABLE ");
-        sql.append(TB_TABLES);
-        sql.append(" (");
-        sql.append("TID int NOT NULL GENERATED ALWAYS AS IDENTITY (START WITH 1, INCREMENT BY 1),");
-        sql.append(C_TABLE_ID);
-        sql.append(" VARCHAR(255) NOT NULL CONSTRAINT TABLE_ID_UNIQ UNIQUE, ");
-        sql.append("path VARCHAR(1024), ");
-        sql.append("store_type CHAR(16), ");
-        sql.append("CONSTRAINT TABLES_PK PRIMARY KEY (TID)");
-        sql.append( ")");
+        String ddl;
+        try {
+          ddl = readSchemaFile("derby/tables.sql");
+        } catch (IOException e) {
+          throw new CatalogException(String.format("cannot read schema file \"%s\"", "derby/tables.sql"));
+        }
 
         if (LOG.isDebugEnabled()) {
-          LOG.debug(sql.toString());
+          LOG.debug(ddl);
         }
-        stmt.addBatch(sql.toString());
+        stmt.addBatch(ddl);
 
         sql.delete(0, sql.length());
         sql.append("CREATE UNIQUE INDEX idx_tables_tid on ");
@@ -326,6 +338,8 @@ public class DerbyStore extends AbstractDBStore {
         baseTableMaps.put(TB_PARTTIONS, true);
       }
 
+      createDatabase(CatalogConstants.DEFAULT_DATABASE_NAME);
+
     } catch (SQLException se) {
       throw new CatalogException(se);
     } finally {
@@ -382,6 +396,7 @@ public class DerbyStore extends AbstractDBStore {
           new String [] {"TABLE"});
 
       baseTableMaps.put(TB_META, false);
+      baseTableMaps.put(TB_DATABASES, false);
       baseTableMaps.put(TB_TABLES, false);
       baseTableMaps.put(TB_COLUMNS, false);
       baseTableMaps.put(TB_OPTIONS, false);

@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX idx_database_db_id on DATABASES (db_id)

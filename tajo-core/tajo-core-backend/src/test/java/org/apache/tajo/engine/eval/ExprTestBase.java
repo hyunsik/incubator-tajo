@@ -41,6 +41,8 @@ import org.junit.BeforeClass;
 import java.io.IOException;
 import java.util.Stack;
 
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 
@@ -161,7 +163,7 @@ public class ExprTestBase {
       assertFalse(e.getMessage(), true);
     } finally {
       if (schema != null) {
-        cat.deleteTable(tableName);
+        cat.deleteTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
       }
     }
   }

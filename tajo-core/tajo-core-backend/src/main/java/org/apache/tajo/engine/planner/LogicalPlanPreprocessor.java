@@ -19,10 +19,7 @@
 package org.apache.tajo.engine.planner;
 
 import org.apache.tajo.algebra.*;
-import org.apache.tajo.catalog.CatalogService;
-import org.apache.tajo.catalog.Column;
-import org.apache.tajo.catalog.Schema;
-import org.apache.tajo.catalog.TableDesc;
+import org.apache.tajo.catalog.*;
 import org.apache.tajo.engine.eval.EvalNode;
 import org.apache.tajo.engine.eval.EvalType;
 import org.apache.tajo.engine.eval.FieldEval;
@@ -33,6 +30,9 @@ import org.apache.tajo.engine.utils.SchemaUtil;
 import org.apache.tajo.util.TUtil;
 
 import java.util.*;
+
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
 
 /**
  * It finds all relations for each block and builds base schema information.
@@ -328,7 +328,7 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
       throws PlanningException {
 
     Relation relation = expr;
-    TableDesc desc = catalog.getTableDesc(relation.getName());
+    TableDesc desc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, relation.getName());
 
     ScanNode scanNode = ctx.plan.createNode(ScanNode.class);
     if (relation.hasAlias()) {

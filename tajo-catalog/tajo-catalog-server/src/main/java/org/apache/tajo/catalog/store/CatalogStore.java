@@ -24,29 +24,43 @@ import org.apache.tajo.catalog.proto.CatalogProtos.IndexDescProto;
 
 import java.io.Closeable;
 import org.apache.tajo.catalog.exception.CatalogException;
+
+import java.util.Collection;
 import java.util.List;
 
+import static org.apache.tajo.catalog.proto.CatalogProtos.PartitionMethodProto;
+
 public interface CatalogStore extends Closeable {
+  /*************************** Database ******************************/
+  void createDatabase(String name) throws CatalogException;
+
+  boolean existDatabase(String name) throws CatalogException;
+
+  void dropDatabase(String name) throws CatalogException;
+
+  Collection<String> getAllDatabaseNames() throws CatalogException;
+
   /*************************** TABLE ******************************/
   void addTable(CatalogProtos.TableDescProto desc) throws CatalogException;
   
-  boolean existTable(String name) throws CatalogException;
+  boolean existTable(String databaseName, String namespace, String tableName) throws CatalogException;
   
-  void deleteTable(String name) throws CatalogException;
+  void deleteTable(String databaseName, String namespace, String tableName) throws CatalogException;
   
-  CatalogProtos.TableDescProto getTable(String name) throws CatalogException;
+  CatalogProtos.TableDescProto getTable(String databaseName, String namespace, String name) throws CatalogException;
   
-  List<String> getAllTableNames() throws CatalogException;
+  List<String> getAllTableNames(String databaseName, String namespace) throws CatalogException;
 
 
   /************************ PARTITION METHOD **************************/
-  void addPartitionMethod(CatalogProtos.PartitionMethodProto partitionMethodProto) throws CatalogException;
+  void addPartitionMethod(PartitionMethodProto partitionMethodProto) throws CatalogException;
 
-  CatalogProtos.PartitionMethodProto getPartitionMethod(String tableName) throws CatalogException;
+  PartitionMethodProto getPartitionMethod(String databaseName, String namespace, String tableName)
+      throws CatalogException;
 
-  boolean existPartitionMethod(String tableName) throws CatalogException;
+  boolean existPartitionMethod(String dbName, String namespace, String tableName) throws CatalogException;
 
-  void delPartitionMethod(String tableName) throws CatalogException;
+  void dropPartitionMethod(String dbName, String tableName) throws CatalogException;
 
 
   /************************** PARTITIONS *****************************/

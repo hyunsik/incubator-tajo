@@ -54,6 +54,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
 
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
 import static org.apache.tajo.ipc.ClientProtos.GetQueryStatusResponse;
 
 public class GlobalEngine extends AbstractService {
@@ -287,7 +289,7 @@ public class GlobalEngine extends AbstractService {
   public TableDesc createTableOnPath(String tableName, Schema schema, TableMeta meta,
                                      Path path, boolean isCreated, PartitionMethodDesc partitionDesc)
       throws IOException {
-    if (catalog.existsTable(tableName)) {
+    if (catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName)) {
       throw new AlreadyExistsTableException(tableName);
     }
 
@@ -333,12 +335,12 @@ public class GlobalEngine extends AbstractService {
   public void dropTable(String tableName, boolean purge) {
     CatalogService catalog = context.getCatalog();
 
-    if (!catalog.existsTable(tableName)) {
+    if (!catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName)) {
       throw new NoSuchTableException(tableName);
     }
 
-    Path path = catalog.getTableDesc(tableName).getPath();
-    catalog.deleteTable(tableName);
+    Path path = catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName).getPath();
+    catalog.deleteTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
 
     if (purge) {
       try {

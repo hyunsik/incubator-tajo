@@ -29,19 +29,22 @@ import org.apache.tajo.catalog.CatalogConstants;
 import org.apache.tajo.catalog.CatalogUtil;
 import org.apache.tajo.catalog.FunctionDesc;
 import org.apache.tajo.catalog.exception.CatalogException;
+import org.apache.tajo.catalog.exception.NoSuchDatabaseException;
 import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.catalog.proto.CatalogProtos.*;
 import org.apache.tajo.common.TajoDataTypes.Type;
 import org.apache.tajo.exception.InternalException;
+import org.apache.tajo.util.FileUtil;
 
+import java.io.File;
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public abstract class AbstractDBStore extends CatalogConstants implements CatalogStore {
   protected final Log LOG = LogFactory.getLog(getClass());
@@ -148,6 +151,17 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
 //        throw new InternalException("DB upgrade is failed.", e);
 //      }
 //    }
+  }
+
+  public String readSchemaFile(String path) throws IOException {
+    URL schema = ClassLoader.getSystemResource("schemas/" + path);
+    String sql = null;
+    try {
+      sql = FileUtil.readTextFile(new File(schema.toURI()));
+    } catch (URISyntaxException use) {
+      throw new IOException(use);
+    }
+    return sql;
   }
 
   protected String getCatalogUri(){
@@ -267,6 +281,75 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     }
   }
 
+  @Override
+  public void createDatabase(String databaseName) throws CatalogException {
+    Connection conn = null;
+    PreparedStatement pstmt = null;
+    ResultSet res = null;
+
+    try {
+      conn = getConnection();
+      conn.setAutoCommit(false);
+      String sql = String.format("INSERT INTO %s (DB_NAME) VALUES (?)", TB_DATABASES);
+
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(sql);
+      }
+
+      pstmt = conn.prepareStatement(sql);
+      pstmt.setString(1, databaseName);
+      pstmt.executeUpdate();
+      pstmt.close();
+    } catch (SQLException se) {
+      try {
+        // If there is any error, rollback the changes.
+        conn.rollback();
+      } catch (SQLException se2) {
+        LOG.error(se2);
+      }
+      throw new CatalogException(se);
+    } finally {
+      CatalogUtil.closeQuietly(conn, pstmt, res);
+    }
+  }
+
+  @Override
+  public boolean existDatabase(String databaseName) throws CatalogException {
+    Connection conn = null;
+    PreparedStatement pstmt = null;
+    ResultSet res = null;
+    boolean exist = false;
+
+    try {
+      StringBuilder sql = new StringBuilder();
+      sql.append("SELECT DB_NAME FROM DATABASES WHERE DB_NAME = ?");
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(sql.toString());
+      }
+
+      conn = getConnection();
+      pstmt = conn.prepareStatement(sql.toString());
+      pstmt.setString(1, databaseName);
+      res = pstmt.executeQuery();
+      exist = res.next();
+    } catch (SQLException se) {
+      throw new CatalogException(se);
+    } finally {
+      CatalogUtil.closeQuietly(conn, pstmt, res);
+    }
+
+    return exist;
+  }
+
+  @Override
+  public void dropDatabase(String name) throws CatalogException {
+
+  }
+
+  @Override
+  public Collection<String> getAllDatabaseNames() throws CatalogException {
+    return null;
+  }
 
   @Override
   public void addTable(final CatalogProtos.TableDescProto table) throws CatalogException {
@@ -277,28 +360,35 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     try {
       conn = getConnection();
       conn.setAutoCommit(false);
-      String tableName = table.getId().toLowerCase();
 
-      String sql = String.format("INSERT INTO %s (%s, path, store_type) VALUES(?, ?, ?) ", TB_TABLES, C_TABLE_ID);
+      String databaseName = CatalogUtil.normalizeIdentifier(table.getDatabaseName());
+      String tableName = CatalogUtil.normalizeIdentifier(table.getTableName());
+
+      int dbid = getDatabaseId(databaseName);
+
+      String sql = String.format("INSERT INTO %s (db_id, %s, path, store_type) VALUES(?, ?, ?, ?) ",
+          TB_TABLES, C_TABLE_ID);
 
       if (LOG.isDebugEnabled()) {
         LOG.debug(sql);
       }
 
       pstmt = conn.prepareStatement(sql);
-      pstmt.setString(1, tableName);
-      pstmt.setString(2, table.getPath());
-      pstmt.setString(3, table.getMeta().getStoreType().name());
+      pstmt.setInt(1, dbid);
+      pstmt.setString(2, tableName);
+      pstmt.setString(3, table.getPath());
+      pstmt.setString(4, table.getMeta().getStoreType().name());
       pstmt.executeUpdate();
       pstmt.close();
 
-      String tidSql = String.format("SELECT TID from %s WHERE %s = ?", TB_TABLES, C_TABLE_ID);
+      String tidSql = String.format("SELECT TID from %s WHERE db_id = ? AND %s = ?", TB_TABLES, C_TABLE_ID);
       pstmt = conn.prepareStatement(tidSql);
-      pstmt.setString(1, tableName);
+      pstmt.setInt(1, dbid);
+      pstmt.setString(2, tableName);
       res = pstmt.executeQuery();
 
       if (!res.next()) {
-        throw new CatalogException("ERROR: there is no tid matched to " + table.getId());
+        throw new CatalogException("ERROR: there is no tid matched to " + table.getTableName());
       }
 
       int tid = res.getInt("TID");
@@ -394,18 +484,43 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     }
   }
 
+  private int getDatabaseId(String databaseName) throws SQLException {
+    String sql = String.format("SELECT db_id from %s WHERE db_name = ?", TB_DATABASES);
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(sql);
+    }
+
+    Connection conn = null;
+    PreparedStatement pstmt = null;
+    ResultSet res = null;
+
+    try {
+      conn = getConnection();
+      pstmt = conn.prepareStatement(sql);
+      pstmt.setString(1, databaseName);
+      res = pstmt.executeQuery();
+      if (!res.next()) {
+        throw new NoSuchDatabaseException(databaseName);
+      }
+
+      return res.getInt("db_id");
+    } finally {
+      CatalogUtil.closeQuietly(conn, pstmt, res);
+    }
+  }
+
   @Override
-  public boolean existTable(final String name) throws CatalogException {
+  public boolean existTable(String databaseName, String namespace, final String tableName) throws CatalogException {
     Connection conn = null;
     PreparedStatement pstmt = null;
     ResultSet res = null;
     boolean exist = false;
 
     try {
-      StringBuilder sql = new StringBuilder();
-      sql.append(" SELECT ").append(C_TABLE_ID);
-      sql.append(" FROM ").append(TB_TABLES);
-      sql.append(" WHERE ").append(C_TABLE_ID).append(" = ? ");
+      int dbid = getDatabaseId(databaseName);
+
+      String sql = "SELECT TID FROM TABLES WHERE db_id = ? AND TABLE_ID = ?";
 
       if (LOG.isDebugEnabled()) {
         LOG.debug(sql.toString());
@@ -414,7 +529,8 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       conn = getConnection();
       pstmt = conn.prepareStatement(sql.toString());
 
-      pstmt.setString(1, name);
+      pstmt.setInt(1, dbid);
+      pstmt.setString(2, tableName);
       res = pstmt.executeQuery();
       exist = res.next();
     } catch (SQLException se) {
@@ -427,7 +543,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
   }
 
   @Override
-  public void deleteTable(final String name) throws CatalogException {
+  public void deleteTable(String databaseName, String namespace, final String tableName) throws CatalogException {
     Connection conn = null;
     PreparedStatement pstmt = null;
 
@@ -444,7 +560,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       }
 
       pstmt = conn.prepareStatement(sql.toString());
-      pstmt.setString(1, name);
+      pstmt.setString(1, tableName);
       pstmt.executeUpdate();
       pstmt.close();
 
@@ -457,7 +573,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       }
 
       pstmt = conn.prepareStatement(sql.toString());
-      pstmt.setString(1, name);
+      pstmt.setString(1, tableName);
       pstmt.executeUpdate();
       pstmt.close();
 
@@ -470,7 +586,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       }
 
       pstmt = conn.prepareStatement(sql.toString());
-      pstmt.setString(1, name);
+      pstmt.setString(1, tableName);
       pstmt.executeUpdate();
       pstmt.close();
 
@@ -483,20 +599,22 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       }
 
       pstmt = conn.prepareStatement(sql.toString());
-      pstmt.setString(1, name);
+      pstmt.setString(1, tableName);
       pstmt.executeUpdate();
       pstmt.close();
 
+      int dbid = getDatabaseId(databaseName);
+
       sql.delete(0, sql.length());
-      sql.append("DELETE FROM ").append(TB_TABLES);
-      sql.append(" WHERE ").append(C_TABLE_ID).append(" = ? ");
+      sql.append("DELETE FROM TABLES WHERE db_id = ? AND TABLE_ID = ?");
 
       if (LOG.isDebugEnabled()) {
         LOG.debug(sql.toString());
       }
 
       pstmt = conn.prepareStatement(sql.toString());
-      pstmt.setString(1, name);
+      pstmt.setInt(1, dbid);
+      pstmt.setString(2, tableName);
       pstmt.executeUpdate();
 
       // If there is no error, commit the changes.
@@ -514,21 +632,23 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
   }
 
   @Override
-  public CatalogProtos.TableDescProto getTable(final String name) throws CatalogException {
+  public CatalogProtos.TableDescProto getTable(String databaseName, String namespace, String tableName)
+      throws CatalogException {
     Connection conn = null;
     ResultSet res = null;
     PreparedStatement pstmt = null;
 
     CatalogProtos.TableDescProto.Builder tableBuilder = null;
-    StoreType storeType = null;
+    StoreType storeType;
 
     try {
       tableBuilder = CatalogProtos.TableDescProto.newBuilder();
 
+      int dbid = getDatabaseId(databaseName);
+      tableBuilder.setDatabaseName(databaseName);
+
       StringBuilder sql = new StringBuilder();
-      sql.append(" SELECT ").append(C_TABLE_ID).append(", path, store_type");
-      sql.append(" from ").append(TB_TABLES);
-      sql.append(" WHERE ").append(C_TABLE_ID).append(" = ? ");
+      sql.append(" SELECT TABLE_ID, path, store_type FROM TABLES WHERE db_id = ? AND TABLE_ID = ?");
 
       if (LOG.isDebugEnabled()) {
         LOG.debug(sql.toString());
@@ -536,14 +656,15 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
 
       conn = getConnection();
       pstmt = conn.prepareStatement(sql.toString());
-      pstmt.setString(1, name);
+      pstmt.setInt(1, dbid);
+      pstmt.setString(2, tableName);
       res = pstmt.executeQuery();
 
       if (!res.next()) { // there is no table of the given name.
         return null;
       }
 
-      tableBuilder.setId(res.getString(C_TABLE_ID).trim());
+      tableBuilder.setTableName(res.getString(C_TABLE_ID).trim());
       tableBuilder.setPath(res.getString("path").trim());
       storeType = CatalogUtil.getStoreType(res.getString("store_type").trim());
 
@@ -562,14 +683,14 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       }
 
       pstmt = conn.prepareStatement(sql.toString());
-      pstmt.setString(1, name);
+      pstmt.setString(1, tableName);
       res = pstmt.executeQuery();
 
       while (res.next()) {
         schemaBuilder.addFields(resultToColumnProto(res));
       }
 
-      tableBuilder.setSchema(CatalogUtil.getQualfiedSchema(name, schemaBuilder.build()));
+      tableBuilder.setSchema(CatalogUtil.getQualfiedSchema(tableName, schemaBuilder.build()));
 
       res.close();
       pstmt.close();
@@ -586,7 +707,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       }
 
       pstmt = conn.prepareStatement(sql.toString());
-      pstmt.setString(1, name);
+      pstmt.setString(1, tableName);
       res = pstmt.executeQuery();
       metaBuilder.setParams(resultToKeyValueSetProto(res));
 
@@ -605,7 +726,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       }
 
       pstmt = conn.prepareStatement(sql.toString());
-      pstmt.setString(1, name);
+      pstmt.setString(1, tableName);
       res = pstmt.executeQuery();
 
       if (res.next()) {
@@ -628,11 +749,11 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       }
 
       pstmt = conn.prepareStatement(sql.toString());
-      pstmt.setString(1, name);
+      pstmt.setString(1, tableName);
       res = pstmt.executeQuery();
 
       if (res.next()) {
-        tableBuilder.setPartition(resultToPartitionMethodProto(name, res));
+        tableBuilder.setPartition(resultToPartitionMethodProto(databaseName, namespace, tableName, res));
       }
     } catch (InvalidProtocolBufferException e) {
       throw new CatalogException(e);
@@ -688,7 +809,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
   }
 
   @Override
-  public List<String> getAllTableNames() throws CatalogException {
+  public List<String> getAllTableNames(String databaseName, String namespace) throws CatalogException {
     Connection conn = null;
     PreparedStatement pstmt = null;
     ResultSet res = null;
@@ -778,7 +899,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
 
       conn = getConnection();
       pstmt = conn.prepareStatement(sql.toString());
-      pstmt.setString(1, proto.getTableId().toLowerCase());
+      pstmt.setString(1, proto.getTableName().toLowerCase());
       pstmt.setString(2, proto.getPartitionType().name());
       pstmt.setString(3, proto.getExpression());
       pstmt.setBytes(4, proto.getExpressionSchema().toByteArray());
@@ -791,7 +912,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
   }
 
   @Override
-  public void delPartitionMethod(String tableName) throws CatalogException {
+  public void dropPartitionMethod(String databaseName, String tableName) throws CatalogException {
     Connection conn = null;
     PreparedStatement pstmt = null;
 
@@ -816,7 +937,8 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
   }
 
   @Override
-  public CatalogProtos.PartitionMethodProto getPartitionMethod(String tableName) throws CatalogException {
+  public CatalogProtos.PartitionMethodProto getPartitionMethod(String databaseName, String namespace, String tableName)
+      throws CatalogException {
     Connection conn = null;
     ResultSet res = null;
     PreparedStatement pstmt = null;
@@ -837,7 +959,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       res = pstmt.executeQuery();
 
       if (res.next()) {
-        return resultToPartitionMethodProto(tableName, res);
+        return resultToPartitionMethodProto(databaseName, namespace, tableName, res);
       }
     } catch (InvalidProtocolBufferException e) {
       throw new CatalogException(e);
@@ -850,7 +972,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
   }
 
   @Override
-  public boolean existPartitionMethod(String tableName) throws CatalogException {
+  public boolean existPartitionMethod(String databaseName, String namespace, String tableName) throws CatalogException {
     Connection conn = null;
     ResultSet res = null;
     PreparedStatement pstmt = null;
@@ -1358,10 +1480,15 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     }
   }
 
-  private CatalogProtos.PartitionMethodProto resultToPartitionMethodProto(final String tableName, final ResultSet res)
+  private CatalogProtos.PartitionMethodProto resultToPartitionMethodProto(final String databaseName,
+                                                                          final String namespace,
+                                                                          final String tableName,
+                                                                          final ResultSet res)
       throws SQLException, InvalidProtocolBufferException {
     CatalogProtos.PartitionMethodProto.Builder partBuilder = CatalogProtos.PartitionMethodProto.newBuilder();
-    partBuilder.setTableId(tableName);
+    partBuilder.setDatabaseName(databaseName);
+    partBuilder.setNamespace(namespace);
+    partBuilder.setTableName(tableName);
     partBuilder.setPartitionType(CatalogProtos.PartitionType.valueOf(res.getString("partition_type")));
     partBuilder.setExpression(res.getString("expression"));
     partBuilder.setExpressionSchema(SchemaProto.parseFrom(res.getBytes("expression_schema")));

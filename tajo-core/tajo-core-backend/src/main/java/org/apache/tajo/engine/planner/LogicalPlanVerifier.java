@@ -19,6 +19,7 @@
 package org.apache.tajo.engine.planner;
 
 import com.google.common.base.Preconditions;
+import org.apache.tajo.catalog.CatalogConstants;
 import org.apache.tajo.catalog.CatalogService;
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Schema;
@@ -26,6 +27,9 @@ import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.engine.planner.logical.*;
 
 import java.util.Stack;
+
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
 
 public class LogicalPlanVerifier extends BasicLogicalPlanVisitor<VerificationState, LogicalNode> {
   private TajoConf conf;
@@ -220,7 +224,7 @@ public class LogicalPlanVerifier extends BasicLogicalPlanVisitor<VerificationSta
                                       CreateTableNode node, Stack<LogicalNode> stack) throws PlanningException {
     super.visitCreateTable(state, plan, block, node, stack);
 
-    if (catalog.existsTable(node.getTableName())) {
+    if (catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, node.getTableName())) {
       state.addVerification("relation \"" + node.getTableName() + "\" already exists");
     }
 
@@ -230,7 +234,7 @@ public class LogicalPlanVerifier extends BasicLogicalPlanVisitor<VerificationSta
   @Override
   public LogicalNode visitDropTable(VerificationState state, LogicalPlan plan, LogicalPlan.QueryBlock block,
                                     DropTableNode node, Stack<LogicalNode> stack) {
-    if (!catalog.existsTable(node.getTableName())) {
+    if (!catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, node.getTableName())) {
       state.addVerification("table \"" + node.getTableName() + "\" does not exist");
     }
 

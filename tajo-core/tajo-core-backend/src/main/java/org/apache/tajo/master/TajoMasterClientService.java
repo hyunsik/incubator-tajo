@@ -56,6 +56,9 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.*;
 
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
+
 public class TajoMasterClientService extends AbstractService {
   private final static Log LOG = LogFactory.getLog(TajoMasterClientService.class);
   private final MasterContext context;
@@ -359,7 +362,7 @@ public class TajoMasterClientService extends AbstractService {
                                 StringProto tableNameProto)
         throws ServiceException {
       String tableName = tableNameProto.getValue();
-      if (catalog.existsTable(tableName)) {
+      if (catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName)) {
         return BOOL_TRUE;
       } else {
         return BOOL_FALSE;
@@ -370,7 +373,7 @@ public class TajoMasterClientService extends AbstractService {
     public GetTableListResponse getTableList(RpcController controller,
                                              GetTableListRequest request)
         throws ServiceException {
-      Collection<String> tableNames = catalog.getAllTableNames();
+      Collection<String> tableNames = catalog.getAllTableNames(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE);
       GetTableListResponse.Builder builder = GetTableListResponse.newBuilder();
       builder.addAllTables(tableNames);
       return builder.build();
@@ -381,10 +384,10 @@ public class TajoMasterClientService extends AbstractService {
                                       GetTableDescRequest request)
         throws ServiceException {
       String name = request.getTableName();
-      if (catalog.existsTable(name)) {
+      if (catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, name)) {
         return TableResponse.newBuilder()
             .setResultCode(ResultCode.OK)
-            .setTableDesc(catalog.getTableDesc(name).getProto())
+            .setTableDesc(catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, name).getProto())
             .build();
       } else {
         return TableResponse.newBuilder()

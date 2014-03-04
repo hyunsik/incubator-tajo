@@ -18,6 +18,7 @@
 
 package org.apache.tajo.catalog;
 
+import org.apache.tajo.annotation.Nullable;
 import org.apache.tajo.catalog.partition.PartitionMethodDesc;
 import org.apache.tajo.common.TajoDataTypes.DataType;
 
@@ -29,19 +30,19 @@ public interface CatalogService {
 
   /**
    * Get a table description by name
-   * @param name table name
+   * @param tableName table name
    * @return a table description
    * @see TableDesc
    * @throws Throwable
    */
-  TableDesc getTableDesc(String name);
+  TableDesc getTableDesc(String databaseName, @Nullable String schemaName, String tableName);
 
   /**
    *
    * @return
    * @throws org.apache.tajo.catalog.exception.CatalogException
    */
-  Collection<String> getAllTableNames();
+  Collection<String> getAllTableNames(String databaseName, @Nullable String schemaName);
 
   /**
    *
@@ -61,16 +62,16 @@ public interface CatalogService {
   /**
    * Drop a table by name
    *
-   * @param name table name
+   * @param tableName table name
    * @throws Throwable
    */
-  boolean deleteTable(String name);
+  boolean deleteTable(String databaseName, @Nullable String schemaName, String tableName);
 
-  boolean existsTable(String tableId);
+  boolean existsTable(String databaseName, @Nullable String schemaName, String tableName);
 
-  PartitionMethodDesc getPartitionMethod(String tableId);
+  PartitionMethodDesc getPartitionMethod(String databaseName, @Nullable String schemaName, String tableName);
 
-  boolean existPartitionMethod(String tableId);
+  boolean existPartitionMethod(String databaseName, @Nullable String schemaName, String tableId);
 
   boolean addIndex(IndexDesc index);
 

@@ -25,15 +25,15 @@ import "CatalogProtos.proto";
 import "PrimitiveProtos.proto";
 
 service CatalogProtocolService {
-  rpc getTableDesc(StringProto) returns (TableDescProto);
-  rpc getAllTableNames(NullProto) returns (GetAllTableNamesResponse);
+  rpc getTableDesc(TableIdentifierProto) returns (TableDescProto);
+  rpc getAllTableNames(NamespaceProto) returns (GetAllTableNamesResponse);
   rpc addTable(TableDescProto) returns (BoolProto);
-  rpc deleteTable(StringProto) returns (BoolProto);
-  rpc existsTable(StringProto) returns (BoolProto);
+  rpc deleteTable(TableIdentifierProto) returns (BoolProto);
+  rpc existsTable(TableIdentifierProto) returns (BoolProto);
 
-  rpc getPartitionMethodByTableName(StringProto) returns (PartitionMethodProto);
-  rpc existPartitionMethod(StringProto) returns (BoolProto);
-  rpc delPartitionMethod(StringProto) returns (BoolProto);
+  rpc getPartitionMethodByTableName(TableIdentifierProto) returns (PartitionMethodProto);
+  rpc existPartitionMethod(TableIdentifierProto) returns (BoolProto);
+  rpc dropPartitionMethod(TableIdentifierProto) returns (BoolProto);
 
   rpc addPartitions(PartitionsProto) returns (BoolProto);
   rpc addPartition(PartitionDescProto) returns (BoolProto);

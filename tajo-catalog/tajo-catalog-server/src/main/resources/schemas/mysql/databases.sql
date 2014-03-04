@@ -1,0 +1,4 @@
+CREATE TABLE databases (
+  db_id int NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  db_name VARCHAR(255) NOT NULL UNIQUE
+);

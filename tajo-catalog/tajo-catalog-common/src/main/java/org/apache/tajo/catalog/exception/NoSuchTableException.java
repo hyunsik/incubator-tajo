@@ -19,10 +19,16 @@
 package org.apache.tajo.catalog.exception;
 
 
+import org.apache.tajo.annotation.Nullable;
+
 public class NoSuchTableException extends CatalogException {
 	private static final long serialVersionUID = 277182608283894937L;
 
 	public NoSuchTableException() {}
+
+  public NoSuchTableException(String databaseName, @Nullable String namespace, String relName) {
+    super(String.format("ERROR: relation \" %s \" in %s.%s does not exist", relName, databaseName, namespace));
+  }
 
 	public NoSuchTableException(String relName) {
 		super("ERROR: relation \"" + relName + "\" does not exist");

@@ -47,6 +47,8 @@ import org.apache.tajo.util.TUtil;
 import java.util.*;
 
 import static org.apache.tajo.algebra.CreateTable.PartitionType;
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
 import static org.apache.tajo.engine.planner.ExprNormalizer.ExprNormalizedResult;
 import static org.apache.tajo.engine.planner.LogicalPlan.BlockType;
 import static org.apache.tajo.engine.planner.LogicalPlanPreprocessor.PreprocessContext;
@@ -1148,7 +1150,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   private InsertNode buildInsertIntoTablePlan(PlanContext context, InsertNode insertNode, Insert expr)
       throws PlanningException {
     // Get and set a target table
-    TableDesc desc = catalog.getTableDesc(expr.getTableName());
+    TableDesc desc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, expr.getTableName());
     insertNode.setTargetTable(desc);
 
     //
@@ -1360,7 +1362,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
                                                  String tableName,
                                                  CreateTable.PartitionMethodDescExpr expr) throws PlanningException {
     PartitionMethodDesc partitionMethodDesc = new PartitionMethodDesc();
-    partitionMethodDesc.setTableId(tableName);
+    partitionMethodDesc.setTableName(tableName);
 
     if(expr.getPartitionType() == PartitionType.COLUMN) {
       CreateTable.ColumnPartition partition = (CreateTable.ColumnPartition) expr;

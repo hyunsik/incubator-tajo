@@ -27,6 +27,7 @@ import org.apache.hadoop.io.compress.CompressionCodecFactory;
 import org.apache.hadoop.io.compress.DeflateCodec;
 import org.apache.tajo.QueryTestCaseBase;
 import org.apache.tajo.TajoTestingCluster;
+import org.apache.tajo.catalog.CatalogConstants;
 import org.apache.tajo.catalog.CatalogService;
 import org.apache.tajo.catalog.TableDesc;
 import org.junit.Test;
@@ -35,6 +36,8 @@ import java.io.IOException;
 import java.sql.ResultSet;
 import java.util.Map;
 
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
 import static org.junit.Assert.*;
 
 public class TestTablePartitions extends QueryTestCaseBase {
@@ -51,9 +54,9 @@ public class TestTablePartitions extends QueryTestCaseBase {
         "create table " + tableName + " (col1 int4, col2 int4) partition by column(key float8) ");
     res.close();
 
-    assertTrue(catalog.existsTable(tableName));
-    assertEquals(2, catalog.getTableDesc(tableName).getSchema().size());
-    assertEquals(3, catalog.getTableDesc(tableName).getLogicalSchema().size());
+    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
+    assertEquals(2, catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName).getSchema().size());
+    assertEquals(3, catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName).getLogicalSchema().size());
 
     res = testBase.execute(
         "insert overwrite into " + tableName + " select l_orderkey, l_partkey, l_quantity from lineitem");
@@ -67,9 +70,9 @@ public class TestTablePartitions extends QueryTestCaseBase {
         "create table " + tableName + " (col1 int4, col2 int4, null_col int4) partition by column(key float8) ");
     res.close();
 
-    assertTrue(catalog.existsTable(tableName));
-    assertEquals(3, catalog.getTableDesc(tableName).getSchema().size());
-    assertEquals(4, catalog.getTableDesc(tableName).getLogicalSchema().size());
+    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
+    assertEquals(3, catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName).getSchema().size());
+    assertEquals(4, catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName).getLogicalSchema().size());
 
     res = executeString("insert overwrite into " + tableName + " (col1, col2, key) select l_orderkey, " +
         "l_partkey, l_quantity from lineitem");
@@ -83,13 +86,13 @@ public class TestTablePartitions extends QueryTestCaseBase {
         "create table " + tableName + " (col1 int4, col2 int4, null_col int4) partition by column(key float8) ");
     res.close();
 
-    assertTrue(catalog.existsTable(tableName));
+    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
 
     res = executeString("insert overwrite into " + tableName
         + " (col1, col2, key) select l_orderkey, l_partkey, l_quantity from lineitem");
     res.close();
 
-    TableDesc desc = catalog.getTableDesc(tableName);
+    TableDesc desc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
     assertPartitionDirectories(desc);
 
     res = executeString(
@@ -126,14 +129,14 @@ public class TestTablePartitions extends QueryTestCaseBase {
         "create table " + tableName + " (col1 int4, col2 int4, null_col int4) partition by column(key float8) ");
     res.close();
 
-    assertTrue(catalog.existsTable(tableName));
+    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
 
     res = executeString(
         "insert overwrite into " + tableName
             + " (col1, col2, key) select l_orderkey, l_partkey, l_quantity from lineitem");
     res.close();
 
-    TableDesc desc = catalog.getTableDesc(tableName);
+    TableDesc desc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
     assertPartitionDirectories(desc);
 
     res = executeFile("case1.sql");
@@ -157,13 +160,13 @@ public class TestTablePartitions extends QueryTestCaseBase {
     res.close();
     TajoTestingCluster cluster = testBase.getTestingCluster();
     CatalogService catalog = cluster.getMaster().getCatalog();
-    assertTrue(catalog.existsTable(tableName));
+    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
 
     res = executeString("insert overwrite into " + tableName
         + " select l_returnflag, l_orderkey, l_partkey, l_quantity from lineitem");
     res.close();
 
-    TableDesc desc = catalog.getTableDesc(tableName);
+    TableDesc desc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
     Path path = desc.getPath();
 
     FileSystem fs = FileSystem.get(conf);
@@ -219,12 +222,12 @@ public class TestTablePartitions extends QueryTestCaseBase {
             "WITH ('csvfile.delimiter'='|','compression.codec'='org.apache.hadoop.io.compress.DeflateCodec') " +
             "PARTITION BY column(col1 int4)");
     res.close();
-    assertTrue(catalog.existsTable(tableName));
+    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
 
     res = executeString(
         "insert overwrite into " + tableName + " select l_partkey, l_quantity, l_orderkey from lineitem");
     res.close();
-    TableDesc desc = catalog.getTableDesc(tableName);
+    TableDesc desc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
     assertEquals(5, desc.getStats().getNumRows().intValue());
 
     FileSystem fs = FileSystem.get(conf);
@@ -253,13 +256,13 @@ public class TestTablePartitions extends QueryTestCaseBase {
         "PARTITION by column(col1 int4, col2 int4)");
     res.close();
 
-    assertTrue(catalog.existsTable(tableName));
+    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
 
     res = executeString(
         "insert overwrite into " + tableName +
             " select  l_quantity, l_returnflag, l_orderkey, l_partkey from lineitem");
     res.close();
-    TableDesc desc = catalog.getTableDesc(tableName);
+    TableDesc desc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
     assertEquals(5, desc.getStats().getNumRows().intValue());
 
     FileSystem fs = FileSystem.get(conf);
@@ -296,13 +299,13 @@ public class TestTablePartitions extends QueryTestCaseBase {
             "partition by column(col1 int4, col2 int4, col3 float8)");
     res.close();
 
-    assertTrue(catalog.existsTable(tableName));
+    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
 
     res = executeString(
         "insert overwrite into " + tableName +
             " select l_returnflag, l_orderkey, l_partkey, l_quantity from lineitem");
     res.close();
-    TableDesc desc = catalog.getTableDesc(tableName);
+    TableDesc desc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
     assertEquals(5, desc.getStats().getNumRows().intValue());
 
     FileSystem fs = FileSystem.get(conf);
@@ -377,13 +380,13 @@ public class TestTablePartitions extends QueryTestCaseBase {
             "partition by column(col1 int4, col2 int4, col3 float8)");
     res.close();
 
-    assertTrue(catalog.existsTable(tableName));
+    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
 
     res = executeString(
         "insert overwrite into " + tableName +
             " select l_returnflag , l_orderkey, l_partkey, l_quantity from lineitem");
     res.close();
-    TableDesc desc = catalog.getTableDesc(tableName);
+    TableDesc desc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
     assertEquals(5, desc.getStats().getNumRows().intValue());
 
     FileSystem fs = FileSystem.get(conf);

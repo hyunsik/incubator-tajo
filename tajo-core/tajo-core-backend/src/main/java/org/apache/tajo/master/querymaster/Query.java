@@ -32,6 +32,7 @@ import org.apache.tajo.ExecutionBlockId;
 import org.apache.tajo.QueryId;
 import org.apache.tajo.TajoConstants;
 import org.apache.tajo.TajoProtos.QueryState;
+import org.apache.tajo.catalog.CatalogConstants;
 import org.apache.tajo.catalog.CatalogService;
 import org.apache.tajo.catalog.TableDesc;
 import org.apache.tajo.catalog.TableMeta;
@@ -54,6 +55,9 @@ import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
 
 public class Query implements EventHandler<QueryEvent> {
   private static final Log LOG = LogFactory.getLog(Query.class);
@@ -517,7 +521,7 @@ public class Query implements EventHandler<QueryEvent> {
         TableDesc finalTable;
         if (insertNode.hasTargetTable()) {
           String tableName = insertNode.getTableName();
-          finalTable = catalog.getTableDesc(tableName);
+          finalTable = catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
         } else {
           String tableName = query.getId().toString();
           finalTable = new TableDesc(tableName, lastStage.getSchema(), meta, finalOutputDir);
@@ -528,7 +532,7 @@ public class Query implements EventHandler<QueryEvent> {
         finalTable.setStats(stats);
 
         if (insertNode.hasTargetTable()) {
-          catalog.deleteTable(insertNode.getTableName());
+          catalog.deleteTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, insertNode.getTableName());
           catalog.addTable(finalTable);
         }
 

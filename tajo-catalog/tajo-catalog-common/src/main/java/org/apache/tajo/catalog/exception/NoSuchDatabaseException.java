@@ -19,19 +19,12 @@
 package org.apache.tajo.catalog.exception;
 
 
-import org.apache.tajo.annotation.Nullable;
+public class NoSuchDatabaseException extends CatalogException {
+	private static final long serialVersionUID = 277182608283894937L;
 
-public class AlreadyExistsTableException extends CatalogException {
-	private static final long serialVersionUID = -641623770742392865L;
+	public NoSuchDatabaseException() {}
 
-	public AlreadyExistsTableException() {		
-	}
-
-  public AlreadyExistsTableException(String databaseName, @Nullable String namespace, String relName) {
-    super(String.format("relation \" %s \" already exists in %s.%s", relName, databaseName, namespace));
-  }
-
-	public AlreadyExistsTableException(String tableName) {
-		super("relation \"" + tableName + "\" exists table");
+	public NoSuchDatabaseException(String databaseName) {
+		super("ERROR: database \"" + databaseName + "\" does not exist");
 	}
 }

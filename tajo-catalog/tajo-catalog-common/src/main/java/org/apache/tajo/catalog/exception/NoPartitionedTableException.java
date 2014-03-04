@@ -18,20 +18,13 @@
 
 package org.apache.tajo.catalog.exception;
 
-
 import org.apache.tajo.annotation.Nullable;
 
-public class AlreadyExistsTableException extends CatalogException {
-	private static final long serialVersionUID = -641623770742392865L;
+public class NoPartitionedTableException extends Exception {
 
-	public AlreadyExistsTableException() {		
-	}
+  public NoPartitionedTableException() {}
 
-  public AlreadyExistsTableException(String databaseName, @Nullable String namespace, String relName) {
-    super(String.format("relation \" %s \" already exists in %s.%s", relName, databaseName, namespace));
+  public NoPartitionedTableException(String databaseName, @Nullable String namespace, String relName) {
+    super(String.format("ERROR: \"%s.%s.%s\" is not a partitioned table", databaseName, namespace, relName));
   }
-
-	public AlreadyExistsTableException(String tableName) {
-		super("relation \"" + tableName + "\" exists table");
-	}
 }

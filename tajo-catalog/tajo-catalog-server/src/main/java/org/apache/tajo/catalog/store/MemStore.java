@@ -23,66 +23,101 @@ package org.apache.tajo.catalog.store;
 
 import com.google.common.collect.Maps;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.tajo.catalog.CatalogConstants;
 import org.apache.tajo.catalog.CatalogUtil;
 import org.apache.tajo.catalog.FunctionDesc;
-import org.apache.tajo.catalog.exception.CatalogException;
+import org.apache.tajo.catalog.exception.*;
 import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.catalog.proto.CatalogProtos.IndexDescProto;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class MemStore implements CatalogStore {
-  private final Map<String,CatalogProtos.TableDescProto> tables = Maps.newHashMap();
+  private final Map<String, Map<String, CatalogProtos.TableDescProto>> databases = Maps.newConcurrentMap();
   private final Map<String, CatalogProtos.FunctionDescProto> functions = Maps.newHashMap();
   private final Map<String, IndexDescProto> indexes = Maps.newHashMap();
   private final Map<String, IndexDescProto> indexesByColumn = Maps.newHashMap();
   
   public MemStore(Configuration conf) {
+    createDatabase(CatalogConstants.DEFAULT_DATABASE_NAME);
   }
 
-  /* (non-Javadoc)
-   * @see java.io.Closeable#close()
-   */
   @Override
   public void close() throws IOException {
-    tables.clear();
+    databases.clear();
     functions.clear();
     indexes.clear();
   }
 
+  @Override
+  public void createDatabase(String dbName) throws CatalogException {
+    if (databases.containsKey(dbName)) {
+      throw new AlreadyExistsDatabaseException(dbName);
+    }
+
+    databases.put(dbName, new HashMap<String, CatalogProtos.TableDescProto>());
+  }
+
+  @Override
+  public boolean existDatabase(String dbName) throws CatalogException {
+    return databases.containsKey(dbName);
+  }
+
+  @Override
+  public void dropDatabase(String dbName) throws CatalogException {
+    if (!databases.containsKey(dbName)) {
+      throw new NoSuchDatabaseException(dbName);
+    }
+    databases.remove(dbName);
+  }
+
+  @Override
+  public Collection<String> getAllDatabaseNames() throws CatalogException {
+    return databases.keySet();
+  }
+
+  private Map<String, CatalogProtos.TableDescProto> checkAndGetDatabase(String dbName) {
+    if (databases.containsKey(dbName)) {
+      return databases.get(dbName);
+    } else {
+      throw new NoSuchDatabaseException(dbName);
+    }
+  }
+
   /* (non-Javadoc)
-   * @see CatalogStore#addTable(TableDesc)
-   */
+     * @see CatalogStore#addTable(TableDesc)
+     */
   @Override
   public void addTable(CatalogProtos.TableDescProto desc) throws CatalogException {
-    synchronized(tables) {
-      String tableId = desc.getId().toLowerCase();
-      tables.put(tableId, desc);
+    String dbName = CatalogUtil.normalizeIdentifier(desc.getDatabaseName());
+    Map<String, CatalogProtos.TableDescProto> database = checkAndGetDatabase(dbName);
+    synchronized(database) {
+      String tbName = CatalogUtil.normalizeIdentifier(desc.getTableName());
+      if (database.containsKey(tbName)) {
+        throw new AlreadyExistsTableException(tbName);
+      }
+      database.put(tbName, desc);
     }
   }
 
-  /* (non-Javadoc)
-   * @see CatalogStore#existTable(java.lang.String)
-   */
   @Override
-  public boolean existTable(String name) throws CatalogException {
-    synchronized(tables) {
-      String tableId = name.toLowerCase();
-      return tables.containsKey(tableId);
+  public boolean existTable(String dbName, String namespace, String tbName) throws CatalogException {
+    Map<String, CatalogProtos.TableDescProto> database = checkAndGetDatabase(dbName);
+    synchronized(database) {
+      return database.containsKey(tbName);
     }
   }
 
-  /* (non-Javadoc)
-   * @see CatalogStore#deleteTable(java.lang.String)
-   */
   @Override
-  public void deleteTable(String name) throws CatalogException {
-    synchronized(tables) {
-      String tableId = name.toLowerCase();
-      tables.remove(tableId);
+  public void deleteTable(String dbName, String namespace, String tbName) throws CatalogException {
+    Map<String, CatalogProtos.TableDescProto> database = checkAndGetDatabase(dbName);
+    synchronized(database) {
+      if (database.containsKey(tbName)) {
+        database.remove(tbName);
+      } else {
+        throw new NoSuchTableException(tbName);
+      }
     }
   }
 
@@ -90,24 +125,31 @@ public class MemStore implements CatalogStore {
    * @see CatalogStore#getTable(java.lang.String)
    */
   @Override
-  public CatalogProtos.TableDescProto getTable(String name) throws CatalogException {
-    String tableId = name.toLowerCase();
-    CatalogProtos.TableDescProto unqualified = tables.get(tableId);
-    if(unqualified == null)
-      return null;
-    CatalogProtos.TableDescProto.Builder builder = CatalogProtos.TableDescProto.newBuilder();
-    CatalogProtos.SchemaProto schemaProto = CatalogUtil.getQualfiedSchema(tableId, unqualified.getSchema());
-    builder.mergeFrom(unqualified);
-    builder.setSchema(schemaProto);
-    return builder.build();
+  public CatalogProtos.TableDescProto getTable(String databaseName, String namespace, String tableName) throws CatalogException {
+    Map<String, CatalogProtos.TableDescProto> database = checkAndGetDatabase(databaseName);
+    synchronized(database) {
+      if (database.containsKey(tableName)) {
+        CatalogProtos.TableDescProto unqualified = database.get(tableName);
+        CatalogProtos.TableDescProto.Builder builder = CatalogProtos.TableDescProto.newBuilder();
+        CatalogProtos.SchemaProto schemaProto = CatalogUtil.getQualfiedSchema(tableName, unqualified.getSchema());
+        builder.mergeFrom(unqualified);
+        builder.setSchema(schemaProto);
+        return builder.build();
+      } else {
+        throw new NoSuchTableException(tableName);
+      }
+    }
   }
 
   /* (non-Javadoc)
    * @see CatalogStore#getAllTableNames()
    */
   @Override
-  public List<String> getAllTableNames() throws CatalogException {
-    return new ArrayList<String>(tables.keySet());
+  public List<String> getAllTableNames(String databaseName, String namespace) throws CatalogException {
+    Map<String, CatalogProtos.TableDescProto> database = checkAndGetDatabase(databaseName);
+    synchronized(database) {
+      return new ArrayList<String>(database.keySet());
+    }
   }
 
   @Override
@@ -116,21 +158,35 @@ public class MemStore implements CatalogStore {
   }
 
   @Override
-  public CatalogProtos.PartitionMethodProto getPartitionMethod(String tableName) throws CatalogException {
-    String tableId = tableName.toLowerCase();
-    CatalogProtos.TableDescProto table = tables.get(tableId);
-    return (table != null && table.hasPartition()) ? table.getPartition() : null;
+  public CatalogProtos.PartitionMethodProto getPartitionMethod(String databaseName, String namespace, String tableName)
+      throws CatalogException {
+    Map<String, CatalogProtos.TableDescProto> database = checkAndGetDatabase(databaseName);
+    synchronized(database) {
+      if (database.containsKey(tableName)) {
+        CatalogProtos.TableDescProto table = database.get(tableName);
+        return table.hasPartition() ? table.getPartition() : null;
+      } else {
+        throw new NoSuchTableException(tableName);
+      }
+    }
   }
 
   @Override
-  public boolean existPartitionMethod(String tableName) throws CatalogException {
-    String tableId = tableName.toLowerCase();
-    CatalogProtos.TableDescProto table = tables.get(tableId);
-    return (table != null && table.hasPartition());
+  public boolean existPartitionMethod(String databaseName, String namespace, String tableName)
+      throws CatalogException {
+    Map<String, CatalogProtos.TableDescProto> database = checkAndGetDatabase(databaseName);
+    synchronized(database) {
+      if (database.containsKey(tableName)) {
+        CatalogProtos.TableDescProto table = database.get(tableName);
+        return table.hasPartition();
+      } else {
+        throw new NoSuchTableException(tableName);
+      }
+    }
   }
 
   @Override
-  public void delPartitionMethod(String tableName) throws CatalogException {
+  public void dropPartitionMethod(String dbName, String tableName) throws CatalogException {
     throw new RuntimeException("not supported!");
   }
 

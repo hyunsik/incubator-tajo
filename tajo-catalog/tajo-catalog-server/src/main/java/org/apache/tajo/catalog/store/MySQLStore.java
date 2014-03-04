@@ -26,6 +26,7 @@ import org.apache.tajo.catalog.CatalogUtil;
 import org.apache.tajo.catalog.exception.CatalogException;
 import org.apache.tajo.exception.InternalException;
 
+import java.io.IOException;
 import java.sql.*;
 import java.util.HashMap;
 import java.util.Map;
@@ -70,6 +71,16 @@ public class MySQLStore extends AbstractDBStore  {
         stmt.executeUpdate(sql.toString());
         LOG.info("Table '" + TB_META + " is created.");
         baseTableMaps.put(TB_META, true);
+      }
+
+      // DATABASES
+      if (!baseTableMaps.get(TB_DATABASES)) {
+        try {
+          String ddl = readSchemaFile("mysql/databases.sql");
+          stmt.addBatch(ddl);
+        } catch (IOException e) {
+          throw new CatalogException(String.format("cannot read schema file \"%s\"", "mysql/databases.sql"));
+        }
       }
 
       // TABLES
@@ -310,5 +321,4 @@ public class MySQLStore extends AbstractDBStore  {
 
     return  true;
   }
-
 }

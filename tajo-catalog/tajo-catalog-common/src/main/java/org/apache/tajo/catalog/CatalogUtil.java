@@ -87,6 +87,10 @@ public class CatalogUtil {
     }
   }
 
+  public static String getFQName(String databaseName, String schemaName, String tableName) {
+    return databaseName + IDENTIFIER_DELIMITER + schemaName + IDENTIFIER_DELIMITER + tableName;
+  }
+
   public static String getCanonicalName(String signature, Collection<DataType> paramTypes) {
     DataType [] types = paramTypes.toArray(new DataType[paramTypes.size()]);
     return getCanonicalName(signature, types);

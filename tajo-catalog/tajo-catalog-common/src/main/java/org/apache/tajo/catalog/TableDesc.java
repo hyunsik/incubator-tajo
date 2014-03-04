@@ -38,7 +38,9 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
   private final Log LOG = LogFactory.getLog(TableDesc.class);
 
   protected TableDescProto.Builder builder = null;
-  
+
+  @Expose protected String databaseName;                     // required
+  @Expose protected String namespace;                        // optional
 	@Expose protected String tableName;                        // required
   @Expose protected Schema schema;
   @Expose protected TableMeta meta;                          // required
@@ -53,6 +55,8 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
 	public TableDesc(String tableName, Schema schema, TableMeta info, Path path) {
 		this();
 		// tajo deems all identifiers as lowcase characters
+    this.databaseName = CatalogConstants.DEFAULT_DATABASE_NAME;
+    this.namespace = CatalogConstants.DEFAULT_NAMESPACE;
 	  this.tableName = tableName.toLowerCase();
     this.schema = schema;
 	  this.meta = info;
@@ -64,7 +68,8 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
 	}
 	
 	public TableDesc(TableDescProto proto) {
-	  this(proto.getId(), new Schema(proto.getSchema()), new TableMeta(proto.getMeta()), new Path(proto.getPath()));
+	  this(proto.getTableName(), new Schema(proto.getSchema()), new TableMeta(proto.getMeta()),
+        new Path(proto.getPath()));
     if(proto.hasStats()) {
       this.stats = new TableStats(proto.getStats());
     }
@@ -77,6 +82,14 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
 	  // tajo deems all identifiers as lowcase characters
 		this.tableName = tableId.toLowerCase();
 	}
+
+  public String getDatabaseName() {
+    return this.databaseName;
+  }
+
+  public String getNamespace() {
+    return this.namespace;
+  }
 	
   public String getName() {
     return this.tableName;
@@ -186,8 +199,15 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
     if (builder == null) {
       builder = TableDescProto.newBuilder();
     }
+
+    if (this.databaseName != null) {
+      builder.setDatabaseName(this.databaseName);
+    }
+    if (this.namespace != null) {
+      builder.setNamespace(namespace);
+    }
     if (this.tableName != null) {
-      builder.setId(this.tableName);
+      builder.setTableName(this.tableName);
     }
     if (this.schema != null) {
       builder.setSchema(schema.getProto());

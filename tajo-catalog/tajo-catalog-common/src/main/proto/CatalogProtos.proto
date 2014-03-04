@@ -40,33 +40,11 @@ enum OrderType {
     DSC = 2;
 }
 
-enum CompressType {
-    COMP_NONE = 0;
-    NULL_SUPPRESS = 1;
-    RUN_LENGTH = 2;
-    BIT_VECTOR = 3;
-    DICTIONARY = 4;
-    SNAPPY = 5;
-    LZ = 6;
-}
-
 enum PartitionType {
     RANGE = 0;
     HASH = 1;
     LIST = 2;
     COLUMN = 3;
-}
-
-message ColumnMetaProto {
-    required DataType dataType = 1;
-    required bool compressed = 2;
-    required bool sorted = 3;
-    required bool contiguous = 4;
-    required StoreType storeType = 5;
-    required CompressType compType = 6;
-    required int64 startRid = 7;
-    required int32 recordNum = 8;
-    required int32 offsetToIndex = 9;
 }
 
 message ColumnProto {
@@ -102,17 +80,30 @@ message FileFragmentProto {
 }
 
 message TableProto {
-    required StoreType storeType = 1;
-    optional KeyValueSetProto params = 2;
+  required StoreType storeType = 1;
+  optional KeyValueSetProto params = 2;
 }
 
 message TableDescProto {
-	required string id = 1;
-	required string path = 2;
-	required TableProto meta = 3;
-	required SchemaProto schema = 4;
-	optional TableStatsProto stats = 5;
-  optional PartitionMethodProto partition = 6;
+  required string database_name = 1;
+  optional string namespace = 2;
+	required string table_name = 3;
+	required string path = 4;
+	required TableProto meta = 5;
+	required SchemaProto schema = 6;
+	optional TableStatsProto stats = 7;
+  optional PartitionMethodProto partition = 8;
+}
+
+message TableIdentifierProto {
+  required string database_name = 1;
+  optional string namespace = 2;
+  required string table_name = 3;
+}
+
+message NamespaceProto {
+  required string database_name = 1;
+  optional string namespace = 2;
 }
 
 enum FunctionType {
@@ -243,10 +234,12 @@ message PartitionsProto {
 }
 
 message PartitionMethodProto {
-  required string tableId = 1;
-  required PartitionType partitionType = 2;
-  required string expression = 3;
-  required SchemaProto expressionSchema = 4;
+  required string database_name = 1;
+  required string namespace = 2;
+  required string table_name = 3;
+  required PartitionType partitionType = 4;
+  required string expression = 5;
+  required SchemaProto expressionSchema = 6;
 }
 
 message PartitionDescProto {
