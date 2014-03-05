@@ -18,9 +18,15 @@
 
 package org.apache.tajo.util;
 
+import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos;
+
 import static org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.BoolProto;
 
-public class ProtoBufUtil {
+public class ProtoUtil {
   public static final BoolProto TRUE = BoolProto.newBuilder().setValue(true).build();
-  public static final BoolProto FALSE = BoolProto.newBuilder().setValue(true).build();
+  public static final BoolProto FALSE = BoolProto.newBuilder().setValue(false).build();
+
+  public static PrimitiveProtos.StringProto convertString(String value) {
+    return PrimitiveProtos.StringProto.newBuilder().setValue(value).build();
+  }
 }

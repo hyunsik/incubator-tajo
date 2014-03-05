@@ -33,6 +33,7 @@ import org.apache.tajo.rpc.RpcConnectionPool;
 import org.apache.tajo.rpc.ServerCallable;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.NullProto;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.StringProto;
+import org.apache.tajo.util.ProtoUtil;
 
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -55,6 +56,51 @@ public abstract class AbstractCatalogClient implements CatalogService {
     this.pool = RpcConnectionPool.getPool(conf);
     this.catalogServerAddr = catalogServerAddr;
     this.conf = conf;
+  }
+
+  @Override
+  public final Boolean createDatabase(final String databaseName) {
+    try {
+      return new ServerCallable<Boolean>(conf, catalogServerAddr, CatalogProtocol.class, false) {
+        public Boolean call(NettyClientBase client) throws ServiceException {
+          CatalogProtocolService.BlockingInterface stub = getStub(client);
+          return stub.createDatabase(null, ProtoUtil.convertString(databaseName)).getValue();
+        }
+      }.withRetries();
+    } catch (ServiceException e) {
+      LOG.error(e.getMessage(), e);
+      return null;
+    }
+  }
+
+  @Override
+  public final Boolean dropDatabase(final String databaseName) {
+    try {
+      return new ServerCallable<Boolean>(conf, catalogServerAddr, CatalogProtocol.class, false) {
+        public Boolean call(NettyClientBase client) throws ServiceException {
+          CatalogProtocolService.BlockingInterface stub = getStub(client);
+          return stub.dropDatabase(null, ProtoUtil.convertString(databaseName)).getValue();
+        }
+      }.withRetries();
+    } catch (ServiceException e) {
+      LOG.error(e.getMessage(), e);
+      return null;
+    }
+  }
+
+  @Override
+  public final Boolean existDatabase(final String databaseName) {
+    try {
+      return new ServerCallable<Boolean>(conf, catalogServerAddr, CatalogProtocol.class, false) {
+        public Boolean call(NettyClientBase client) throws ServiceException {
+          CatalogProtocolService.BlockingInterface stub = getStub(client);
+          return stub.existDatabase(null, ProtoUtil.convertString(databaseName)).getValue();
+        }
+      }.withRetries();
+    } catch (ServiceException e) {
+      LOG.error(e.getMessage(), e);
+      return null;
+    }
   }
 
   @Override

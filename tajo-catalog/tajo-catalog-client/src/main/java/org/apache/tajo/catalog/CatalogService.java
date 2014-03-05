@@ -28,6 +28,12 @@ import static org.apache.tajo.catalog.proto.CatalogProtos.FunctionType;
 
 public interface CatalogService {
 
+  Boolean createDatabase(String databaseName);
+
+  Boolean dropDatabase(String databaseName);
+
+  Boolean existDatabase(String databaseName);
+
   /**
    * Get a table description by name
    * @param tableName table name

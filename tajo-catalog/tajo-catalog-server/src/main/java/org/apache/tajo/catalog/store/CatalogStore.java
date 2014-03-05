@@ -45,7 +45,7 @@ public interface CatalogStore extends Closeable {
   
   boolean existTable(String databaseName, String namespace, String tableName) throws CatalogException;
   
-  void deleteTable(String databaseName, String namespace, String tableName) throws CatalogException;
+  void dropTable(String databaseName, String namespace, String tableName) throws CatalogException;
   
   CatalogProtos.TableDescProto getTable(String databaseName, String namespace, String name) throws CatalogException;
   

@@ -82,7 +82,7 @@ public class TestDBStore {
     TableDesc retrieved = new TableDesc(store.getTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
     // Schema order check
     assertSchemaOrder(desc.getSchema(), retrieved.getSchema());
-    store.deleteTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
+    store.dropTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
     assertFalse(store.existTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
   }
   
@@ -114,7 +114,7 @@ public class TestDBStore {
     assertTrue(1023234 == desc.getStats().getNumBytes());
     // Schema order check
     assertSchemaOrder(desc.getSchema(), retrieved.getSchema());
-    store.deleteTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
+    store.dropTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
   }
   
   @Test
@@ -147,7 +147,7 @@ public class TestDBStore {
     store.delIndex(TestCatalog.desc1.getName());
     assertFalse(store.existIndex(TestCatalog.desc1.getName()));
     
-    store.deleteTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, table.getName());
+    store.dropTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, table.getName());
   }
   
   @Test
@@ -162,7 +162,7 @@ public class TestDBStore {
         new IndexDesc(store.getIndex(TestCatalog.desc2.getName())));
     store.delIndex(TestCatalog.desc2.getName());
     
-    store.deleteTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, table.getName());
+    store.dropTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, table.getName());
   }
   
   @Test
@@ -180,7 +180,7 @@ public class TestDBStore {
         new IndexDesc(store.getIndex(tableId, columnName)));
     store.delIndex(TestCatalog.desc2.getName());
     
-    store.deleteTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, table.getName());
+    store.dropTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, table.getName());
   }
   
   @Test
@@ -197,7 +197,7 @@ public class TestDBStore {
     store.delIndex(TestCatalog.desc1.getName());
     store.delIndex(TestCatalog.desc2.getName());
     
-    store.deleteTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, table.getName());
+    store.dropTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, table.getName());
   }
   
   public static TableDesc prepareTable() throws IOException {
@@ -255,7 +255,7 @@ public class TestDBStore {
 
     // Schema order check
     assertSchemaOrder(desc.getSchema(), retrieved.getSchema());
-    store.deleteTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
+    store.dropTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
     assertFalse(store.existTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
   }
 
@@ -291,7 +291,7 @@ public class TestDBStore {
 
     // Schema order check
     assertSchemaOrder(desc.getSchema(), retrieved.getSchema());
-    store.deleteTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
+    store.dropTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
     assertFalse(store.existTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
   }
 
@@ -326,7 +326,7 @@ public class TestDBStore {
 
     // Schema order check
     assertSchemaOrder(desc.getSchema(), retrieved.getSchema());
-    store.deleteTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
+    store.dropTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
     assertFalse(store.existTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
   }
 
@@ -361,7 +361,7 @@ public class TestDBStore {
 
     // Schema order check
     assertSchemaOrder(desc.getSchema(), retrieved.getSchema());
-    store.deleteTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
+    store.dropTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
     assertFalse(store.existTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
   }
 
@@ -396,7 +396,7 @@ public class TestDBStore {
 
     // Schema order check
     assertSchemaOrder(desc.getSchema(), retrieved.getSchema());
-    store.deleteTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
+    store.dropTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
     assertFalse(store.existTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
   }
 

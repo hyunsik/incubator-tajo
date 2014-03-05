@@ -342,8 +342,33 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
   }
 
   @Override
-  public void dropDatabase(String name) throws CatalogException {
+  public void dropDatabase(String databaseName) throws CatalogException {
+    Collection<String> tableNames = getAllTableNames(databaseName, DEFAULT_NAMESPACE);
 
+    Connection conn = null;
+    PreparedStatement pstmt = null;
+    try {
+      conn = getConnection();
+      conn.setAutoCommit(false);
+
+      for (String tableName : tableNames) {
+        dropTableInternal(conn, databaseName, DEFAULT_NAMESPACE, tableName);
+      }
+
+      String sql = "DELETE FROM DATABASES WHERE DB_NAME = ?";
+      pstmt = conn.prepareStatement(sql);
+      pstmt.setString(1, databaseName);
+      pstmt.executeUpdate();
+      conn.commit();
+    } catch (SQLException cae) {
+      try {
+        conn.rollback();
+      } catch (SQLException e) {
+        LOG.error(e);
+      }
+    } finally {
+      CatalogUtil.closeQuietly(conn, pstmt);
+    }
   }
 
   @Override
@@ -542,15 +567,12 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     return exist;
   }
 
-  @Override
-  public void deleteTable(String databaseName, String namespace, final String tableName) throws CatalogException {
-    Connection conn = null;
+  public void dropTableInternal(Connection conn, String databaseName, String namespace, final String tableName)
+      throws SQLException {
+
     PreparedStatement pstmt = null;
 
     try {
-      conn = getConnection();
-      conn.setAutoCommit(false);
-
       StringBuilder sql = new StringBuilder();
       sql.append("DELETE FROM ").append(TB_COLUMNS);
       sql.append(" WHERE ").append(C_TABLE_ID).append(" = ? ");
@@ -616,18 +638,27 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       pstmt.setInt(1, dbid);
       pstmt.setString(2, tableName);
       pstmt.executeUpdate();
+    } finally {
+      CatalogUtil.closeQuietly(conn, pstmt);
+    }
+  }
 
-      // If there is no error, commit the changes.
+  @Override
+  public void dropTable(String databaseName, String namespace, final String tableName) throws CatalogException {
+    Connection conn = null;
+    try {
+      conn = getConnection();
+      conn.setAutoCommit(false);
+      dropTableInternal(conn, databaseName, namespace, tableName);
       conn.commit();
     } catch (SQLException se) {
       try {
-        // If there is any error, rollback the changes.
         conn.rollback();
-      } catch (SQLException se2) {
+      } catch (SQLException e) {
+        LOG.error(e);
       }
-      throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt);
+      CatalogUtil.closeQuietly(conn);
     }
   }
 
@@ -817,11 +848,10 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     List<String> tables = new ArrayList<String>();
 
     try {
-      StringBuilder sql = new StringBuilder();
-      sql.append("SELECT ");
-      sql.append(C_TABLE_ID);
-      sql.append(" from ");
-      sql.append(TB_TABLES);
+
+      int dbid = getDatabaseId(databaseName);
+
+      String sql = "SELECT TABLE_ID FROM TABLES WHERE db_id = ?";
 
       if (LOG.isDebugEnabled()) {
         LOG.debug(sql.toString());
@@ -829,6 +859,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
 
       conn = getConnection();
       pstmt = conn.prepareStatement(sql.toString());
+      pstmt.setInt(1, dbid);
       res = pstmt.executeQuery();
       while (res.next()) {
         tables.add(res.getString(C_TABLE_ID).trim());

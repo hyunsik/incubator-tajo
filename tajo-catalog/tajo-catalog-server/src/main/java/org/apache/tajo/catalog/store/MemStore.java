@@ -110,7 +110,7 @@ public class MemStore implements CatalogStore {
   }
 
   @Override
-  public void deleteTable(String dbName, String namespace, String tbName) throws CatalogException {
+  public void dropTable(String dbName, String namespace, String tbName) throws CatalogException {
     Map<String, CatalogProtos.TableDescProto> database = checkAndGetDatabase(dbName);
     synchronized(database) {
       if (database.containsKey(tbName)) {

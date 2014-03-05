@@ -38,7 +38,7 @@ import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.BoolProto;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.NullProto;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.StringProto;
 import org.apache.tajo.util.NetUtils;
-import org.apache.tajo.util.ProtoBufUtil;
+import org.apache.tajo.util.ProtoUtil;
 import org.apache.tajo.util.TUtil;
 
 import java.io.IOException;
@@ -201,6 +201,67 @@ public class CatalogServer extends AbstractService {
   public class CatalogProtocolHandler implements CatalogProtocolService.BlockingInterface {
 
     @Override
+    public BoolProto createDatabase(RpcController controller, StringProto request) throws ServiceException {
+      String databaseName = CatalogUtil.normalizeIdentifier(request.getValue());
+
+      wlock.lock();
+      try {
+        if (store.existDatabase(databaseName)) {
+          throw new AlreadyExistsDatabaseException(databaseName);
+        }
+
+        store.createDatabase(databaseName);
+        return ProtoUtil.TRUE;
+
+      } catch (Exception e) {
+        LOG.error(e);
+        throw new ServiceException(e);
+      } finally {
+        wlock.unlock();
+      }
+    }
+
+    @Override
+    public BoolProto dropDatabase(RpcController controller, StringProto request) throws ServiceException {
+      String databaseName = CatalogUtil.normalizeIdentifier(request.getValue());
+
+      wlock.lock();
+      try {
+        if (!store.existDatabase(databaseName)) {
+          throw new NoSuchDatabaseException(databaseName);
+        }
+
+        store.dropDatabase(databaseName);
+        return ProtoUtil.TRUE;
+
+      } catch (Exception e) {
+        LOG.error(e);
+        throw new ServiceException(e);
+      } finally {
+        wlock.unlock();
+      }
+    }
+
+    @Override
+    public BoolProto existDatabase(RpcController controller, StringProto request) throws ServiceException {
+      String databaseName = CatalogUtil.normalizeIdentifier(request.getValue());
+
+      rlock.lock();
+      try {
+        if (store.existDatabase(databaseName)) {
+          return ProtoUtil.TRUE;
+        } else {
+          return ProtoUtil.FALSE;
+        }
+      } catch (Exception e) {
+        LOG.error(e);
+        throw new ServiceException(e);
+      } finally {
+        rlock.unlock();
+      }
+    }
+
+    @Override
     public TableDescProto getTableDesc(RpcController controller,
                                        TableIdentifierProto request) throws ServiceException {
       String databaseName = CatalogUtil.normalizeIdentifier(request.getDatabaseName());
@@ -294,12 +355,12 @@ public class CatalogServer extends AbstractService {
         }
       } catch (Exception e) {
         LOG.error(e.getMessage(), e);
-        return ProtoBufUtil.FALSE;
+        return ProtoUtil.FALSE;
       } finally {
         wlock.unlock();
       }
 
-      return ProtoBufUtil.TRUE;
+      return ProtoUtil.TRUE;
     }
 
     @Override
@@ -319,7 +380,7 @@ public class CatalogServer extends AbstractService {
             throw new NoSuchTableException(databaseName, namespace, tableName);
           }
 
-          store.deleteTable(databaseName, namespace, tableName);
+          store.dropTable(databaseName, namespace, tableName);
           LOG.info(String.format("relation \"%s\" is deleted from the catalog (%s)", tableName, bindAddressStr));
         } else {
           throw new NoSuchDatabaseException(databaseName);
@@ -420,9 +481,9 @@ public class CatalogServer extends AbstractService {
           contain = store.existTable(databaseName, namespace, tableName);
           if (contain) {
             if (store.existPartitionMethod(databaseName, namespace, tableName)) {
-              return ProtoBufUtil.TRUE;
+              return ProtoUtil.TRUE;
             } else {
-              return ProtoBufUtil.FALSE;
+              return ProtoUtil.FALSE;
             }
           } else {
             throw new NoSuchTableException(databaseName);
@@ -441,18 +502,18 @@ public class CatalogServer extends AbstractService {
     @Override
     public BoolProto dropPartitionMethod(RpcController controller, TableIdentifierProto request)
         throws ServiceException {
-      return ProtoBufUtil.TRUE;
+      return ProtoUtil.TRUE;
     }
 
     @Override
     public BoolProto addPartitions(RpcController controller, PartitionsProto request) throws ServiceException {
 
-      return ProtoBufUtil.TRUE;
+      return ProtoUtil.TRUE;
     }
 
     @Override
     public BoolProto addPartition(RpcController controller, PartitionDescProto request) throws ServiceException {
-      return ProtoBufUtil.TRUE;
+      return ProtoUtil.TRUE;
     }
 
     @Override

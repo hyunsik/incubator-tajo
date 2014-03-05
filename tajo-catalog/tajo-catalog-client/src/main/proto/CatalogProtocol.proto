@@ -25,6 +25,10 @@ import "CatalogProtos.proto";
 import "PrimitiveProtos.proto";
 
 service CatalogProtocolService {
+  rpc createDatabase(StringProto) returns (BoolProto);
+  rpc dropDatabase(StringProto) returns (BoolProto);
+  rpc existDatabase(StringProto) returns (BoolProto);
+
   rpc getTableDesc(TableIdentifierProto) returns (TableDescProto);
   rpc getAllTableNames(NamespaceProto) returns (GetAllTableNamesResponse);
   rpc addTable(TableDescProto) returns (BoolProto);

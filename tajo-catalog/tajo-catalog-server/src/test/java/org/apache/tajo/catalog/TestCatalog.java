@@ -18,6 +18,7 @@
 
 package org.apache.tajo.catalog;
 
+import com.google.common.collect.Sets;
 import org.apache.hadoop.fs.Path;
 import org.apache.tajo.catalog.exception.NoSuchFunctionException;
 import org.apache.tajo.catalog.function.Function;
@@ -30,15 +31,15 @@ import org.apache.tajo.common.TajoDataTypes;
 import org.apache.tajo.common.TajoDataTypes.Type;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.util.CommonTestingUtil;
+import org.apache.tajo.util.TUtil;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.util.Set;
 
-import static org.apache.tajo.catalog.CatalogConstants.CATALOG_URI;
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
+import static org.apache.tajo.catalog.CatalogConstants.*;
 import static org.junit.Assert.*;
 
 public class TestCatalog {
@@ -72,6 +73,69 @@ public class TestCatalog {
 	public static void tearDown() throws IOException {
 	  server.stop();
 	}
+
+  @Test
+  public void testCreateDatabase() throws Exception {
+    boolean value = catalog.existDatabase("testCreateDatabase");
+    assertFalse(value);
+    assertTrue(catalog.createDatabase("testCreateDatabase"));
+    assertTrue(catalog.existDatabase("testCreateDatabase"));
+  }
+
+  @Test
+  public void testCreateTable() throws Exception {
+    assertTrue(catalog.createDatabase("tmpdb1"));
+    assertTrue(catalog.existDatabase("tmpdb1"));
+    assertTrue(catalog.createDatabase("tmpdb2"));
+    assertTrue(catalog.existDatabase("tmpdb2"));
+
+    schema1 = new Schema();
+    schema1.addColumn(FieldName1, Type.BLOB);
+    schema1.addColumn(FieldName2, Type.INT4);
+    schema1.addColumn(FieldName3, Type.INT8);
+    Path path = new Path(CommonTestingUtil.getTestDir(), "table1");
+    TableDesc table1 = new TableDesc(
+        "tmpdb1",
+        null,
+        "table1",
+        schema1,
+        new TableMeta(StoreType.CSV, new Options()),
+        path);
+    assertTrue(catalog.addTable(table1));
+
+    schema1 = new Schema();
+    schema1.addColumn(FieldName1, Type.BLOB);
+    schema1.addColumn(FieldName2, Type.INT4);
+    schema1.addColumn(FieldName3, Type.INT8);
+    path = new Path(CommonTestingUtil.getTestDir(), "table2");
+    TableDesc table2 = new TableDesc(
+        "tmpdb2",
+        null,
+        "table2",
+        schema1,
+        new TableMeta(StoreType.CSV, new Options()),
+        path);
+    assertTrue(catalog.addTable(table2));
+
+    Set<String> tmpdb1 = Sets.newHashSet(catalog.getAllTableNames("tmpdb1", CatalogConstants.DEFAULT_NAMESPACE));
+    assertEquals(1, tmpdb1.size());
+    assertTrue(tmpdb1.contains("table1"));
+
+
+    Set<String> tmpdb2 = Sets.newHashSet(catalog.getAllTableNames("tmpdb2", CatalogConstants.DEFAULT_NAMESPACE));
+    assertEquals(1, tmpdb2.size());
+    assertTrue(tmpdb2.contains("table2"));
+
+    assertTrue(catalog.dropDatabase("tmpdb1"));
+    assertFalse(catalog.existDatabase("tmpdb1"));
+
+    tmpdb2 = Sets.newHashSet(catalog.getAllTableNames("tmpdb2", CatalogConstants.DEFAULT_NAMESPACE));
+    assertEquals(1, tmpdb2.size());
+    assertTrue(tmpdb2.contains("table2"));
+
+    assertTrue(catalog.dropDatabase("tmpdb2"));
+    assertFalse(catalog.existDatabase("tmpdb2"));
+  }
 	
 	@Test
 	public void testGetTable() throws Exception {
