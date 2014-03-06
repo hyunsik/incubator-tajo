@@ -9,7 +9,7 @@ In this section, we explain how to get JDBC driver and an example code.
 How to get JDBC driver
 =======================
 
-Tajo provides some necesssary jar files packaged by maven. In order get the jar files,
+Tajo provides some necesssary jar files packaged by maven. In order get the jar files, 
 please follow the below commands.
 
 .. code-block:: bash
@@ -19,11 +19,13 @@ please follow the below commands.
   $ ls -l tajo-dist/target/tajo-x.y.z-incubating/share/jdbc-dist
 
 
-CLASSPATH
+Setting the CLASSPATH
 =======================
 
 In order to use the JDBC driver, you should set the jar files included in 
 ``tajo-dist/target/tajo-x.y.z-incubating/share/jdbc-dist`` to your ``CLASSPATH``.
+In addition, you should add hadoop clsspath into your ``CLASSPATH``.
+So, ``CLASSPATH`` will be set as follows:
 
 .. code-block:: bash
 
@@ -31,10 +33,14 @@ In order to use the JDBC driver, you should set the jar files included in
 
 .. note::
 
-  You can get ${hadoop classpath} by executing ``bin/hadoop classpath``.
+  You can get ${hadoop classpath} by executing  the command ``bin/hadoop classpath`` in your hadoop cluster.
 
 An Example JDBC Client
 =======================
+
+The JDBC driver class name is ``org.apache.tajo.jdbc.TajoDriver``.
+You can get the driver ``Class.forName("org.apache.tajo.jdbc.TajoDriver").newInstance()``.
+The following shows an example of JDBC Client.
 
 .. code-block:: java
 
@@ -66,3 +72,16 @@ An Example JDBC Client
       }
     }
   }
+
+
+FAQ
+===========================================
+
+java.nio.channels.UnresolvedAddressException
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When retriving the final result, Tajo JDBC Driver tries to access HDFS data nodes.
+So, the network access between JDBC client and HDFS data nodes must be available.
+In many cases, a HDFS cluster is built in a private network which use private hostnames.
+So, the host names must be shared with the JDBC client side.
+
