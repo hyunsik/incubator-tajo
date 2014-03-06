@@ -136,16 +136,21 @@ public class TestTablePartitions extends QueryTestCaseBase {
     TableDesc desc = catalog.getTableDesc(tableName);
     assertPartitionDirectories(desc);
 
-    res = executeFile("case1.sql");
-    assertResultSet(res, "case1.result");
-    res.close();
+//    res = executeFile("case1.sql");
+//    assertResultSet(res, "case1.result");
+//    res.close();
+//
+//    res = executeFile("case2.sql");
+//    assertResultSet(res, "case2.result");
+//    res.close();
+//
+//    res = executeFile("case3.sql");
+//    assertResultSet(res, "case3.result");
+//    res.close();
 
-    res = executeFile("case2.sql");
-    assertResultSet(res, "case2.result");
-    res.close();
-
-    res = executeFile("case3.sql");
-    assertResultSet(res, "case3.result");
+    // Alias test
+    res = executeFile("partition_and_alias1.sql");
+    System.out.println(resultSetToString(res));
     res.close();
   }
 
