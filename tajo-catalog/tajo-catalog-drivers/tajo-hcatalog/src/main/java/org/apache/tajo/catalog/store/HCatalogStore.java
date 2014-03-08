@@ -26,7 +26,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.*;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hcatalog.common.HCatUtil;
-import org.apache.hcatalog.data.Pair;
 import org.apache.hcatalog.data.schema.HCatFieldSchema;
 import org.apache.hcatalog.data.schema.HCatSchema;
 import org.apache.tajo.catalog.*;
@@ -37,12 +36,10 @@ import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.common.TajoDataTypes;
 import org.apache.tajo.exception.InternalException;
+import org.apache.tajo.exception.UnimplementedException;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 
 import static org.apache.tajo.catalog.proto.CatalogProtos.PartitionType;
 
@@ -65,27 +62,17 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
   }
 
   @Override
-  public boolean existTable(final String name) throws CatalogException {
+  public boolean existTable(String databaseName, String namespace, final String tableName) throws CatalogException {
     boolean exist = false;
 
-    String dbName = null, tableName = null;
-    Pair<String, String> tablePair = null;
     org.apache.hadoop.hive.ql.metadata.Table table = null;
     HCatalogStoreClientPool.HCatalogStoreClient client = null;
-    // get db name and table name.
-    try {
-      tablePair = HCatUtil.getDbAndTableName(name);
-      dbName = tablePair.first;
-      tableName = tablePair.second;
-    } catch (Exception ioe) {
-      throw new CatalogException("Table name is wrong.", ioe);
-    }
 
     // get table
     try {
       try {
         client = clientPool.getClient();
-        table = HCatUtil.getTable(client.getHiveClient(), dbName, tableName);
+        table = HCatUtil.getTable(client.getHiveClient(), databaseName, tableName);
         if (table != null) {
           exist = true;
         }
@@ -102,9 +89,9 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
   }
 
   @Override
-  public final CatalogProtos.TableDescProto getTable(final String name) throws CatalogException {
-    String dbName = null, tableName = null;
-    Pair<String, String> tablePair = null;
+  public final CatalogProtos.TableDescProto getTable(final String databaseName, String namespace, final String tableName)
+      throws CatalogException {
+
     org.apache.hadoop.hive.ql.metadata.Table table = null;
     HCatalogStoreClientPool.HCatalogStoreClient client = null;
     Path path = null;
@@ -114,15 +101,6 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
     TableStats stats = null;
     PartitionMethodDesc partitions = null;
 
-    // get db name and table name.
-    try {
-      tablePair = HCatUtil.getDbAndTableName(name);
-      dbName = tablePair.first;
-      tableName = tablePair.second;
-    } catch (Exception ioe) {
-      throw new CatalogException("Table name is wrong.", ioe);
-    }
-
     //////////////////////////////////
     // set tajo table schema.
     //////////////////////////////////
@@ -130,10 +108,10 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
       // get hive table schema
       try {
         client = clientPool.getClient();
-        table = HCatUtil.getTable(client.getHiveClient(), dbName, tableName);
+        table = HCatUtil.getTable(client.getHiveClient(), databaseName, tableName);
         path = table.getPath();
       } catch (NoSuchObjectException nsoe) {
-        throw new CatalogException("Table not found. - tableName:" + name, nsoe);
+        throw new CatalogException("Table not found. - tableName:" + tableName, nsoe);
       } catch (Exception e) {
         throw new CatalogException(e);
       }
@@ -145,7 +123,7 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
       try {
         tableSchema = HCatUtil.getTableSchemaWithPtnCols(table);
       } catch (IOException ioe) {
-        throw new CatalogException("Fail to get table schema. - tableName:" + name, ioe);
+        throw new CatalogException("Fail to get table schema. - tableName:" + tableName, ioe);
       }
       List<HCatFieldSchema> fieldSchemaList = tableSchema.getFields();
       boolean isPartitionKey = false;
@@ -161,7 +139,7 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
         }
 
         if (!isPartitionKey) {
-          String fieldName = dbName + "." + tableName + "." + eachField.getName();
+          String fieldName = databaseName + "." + tableName + "." + eachField.getName();
           TajoDataTypes.Type dataType = HCatalogUtil.getTajoFieldType(eachField.getType().toString());
           schema.addColumn(fieldName, dataType);
         }
@@ -222,13 +200,16 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
           for(int i = 0; i < partitionKeys.size(); i++) {
             FieldSchema fieldSchema = partitionKeys.get(i);
             TajoDataTypes.Type dataType = HCatalogUtil.getTajoFieldType(fieldSchema.getType().toString());
-            expressionSchema.addColumn(new Column(dbName + "." + tableName + "." + fieldSchema.getName(), dataType));
+            expressionSchema.addColumn(
+                new Column(databaseName + "." + tableName + "." + fieldSchema.getName(), dataType));
             if (i > 0) {
               sb.append(",");
             }
             sb.append(fieldSchema.getName());
           }
           partitions = new PartitionMethodDesc(
+              databaseName,
+              namespace,
               tableName,
               PartitionType.COLUMN,
               sb.toString(),
@@ -240,7 +221,7 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
     }
     TableMeta meta = new TableMeta(storeType, options);
 
-    TableDesc tableDesc = new TableDesc(dbName + "." + tableName, schema, meta, path);
+    TableDesc tableDesc = new TableDesc(databaseName + "." + tableName, schema, meta, path);
     if (stats != null) {
       tableDesc.setStats(stats);
     }
@@ -261,7 +242,7 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
   }
 
   @Override
-  public final List<String> getAllTableNames() throws CatalogException {
+  public final List<String> getAllTableNames(String databaseName, String namespace) throws CatalogException {
     List<String> dbs = null;
     List<String> tables = null;
     List<String> allTables = new ArrayList<String>();
@@ -269,12 +250,9 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
 
     try {
       client = clientPool.getClient();
-      dbs = client.getHiveClient().getAllDatabases();
-      for(String eachDB: dbs) {
-        tables = client.getHiveClient().getAllTables(eachDB);
-        for(String eachTable: tables) {
-          allTables.add(eachDB + "." + eachTable);
-        }
+      tables = client.getHiveClient().getAllTables(databaseName);
+      for(String eachTable: tables) {
+        allTables.add(databaseName + "." + eachTable);
       }
     } catch (MetaException e) {
       throw new CatalogException(e);
@@ -285,26 +263,38 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
   }
 
   @Override
-  public final void addTable(final CatalogProtos.TableDescProto tableDesc) throws CatalogException {
-    String dbName = null, tableName = null;
-    Pair<String, String> tablePair = null;
+  public void createDatabase(String name) throws CatalogException {
+    throw new UnimplementedException("createDatabase is not implemented yet");
+  }
+
+  @Override
+  public boolean existDatabase(String name) throws CatalogException {
+    throw new UnimplementedException("existDatabase() is not implemented yet");
+  }
+
+  @Override
+  public void dropDatabase(String name) throws CatalogException {
+    throw new UnimplementedException("dropDatabase() is not implemented yet");
+  }
+
+  @Override
+  public Collection<String> getAllDatabaseNames() throws CatalogException {
+    return null;
+  }
+
+  @Override
+  public final void createTable(final CatalogProtos.TableDescProto tableDesc) throws CatalogException {
     HCatalogStoreClientPool.HCatalogStoreClient client = null;
 
-    // get db name and table name.
-    try {
-      tablePair = HCatUtil.getDbAndTableName(tableDesc.getId());
-      dbName = tablePair.first;
-      tableName = tablePair.second;
-    } catch (Exception ioe) {
-      throw new CatalogException("Table name is wrong.", ioe);
-    }
+    String databaseName = CatalogUtil.normalizeIdentifier(tableDesc.getDatabaseName());
+    String tableName = CatalogUtil.normalizeIdentifier(tableDesc.getTableName());
 
     try {
       client = clientPool.getClient();
 
       org.apache.hadoop.hive.metastore.api.Table table = new org.apache.hadoop.hive.metastore.api.Table();
 
-      table.setDbName(dbName);
+      table.setDbName(databaseName);
       table.setTableName(tableName);
       // TODO: set owner
       //table.setOwner();
@@ -376,23 +366,12 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
   }
 
   @Override
-  public final void deleteTable(final String name) throws CatalogException {
-    String dbName = null, tableName = null;
-    Pair<String, String> tablePair = null;
+  public final void dropTable(String databaseName, String namespace, final String tableName) throws CatalogException {
     HCatalogStoreClientPool.HCatalogStoreClient client = null;
-
-    // get db name and table name.
-    try {
-      tablePair = HCatUtil.getDbAndTableName(name);
-      dbName = tablePair.first;
-      tableName = tablePair.second;
-    } catch (Exception ioe) {
-      throw new CatalogException("Table name is wrong.", ioe);
-    }
 
     try {
       client = clientPool.getClient();
-      client.getHiveClient().dropTable(dbName, tableName, false, false);
+      client.getHiveClient().dropTable(databaseName, tableName, false, false);
     } catch (NoSuchObjectException nsoe) {
     } catch (Exception e) {
       throw new CatalogException(e);
@@ -407,18 +386,18 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
   }
 
   @Override
-  public CatalogProtos.PartitionMethodProto getPartitionMethod(String tableName) throws CatalogException {
-    return null;  // TODO - not implemented yet
+  public CatalogProtos.PartitionMethodProto getPartitionMethod(String databaseName, String namespace, String tableName) throws CatalogException {
+    return null;
   }
 
   @Override
-  public boolean existPartitionMethod(String tableName) throws CatalogException {
-    return false;  // TODO - not implemented yet
+  public boolean existPartitionMethod(String dbName, String namespace, String tableName) throws CatalogException {
+    return false;
   }
 
   @Override
-  public void delPartitionMethod(String tableName) throws CatalogException {
-    // TODO - not implemented yet
+  public void dropPartitionMethod(String dbName, String tableName) throws CatalogException {
+
   }
 
   @Override
@@ -427,8 +406,8 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
   }
 
   @Override
-  public void addPartition(CatalogProtos.PartitionDescProto partitionDescProto) throws CatalogException {
-    // TODO - not implemented yet
+  public void addPartition(String databaseName, String namespace, String tableName, CatalogProtos.PartitionDescProto partitionDescProto) throws CatalogException {
+
   }
 
   @Override
@@ -447,7 +426,7 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
   }
 
   @Override
-  public void delPartitions(String tableName) throws CatalogException {
+  public void dropPartitions(String tableName) throws CatalogException {
     // TODO - not implemented yet
   }
 
@@ -473,44 +452,41 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
   }
 
   @Override
-  public void delIndex(String indexName) throws CatalogException {
+  public void createIndex(CatalogProtos.IndexDescProto proto) throws CatalogException {
     // TODO - not implemented yet
   }
 
   @Override
-  public boolean existIndex(String indexName) throws CatalogException {
-    // TODO - not implemented yet
+  public void dropIndex(String databaseName, String namespace, String indexName) throws CatalogException {
+
+  }
+
+  @Override
+  public CatalogProtos.IndexDescProto getIndexByName(String databaseName, String namespace, String indexName) throws CatalogException {
+    return null;
+  }
+
+  @Override
+  public CatalogProtos.IndexDescProto getIndexByColumn(String databaseName, String namespace, String tableName,
+                                                       String columnName) throws CatalogException {
+    return null;
+  }
+
+  @Override
+  public boolean existIndexByName(String databaseName, String namespace, String indexName) throws CatalogException {
     return false;
   }
 
   @Override
-  public CatalogProtos.IndexDescProto[] getIndexes(String tableName) throws CatalogException {
-    // TODO - not implemented yet
-    return null;
-  }
-
-  @Override
-  public void addIndex(CatalogProtos.IndexDescProto proto) throws CatalogException {
-    // TODO - not implemented yet
-  }
-
-  @Override
-  public CatalogProtos.IndexDescProto getIndex(String indexName) throws CatalogException {
-    // TODO - not implemented yet
-    return null;
-  }
-
-  @Override
-  public CatalogProtos.IndexDescProto getIndex(String tableName, String columnName) throws CatalogException {
-    // TODO - not implemented yet
-    return null;
-  }
-
-  @Override
-  public boolean existIndex(String tableName, String columnName) throws CatalogException{
-    // TODO - not implemented yet
+  public boolean existIndexByColumn(String databaseName, String namespace, String tableName, String columnName) throws CatalogException {
     return false;
   }
+
+  @Override
+  public CatalogProtos.IndexDescProto[] getIndexes(String databaseName, String namespace, String tableName) throws CatalogException {
+    return new CatalogProtos.IndexDescProto[0];
+  }
+
 
   @Override
   public final void close() {

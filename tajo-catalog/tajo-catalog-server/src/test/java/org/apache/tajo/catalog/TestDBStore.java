@@ -76,7 +76,7 @@ public class TestDBStore {
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV, opts);
     TableDesc desc = new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     assertFalse(store.existTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
-    store.addTable(desc.getProto());
+    store.createTable(desc.getProto());
     assertTrue(store.existTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
 
     TableDesc retrieved = new TableDesc(store.getTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
@@ -106,7 +106,7 @@ public class TestDBStore {
     TableDesc desc = new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "gettable"));
     desc.setStats(stat);
 
-    store.addTable(desc.getProto());
+    store.createTable(desc.getProto());
     TableDesc retrieved = new TableDesc(store.getTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
     assertEquals(",", retrieved.getMeta().getOption("file.delimiter"));
     assertEquals(desc, retrieved);
@@ -131,7 +131,7 @@ public class TestDBStore {
       TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV);
       TableDesc desc = new TableDesc(tableName, schema, meta,
           new Path(CommonTestingUtil.getTestDir(), "tableA_" + i));
-      store.addTable(desc.getProto());
+      store.createTable(desc.getProto());
     }
     
     assertEquals(numTables, store.getAllTableNames(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE).size());
@@ -140,13 +140,12 @@ public class TestDBStore {
   @Test
   public final void testAddAndDeleteIndex() throws Exception {
     TableDesc table = prepareTable();
-    store.addTable(table.getProto());
+    store.createTable(table.getProto());
     
-    store.addIndex(TestCatalog.desc1.getProto());
-    assertTrue(store.existIndex(TestCatalog.desc1.getName()));
-    store.delIndex(TestCatalog.desc1.getName());
-    assertFalse(store.existIndex(TestCatalog.desc1.getName()));
-    
+    store.createIndex(TestCatalog.desc1.getProto());
+    assertTrue(store.existIndexByName(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, TestCatalog.desc1.getIndexName()));
+    store.dropIndex(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, TestCatalog.desc1.getIndexName());
+    assertFalse(store.existIndexByName(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, TestCatalog.desc1.getIndexName()));
     store.dropTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, table.getName());
   }
   
@@ -154,14 +153,15 @@ public class TestDBStore {
   public final void testGetIndex() throws Exception {
     
     TableDesc table = prepareTable();
-    store.addTable(table.getProto());
+    store.createTable(table.getProto());
     
-    store.addIndex(TestCatalog.desc2.getProto());
+    store.createIndex(TestCatalog.desc2.getProto());
+    CatalogProtos.IndexDescProto proto = store.getIndexByName(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE,
+        TestCatalog.desc2.getIndexName());
+
     assertEquals(
-        new IndexDesc(TestCatalog.desc2.getProto()),
-        new IndexDesc(store.getIndex(TestCatalog.desc2.getName())));
-    store.delIndex(TestCatalog.desc2.getName());
-    
+        new IndexDesc(TestCatalog.desc2.getProto()), new IndexDesc(proto));
+    store.dropIndex(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, TestCatalog.desc2.getIndexName());
     store.dropTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, table.getName());
   }
   
@@ -169,16 +169,18 @@ public class TestDBStore {
   public final void testGetIndexByTableAndColumn() throws Exception {
     
     TableDesc table = prepareTable();
-    store.addTable(table.getProto());
+    store.createTable(table.getProto());
     
-    store.addIndex(TestCatalog.desc2.getProto());
+    store.createIndex(TestCatalog.desc2.getProto());
     
-    String tableId = TestCatalog.desc2.getTableId();
+    String tableId = TestCatalog.desc2.getTableName();
     String columnName = "score";
+    CatalogProtos.IndexDescProto retrieved =
+        store.getIndexByColumn(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableId, columnName);
     assertEquals(
         new IndexDesc(TestCatalog.desc2.getProto()),
-        new IndexDesc(store.getIndex(tableId, columnName)));
-    store.delIndex(TestCatalog.desc2.getName());
+        new IndexDesc(retrieved));
+    store.dropIndex(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, TestCatalog.desc2.getIndexName());
     
     store.dropTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, table.getName());
   }
@@ -187,15 +189,15 @@ public class TestDBStore {
   public final void testGetAllIndexes() throws Exception {
     
     TableDesc table = prepareTable();
-    store.addTable(table.getProto());
+    store.createTable(table.getProto());
     
-    store.addIndex(TestCatalog.desc1.getProto());
-    store.addIndex(TestCatalog.desc2.getProto());
+    store.createIndex(TestCatalog.desc1.getProto());
+    store.createIndex(TestCatalog.desc2.getProto());
         
     assertEquals(2, 
-        store.getIndexes(TestCatalog.desc2.getTableId()).length);
-    store.delIndex(TestCatalog.desc1.getName());
-    store.delIndex(TestCatalog.desc2.getName());
+        store.getIndexes(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, TestCatalog.desc2.getTableName()).length);
+    store.dropIndex(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, TestCatalog.desc1.getIndexName());
+    store.dropIndex(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, TestCatalog.desc2.getIndexName());
     
     store.dropTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, table.getName());
   }
@@ -237,18 +239,16 @@ public class TestDBStore {
     opts.put("file.delimiter", ",");
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV, opts);
 
-    PartitionMethodDesc partitionDesc = new PartitionMethodDesc();
-    partitionDesc.setTableName(tableName);
-    partitionDesc.setExpression("id");
     Schema partSchema = new Schema();
     partSchema.addColumn("id", Type.INT4);
-    partitionDesc.setExpressionSchema(partSchema);
-    partitionDesc.setPartitionType(CatalogProtos.PartitionType.HASH);
+    PartitionMethodDesc partitionDesc =
+        new PartitionMethodDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName, CatalogProtos.PartitionType.HASH,
+            "id", partSchema);
 
     TableDesc desc = new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
     assertFalse(store.existTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
-    store.addTable(desc.getProto());
+    store.createTable(desc.getProto());
     assertTrue(store.existTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
 
     TableDesc retrieved = new TableDesc(store.getTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
@@ -272,19 +272,16 @@ public class TestDBStore {
     opts.put("file.delimiter", ",");
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV, opts);
 
-
-    PartitionMethodDesc partitionDesc = new PartitionMethodDesc();
-    partitionDesc.setTableName(tableName);
-    partitionDesc.setExpression("id");
     Schema partSchema = new Schema();
     partSchema.addColumn("id", Type.INT4);
-    partitionDesc.setExpressionSchema(partSchema);
-    partitionDesc.setPartitionType(CatalogProtos.PartitionType.HASH);
+    PartitionMethodDesc partitionDesc =
+        new PartitionMethodDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName, CatalogProtos.PartitionType.HASH,
+            "id", partSchema);
 
     TableDesc desc = new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
     assertFalse(store.existTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
-    store.addTable(desc.getProto());
+    store.createTable(desc.getProto());
     assertTrue(store.existTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
 
     TableDesc retrieved = new TableDesc(store.getTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
@@ -308,18 +305,16 @@ public class TestDBStore {
     opts.put("file.delimiter", ",");
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV, opts);
 
-    PartitionMethodDesc partitionDesc = new PartitionMethodDesc();
-    partitionDesc.setTableName(tableName);
-    partitionDesc.setExpression("id");
     Schema partSchema = new Schema();
     partSchema.addColumn("id", Type.INT4);
-    partitionDesc.setExpressionSchema(partSchema);
-    partitionDesc.setPartitionType(CatalogProtos.PartitionType.LIST);
+    PartitionMethodDesc partitionDesc =
+        new PartitionMethodDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName, CatalogProtos.PartitionType.LIST,
+            "id", partSchema);
 
     TableDesc desc = new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
     assertFalse(store.existTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
-    store.addTable(desc.getProto());
+    store.createTable(desc.getProto());
     assertTrue(store.existTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
 
     TableDesc retrieved = new TableDesc(store.getTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
@@ -343,18 +338,16 @@ public class TestDBStore {
     opts.put("file.delimiter", ",");
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV, opts);
 
-    PartitionMethodDesc partitionDesc = new PartitionMethodDesc();
-    partitionDesc.setTableName(tableName);
-    partitionDesc.setExpression("id");
     Schema partSchema = new Schema();
     partSchema.addColumn("id", Type.INT4);
-    partitionDesc.setExpressionSchema(partSchema);
-    partitionDesc.setPartitionType(CatalogProtos.PartitionType.RANGE);
+    PartitionMethodDesc partitionDesc =
+        new PartitionMethodDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName, CatalogProtos.PartitionType.RANGE,
+            "id", partSchema);
 
     TableDesc desc = new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
     assertFalse(store.existTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
-    store.addTable(desc.getProto());
+    store.createTable(desc.getProto());
     assertTrue(store.existTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
 
     TableDesc retrieved = new TableDesc(store.getTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
@@ -378,18 +371,16 @@ public class TestDBStore {
     opts.put("file.delimiter", ",");
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV, opts);
 
-    PartitionMethodDesc partitionDesc = new PartitionMethodDesc();
-    partitionDesc.setTableName(tableName);
-    partitionDesc.setExpression("id");
     Schema partSchema = new Schema();
     partSchema.addColumn("id", Type.INT4);
-    partitionDesc.setExpressionSchema(partSchema);
-    partitionDesc.setPartitionType(CatalogProtos.PartitionType.COLUMN);
+    PartitionMethodDesc partitionDesc =
+        new PartitionMethodDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName, CatalogProtos.PartitionType.COLUMN,
+            "id", partSchema);
 
     TableDesc desc = new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
     assertFalse(store.existTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
-    store.addTable(desc.getProto());
+    store.createTable(desc.getProto());
     assertTrue(store.existTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
 
     TableDesc retrieved = new TableDesc(store.getTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));

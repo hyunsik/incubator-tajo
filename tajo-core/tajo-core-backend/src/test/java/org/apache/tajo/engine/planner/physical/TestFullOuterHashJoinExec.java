@@ -107,7 +107,7 @@ public class TestFullOuterHashJoinExec {
     appender1.flush();
     appender1.close();
     dep3 = CatalogUtil.newTableDesc("dep3", dep3Schema, dep3Meta, dep3Path);
-    catalog.addTable(dep3);
+    catalog.createTable(dep3);
 
     //----------------- job3 ------------------------------
     //  job_id  | job_title
@@ -136,7 +136,7 @@ public class TestFullOuterHashJoinExec {
     appender2.flush();
     appender2.close();
     job3 = CatalogUtil.newTableDesc("job3", job3Schema, job3Meta, job3Path);
-    catalog.addTable(job3);
+    catalog.createTable(job3);
 
 
 
@@ -200,7 +200,7 @@ public class TestFullOuterHashJoinExec {
     appender3.flush();
     appender3.close();
     emp3 = CatalogUtil.newTableDesc("emp3", emp3Schema, emp3Meta, emp3Path);
-    catalog.addTable(emp3);
+    catalog.createTable(emp3);
 
     //---------------------phone3 --------------------
     // emp_id  | phone_number
@@ -221,7 +221,7 @@ public class TestFullOuterHashJoinExec {
     appender5.flush();
     appender5.close();
     phone3 = CatalogUtil.newTableDesc("phone3", phone3Schema, phone3Meta, phone3Path);
-    catalog.addTable(phone3);
+    catalog.createTable(phone3);
 
 
 

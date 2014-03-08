@@ -100,7 +100,7 @@ public class TestMergeJoinExec {
     appender.flush();
     appender.close();
     employee = CatalogUtil.newTableDesc("employee", employeeSchema, employeeMeta, employeePath);
-    catalog.addTable(employee);
+    catalog.createTable(employee);
 
     Schema peopleSchema = new Schema();
     peopleSchema.addColumn("empId", Type.INT4);
@@ -131,7 +131,7 @@ public class TestMergeJoinExec {
     appender.close();
 
     people = CatalogUtil.newTableDesc("people", peopleSchema, peopleMeta, peoplePath);
-    catalog.addTable(people);
+    catalog.createTable(people);
     analyzer = new SQLAnalyzer();
     planner = new LogicalPlanner(catalog);
   }

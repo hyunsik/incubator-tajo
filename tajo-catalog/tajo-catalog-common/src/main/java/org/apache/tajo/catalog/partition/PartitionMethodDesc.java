@@ -22,7 +22,6 @@ import com.google.common.base.Objects;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.annotations.Expose;
-import org.apache.tajo.catalog.CatalogConstants;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.catalog.json.CatalogGsonHelper;
 import org.apache.tajo.catalog.proto.CatalogProtos;
@@ -30,9 +29,8 @@ import org.apache.tajo.common.ProtoObject;
 import org.apache.tajo.json.GsonObject;
 import org.apache.tajo.util.TUtil;
 
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
 import static org.apache.tajo.catalog.proto.CatalogProtos.PartitionType;
+import static org.apache.tajo.catalog.proto.CatalogProtos.TableIdentifierProto;
 
 /**
  * <code>PartitionMethodDesc</code> presents a table description, including partition type, and partition keys.
@@ -40,8 +38,8 @@ import static org.apache.tajo.catalog.proto.CatalogProtos.PartitionType;
 public class PartitionMethodDesc implements ProtoObject<CatalogProtos.PartitionMethodProto>, Cloneable, GsonObject {
   private CatalogProtos.PartitionMethodProto.Builder builder;
 
-  @Expose private String databaseName = DEFAULT_DATABASE_NAME; // required
-  @Expose private String namespace = DEFAULT_NAMESPACE;        // optional
+  @Expose private String databaseName;                         // required
+  @Expose private String namespace;                            // optional
   @Expose private String tableName;                            // required
   @Expose private PartitionType partitionType;                 // required
   @Expose private String expression;                           // required
@@ -51,8 +49,11 @@ public class PartitionMethodDesc implements ProtoObject<CatalogProtos.PartitionM
     builder = CatalogProtos.PartitionMethodProto.newBuilder();
   }
 
-  public PartitionMethodDesc(String tableName, PartitionType partitionType, String expression,
+  public PartitionMethodDesc(String databaseName, String namespace, String tableName,
+                             PartitionType partitionType, String expression,
                              Schema expressionSchema) {
+    this.databaseName = databaseName;
+    this.namespace = namespace;
     this.tableName = tableName;
     this.partitionType = partitionType;
     this.expression = expression;
@@ -60,7 +61,11 @@ public class PartitionMethodDesc implements ProtoObject<CatalogProtos.PartitionM
   }
 
   public PartitionMethodDesc(CatalogProtos.PartitionMethodProto proto) {
-    this(proto.getTableName(), proto.getPartitionType(), proto.getExpression(), new Schema(proto.getExpressionSchema()));
+    this(proto.getTableIdentifier().getDatabaseName(),
+        proto.getTableIdentifier().getNamespace(),
+        proto.getTableIdentifier().getTableName(),
+        proto.getPartitionType(), proto.getExpression(),
+        new Schema(proto.getExpressionSchema()));
   }
 
   public String getTableName() {
@@ -119,9 +124,20 @@ public class PartitionMethodDesc implements ProtoObject<CatalogProtos.PartitionM
     if(builder == null) {
       builder = CatalogProtos.PartitionMethodProto.newBuilder();
     }
-    builder.setDatabaseName(databaseName);
-    builder.setNamespace(namespace);
-    builder.setTableName(tableName);
+
+    TableIdentifierProto.Builder tableIdentifierBuilder = TableIdentifierProto.newBuilder();
+    if (databaseName != null) {
+      tableIdentifierBuilder.setDatabaseName(databaseName);
+    }
+    if (namespace != null) {
+      tableIdentifierBuilder.setNamespace(namespace);
+    }
+    if (tableName != null) {
+      tableIdentifierBuilder.setTableName(tableName);
+    }
+
+    CatalogProtos.PartitionMethodProto.Builder builder = CatalogProtos.PartitionMethodProto.newBuilder();
+    builder.setTableIdentifier(tableIdentifierBuilder.build());
     builder.setPartitionType(partitionType);
     builder.setExpression(expression);
     builder.setExpressionSchema(expressionSchema.getProto());

@@ -31,8 +31,8 @@ import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.rpc.NettyClientBase;
 import org.apache.tajo.rpc.RpcConnectionPool;
 import org.apache.tajo.rpc.ServerCallable;
+import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.NullProto;
-import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.StringProto;
 import org.apache.tajo.util.ProtoUtil;
 
 import java.net.InetSocketAddress;
@@ -95,6 +95,22 @@ public abstract class AbstractCatalogClient implements CatalogService {
         public Boolean call(NettyClientBase client) throws ServiceException {
           CatalogProtocolService.BlockingInterface stub = getStub(client);
           return stub.existDatabase(null, ProtoUtil.convertString(databaseName)).getValue();
+        }
+      }.withRetries();
+    } catch (ServiceException e) {
+      LOG.error(e.getMessage(), e);
+      return null;
+    }
+  }
+
+  @Override
+  public final Collection<String> getAllDatabaseNames() {
+    try {
+      return new ServerCallable<Collection<String>>(conf, catalogServerAddr, CatalogProtocol.class, false) {
+        public Collection<String> call(NettyClientBase client) throws ServiceException {
+          CatalogProtocolService.BlockingInterface stub = getStub(client);
+          PrimitiveProtos.StringListProto response = stub.getAllDatabaseNames(null, ProtoUtil.NULL_PROTO);
+          return ProtoUtil.convertStrings(response);
         }
       }.withRetries();
     } catch (ServiceException e) {
@@ -187,14 +203,9 @@ public abstract class AbstractCatalogClient implements CatalogService {
             builder.setNamespace(namespace);
           }
 
-          List<String> tableNames = new ArrayList<String>();
           CatalogProtocolService.BlockingInterface stub = getStub(client);
-          GetAllTableNamesResponse response = stub.getAllTableNames(null, builder.build());
-          int size = response.getTableNameCount();
-          for (int i = 0; i < size; i++) {
-            tableNames.add(response.getTableName(i));
-          }
-          return tableNames;
+          PrimitiveProtos.StringListProto response = stub.getAllTableNames(null, builder.build());
+          return ProtoUtil.convertStrings(response);
         }
       }.withRetries();
     } catch (ServiceException e) {
@@ -231,12 +242,12 @@ public abstract class AbstractCatalogClient implements CatalogService {
   }
 
   @Override
-  public final boolean addTable(final TableDesc desc) {
+  public final boolean createTable(final TableDesc desc) {
     try {
       return new ServerCallable<Boolean>(conf, catalogServerAddr, CatalogProtocol.class, false) {
         public Boolean call(NettyClientBase client) throws ServiceException {
           CatalogProtocolService.BlockingInterface stub = getStub(client);
-          return stub.addTable(null, desc.getProto()).getValue();
+          return stub.createTable(null, desc.getProto()).getValue();
         }
       }.withRetries();
     } catch (ServiceException e) {
@@ -246,8 +257,8 @@ public abstract class AbstractCatalogClient implements CatalogService {
   }
 
   @Override
-  public final boolean deleteTable(final String databaseName,
-                                   @Nullable final String namespace, final String tableName) {
+  public final boolean dropTable(final String databaseName,
+                                 @Nullable final String namespace, final String tableName) {
     try {
       return new ServerCallable<Boolean>(conf, catalogServerAddr, CatalogProtocol.class, false) {
         public Boolean call(NettyClientBase client) throws ServiceException {
@@ -260,7 +271,7 @@ public abstract class AbstractCatalogClient implements CatalogService {
           builder.setTableName(tableName);
 
           CatalogProtocolService.BlockingInterface stub = getStub(client);
-          return stub.deleteTable(null, builder.build()).getValue();
+          return stub.dropTable(null, builder.build()).getValue();
         }
       }.withRetries();
     } catch (ServiceException e) {
@@ -295,12 +306,12 @@ public abstract class AbstractCatalogClient implements CatalogService {
   }
 
   @Override
-  public final boolean addIndex(final IndexDesc index) {
+  public final boolean createIndex(final IndexDesc index) {
     try {
       return new ServerCallable<Boolean>(conf, catalogServerAddr, CatalogProtocol.class, false) {
         public Boolean call(NettyClientBase client) throws ServiceException {
           CatalogProtocolService.BlockingInterface stub = getStub(client);
-          return stub.addIndex(null, index.getProto()).getValue();
+          return stub.createIndex(null, index.getProto()).getValue();
         }
       }.withRetries();
     } catch (ServiceException e) {
@@ -310,13 +321,21 @@ public abstract class AbstractCatalogClient implements CatalogService {
   }
 
   @Override
-  public final boolean existIndex(final String indexName) {
+  public final boolean existIndexByName(final String databaseName,
+                                        final @Nullable String namespace,
+                                        final String indexName) {
     try {
       return new ServerCallable<Boolean>(conf, catalogServerAddr, CatalogProtocol.class, false) {
         public Boolean call(NettyClientBase client) throws ServiceException {
+          IndexNameProto.Builder builder = IndexNameProto.newBuilder();
+          builder.setDatabaseName(databaseName);
+          if (namespace != null) {
+            builder.setNamespace(namespace);
+          }
+          builder.setIndexName(indexName);
+
           CatalogProtocolService.BlockingInterface stub = getStub(client);
-          return stub.existIndexByName(null, StringProto.newBuilder().
-              setValue(indexName).build()).getValue();
+          return stub.existIndexByName(null, builder.build()).getValue();
         }
       }.withRetries();
     } catch (ServiceException e) {
@@ -326,15 +345,20 @@ public abstract class AbstractCatalogClient implements CatalogService {
   }
 
   @Override
-  public boolean existIndex(final String tableName, final String columnName) {
+  public boolean existIndexByColumn(final String databaseName,
+                                    final @Nullable String namespace,
+                                    final String tableName,
+                                    final String columnName) {
     try {
       return new ServerCallable<Boolean>(conf, catalogServerAddr, CatalogProtocol.class, false) {
         public Boolean call(NettyClientBase client) throws ServiceException {
-          GetIndexRequest.Builder builder = GetIndexRequest.newBuilder();
-          builder.setTableName(tableName);
-          builder.setColumnName(columnName);
+
+          GetIndexByColumnRequest.Builder builder = GetIndexByColumnRequest.newBuilder();
+          builder.setTableIdentifier(CatalogUtil.buildTableIdentifier(databaseName, namespace, tableName));
+          builder.setColumnName(CatalogUtil.normalizeIdentifier(columnName));
+
           CatalogProtocolService.BlockingInterface stub = getStub(client);
-          return stub.existIndex(null, builder.build()).getValue();
+          return stub.existIndexByColumn(null, builder.build()).getValue();
         }
       }.withRetries();
     } catch (ServiceException e) {
@@ -344,14 +368,22 @@ public abstract class AbstractCatalogClient implements CatalogService {
   }
 
   @Override
-  public final IndexDesc getIndex(final String indexName) {
+  public final IndexDesc getIndexByName(final String databaseName,
+                                        final @Nullable String namespace,
+                                        final String indexName) {
     try {
       return new ServerCallable<IndexDesc>(conf, catalogServerAddr, CatalogProtocol.class, false) {
         public IndexDesc call(NettyClientBase client) throws ServiceException {
+
+          IndexNameProto.Builder builder = IndexNameProto.newBuilder();
+          builder.setDatabaseName(databaseName);
+          if (namespace != null) {
+            builder.setNamespace(namespace);
+          }
+          builder.setIndexName(indexName);
+
           CatalogProtocolService.BlockingInterface stub = getStub(client);
-          return new IndexDesc(
-              stub.getIndexByName(null,
-                  StringProto.newBuilder().setValue(indexName).build()));
+          return new IndexDesc(stub.getIndexByName(null, builder.build()));
         }
       }.withRetries();
     } catch (ServiceException e) {
@@ -361,16 +393,20 @@ public abstract class AbstractCatalogClient implements CatalogService {
   }
 
   @Override
-  public final IndexDesc getIndex(final String tableName, final String columnName) {
+  public final IndexDesc getIndexByColumn(final String databaseName,
+                                          final @Nullable String namespace,
+                                          final String tableName,
+                                          final String columnName) {
     try {
       return new ServerCallable<IndexDesc>(conf, catalogServerAddr, CatalogProtocol.class, false) {
         public IndexDesc call(NettyClientBase client) throws ServiceException {
-          GetIndexRequest.Builder builder = GetIndexRequest.newBuilder();
-          builder.setTableName(tableName);
+
+          GetIndexByColumnRequest.Builder builder = GetIndexByColumnRequest.newBuilder();
+          builder.setTableIdentifier(CatalogUtil.buildTableIdentifier(databaseName, namespace, tableName));
           builder.setColumnName(columnName);
 
           CatalogProtocolService.BlockingInterface stub = getStub(client);
-          return new IndexDesc(stub.getIndex(null, builder.build()));
+          return new IndexDesc(stub.getIndexByColumn(null, builder.build()));
         }
       }.withRetries();
     } catch (ServiceException e) {
@@ -380,13 +416,22 @@ public abstract class AbstractCatalogClient implements CatalogService {
   }
 
   @Override
-  public boolean deleteIndex(final String indexName) {
+  public boolean dropIndex(final String databaseName,
+                           final @Nullable String namespace,
+                           final String indexName) {
     try {
       return new ServerCallable<Boolean>(conf, catalogServerAddr, CatalogProtocol.class, false) {
         public Boolean call(NettyClientBase client) throws ServiceException {
+
+          IndexNameProto.Builder builder = IndexNameProto.newBuilder();
+          builder.setDatabaseName(databaseName);
+          if (namespace != null) {
+            builder.setNamespace(namespace);
+          }
+          builder.setIndexName(indexName);
+
           CatalogProtocolService.BlockingInterface stub = getStub(client);
-          return stub.delIndex(null,
-              StringProto.newBuilder().setValue(indexName).build()).getValue();
+          return stub.dropIndex(null, builder.build()).getValue();
         }
       }.withRetries();
     } catch (ServiceException e) {

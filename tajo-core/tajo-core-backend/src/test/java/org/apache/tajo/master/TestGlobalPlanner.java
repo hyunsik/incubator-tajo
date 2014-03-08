@@ -77,7 +77,7 @@ public class TestGlobalPlanner {
       stats.setNumBytes(volumes[i]);
       TableDesc d = CatalogUtil.newTableDesc(tables[i], tpch.getSchema(tables[i]), m, CommonTestingUtil.getTestDir());
       d.setStats(stats);
-      catalog.addTable(d);
+      catalog.createTable(d);
     }
 
     sqlAnalyzer = new SQLAnalyzer();

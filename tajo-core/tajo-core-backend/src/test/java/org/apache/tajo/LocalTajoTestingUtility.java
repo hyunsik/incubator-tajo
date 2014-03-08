@@ -90,7 +90,7 @@ public class LocalTajoTestingUtility {
       stats.setNumBytes(TPCH.tableVolumes.get(names[i]));
       TableDesc tableDesc = new TableDesc(names[i], schemas[i], meta, tablePath);
       tableDesc.setStats(stats);
-      util.getMaster().getCatalog().addTable(tableDesc);
+      util.getMaster().getCatalog().createTable(tableDesc);
     }
 
     LOG.info("===================================================");

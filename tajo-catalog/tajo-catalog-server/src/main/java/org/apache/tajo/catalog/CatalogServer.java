@@ -25,6 +25,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.AbstractService;
+import org.apache.tajo.annotation.ThreadSafe;
 import org.apache.tajo.catalog.CatalogProtocol.CatalogProtocolService;
 import org.apache.tajo.catalog.exception.*;
 import org.apache.tajo.catalog.proto.CatalogProtos.*;
@@ -50,12 +51,14 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static org.apache.tajo.catalog.proto.CatalogProtos.FunctionType.*;
+import static org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.StringListProto;
 
 /**
  * This class provides the catalog service. The catalog service enables clients
  * to register, unregister and access information about tables, functions, and
  * cluster information.
  */
+@ThreadSafe
 public class CatalogServer extends AbstractService {
 
   private final static String DEFAULT_NAMESPACE = "public";
@@ -262,6 +265,19 @@ public class CatalogServer extends AbstractService {
     }
 
     @Override
+    public StringListProto getAllDatabaseNames(RpcController controller, NullProto request) throws ServiceException {
+      rlock.lock();
+      try {
+        return ProtoUtil.convertStrings(store.getAllDatabaseNames());
+      } catch (Exception e) {
+        LOG.error(e);
+        throw new ServiceException(e);
+      } finally {
+        rlock.unlock();
+      }
+    }
+
+    @Override
     public TableDescProto getTableDesc(RpcController controller,
                                        TableIdentifierProto request) throws ServiceException {
       String databaseName = CatalogUtil.normalizeIdentifier(request.getDatabaseName());
@@ -294,7 +310,7 @@ public class CatalogServer extends AbstractService {
     }
 
     @Override
-    public GetAllTableNamesResponse getAllTableNames(RpcController controller, NamespaceProto request)
+    public StringListProto getAllTableNames(RpcController controller, NamespaceProto request)
         throws ServiceException {
 
       String databaseName = CatalogUtil.normalizeIdentifier(request.getDatabaseName());
@@ -304,9 +320,7 @@ public class CatalogServer extends AbstractService {
       rlock.lock();
       try {
         if (store.existDatabase(databaseName)) {
-          GetAllTableNamesResponse.Builder builder = GetAllTableNamesResponse.newBuilder();
-          builder.addAllTableName(store.getAllTableNames(databaseName, namespace));
-          return builder.build();
+          return ProtoUtil.convertStrings(store.getAllTableNames(databaseName, namespace));
         } else {
           throw new NoSuchDatabaseException(databaseName);
         }
@@ -331,7 +345,7 @@ public class CatalogServer extends AbstractService {
     }
 
     @Override
-    public BoolProto addTable(RpcController controller, TableDescProto request)throws ServiceException {
+    public BoolProto createTable(RpcController controller, TableDescProto request)throws ServiceException {
 
       String databaseName = CatalogUtil.normalizeIdentifier(request.getDatabaseName());
       String namespace = request.hasNamespace() ? CatalogUtil.normalizeIdentifier(request.getNamespace())
@@ -348,8 +362,9 @@ public class CatalogServer extends AbstractService {
             throw new AlreadyExistsTableException(databaseName, namespace, tableName);
           }
 
-          store.addTable(request);
-          LOG.info(String.format("relation \"%s\" is added to the catalog (%s)", tableName, bindAddressStr));
+          store.createTable(request);
+          LOG.info(String.format("relation \"%s\" is added to the catalog (%s)",
+              CatalogUtil.getCanonicalTableName(databaseName, namespace, tableName), bindAddressStr));
         } else {
           throw new NoSuchDatabaseException(databaseName);
         }
@@ -364,7 +379,7 @@ public class CatalogServer extends AbstractService {
     }
 
     @Override
-    public BoolProto deleteTable(RpcController controller, TableIdentifierProto request) throws ServiceException {
+    public BoolProto dropTable(RpcController controller, TableIdentifierProto request) throws ServiceException {
 
       String databaseName = CatalogUtil.normalizeIdentifier(request.getDatabaseName());
       String namespace = request.hasNamespace() ? CatalogUtil.normalizeIdentifier(request.getNamespace())
@@ -381,7 +396,8 @@ public class CatalogServer extends AbstractService {
           }
 
           store.dropTable(databaseName, namespace, tableName);
-          LOG.info(String.format("relation \"%s\" is deleted from the catalog (%s)", tableName, bindAddressStr));
+          LOG.info(String.format("relation \"%s\" is deleted from the catalog (%s)",
+              CatalogUtil.getCanonicalTableName(databaseName, namespace, tableName), bindAddressStr));
         } else {
           throw new NoSuchDatabaseException(databaseName);
         }
@@ -536,14 +552,17 @@ public class CatalogServer extends AbstractService {
     }
 
     @Override
-    public BoolProto addIndex(RpcController controller, IndexDescProto indexDesc)
+    public BoolProto createIndex(RpcController controller, IndexDescProto indexDesc)
         throws ServiceException {
       rlock.lock();
       try {
-        if (store.existIndex(indexDesc.getName())) {
+        if (store.existIndexByName(
+            indexDesc.getTableIdentifier().getDatabaseName(),
+            indexDesc.getTableIdentifier().getNamespace(),
+            indexDesc.getName())) {
           throw new AlreadyExistsIndexException(indexDesc.getName());
         }
-        store.addIndex(indexDesc);
+        store.createIndex(indexDesc);
       } catch (Exception e) {
         LOG.error("ERROR : cannot add index " + indexDesc.getName(), e);
         LOG.error(indexDesc);
@@ -556,13 +575,16 @@ public class CatalogServer extends AbstractService {
     }
 
     @Override
-    public BoolProto existIndexByName(RpcController controller,
-                                      StringProto indexName)
-        throws ServiceException {
+    public BoolProto existIndexByName(RpcController controller, IndexNameProto request) throws ServiceException {
+
+      String databaseName = CatalogUtil.normalizeIdentifier(request.getDatabaseName());
+      String namespace = request.hasNamespace() ? CatalogUtil.normalizeIdentifier(request.getNamespace())
+          : DEFAULT_NAMESPACE;
+      String indexName = CatalogUtil.normalizeIdentifier(request.getIndexName());
+
       rlock.lock();
       try {
-        return BoolProto.newBuilder().setValue(
-            store.existIndex(indexName.getValue())).build();
+        return store.existIndexByName(databaseName, namespace, indexName) ? ProtoUtil.TRUE : ProtoUtil.FALSE;
       } catch (Exception e) {
         LOG.error(e);
         return BoolProto.newBuilder().setValue(false).build();
@@ -572,14 +594,20 @@ public class CatalogServer extends AbstractService {
     }
 
     @Override
-    public BoolProto existIndex(RpcController controller,
-                                GetIndexRequest request)
+    public BoolProto existIndexByColumn(RpcController controller, GetIndexByColumnRequest request)
         throws ServiceException {
+
+      TableIdentifierProto identifier = request.getTableIdentifier();
+      String databaseName = CatalogUtil.normalizeIdentifier(identifier.getDatabaseName());
+      String namespace = identifier.hasNamespace() ? CatalogUtil.normalizeIdentifier(identifier.getNamespace())
+          : DEFAULT_NAMESPACE;
+      String tableName = CatalogUtil.normalizeIdentifier(identifier.getTableName());
+      String columnName = CatalogUtil.normalizeIdentifier(request.getColumnName());
+
       rlock.lock();
       try {
-        return BoolProto.newBuilder().setValue(
-            store.existIndex(request.getTableName(),
-                request.getColumnName())).build();
+        return store.existIndexByColumn(databaseName, namespace, tableName, columnName) ?
+            ProtoUtil.TRUE : ProtoUtil.FALSE;
       } catch (Exception e) {
         LOG.error(e);
         return BoolProto.newBuilder().setValue(false).build();
@@ -589,15 +617,20 @@ public class CatalogServer extends AbstractService {
     }
 
     @Override
-    public IndexDescProto getIndexByName(RpcController controller,
-                                         StringProto indexName)
+    public IndexDescProto getIndexByName(RpcController controller, IndexNameProto request)
         throws ServiceException {
+
+      String databaseName = CatalogUtil.normalizeIdentifier(request.getDatabaseName());
+      String namespace = request.hasNamespace() ? CatalogUtil.normalizeIdentifier(request.getNamespace())
+          : DEFAULT_NAMESPACE;
+      String indexName = CatalogUtil.normalizeIdentifier(request.getIndexName());
+
       rlock.lock();
       try {
-        if (!store.existIndex(indexName.getValue())) {
-          throw new NoSuchIndexException(indexName.getValue());
+        if (!store.existIndexByName(databaseName, namespace, indexName)) {
+          throw new NoSuchIndexException(databaseName, namespace, indexName);
         }
-        return store.getIndex(indexName.getValue());
+        return store.getIndexByName(databaseName, namespace, indexName);
       } catch (Exception e) {
         LOG.error("ERROR : cannot get index " + indexName, e);
         return null;
@@ -607,19 +640,24 @@ public class CatalogServer extends AbstractService {
     }
 
     @Override
-    public IndexDescProto getIndex(RpcController controller,
-                                   GetIndexRequest request)
+    public IndexDescProto getIndexByColumn(RpcController controller, GetIndexByColumnRequest request)
         throws ServiceException {
+
+      TableIdentifierProto identifier = request.getTableIdentifier();
+      String databaseName = CatalogUtil.normalizeIdentifier(identifier.getDatabaseName());
+      String namespace = identifier.hasNamespace() ? CatalogUtil.normalizeIdentifier(identifier.getNamespace())
+          : DEFAULT_NAMESPACE;
+      String tableName = CatalogUtil.normalizeIdentifier(identifier.getTableName());
+      String columnName = CatalogUtil.normalizeIdentifier(request.getColumnName());
+
       rlock.lock();
       try {
-        if (!store.existIndex(request.getTableName())) {
-          throw new NoSuchIndexException(request.getTableName() + "."
-              + request.getColumnName());
+        if (!store.existIndexByColumn(databaseName, namespace, tableName, columnName)) {
+          throw new NoSuchIndexException(databaseName, namespace, columnName);
         }
-        return store.getIndex(request.getTableName(), request.getColumnName());
+        return store.getIndexByColumn(databaseName, namespace, tableName, columnName);
       } catch (Exception e) {
-        LOG.error("ERROR : cannot get index " + request.getTableName() + "."
-            + request.getColumnName(), e);
+        LOG.error("ERROR : cannot get index for " + tableName + "." + columnName, e);
         return null;
       } finally {
         rlock.unlock();
@@ -627,14 +665,20 @@ public class CatalogServer extends AbstractService {
     }
 
     @Override
-    public BoolProto delIndex(RpcController controller, StringProto indexName)
+    public BoolProto dropIndex(RpcController controller, IndexNameProto request)
         throws ServiceException {
+
+      String databaseName = CatalogUtil.normalizeIdentifier(request.getDatabaseName());
+      String namespace = request.hasNamespace() ? CatalogUtil.normalizeIdentifier(request.getNamespace())
+          : DEFAULT_NAMESPACE;
+      String indexName = CatalogUtil.normalizeIdentifier(request.getIndexName());
+
       wlock.lock();
       try {
-        if (!store.existIndex(indexName.getValue())) {
-          throw new NoSuchIndexException(indexName.getValue());
+        if (!store.existIndexByName(databaseName, namespace, indexName)) {
+          throw new NoSuchIndexException(indexName);
         }
-        store.delIndex(indexName.getValue());
+        store.dropIndex(databaseName, namespace, indexName);
       } catch (Exception e) {
         LOG.error(e);
       } finally {

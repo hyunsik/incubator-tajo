@@ -140,7 +140,7 @@ public class TestBSTIndexExec {
     writer.close();
 
     TableDesc desc = new TableDesc("employee", schema, meta, sm.getTablePath("employee"));
-    catalog.addTable(desc);
+    catalog.createTable(desc);
 
     analyzer = new SQLAnalyzer();
     planner = new LogicalPlanner(catalog);

@@ -130,7 +130,7 @@ public class TestRangeRetrieverHandler {
     appender.close();
 
     TableDesc employee = new TableDesc("employee", schema, employeeMeta, tableDir);
-    catalog.addTable(employee);
+    catalog.createTable(employee);
 
     FileFragment[] frags = StorageManager.splitNG(conf, "employee", employeeMeta, tableDir, Integer.MAX_VALUE);
 
@@ -251,7 +251,7 @@ public class TestRangeRetrieverHandler {
     appender.close();
 
     TableDesc employee = new TableDesc("employee", schema, meta, tablePath);
-    catalog.addTable(employee);
+    catalog.createTable(employee);
 
     FileFragment[] frags = sm.splitNG(conf, "employee", meta, tablePath, Integer.MAX_VALUE);
 

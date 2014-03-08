@@ -26,12 +26,13 @@ import org.apache.tajo.catalog.CatalogUtil;
 import org.apache.tajo.catalog.exception.CatalogException;
 import org.apache.tajo.exception.InternalException;
 
-import java.io.IOException;
 import java.sql.*;
 import java.util.HashMap;
 import java.util.Map;
 
 public class MySQLStore extends AbstractDBStore  {
+  /** 2014-03-07: First Versioning */
+  private static final int MYSQL_CATALOG_STORE_VERSION = 1;
 
   private static final String CATALOG_DRIVER = "com.mysql.jdbc.Driver";
   protected String getCatalogDriverName(){
@@ -40,6 +41,11 @@ public class MySQLStore extends AbstractDBStore  {
 
   public MySQLStore(Configuration conf) throws InternalException {
     super(conf);
+  }
+
+  @Override
+  public int getDriverVersion() {
+    return MYSQL_CATALOG_STORE_VERSION;
   }
 
   protected Connection createConnection(Configuration conf) throws SQLException {
@@ -59,9 +65,10 @@ public class MySQLStore extends AbstractDBStore  {
       conn = getConnection();
       stmt = conn.createStatement();
 
-      StringBuilder sql = new StringBuilder();
+
       // META
       if (!baseTableMaps.get(TB_META)) {
+        StringBuilder sql = new StringBuilder();
         sql.append("CREATE TABLE ").append(TB_META).append(" (version int NOT NULL)");
 
         if (LOG.isDebugEnabled()) {
@@ -75,20 +82,20 @@ public class MySQLStore extends AbstractDBStore  {
 
       // DATABASES
       if (!baseTableMaps.get(TB_DATABASES)) {
-        try {
-          String ddl = readSchemaFile("mysql/databases.sql");
-          stmt.addBatch(ddl);
-        } catch (IOException e) {
-          throw new CatalogException(String.format("cannot read schema file \"%s\"", "mysql/databases.sql"));
+        String sql = readSchemaFile("mysql/databases.sql");
+        if (LOG.isDebugEnabled()) {
+          LOG.debug(sql);
         }
+        stmt.executeUpdate(sql);
       }
 
       // TABLES
       if (!baseTableMaps.get(TB_TABLES)) {
+        StringBuilder sql = new StringBuilder();
         sql.delete(0, sql.length());
         sql.append("CREATE TABLE ").append(TB_TABLES).append("(");
         sql.append("TID int NOT NULL AUTO_INCREMENT PRIMARY KEY, ");
-        sql.append(C_TABLE_ID).append(" VARCHAR(255) NOT NULL UNIQUE, ");
+        sql.append(COL_TABLES_NAME).append(" VARCHAR(255) NOT NULL UNIQUE, ");
         sql.append("path TEXT, ").append("store_type CHAR(16)").append(")");
 
         if (LOG.isDebugEnabled()) {
@@ -102,18 +109,18 @@ public class MySQLStore extends AbstractDBStore  {
 
       // COLUMNS
       if (!baseTableMaps.get(TB_COLUMNS)) {
-        sql.delete(0, sql.length());
+        StringBuilder sql = new StringBuilder();
         sql.append("CREATE TABLE ").append(TB_COLUMNS).append("(");
         sql.append("TID INT NOT NULL, ");
-        sql.append(C_TABLE_ID).append(" VARCHAR(255) NOT NULL,");
+        sql.append(COL_TABLES_NAME).append(" VARCHAR(255) NOT NULL,");
         sql.append("column_id INT NOT NULL,");
         sql.append("column_name VARCHAR(255) NOT NULL, ");
         sql.append("data_type CHAR(16), ");
         sql.append("type_length INTEGER, ");
-        sql.append("UNIQUE KEY(").append(C_TABLE_ID).append(", column_name),");
+        sql.append("UNIQUE KEY(").append(COL_TABLES_NAME).append(", column_name),");
         sql.append("FOREIGN KEY(TID) REFERENCES ").append(TB_TABLES).append("(TID) ON DELETE CASCADE,");
-        sql.append("FOREIGN KEY(").append(C_TABLE_ID).append(") REFERENCES ");
-        sql.append(TB_TABLES).append("(").append(C_TABLE_ID).append(") ON DELETE CASCADE)");
+        sql.append("FOREIGN KEY(").append(COL_TABLES_NAME).append(") REFERENCES ");
+        sql.append(TB_TABLES).append("(").append(COL_TABLES_NAME).append(") ON DELETE CASCADE)");
 
         if (LOG.isDebugEnabled()) {
           LOG.debug(sql.toString());
@@ -126,14 +133,14 @@ public class MySQLStore extends AbstractDBStore  {
 
       // OPTIONS
       if (!baseTableMaps.get(TB_OPTIONS)) {
-        sql.delete(0, sql.length());
+        StringBuilder sql = new StringBuilder();
         sql.append("CREATE TABLE ").append(TB_OPTIONS).append("(");
-        sql.append(C_TABLE_ID).append( " VARCHAR(255) NOT NULL,");
+        sql.append(COL_TABLES_NAME).append( " VARCHAR(255) NOT NULL,");
         sql.append("key_ VARCHAR(255) NOT NULL, value_ VARCHAR(255) NOT NULL,");
-        sql.append("INDEX(").append(C_TABLE_ID).append(", key_),");
-        sql.append("FOREIGN KEY(").append(C_TABLE_ID);
+        sql.append("INDEX(").append(COL_TABLES_NAME).append(", key_),");
+        sql.append("FOREIGN KEY(").append(COL_TABLES_NAME);
         sql.append(") REFERENCES ").append(TB_TABLES);
-        sql.append("(").append(C_TABLE_ID).append(") ON DELETE CASCADE)");
+        sql.append("(").append(COL_TABLES_NAME).append(") ON DELETE CASCADE)");
 
         if (LOG.isDebugEnabled()) {
           LOG.debug(sql.toString());
@@ -146,20 +153,20 @@ public class MySQLStore extends AbstractDBStore  {
 
       // INDEXES
       if (!baseTableMaps.get(TB_INDEXES)) {
-        sql.delete(0, sql.length());
+        StringBuilder sql = new StringBuilder();
         sql.append("CREATE TABLE ").append(TB_INDEXES).append("(");
         sql.append("index_name VARCHAR(255) NOT NULL PRIMARY KEY, ");
-        sql.append(C_TABLE_ID).append(" VARCHAR(255) NOT NULL,");
+        sql.append(COL_TABLES_NAME).append(" VARCHAR(255) NOT NULL,");
         sql.append("column_name VARCHAR(255) NOT NULL, ");
         sql.append("data_type VARCHAR(255) NOT NULL, ");
         sql.append("index_type CHAR(32) NOT NULL, ");
         sql.append("is_unique BOOLEAN NOT NULL, ");
         sql.append("is_clustered BOOLEAN NOT NULL, ");
         sql.append("is_ascending BOOLEAN NOT NULL,");
-        sql.append("INDEX(").append(C_TABLE_ID).append(", column_name),");
-        sql.append("FOREIGN KEY(").append(C_TABLE_ID);
+        sql.append("INDEX(").append(COL_TABLES_NAME).append(", column_name),");
+        sql.append("FOREIGN KEY(").append(COL_TABLES_NAME);
         sql.append(") REFERENCES ").append(TB_TABLES);
-        sql.append("(").append(C_TABLE_ID).append(") ON DELETE CASCADE)");
+        sql.append("(").append(COL_TABLES_NAME).append(") ON DELETE CASCADE)");
 
         if (LOG.isDebugEnabled()) {
           LOG.debug(sql.toString());
@@ -171,15 +178,15 @@ public class MySQLStore extends AbstractDBStore  {
       }
 
       if (!baseTableMaps.get(TB_STATISTICS)) {
-        sql.delete(0, sql.length());
+        StringBuilder sql = new StringBuilder();
         sql.append("CREATE TABLE ").append(TB_STATISTICS).append("(");
-        sql.append(C_TABLE_ID).append(" VARCHAR(255) NOT NULL,");
+        sql.append(COL_TABLES_NAME).append(" VARCHAR(255) NOT NULL,");
         sql.append("num_rows BIGINT, ");
         sql.append("num_bytes BIGINT,");
-        sql.append("INDEX(").append(C_TABLE_ID).append("),");
-        sql.append("FOREIGN KEY(").append(C_TABLE_ID);
+        sql.append("INDEX(").append(COL_TABLES_NAME).append("),");
+        sql.append("FOREIGN KEY(").append(COL_TABLES_NAME);
         sql.append(") REFERENCES ").append(TB_TABLES);
-        sql.append("(").append(C_TABLE_ID).append(") ON DELETE CASCADE)");
+        sql.append("(").append(COL_TABLES_NAME).append(") ON DELETE CASCADE)");
 
         if (LOG.isDebugEnabled()) {
           LOG.debug(sql.toString());
@@ -192,40 +199,32 @@ public class MySQLStore extends AbstractDBStore  {
 
       // PARTITION_METHODS
       if (!baseTableMaps.get(TB_PARTITION_METHODS)) {
-        sql.delete(0, sql.length());
-        sql.append("CREATE TABLE ").append(TB_PARTITION_METHODS).append("(");
-        sql.append(C_TABLE_ID).append(" VARCHAR(255) PRIMARY KEY,");
-        sql.append("partition_type VARCHAR(10) NOT NULL,");
-        sql.append("expression TEXT NOT NULL,");
-        sql.append("expression_schema VARBINARY(1024) NOT NULL, ");
-        sql.append("FOREIGN KEY(").append(C_TABLE_ID);
-        sql.append(") REFERENCES ").append(TB_TABLES);
-        sql.append("(").append(C_TABLE_ID).append(") ON DELETE CASCADE)");
+        String sql = readSchemaFile("partition_methods.sql");
 
         if (LOG.isDebugEnabled()) {
-          LOG.debug(sql.toString());
+          LOG.debug(sql);
         }
 
-        stmt.executeUpdate(sql.toString());
+        stmt.executeUpdate(sql);
         LOG.info("Table '" + TB_PARTITION_METHODS + "' is created.");
         baseTableMaps.put(TB_PARTITION_METHODS, true);
       }
 
       // PARTITIONS
       if (!baseTableMaps.get(TB_PARTTIONS)) {
-        sql.delete(0, sql.length());
+        StringBuilder sql = new StringBuilder();
         sql.append("CREATE TABLE ").append(TB_PARTTIONS).append("(");
         sql.append("PID int NOT NULL AUTO_INCREMENT PRIMARY KEY, ");
-        sql.append(C_TABLE_ID).append( " VARCHAR(255) NOT NULL,");
+        sql.append(COL_TABLES_NAME).append( " VARCHAR(255) NOT NULL,");
         sql.append("partition_name VARCHAR(255), ");
         sql.append("ordinal_position INT NOT NULL,");
         sql.append("partition_value TEXT,");
         sql.append("path TEXT,");
         sql.append("cache_nodes VARCHAR(255), ");
-        sql.append("UNIQUE KEY(").append(C_TABLE_ID).append(", partition_name),");
-        sql.append("FOREIGN KEY(").append(C_TABLE_ID);
+        sql.append("UNIQUE KEY(").append(COL_TABLES_NAME).append(", partition_name),");
+        sql.append("FOREIGN KEY(").append(COL_TABLES_NAME);
         sql.append(") REFERENCES ").append(TB_TABLES);
-        sql.append("(").append(C_TABLE_ID).append(") ON DELETE CASCADE)");
+        sql.append("(").append(COL_TABLES_NAME).append(") ON DELETE CASCADE)");
 
         if (LOG.isDebugEnabled()) {
           LOG.debug(sql.toString());
@@ -235,8 +234,12 @@ public class MySQLStore extends AbstractDBStore  {
         LOG.info("Table '" + TB_PARTTIONS + "' is created.");
         baseTableMaps.put(TB_PARTTIONS, true);
       }
+
+      insertSchemaVersion();
+      createDatabase(DEFAULT_DATABASE_NAME);
+
     } catch (SQLException se) {
-      throw new CatalogException(se);
+      throw new CatalogException("failed to create base tables for MySQL catalog store", se);
     } finally {
       CatalogUtil.closeQuietly(conn, stmt);
     }

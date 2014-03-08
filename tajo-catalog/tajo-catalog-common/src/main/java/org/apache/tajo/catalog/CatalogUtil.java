@@ -20,6 +20,7 @@ package org.apache.tajo.catalog;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.tajo.TajoConstants;
+import org.apache.tajo.annotation.Nullable;
 import org.apache.tajo.catalog.partition.PartitionMethodDesc;
 import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.catalog.proto.CatalogProtos.ColumnProto;
@@ -87,15 +88,24 @@ public class CatalogUtil {
     }
   }
 
-  public static String getFQName(String databaseName, String schemaName, String tableName) {
-    return databaseName + IDENTIFIER_DELIMITER + schemaName + IDENTIFIER_DELIMITER + tableName;
+  public static String getCanonicalTableName(String databaseName, @Nullable String namespace, String tableName) {
+    StringBuilder sb = new StringBuilder(databaseName);
+    sb.append(IDENTIFIER_DELIMITER);
+    if (namespace != null) {
+      sb.append(namespace);
+    } else {
+      sb.append(CatalogConstants.DEFAULT_NAMESPACE);
+    }
+    sb.append(IDENTIFIER_DELIMITER);
+    sb.append(tableName);
+    return sb.toString();
   }
 
-  public static String getCanonicalName(String signature, Collection<DataType> paramTypes) {
+  public static String getCanonicalSignature(String functionName, Collection<DataType> paramTypes) {
     DataType [] types = paramTypes.toArray(new DataType[paramTypes.size()]);
-    return getCanonicalName(signature, types);
+    return getCanonicalSignature(functionName, types);
   }
-  public static String getCanonicalName(String signature, DataType...paramTypes) {
+  public static String getCanonicalSignature(String signature, DataType... paramTypes) {
     StringBuilder sb = new StringBuilder(signature);
     sb.append("(");
     int i = 0;
@@ -208,6 +218,18 @@ public class CatalogUtil {
       sb.append(" (").append(column.getDataType().getLength()).append(")");
     }
     return sb.toString();
+  }
+
+  public static CatalogProtos.TableIdentifierProto buildTableIdentifier(String databaseName,
+                                                                        @Nullable String namespace,
+                                                                        String tableName) {
+    CatalogProtos.TableIdentifierProto.Builder builder = CatalogProtos.TableIdentifierProto.newBuilder();
+    builder.setDatabaseName(databaseName);
+    if (namespace != null) {
+      builder.setNamespace(namespace);
+    }
+    builder.setTableName(tableName);
+    return builder.build();
   }
 
   public static void closeQuietly(Connection conn) {

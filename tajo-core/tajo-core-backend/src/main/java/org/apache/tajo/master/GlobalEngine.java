@@ -319,7 +319,7 @@ public class GlobalEngine extends AbstractService {
     if (partitionDesc != null) {
       desc.setPartitionMethod(partitionDesc);
     }
-    catalog.addTable(desc);
+    catalog.createTable(desc);
 
     LOG.info("Table " + desc.getName() + " is created (" + desc.getStats().getNumBytes() + ")");
 
@@ -340,7 +340,7 @@ public class GlobalEngine extends AbstractService {
     }
 
     Path path = catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName).getPath();
-    catalog.deleteTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
+    catalog.dropTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
 
     if (purge) {
       try {

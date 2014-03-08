@@ -95,7 +95,7 @@ public class TestEvalTreeUtil {
 
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV);
     TableDesc desc = new TableDesc("people", schema, meta, CommonTestingUtil.getTestDir());
-    catalog.addTable(desc);
+    catalog.createTable(desc);
 
     FunctionDesc funcMeta = new FunctionDesc("test_sum", TestSum.class,
         FunctionType.GENERAL,

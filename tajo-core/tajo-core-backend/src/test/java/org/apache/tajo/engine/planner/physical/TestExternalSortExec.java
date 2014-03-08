@@ -96,7 +96,7 @@ public class TestExternalSortExec {
         " MB)");
 
     employee = new TableDesc("employee", schema, employeeMeta, employeePath);
-    catalog.addTable(employee);
+    catalog.createTable(employee);
     analyzer = new SQLAnalyzer();
     planner = new LogicalPlanner(catalog);
   }

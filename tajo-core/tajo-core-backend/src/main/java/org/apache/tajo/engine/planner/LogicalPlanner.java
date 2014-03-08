@@ -1361,18 +1361,16 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   private PartitionMethodDesc getPartitionMethod(PlanContext context,
                                                  String tableName,
                                                  CreateTable.PartitionMethodDescExpr expr) throws PlanningException {
-    PartitionMethodDesc partitionMethodDesc = new PartitionMethodDesc();
-    partitionMethodDesc.setTableName(tableName);
+    PartitionMethodDesc partitionMethodDesc;
 
     if(expr.getPartitionType() == PartitionType.COLUMN) {
       CreateTable.ColumnPartition partition = (CreateTable.ColumnPartition) expr;
       String partitionExpression = Joiner.on(',').join(partition.getColumns());
-      partitionMethodDesc.setPartitionType(CatalogProtos.PartitionType.COLUMN);
-      partitionMethodDesc.setExpression(partitionExpression);
-      partitionMethodDesc.setExpressionSchema(convertColumnsToSchema(partition.getColumns()));
+
+      partitionMethodDesc = new PartitionMethodDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName,
+          CatalogProtos.PartitionType.COLUMN, partitionExpression, convertColumnsToSchema(partition.getColumns()));
     } else {
-      throw new PlanningException(String.format("Not supported PartitonType: %s",
-          expr.getPartitionType()));
+      throw new PlanningException(String.format("Not supported PartitonType: %s", expr.getPartitionType()));
     }
     return partitionMethodDesc;
   }

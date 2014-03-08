@@ -41,7 +41,7 @@ public interface CatalogStore extends Closeable {
   Collection<String> getAllDatabaseNames() throws CatalogException;
 
   /*************************** TABLE ******************************/
-  void addTable(CatalogProtos.TableDescProto desc) throws CatalogException;
+  void createTable(CatalogProtos.TableDescProto desc) throws CatalogException;
   
   boolean existTable(String databaseName, String namespace, String tableName) throws CatalogException;
   
@@ -66,7 +66,8 @@ public interface CatalogStore extends Closeable {
   /************************** PARTITIONS *****************************/
   void addPartitions(CatalogProtos.PartitionsProto partitionsProto) throws CatalogException;
 
-  void addPartition(CatalogProtos.PartitionDescProto partitionDescProto) throws CatalogException;
+  void addPartition(String databaseName, String namespace, String tableName,
+                    CatalogProtos.PartitionDescProto partitionDescProto) throws CatalogException;
 
   /**
    * Get all partitions of a table
@@ -80,23 +81,27 @@ public interface CatalogStore extends Closeable {
 
   void delPartition(String partitionName) throws CatalogException;
 
-  void delPartitions(String tableName) throws CatalogException;
+  void dropPartitions(String tableName) throws CatalogException;
 
   /**************************** INDEX *******************************/
-  void addIndex(IndexDescProto proto) throws CatalogException;
+  void createIndex(IndexDescProto proto) throws CatalogException;
   
-  void delIndex(String indexName) throws CatalogException;
+  void dropIndex(String databaseName, String namespace, String indexName) throws CatalogException;
   
-  IndexDescProto getIndex(String indexName) throws CatalogException;
+  IndexDescProto getIndexByName(String databaseName, String namespace, String indexName) throws CatalogException;
   
-  IndexDescProto getIndex(String tableName, String columnName) throws CatalogException;
+  IndexDescProto getIndexByColumn(String databaseName, String namespace, String tableName, String columnName)
+      throws CatalogException;
   
-  boolean existIndex(String indexName) throws CatalogException;
+  boolean existIndexByName(String databaseName, String namespace, String indexName) throws CatalogException;
   
-  boolean existIndex(String tableName, String columnName) throws CatalogException;
+  boolean existIndexByColumn(String databaseName, String namespace, String tableName, String columnName)
+      throws CatalogException;
+
+  IndexDescProto [] getIndexes(String databaseName, String namespace, String tableName) throws CatalogException;
 
   /************************** FUNCTION *****************************/
-  IndexDescProto [] getIndexes(String tableName) throws CatalogException;
+
   
   void addFunction(FunctionDesc func) throws CatalogException;
   

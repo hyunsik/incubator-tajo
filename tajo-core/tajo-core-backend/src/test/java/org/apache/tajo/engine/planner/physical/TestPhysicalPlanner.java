@@ -124,7 +124,7 @@ public class TestPhysicalPlanner {
     appender.close();
 
     employee = new TableDesc("employee", employeeSchema, employeeMeta, employeePath);
-    catalog.addTable(employee);
+    catalog.createTable(employee);
 
     Path scorePath = new Path(testDir, "score");
     TableMeta scoreMeta = CatalogUtil.newTableMeta(StoreType.CSV, new Options());
@@ -149,7 +149,7 @@ public class TestPhysicalPlanner {
     }
     appender.flush();
     appender.close();
-    catalog.addTable(score);
+    catalog.createTable(score);
     analyzer = new SQLAnalyzer();
     planner = new LogicalPlanner(catalog);
     optimizer = new LogicalOptimizer(conf);

@@ -32,7 +32,6 @@ import org.apache.tajo.ExecutionBlockId;
 import org.apache.tajo.QueryId;
 import org.apache.tajo.TajoConstants;
 import org.apache.tajo.TajoProtos.QueryState;
-import org.apache.tajo.catalog.CatalogConstants;
 import org.apache.tajo.catalog.CatalogService;
 import org.apache.tajo.catalog.TableDesc;
 import org.apache.tajo.catalog.TableMeta;
@@ -492,7 +491,7 @@ public class Query implements EventHandler<QueryEvent> {
         tableDescTobeCreated.setStats(stats);
         query.setResultDesc(tableDescTobeCreated);
 
-        catalog.addTable(tableDescTobeCreated);
+        catalog.createTable(tableDescTobeCreated);
       }
     }
 
@@ -532,8 +531,8 @@ public class Query implements EventHandler<QueryEvent> {
         finalTable.setStats(stats);
 
         if (insertNode.hasTargetTable()) {
-          catalog.deleteTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, insertNode.getTableName());
-          catalog.addTable(finalTable);
+          catalog.dropTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, insertNode.getTableName());
+          catalog.createTable(finalTable);
         }
 
         query.setResultDesc(finalTable);

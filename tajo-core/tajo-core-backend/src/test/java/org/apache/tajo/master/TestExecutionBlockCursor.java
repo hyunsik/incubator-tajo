@@ -69,7 +69,7 @@ public class TestExecutionBlockCursor {
       TableStats stats = new TableStats();
       stats.setNumBytes(TPCH.tableVolumes.get(table));
       d.setStats(stats);
-      catalog.addTable(d);
+      catalog.createTable(d);
     }
 
     analyzer = new SQLAnalyzer();

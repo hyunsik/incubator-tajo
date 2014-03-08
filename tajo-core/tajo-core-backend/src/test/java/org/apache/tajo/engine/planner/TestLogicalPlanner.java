@@ -77,13 +77,13 @@ public class TestLogicalPlanner {
 
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV);
     TableDesc people = new TableDesc("employee", schema, meta, CommonTestingUtil.getTestDir());
-    catalog.addTable(people);
+    catalog.createTable(people);
 
     TableDesc student = new TableDesc("dept", schema2, StoreType.CSV, new Options(), CommonTestingUtil.getTestDir());
-    catalog.addTable(student);
+    catalog.createTable(student);
 
     TableDesc score = new TableDesc("score", schema3, StoreType.CSV, new Options(), CommonTestingUtil.getTestDir());
-    catalog.addTable(score);
+    catalog.createTable(score);
 
     FunctionDesc funcDesc = new FunctionDesc("sumtest", SumInt.class, FunctionType.AGGREGATION,
         CatalogUtil.newSimpleDataType(Type.INT4),
@@ -100,7 +100,7 @@ public class TestLogicalPlanner {
     for (String table : tpchTables) {
       TableMeta m = CatalogUtil.newTableMeta(StoreType.CSV);
       TableDesc d = CatalogUtil.newTableDesc(table, tpch.getSchema(table), m, CommonTestingUtil.getTestDir());
-      catalog.addTable(d);
+      catalog.createTable(d);
     }
 
     catalog.createFunction(funcDesc);

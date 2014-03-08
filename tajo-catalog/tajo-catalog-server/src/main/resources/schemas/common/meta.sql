@@ -1,0 +1,1 @@
+CREATE TABLE meta (version int NOT NULL)

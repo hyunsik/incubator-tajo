@@ -28,11 +28,32 @@ import static org.apache.tajo.catalog.proto.CatalogProtos.FunctionType;
 
 public interface CatalogService {
 
+  /**
+   *
+   * @param databaseName Database name to be created
+   * @return True if database is created successfully. Otherwise, it will return FALSE.
+   */
   Boolean createDatabase(String databaseName);
 
+  /**
+   *
+   * @param databaseName Database name to be dropped
+   * @return True if database is dropped sucessfully. Otherwise, it will return FALSE.
+   */
   Boolean dropDatabase(String databaseName);
 
+  /**
+   *
+   * @param databaseName Database name to be checked
+   * @return True if database exists. Otherwise, it will return FALSE.
+   */
   Boolean existDatabase(String databaseName);
+
+  /**
+   *
+   * @return All database names
+   */
+  Collection<String> getAllDatabaseNames();
 
   /**
    * Get a table description by name
@@ -41,19 +62,17 @@ public interface CatalogService {
    * @see TableDesc
    * @throws Throwable
    */
-  TableDesc getTableDesc(String databaseName, @Nullable String schemaName, String tableName);
+  TableDesc getTableDesc(String databaseName, @Nullable String namespace, String tableName);
 
   /**
    *
-   * @return
-   * @throws org.apache.tajo.catalog.exception.CatalogException
+   * @return All table names which belong to a given database.
    */
-  Collection<String> getAllTableNames(String databaseName, @Nullable String schemaName);
+  Collection<String> getAllTableNames(String databaseName, @Nullable String namespace);
 
   /**
    *
-   * @return
-   * @throws org.apache.tajo.catalog.exception.CatalogException
+   * @return All FunctionDescs
    */
   Collection<FunctionDesc> getFunctions();
 
@@ -62,7 +81,7 @@ public interface CatalogService {
    * @see TableDesc
    * @throws Throwable
    */
-  boolean addTable(TableDesc desc);
+  boolean createTable(TableDesc desc);
 
 
   /**
@@ -71,7 +90,7 @@ public interface CatalogService {
    * @param tableName table name
    * @throws Throwable
    */
-  boolean deleteTable(String databaseName, @Nullable String schemaName, String tableName);
+  boolean dropTable(String databaseName, @Nullable String schemaName, String tableName);
 
   boolean existsTable(String databaseName, @Nullable String schemaName, String tableName);
 
@@ -79,17 +98,17 @@ public interface CatalogService {
 
   boolean existPartitionMethod(String databaseName, @Nullable String schemaName, String tableId);
 
-  boolean addIndex(IndexDesc index);
+  boolean createIndex(IndexDesc index);
 
-  boolean existIndex(String indexName);
+  boolean existIndexByName(String databaseName, @Nullable String namespace, String indexName);
 
-  boolean existIndex(String tableName, String columnName);
+  boolean existIndexByColumn(String databaseName, @Nullable String namespace, String tableName, String columnName);
 
-  IndexDesc getIndex(String indexName);
+  IndexDesc getIndexByName(String databaseName, @Nullable String namespace, String indexName);
 
-  IndexDesc getIndex(String tableName, String columnName);
+  IndexDesc getIndexByColumn(String databaseName, @Nullable String namespace, String tableName, String columnName);
 
-  boolean deleteIndex(String indexName);
+  boolean dropIndex(String databaseName, String namespace, String indexName);
 
   boolean createFunction(FunctionDesc funcDesc);
 

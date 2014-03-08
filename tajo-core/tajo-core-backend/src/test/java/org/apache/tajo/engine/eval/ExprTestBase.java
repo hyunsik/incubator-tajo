@@ -141,7 +141,7 @@ public class ExprTestBase {
           vtuple.put(i, lazyTuple.get(i));
         }
       }
-      cat.addTable(new TableDesc(tableName, inputSchema, CatalogProtos.StoreType.CSV, new Options(),
+      cat.createTable(new TableDesc(tableName, inputSchema, CatalogProtos.StoreType.CSV, new Options(),
           CommonTestingUtil.getTestDir()));
     }
 
@@ -163,7 +163,7 @@ public class ExprTestBase {
       assertFalse(e.getMessage(), true);
     } finally {
       if (schema != null) {
-        cat.deleteTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
+        cat.dropTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
       }
     }
   }

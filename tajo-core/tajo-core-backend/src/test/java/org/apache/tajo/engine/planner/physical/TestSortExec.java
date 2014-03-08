@@ -92,7 +92,7 @@ public class TestSortExec {
     appender.close();
 
     TableDesc desc = new TableDesc("employee", schema, employeeMeta, tablePath);
-    catalog.addTable(desc);
+    catalog.createTable(desc);
 
     analyzer = new SQLAnalyzer();
     planner = new LogicalPlanner(catalog);

@@ -127,8 +127,8 @@ message FunctionDescProto {
 }
 
 message IndexDescProto {
-    required string name = 1;
-    required string tableId = 2;
+    required TableIdentifierProto tableIdentifier = 1;
+    required string name = 2;
     required ColumnProto column = 3;
     required IndexMethod indexMethod = 4;
     optional bool isUnique = 5 [default = false];
@@ -147,9 +147,15 @@ message GetAllTableNamesResponse {
     repeated string tableName = 1;
 }
 
-message GetIndexRequest {
-    required string tableName = 1;
+message GetIndexByColumnRequest {
+    required TableIdentifierProto tableIdentifier = 1;
     required string columnName = 2;
+}
+
+message IndexNameProto {
+  required string databaseName = 1;
+  optional string namespace = 2;
+  required string indexName = 3;
 }
 
 message GetFunctionsResponse {
@@ -230,20 +236,18 @@ message SortSpecProto {
 
 
 message PartitionsProto {
-  repeated PartitionDescProto partition = 1;
+  required TableIdentifierProto tableIdentifier = 1;
+  repeated PartitionDescProto partition = 2;
 }
 
 message PartitionMethodProto {
-  required string database_name = 1;
-  required string namespace = 2;
-  required string table_name = 3;
-  required PartitionType partitionType = 4;
-  required string expression = 5;
-  required SchemaProto expressionSchema = 6;
+  required TableIdentifierProto tableIdentifier = 1;
+  required PartitionType partitionType = 2;
+  required string expression = 3;
+  required SchemaProto expressionSchema = 4;
 }
 
 message PartitionDescProto {
-  required string tableId = 1;
   optional string partitionName = 2;
   required int32  ordinalPosition = 3;
   optional string partitionValue = 4;

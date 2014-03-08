@@ -44,6 +44,7 @@ import org.junit.Test;
 import java.io.IOException;
 import java.util.*;
 
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
 import static org.junit.Assert.*;
 
 /**
@@ -175,10 +176,10 @@ public class TestHCatalogStore {
   @AfterClass
   public static void tearDown() throws IOException {
     try {
-      if (store.existTable(DB_NAME + "." + CUSTOMER))
-        store.deleteTable(DB_NAME + "." + CUSTOMER);
-      if (store.existTable(DB_NAME + "." + NATION))
-        store.deleteTable(DB_NAME + "." + NATION);
+      if (store.existTable(DB_NAME, DEFAULT_NAMESPACE, CUSTOMER))
+        store.dropTable(DB_NAME, DEFAULT_NAMESPACE, CUSTOMER);
+      if (store.existTable(DB_NAME, DEFAULT_NAMESPACE, NATION))
+        store.dropTable(DB_NAME, DEFAULT_NAMESPACE, NATION);
       dropDatabase();
       client.close();
       store.close();
@@ -218,7 +219,7 @@ public class TestHCatalogStore {
 //    schema.addColumn("c_comment", TajoDataTypes.Type.TEXT);
 //
 //    table.setSchema(schema);
-//    store.addTable(table);
+//    store.createTable(table);
 //  }
 //  @Test
 //  public void testAddTableByPartition() throws Exception {
@@ -237,18 +238,18 @@ public class TestHCatalogStore {
 //    partitions.addColumn("type", TajoDataTypes.Type.TEXT);
 //    table.setPartitions(partitions);
 //
-//    store.addTable(table);
+//    store.createTable(table);
 //  }
 
   @Test
   public void testExistTable() throws Exception {
-    assertTrue(store.existTable(DB_NAME + "." + CUSTOMER));
-    assertTrue(store.existTable(DB_NAME + "." + NATION));
+    assertTrue(store.existTable(DB_NAME, DEFAULT_NAMESPACE, CUSTOMER));
+    assertTrue(store.existTable(DB_NAME, DEFAULT_NAMESPACE, NATION));
   }
 
   @Test
   public void testGetTable() throws Exception {
-    TableDesc table = new TableDesc(store.getTable(DB_NAME + "." + CUSTOMER));
+    TableDesc table = new TableDesc(store.getTable(DB_NAME, DEFAULT_NAMESPACE, CUSTOMER));
 
     List<Column> columns = table.getSchema().getColumns();
     assertEquals(DB_NAME + "." + CUSTOMER, table.getName());
@@ -273,7 +274,7 @@ public class TestHCatalogStore {
     assertEquals(table.getMeta().getStoreType().name(), CatalogProtos.StoreType.RCFILE.name());
 
 
-    table = new TableDesc(store.getTable(DB_NAME + "." + NATION));
+    table = new TableDesc(store.getTable(DB_NAME, DEFAULT_NAMESPACE, NATION));
     columns = table.getSchema().getColumns();
     assertEquals(DB_NAME + "." + NATION, table.getName());
     assertEquals(4, columns.size());
@@ -296,7 +297,7 @@ public class TestHCatalogStore {
 
   @Test
   public void testGetAllTableNames() throws Exception{
-    Set<String> tables = new HashSet<String>(store.getAllTableNames());
+    Set<String> tables = new HashSet<String>(store.getAllTableNames(DB_NAME, DEFAULT_NAMESPACE));
     assertEquals(2, tables.size());
     assertTrue(tables.contains(DB_NAME + "." + CUSTOMER));
     assertTrue(tables.contains(DB_NAME + "." + NATION));
@@ -304,14 +305,14 @@ public class TestHCatalogStore {
 
   @Test
   public void testDeleteTable() throws Exception {
-    TableDesc table = new TableDesc(store.getTable(DB_NAME + "." + CUSTOMER));
+    TableDesc table = new TableDesc(store.getTable(DB_NAME, DEFAULT_NAMESPACE, CUSTOMER));
     Path customerPath = table.getPath();
 
-    table = new TableDesc(store.getTable(DB_NAME + "." + NATION));
+    table = new TableDesc(store.getTable(DB_NAME, DEFAULT_NAMESPACE, NATION));
     Path nationPath = table.getPath();
 
-    store.deleteTable(DB_NAME + "." + CUSTOMER);
-    store.deleteTable(DB_NAME + "." + NATION);
+    store.dropTable(DB_NAME, DEFAULT_NAMESPACE, CUSTOMER);
+    store.dropTable(DB_NAME, DEFAULT_NAMESPACE, NATION);
 
     FileSystem fs = FileSystem.getLocal(new Configuration());
     assertTrue(fs.exists(customerPath));

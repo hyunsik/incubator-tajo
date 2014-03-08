@@ -18,15 +18,25 @@
 
 package org.apache.tajo.util;
 
-import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos;
+import java.util.Collection;
 
-import static org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.BoolProto;
+import static org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.*;
 
 public class ProtoUtil {
   public static final BoolProto TRUE = BoolProto.newBuilder().setValue(true).build();
   public static final BoolProto FALSE = BoolProto.newBuilder().setValue(false).build();
 
-  public static PrimitiveProtos.StringProto convertString(String value) {
-    return PrimitiveProtos.StringProto.newBuilder().setValue(value).build();
+  public static final NullProto NULL_PROTO = NullProto.newBuilder().build();
+
+  public static StringProto convertString(String value) {
+    return StringProto.newBuilder().setValue(value).build();
+  }
+
+  public static StringListProto convertStrings(Collection<String> strings) {
+    return StringListProto.newBuilder().addAllValues(strings).build();
+  }
+
+  public static Collection<String> convertStrings(StringListProto strings) {
+    return strings.getValuesList();
   }
 }

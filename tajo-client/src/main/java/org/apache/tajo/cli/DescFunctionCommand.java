@@ -105,7 +105,7 @@ public class DescFunctionCommand extends TajoShellCommand {
 
       for (CatalogProtos.FunctionDescProto eachFunction: functionMap.values()) {
         String signature = eachFunction.getReturnType().getType() + " " +
-            CatalogUtil.getCanonicalName(eachFunction.getSignature(), eachFunction.getParameterTypesList());
+            CatalogUtil.getCanonicalSignature(eachFunction.getSignature(), eachFunction.getParameterTypesList());
         String fullDescription = eachFunction.getDescription();
         if(eachFunction.getDetail() != null && !eachFunction.getDetail().isEmpty()) {
           fullDescription += "\n" + eachFunction.getDetail();

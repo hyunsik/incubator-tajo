@@ -108,7 +108,7 @@ public class TestRightOuterMergeJoinExec {
     appender1.flush();
     appender1.close();
     dep3 = CatalogUtil.newTableDesc("dep3", dep3Schema, dep3Meta, dep3Path);
-    catalog.addTable(dep3);
+    catalog.createTable(dep3);
 
 
     //----------------- dep4 ------------------------------
@@ -146,7 +146,7 @@ public class TestRightOuterMergeJoinExec {
     appender4.flush();
     appender4.close();
     dep4 = CatalogUtil.newTableDesc("dep4", dep4Schema, dep4Meta, dep4Path);
-    catalog.addTable(dep4);
+    catalog.createTable(dep4);
 
 
 
@@ -177,7 +177,7 @@ public class TestRightOuterMergeJoinExec {
     appender2.flush();
     appender2.close();
     job3 = CatalogUtil.newTableDesc("job3", job3Schema, job3Meta, job3Path);
-    catalog.addTable(job3);
+    catalog.createTable(job3);
 
 
 
@@ -241,7 +241,7 @@ public class TestRightOuterMergeJoinExec {
     appender3.flush();
     appender3.close();
     emp3 = CatalogUtil.newTableDesc("emp3", emp3Schema, emp3Meta, emp3Path);
-    catalog.addTable(emp3);
+    catalog.createTable(emp3);
 
     //---------------------phone3 --------------------
     // emp_id  | phone_number
@@ -262,7 +262,7 @@ public class TestRightOuterMergeJoinExec {
     appender5.flush();
     appender5.close();
     phone3 = CatalogUtil.newTableDesc("phone3", phone3Schema, phone3Meta, phone3Path);
-    catalog.addTable(phone3);
+    catalog.createTable(phone3);
 
 
 

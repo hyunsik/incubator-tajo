@@ -28,12 +28,13 @@ service CatalogProtocolService {
   rpc createDatabase(StringProto) returns (BoolProto);
   rpc dropDatabase(StringProto) returns (BoolProto);
   rpc existDatabase(StringProto) returns (BoolProto);
+  rpc getAllDatabaseNames(NullProto) returns (StringListProto);
 
-  rpc getTableDesc(TableIdentifierProto) returns (TableDescProto);
-  rpc getAllTableNames(NamespaceProto) returns (GetAllTableNamesResponse);
-  rpc addTable(TableDescProto) returns (BoolProto);
-  rpc deleteTable(TableIdentifierProto) returns (BoolProto);
+  rpc createTable(TableDescProto) returns (BoolProto);
+  rpc dropTable(TableIdentifierProto) returns (BoolProto);
   rpc existsTable(TableIdentifierProto) returns (BoolProto);
+  rpc getTableDesc(TableIdentifierProto) returns (TableDescProto);
+  rpc getAllTableNames(NamespaceProto) returns (StringListProto);
 
   rpc getPartitionMethodByTableName(TableIdentifierProto) returns (PartitionMethodProto);
   rpc existPartitionMethod(TableIdentifierProto) returns (BoolProto);
@@ -45,12 +46,12 @@ service CatalogProtocolService {
   rpc getPartitionsByTableName(StringProto) returns (PartitionsProto);
   rpc delAllPartitions(StringProto) returns (PartitionsProto);
 
-  rpc addIndex(IndexDescProto) returns (BoolProto);
-  rpc existIndexByName(StringProto) returns (BoolProto);
-  rpc existIndex(GetIndexRequest) returns (BoolProto);
-  rpc getIndexByName(StringProto) returns (IndexDescProto);
-  rpc getIndex(GetIndexRequest) returns (IndexDescProto);
-  rpc delIndex(StringProto) returns (BoolProto);
+  rpc createIndex(IndexDescProto) returns (BoolProto);
+  rpc dropIndex(IndexNameProto) returns (BoolProto);
+  rpc existIndexByName(IndexNameProto) returns (BoolProto);
+  rpc existIndexByColumn(GetIndexByColumnRequest) returns (BoolProto);
+  rpc getIndexByName(IndexNameProto) returns (IndexDescProto);
+  rpc getIndexByColumn(GetIndexByColumnRequest) returns (IndexDescProto);
 
   rpc createFunction(FunctionDescProto) returns (BoolProto);
   rpc dropFunction(UnregisterFunctionRequest) returns (BoolProto);

@@ -71,7 +71,7 @@ public class TestLogicalPlan {
       TableDesc d = CatalogUtil.newTableDesc(tpchTables[i], tpch.getSchema(tpchTables[i]), m,
           CommonTestingUtil.getTestDir());
       d.setStats(stats);
-      catalog.addTable(d);
+      catalog.createTable(d);
     }
     planner = new LogicalPlanner(catalog);
     optimizer = new LogicalOptimizer(util.getConfiguration());
