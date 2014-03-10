@@ -152,7 +152,7 @@ public class DerbyStore extends AbstractDBStore {
 
       // OPTIONS
       if (!baseTableMaps.get(TB_OPTIONS)) {
-        String sql = readSchemaFile("options.sql");
+        String sql = readSchemaFile("table_properties.sql");
 
         if (LOG.isDebugEnabled()) {
           LOG.debug(sql);

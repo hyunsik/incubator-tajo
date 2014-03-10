@@ -243,14 +243,12 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
 
   @Override
   public final List<String> getAllTableNames(String databaseName, String namespace) throws CatalogException {
-    List<String> dbs = null;
-    List<String> tables = null;
     List<String> allTables = new ArrayList<String>();
     HCatalogStoreClientPool.HCatalogStoreClient client = null;
 
     try {
       client = clientPool.getClient();
-      tables = client.getHiveClient().getAllTables(databaseName);
+      List<String> tables = client.getHiveClient().getAllTables(databaseName);
       for(String eachTable: tables) {
         allTables.add(databaseName + "." + eachTable);
       }
