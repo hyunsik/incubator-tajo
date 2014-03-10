@@ -46,6 +46,8 @@ import org.junit.Test;
 
 import java.io.IOException;
 
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_TABLESPACE_NAME;
 import static org.junit.Assert.assertEquals;
 
 // this is not a physical operator in itself, but it uses the HashLeftOuterJoinExec with switched inputs order
@@ -70,6 +72,8 @@ public class TestRightOuterHashJoinExec {
     util.initTestDir();
     catalog = util.startCatalogCluster().getCatalog();
     testDir = CommonTestingUtil.getTestDir(TEST_PATH);
+    catalog.createTablespace(DEFAULT_TABLESPACE_NAME, testDir.toUri().toString());
+    catalog.createDatabase(DEFAULT_DATABASE_NAME, DEFAULT_TABLESPACE_NAME);
     conf = util.getConfiguration();
     sm = StorageManagerFactory.getStorageManager(conf, testDir);
 

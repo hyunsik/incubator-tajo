@@ -72,6 +72,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_TABLESPACE_NAME;
+
 public class TajoMaster extends CompositeService {
   private static final String METRICS_GROUP_NAME = "tajomaster";
 
@@ -338,6 +341,10 @@ public class TajoMaster extends CompositeService {
   @Override
   public void start() {
     LOG.info("TajoMaster startup");
+
+    // check base tablespace and databases
+    checkBaseTBSpaceAndDatabase();
+
     super.start();
 
     // Setting the system global configs
@@ -373,6 +380,16 @@ public class TajoMaster extends CompositeService {
       out.close();
     }
     defaultFS.setReplication(systemConfPath, (short) systemConf.getIntVar(ConfVars.SYSTEM_CONF_REPLICA_COUNT));
+  }
+
+  private void checkBaseTBSpaceAndDatabase() {
+    if (!catalog.existTablespace(DEFAULT_TABLESPACE_NAME)) {
+      catalog.createTablespace(DEFAULT_TABLESPACE_NAME, context.getConf().getVar(ConfVars.ROOT_DIR));
+    }
+
+    if (!catalog.existDatabase(DEFAULT_DATABASE_NAME)) {
+      catalog.createDatabase(DEFAULT_DATABASE_NAME, DEFAULT_TABLESPACE_NAME);
+    }
   }
 
   @Override

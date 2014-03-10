@@ -21,6 +21,7 @@ package org.apache.tajo.catalog;
 import com.google.common.base.Objects;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
+import com.sun.tools.corba.se.idl.InvalidArgument;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -28,6 +29,7 @@ import org.apache.hadoop.service.AbstractService;
 import org.apache.tajo.annotation.ThreadSafe;
 import org.apache.tajo.catalog.CatalogProtocol.CatalogProtocolService;
 import org.apache.tajo.catalog.exception.*;
+import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.catalog.proto.CatalogProtos.*;
 import org.apache.tajo.catalog.store.CatalogStore;
 import org.apache.tajo.catalog.store.DerbyStore;
@@ -35,6 +37,7 @@ import org.apache.tajo.common.TajoDataTypes.DataType;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.conf.TajoConf.ConfVars;
 import org.apache.tajo.rpc.BlockingRpcServer;
+import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.BoolProto;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.NullProto;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.StringProto;
@@ -45,6 +48,7 @@ import org.apache.tajo.util.TUtil;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
@@ -103,14 +107,14 @@ public class CatalogServer extends AbstractService {
   }
 
   @Override
-  public void init(Configuration conf) {
+  public void serviceInit(Configuration conf) throws Exception {
 
     Constructor<?> cons;
     try {
       if (conf instanceof TajoConf) {
         this.conf = (TajoConf) conf;
       } else {
-        throw new CatalogException();
+        throw new CatalogException("conf must be a TajoConf instance");
       }
 
       Class<?> storeClass = this.conf.getClass(CatalogConstants.STORE_CLASS, DerbyStore.class);
@@ -127,7 +131,7 @@ public class CatalogServer extends AbstractService {
       throw new CatalogException(t);
     }
 
-    super.init(conf);
+    super.serviceInit(conf);
   }
 
   public TajoConf getConf() {
@@ -204,8 +208,84 @@ public class CatalogServer extends AbstractService {
   public class CatalogProtocolHandler implements CatalogProtocolService.BlockingInterface {
 
     @Override
-    public BoolProto createDatabase(RpcController controller, StringProto request) throws ServiceException {
-      String databaseName = CatalogUtil.normalizeIdentifier(request.getValue());
+    public BoolProto createTablespace(RpcController controller, CreateTablespaceRequest request) throws ServiceException {
+      final String tablespaceName = CatalogUtil.normalizeIdentifier(request.getTablespaceName());
+      final String uri = request.getTablespaceUri();
+
+      wlock.lock();
+      try {
+        if (store.existTablespace(tablespaceName)) {
+          throw new AlreadyExistsDatabaseException(tablespaceName);
+        }
+
+        store.createTablespace(tablespaceName, uri);
+        return ProtoUtil.TRUE;
+
+      } catch (Exception e) {
+        LOG.error(e);
+        throw new ServiceException(e);
+      } finally {
+        wlock.unlock();
+      }
+    }
+
+    @Override
+    public BoolProto dropTablespace(RpcController controller, StringProto request) throws ServiceException {
+      String tablespaceName = CatalogUtil.normalizeIdentifier(request.getValue());
+
+      wlock.lock();
+      try {
+        if (!store.existTablespace(tablespaceName)) {
+          throw new NoSuchTablespaceException(tablespaceName);
+        }
+
+        store.dropTablespace(tablespaceName);
+        return ProtoUtil.TRUE;
+
+      } catch (Exception e) {
+        LOG.error(e);
+        throw new ServiceException(e);
+      } finally {
+        wlock.unlock();
+      }
+    }
+
+    @Override
+    public BoolProto existTablespace(RpcController controller, StringProto request) throws ServiceException {
+      String tablespaceName = CatalogUtil.normalizeIdentifier(request.getValue());
+
+      rlock.lock();
+      try {
+        if (store.existTablespace(tablespaceName)) {
+          return ProtoUtil.TRUE;
+        } else {
+          return ProtoUtil.FALSE;
+        }
+      } catch (Exception e) {
+        LOG.error(e);
+        throw new ServiceException(e);
+      } finally {
+        rlock.unlock();
+      }
+    }
+
+    @Override
+    public StringListProto getAllTablespaceNames(RpcController controller, NullProto request) throws ServiceException {
+      rlock.lock();
+      try {
+        return ProtoUtil.convertStrings(store.getAllDatabaseNames());
+      } catch (Exception e) {
+        LOG.error(e);
+        throw new ServiceException(e);
+      } finally {
+        rlock.unlock();
+      }
+    }
+
+    @Override
+    public BoolProto createDatabase(RpcController controller, CreateDatabaseRequest request) throws ServiceException {
+      String databaseName = CatalogUtil.normalizeIdentifier(request.getDatabaseName());
+      String tablespaceName = CatalogUtil.normalizeIdentifier(request.getTablespaceName());
 
       wlock.lock();
       try {
@@ -213,7 +293,7 @@ public class CatalogServer extends AbstractService {
           throw new AlreadyExistsDatabaseException(databaseName);
         }
 
-        store.createDatabase(databaseName);
+        store.createDatabase(databaseName, tablespaceName);
         return ProtoUtil.TRUE;
 
       } catch (Exception e) {

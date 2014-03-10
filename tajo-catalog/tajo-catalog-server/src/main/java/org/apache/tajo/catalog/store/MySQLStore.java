@@ -39,7 +39,7 @@ public class MySQLStore extends AbstractDBStore  {
     return CATALOG_DRIVER;
   }
 
-  public MySQLStore(Configuration conf) throws InternalException {
+  public MySQLStore(final Configuration conf) throws InternalException {
     super(conf);
   }
 
@@ -236,7 +236,6 @@ public class MySQLStore extends AbstractDBStore  {
       }
 
       insertSchemaVersion();
-      createDatabase(DEFAULT_DATABASE_NAME);
 
     } catch (SQLException se) {
       throw new CatalogException("failed to create base tables for MySQL catalog store", se);

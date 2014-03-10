@@ -29,22 +29,26 @@ import org.apache.tajo.catalog.FunctionDesc;
 import org.apache.tajo.catalog.exception.*;
 import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.catalog.proto.CatalogProtos.IndexDescProto;
+import org.apache.tajo.conf.TajoConf;
 
 import java.io.IOException;
 import java.util.*;
+
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_TABLESPACE_NAME;
 
 /**
  * CatalogServer guarantees that all operations are thread-safe.
  * So, we don't need to consider concurrency problem here.
  */
 public class MemStore implements CatalogStore {
+  private final Map<String, String> tablespaces = Maps.newHashMap();
   private final Map<String, Map<String, CatalogProtos.TableDescProto>> databases = Maps.newHashMap();
   private final Map<String, CatalogProtos.FunctionDescProto> functions = Maps.newHashMap();
   private final Map<String, Map<String, IndexDescProto>> indexes = Maps.newHashMap();
   private final Map<String, Map<String, IndexDescProto>> indexesByColumn = Maps.newHashMap();
   
   public MemStore(Configuration conf) {
-    createDatabase(CatalogConstants.DEFAULT_DATABASE_NAME);
   }
 
   @Override
@@ -55,25 +59,52 @@ public class MemStore implements CatalogStore {
   }
 
   @Override
-  public void createDatabase(String dbName) throws CatalogException {
-    if (databases.containsKey(dbName)) {
-      throw new AlreadyExistsDatabaseException(dbName);
+  public void createTablespace(String spaceName, String spaceUri) throws CatalogException {
+    if (tablespaces.containsKey(spaceName)) {
+      throw new AlreadyExistsTablespaceException(spaceName);
     }
 
-    databases.put(dbName, new HashMap<String, CatalogProtos.TableDescProto>());
+    tablespaces.put(spaceName, spaceUri);
   }
 
   @Override
-  public boolean existDatabase(String dbName) throws CatalogException {
-    return databases.containsKey(dbName);
+  public boolean existTablespace(String spaceName) throws CatalogException {
+    return tablespaces.containsKey(spaceName);
   }
 
   @Override
-  public void dropDatabase(String dbName) throws CatalogException {
-    if (!databases.containsKey(dbName)) {
-      throw new NoSuchDatabaseException(dbName);
+  public void dropTablespace(String spaceName) throws CatalogException {
+    if (!tablespaces.containsKey(spaceName)) {
+      throw new NoSuchTablespaceException(spaceName);
     }
-    databases.remove(dbName);
+    tablespaces.remove(spaceName);
+  }
+
+  @Override
+  public Collection<String> getAllTablespaceNames() throws CatalogException {
+    return tablespaces.keySet();
+  }
+
+  @Override
+  public void createDatabase(String databaseName, String tablespaceName) throws CatalogException {
+    if (databases.containsKey(databaseName)) {
+      throw new AlreadyExistsDatabaseException(databaseName);
+    }
+
+    databases.put(databaseName, new HashMap<String, CatalogProtos.TableDescProto>());
+  }
+
+  @Override
+  public boolean existDatabase(String databaseName) throws CatalogException {
+    return databases.containsKey(databaseName);
+  }
+
+  @Override
+  public void dropDatabase(String databaseName) throws CatalogException {
+    if (!databases.containsKey(databaseName)) {
+      throw new NoSuchDatabaseException(databaseName);
+    }
+    databases.remove(databaseName);
   }
 
   @Override

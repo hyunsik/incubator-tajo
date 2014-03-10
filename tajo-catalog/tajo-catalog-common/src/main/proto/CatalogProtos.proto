@@ -84,6 +84,16 @@ message TableProto {
   optional KeyValueSetProto params = 2;
 }
 
+message CreateTablespaceRequest {
+  required string tablespace_name = 1;
+  required string tablespace_uri = 2;
+}
+
+message CreateDatabaseRequest {
+  required string database_name = 1;
+  required string tablespace_name = 2;
+}
+
 message TableDescProto {
   required string database_name = 1;
   optional string namespace = 2;

@@ -31,12 +31,21 @@ import java.util.List;
 import static org.apache.tajo.catalog.proto.CatalogProtos.PartitionMethodProto;
 
 public interface CatalogStore extends Closeable {
+  /*************************** Tablespace ******************************/
+  void createTablespace(String spaceName, String spaceUri) throws CatalogException;
+
+  boolean existTablespace(String spaceName) throws CatalogException;
+
+  void dropTablespace(String spaceName) throws CatalogException;
+
+  Collection<String> getAllTablespaceNames() throws CatalogException;;
+
   /*************************** Database ******************************/
-  void createDatabase(String name) throws CatalogException;
+  void createDatabase(String databaseName, String tablespaceName) throws CatalogException;
 
-  boolean existDatabase(String name) throws CatalogException;
+  boolean existDatabase(String databaseName) throws CatalogException;
 
-  void dropDatabase(String name) throws CatalogException;
+  void dropDatabase(String databaseName) throws CatalogException;
 
   Collection<String> getAllDatabaseNames() throws CatalogException;
 

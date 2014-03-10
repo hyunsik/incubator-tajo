@@ -22,7 +22,6 @@
 package org.apache.tajo.catalog.store;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.tajo.catalog.CatalogConstants;
 import org.apache.tajo.catalog.CatalogUtil;
 import org.apache.tajo.catalog.exception.CatalogException;
 import org.apache.tajo.exception.InternalException;
@@ -80,6 +79,21 @@ public class DerbyStore extends AbstractDBStore {
 
         LOG.info("Table '" + TB_META + "' is created.");
         baseTableMaps.put(TB_META, true);
+      }
+
+      // TABLE SPACES
+      if (!baseTableMaps.get(TB_SPACES)) {
+
+        String sql = readSchemaFile("tablespaces.sql");
+
+        if (LOG.isDebugEnabled()) {
+          LOG.debug(sql);
+        }
+
+        stmt.executeUpdate(sql);
+
+        LOG.info("Table '" + TB_SPACES + "' is created.");
+        baseTableMaps.put(TB_SPACES, true);
       }
 
       // DATABASES
@@ -261,7 +275,6 @@ public class DerbyStore extends AbstractDBStore {
       }
 
       insertSchemaVersion();
-      createDatabase(CatalogConstants.DEFAULT_DATABASE_NAME);
 
     } catch (SQLException se) {
       throw new CatalogException("failed to create base tables for Derby catalog store.", se);
@@ -315,6 +328,7 @@ public class DerbyStore extends AbstractDBStore {
           new String [] {"TABLE"});
 
       baseTableMaps.put(TB_META, false);
+      baseTableMaps.put(TB_SPACES, false);
       baseTableMaps.put(TB_DATABASES, false);
       baseTableMaps.put(TB_TABLES, false);
       baseTableMaps.put(TB_COLUMNS, false);

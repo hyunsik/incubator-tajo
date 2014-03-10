@@ -31,10 +31,12 @@ import org.apache.hcatalog.data.schema.HCatSchema;
 import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.catalog.exception.CatalogException;
+import org.apache.tajo.catalog.exception.NoSuchDatabaseException;
 import org.apache.tajo.catalog.partition.PartitionMethodDesc;
 import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.common.TajoDataTypes;
+import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.exception.InternalException;
 import org.apache.tajo.exception.UnimplementedException;
 
@@ -45,15 +47,17 @@ import static org.apache.tajo.catalog.proto.CatalogProtos.PartitionType;
 
 public class HCatalogStore extends CatalogConstants implements CatalogStore {
   public static final String CVSFILE_DELIMITER = "csvfile.delimiter";
+  private final String defaultSpaceUri;
 
   protected final Log LOG = LogFactory.getLog(getClass());
   protected Configuration conf;
   private static final int CLIENT_POOL_SIZE = 2;
   private final HCatalogStoreClientPool clientPool = new HCatalogStoreClientPool(0);
 
-  public HCatalogStore(final Configuration conf)
-      throws InternalException {
+  public HCatalogStore(final Configuration conf) throws InternalException {
     this.conf = conf;
+    this.defaultSpaceUri = conf.get(TajoConf.ConfVars.ROOT_DIR.varname);
+
     try {
       clientPool.addClients(CLIENT_POOL_SIZE);
     } catch (Exception e) {
@@ -261,18 +265,71 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
   }
 
   @Override
-  public void createDatabase(String name) throws CatalogException {
-    throw new UnimplementedException("createDatabase is not implemented yet");
+  public void createTablespace(String spaceName, String spaceUri) throws CatalogException {
+    throw new UnimplementedException("createTablespace is not supported in HCatalogStore");
   }
 
   @Override
-  public boolean existDatabase(String name) throws CatalogException {
-    throw new UnimplementedException("existDatabase() is not implemented yet");
+  public boolean existTablespace(String spaceName) throws CatalogException {
+    throw new UnimplementedException("existTablespace is not supported in HCatalogStore");
   }
 
   @Override
-  public void dropDatabase(String name) throws CatalogException {
-    throw new UnimplementedException("dropDatabase() is not implemented yet");
+  public void dropTablespace(String spaceName) throws CatalogException {
+    throw new UnimplementedException("dropTablespace is not supported in HCatalogStore");
+  }
+
+  @Override
+  public Collection<String> getAllTablespaceNames() throws CatalogException {
+    throw new UnimplementedException("getAllTablespaceNames is not supported in HCatalogStore");
+  }
+
+  @Override
+  public void createDatabase(String databaseName) throws CatalogException {
+    HCatalogStoreClientPool.HCatalogStoreClient client = null;
+
+    String databaseUri = defaultSpaceUri + "/" + databaseName;
+
+    try {
+      client = clientPool.getClient();
+      Database database = new Database(databaseName, "", databaseUri, new HashMap<String, String>());
+      client.getHiveClient().createDatabase(database);
+    } catch (Exception e) {
+      throw new CatalogException(e);
+    } finally {
+      client.release();
+    }
+  }
+
+  @Override
+  public boolean existDatabase(String databaseName) throws CatalogException {
+    HCatalogStoreClientPool.HCatalogStoreClient client = null;
+
+    try {
+      client = clientPool.getClient();
+      List<String> databases = client.getHiveClient().getAllDatabases();
+      return databases.contains(databaseName);
+    } catch (Exception e) {
+      throw new CatalogException(e);
+    } finally {
+      client.release();
+    }
+  }
+
+  @Override
+  public void dropDatabase(String databaseName) throws CatalogException {
+    HCatalogStoreClientPool.HCatalogStoreClient client = null;
+
+    try {
+      client = clientPool.getClient();
+      client.getHiveClient().dropDatabase(databaseName, false, false);
+    } catch (NoSuchObjectException nsoe) {
+      throw new NoSuchDatabaseException(databaseName);
+    } catch (Exception e) {
+      throw new CatalogException(e);
+    } finally {
+      client.release();
+    }
   }
 
   @Override

@@ -30,10 +30,37 @@ public interface CatalogService {
 
   /**
    *
+   * @param tableSpaceName Tablespace name to be created
+   * @return True if tablespace is created successfully. Otherwise, it will return FALSE.
+   */
+  Boolean createTablespace(String tableSpaceName, String uri);
+
+  /**
+   *
+   * @param tableSpaceName Tablespace name to be created
+   * @return True if tablespace is created successfully. Otherwise, it will return FALSE.
+   */
+  Boolean existTablespace(String tableSpaceName);
+
+  /**
+   *
+   * @param tableSpaceName Tablespace name to be created
+   * @return True if tablespace is created successfully. Otherwise, it will return FALSE.
+   */
+  Boolean dropTablespace(String tableSpaceName);
+
+  /**
+   *
+   * @return All tablespace names
+   */
+  Collection<String> getAllTablespaceNames();
+
+  /**
+   *
    * @param databaseName Database name to be created
    * @return True if database is created successfully. Otherwise, it will return FALSE.
    */
-  Boolean createDatabase(String databaseName);
+  Boolean createDatabase(String databaseName, String tablespaceName);
 
   /**
    *

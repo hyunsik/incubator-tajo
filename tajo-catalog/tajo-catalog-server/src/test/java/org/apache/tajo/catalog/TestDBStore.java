@@ -40,6 +40,7 @@ import java.io.IOException;
 
 import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
 import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_TABLESPACE_NAME;
 import static org.junit.Assert.*;
 
 public class TestDBStore {
@@ -54,7 +55,10 @@ public class TestDBStore {
     File absolutePath = new File(testDir.toUri());
     conf.set(CatalogConstants.CATALOG_URI, "jdbc:derby:"+absolutePath.getAbsolutePath()+"/db;create=true");
     LOG.info("derby repository is set to "+conf.get(CatalogConstants.CATALOG_URI));
+
     store = new DerbyStore(conf);
+    store.createTablespace(DEFAULT_TABLESPACE_NAME, testDir.toUri().toString());
+    store.createDatabase(DEFAULT_DATABASE_NAME, DEFAULT_TABLESPACE_NAME);
   }
 
   @AfterClass

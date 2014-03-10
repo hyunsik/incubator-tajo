@@ -39,6 +39,8 @@ import org.junit.Test;
 
 import java.util.List;
 
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_TABLESPACE_NAME;
 import static org.junit.Assert.*;
 
 public class TestPlannerUtil {
@@ -52,6 +54,8 @@ public class TestPlannerUtil {
     util = new TajoTestingCluster();
     util.startCatalogCluster();
     catalog = util.getMiniCatalogCluster().getCatalog();
+    catalog.createTablespace(DEFAULT_TABLESPACE_NAME, "hdfs://localhost:1234/warehouse");
+    catalog.createDatabase(DEFAULT_DATABASE_NAME, DEFAULT_TABLESPACE_NAME);
 
     Schema schema = new Schema();
     schema.addColumn("name", Type.TEXT);

@@ -43,6 +43,7 @@ import java.util.Stack;
 
 import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
 import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_TABLESPACE_NAME;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 
@@ -60,6 +61,8 @@ public class ExprTestBase {
     util = new TajoTestingCluster();
     util.startCatalogCluster();
     cat = util.getMiniCatalogCluster().getCatalog();
+    cat.createTablespace(DEFAULT_TABLESPACE_NAME, "hdfs://localhost:1234/warehouse");
+    cat.createDatabase(DEFAULT_DATABASE_NAME, DEFAULT_TABLESPACE_NAME);
     for (FunctionDesc funcDesc : TajoMaster.initBuiltinFunctions()) {
       cat.createFunction(funcDesc);
     }

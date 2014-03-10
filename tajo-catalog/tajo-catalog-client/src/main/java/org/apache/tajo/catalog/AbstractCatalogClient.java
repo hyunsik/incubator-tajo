@@ -59,12 +59,81 @@ public abstract class AbstractCatalogClient implements CatalogService {
   }
 
   @Override
-  public final Boolean createDatabase(final String databaseName) {
+  public final Boolean createTablespace(final String tablespaceName, final String tablespaceUri) {
     try {
       return new ServerCallable<Boolean>(conf, catalogServerAddr, CatalogProtocol.class, false) {
         public Boolean call(NettyClientBase client) throws ServiceException {
           CatalogProtocolService.BlockingInterface stub = getStub(client);
-          return stub.createDatabase(null, ProtoUtil.convertString(databaseName)).getValue();
+
+          CreateTablespaceRequest.Builder builder = CreateTablespaceRequest.newBuilder();
+          builder.setTablespaceName(tablespaceName);
+          builder.setTablespaceUri(tablespaceUri);
+          return stub.createTablespace(null, builder.build()).getValue();
+        }
+      }.withRetries();
+    } catch (ServiceException e) {
+      LOG.error(e.getMessage(), e);
+      return null;
+    }
+  }
+
+  @Override
+  public final Boolean dropTablespace(final String tablespaceName) {
+    try {
+      return new ServerCallable<Boolean>(conf, catalogServerAddr, CatalogProtocol.class, false) {
+        public Boolean call(NettyClientBase client) throws ServiceException {
+          CatalogProtocolService.BlockingInterface stub = getStub(client);
+          return stub.dropTablespace(null, ProtoUtil.convertString(tablespaceName)).getValue();
+        }
+      }.withRetries();
+    } catch (ServiceException e) {
+      LOG.error(e.getMessage(), e);
+      return null;
+    }
+  }
+
+  @Override
+  public final Boolean existTablespace(final String tablespaceName) {
+    try {
+      return new ServerCallable<Boolean>(conf, catalogServerAddr, CatalogProtocol.class, false) {
+        public Boolean call(NettyClientBase client) throws ServiceException {
+          CatalogProtocolService.BlockingInterface stub = getStub(client);
+          return stub.existTablespace(null, ProtoUtil.convertString(tablespaceName)).getValue();
+        }
+      }.withRetries();
+    } catch (ServiceException e) {
+      LOG.error(e.getMessage(), e);
+      return null;
+    }
+  }
+
+  @Override
+  public final Collection<String> getAllTablespaceNames() {
+    try {
+      return new ServerCallable<Collection<String>>(conf, catalogServerAddr, CatalogProtocol.class, false) {
+        public Collection<String> call(NettyClientBase client) throws ServiceException {
+          CatalogProtocolService.BlockingInterface stub = getStub(client);
+          PrimitiveProtos.StringListProto response = stub.getAllTablespaceNames(null, ProtoUtil.NULL_PROTO);
+          return ProtoUtil.convertStrings(response);
+        }
+      }.withRetries();
+    } catch (ServiceException e) {
+      LOG.error(e.getMessage(), e);
+      return null;
+    }
+  }
+
+  @Override
+  public final Boolean createDatabase(final String databaseName, final String tablespaceName) {
+    try {
+      return new ServerCallable<Boolean>(conf, catalogServerAddr, CatalogProtocol.class, false) {
+        public Boolean call(NettyClientBase client) throws ServiceException {
+          CatalogProtocolService.BlockingInterface stub = getStub(client);
+
+          CreateDatabaseRequest.Builder builder = CreateDatabaseRequest.newBuilder();
+          builder.setDatabaseName(databaseName);
+          builder.setTablespaceName(tablespaceName);
+          return stub.createDatabase(null, builder.build()).getValue();
         }
       }.withRetries();
     } catch (ServiceException e) {

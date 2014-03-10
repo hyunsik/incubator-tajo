@@ -25,12 +25,14 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.tajo.annotation.Nullable;
 import org.apache.tajo.catalog.CatalogConstants;
 import org.apache.tajo.catalog.CatalogUtil;
 import org.apache.tajo.catalog.FunctionDesc;
 import org.apache.tajo.catalog.exception.CatalogException;
 import org.apache.tajo.catalog.exception.NoSuchDatabaseException;
 import org.apache.tajo.catalog.exception.NoSuchTableException;
+import org.apache.tajo.catalog.exception.NoSuchTablespaceException;
 import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.catalog.proto.CatalogProtos.*;
 import org.apache.tajo.common.TajoDataTypes.Type;
@@ -48,11 +50,10 @@ import java.util.*;
 
 public abstract class AbstractDBStore extends CatalogConstants implements CatalogStore {
   protected final Log LOG = LogFactory.getLog(getClass());
-
-  protected Configuration conf;
-  protected String connectionId;
-  protected String connectionPassword;
-  protected String catalogUri;
+  protected final Configuration conf;
+  protected final String connectionId;
+  protected final String connectionPassword;
+  protected final String catalogUri;
 
   private Connection conn;
 
@@ -234,7 +235,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
   }
 
   @Override
-  public void createDatabase(String databaseName) throws CatalogException {
+  public void createTablespace(String spaceName, String spaceUri) throws CatalogException {
     Connection conn = null;
     PreparedStatement pstmt = null;
     ResultSet res = null;
@@ -242,14 +243,147 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     try {
       conn = getConnection();
       conn.setAutoCommit(false);
-      String sql = String.format("INSERT INTO %s (DB_NAME) VALUES (?)", TB_DATABASES);
+      String sql = String.format("INSERT INTO %s (SPACE_NAME, SPACE_URI) VALUES (?, ?)", TB_SPACES);
 
       if (LOG.isDebugEnabled()) {
         LOG.debug(sql);
       }
 
       pstmt = conn.prepareStatement(sql);
+      pstmt.setString(1, spaceName);
+      pstmt.setString(2, spaceUri);
+      pstmt.executeUpdate();
+      pstmt.close();
+    } catch (SQLException se) {
+      try {
+        // If there is any error, rollback the changes.
+        conn.rollback();
+      } catch (SQLException se2) {
+        LOG.error(se2);
+      }
+      throw new CatalogException(se);
+    } finally {
+      CatalogUtil.closeQuietly(conn, pstmt, res);
+    }
+  }
+
+  @Override
+  public boolean existTablespace(String tableSpaceName) throws CatalogException {
+    Connection conn = null;
+    PreparedStatement pstmt = null;
+    ResultSet res = null;
+    boolean exist = false;
+
+    try {
+      StringBuilder sql = new StringBuilder();
+      sql.append("SELECT SPACE_NAME FROM " + TB_SPACES +" WHERE SPACE_NAME = ?");
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(sql.toString());
+      }
+
+      conn = getConnection();
+      pstmt = conn.prepareStatement(sql.toString());
+      pstmt.setString(1, tableSpaceName);
+      res = pstmt.executeQuery();
+      exist = res.next();
+    } catch (SQLException se) {
+      throw new CatalogException(se);
+    } finally {
+      CatalogUtil.closeQuietly(conn, pstmt, res);
+    }
+
+    return exist;
+  }
+
+  @Override
+  public void dropTablespace(String tableSpaceName) throws CatalogException {
+
+
+    Connection conn = null;
+    PreparedStatement pstmt = null;
+    try {
+      TableSpaceInternal tableSpace = getTableSpaceInfo(tableSpaceName);
+      Collection<String> databaseNames = getAllDatabaseNamesInternal(COL_TABLESPACE_PK + " = " + tableSpace.spaceId);
+
+      conn = getConnection();
+      conn.setAutoCommit(false);
+
+      for (String databaseName : databaseNames) {
+        dropDatabase(databaseName);
+      }
+
+      String sql = "DELETE FROM " + TB_SPACES + " WHERE " + COL_TABLESPACE_PK +"= ?";
+      pstmt = conn.prepareStatement(sql);
+      pstmt.setInt(1, tableSpace.getSpaceId());
+      pstmt.executeUpdate();
+      conn.commit();
+    } catch (SQLException se) {
+      try {
+        conn.rollback();
+      } catch (SQLException e) {
+        LOG.error(e);
+      }
+      throw new CatalogException(String.format("Failed to drop tablespace \"%s\"", tableSpaceName), se);
+    } finally {
+      CatalogUtil.closeQuietly(conn, pstmt);
+    }
+  }
+
+  @Override
+  public Collection<String> getAllTablespaceNames() throws CatalogException {
+    return getAllTablespaceNamesInternal(null);
+  }
+
+
+  private Collection<String> getAllTablespaceNamesInternal(@Nullable String whereCondition) throws CatalogException {
+    Connection conn = null;
+    PreparedStatement pstmt = null;
+    ResultSet resultSet = null;
+
+    List<String> tablespaceNames = new ArrayList<String>();
+
+    try {
+      String sql = "SELECT SPACE_NAME FROM " + TB_SPACES;
+
+      if (whereCondition != null) {
+        sql += " WHERE " + whereCondition;
+      }
+
+      conn = getConnection();
+      pstmt = conn.prepareStatement(sql);
+      resultSet = pstmt.executeQuery();
+      while(resultSet.next()) {
+        tablespaceNames.add(resultSet.getString(1));
+      }
+    } catch (SQLException se) {
+      throw new CatalogException(se);
+    } finally {
+      CatalogUtil.closeQuietly(conn, pstmt, resultSet);
+    }
+
+    return tablespaceNames;
+  }
+
+  @Override
+  public void createDatabase(String databaseName, String tablespaceName) throws CatalogException {
+    Connection conn = null;
+    PreparedStatement pstmt = null;
+    ResultSet res = null;
+
+    try {
+      TableSpaceInternal spaceInfo = getTableSpaceInfo(tablespaceName);
+
+      String sql = String.format("INSERT INTO %s (DB_NAME, SPACE_ID) VALUES (?, ?)", TB_DATABASES);
+
+      if (LOG.isDebugEnabled()) {
+        LOG.debug(sql);
+      }
+
+      conn = getConnection();
+      conn.setAutoCommit(false);
+      pstmt = conn.prepareStatement(sql);
       pstmt.setString(1, databaseName);
+      pstmt.setInt(2, spaceInfo.getSpaceId());
       pstmt.executeUpdate();
       pstmt.close();
     } catch (SQLException se) {
@@ -326,6 +460,10 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
 
   @Override
   public Collection<String> getAllDatabaseNames() throws CatalogException {
+    return getAllDatabaseNamesInternal(null);
+  }
+
+  private Collection<String> getAllDatabaseNamesInternal(@Nullable String whereCondition) throws CatalogException {
     Connection conn = null;
     PreparedStatement pstmt = null;
     ResultSet resultSet = null;
@@ -334,6 +472,10 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
 
     try {
       String sql = "SELECT DB_NAME FROM " + TB_DATABASES;
+
+      if (whereCondition != null) {
+        sql += " WHERE " + whereCondition;
+      }
 
       conn = getConnection();
       pstmt = conn.prepareStatement(sql);
@@ -348,6 +490,52 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     }
 
     return databaseNames;
+  }
+
+  private class TableSpaceInternal {
+    private final int spaceId;
+    private final String spaceURI;
+    private final String handler;
+
+    TableSpaceInternal(int spaceId, String spaceURI, String handler) {
+      this.spaceId = spaceId;
+      this.spaceURI = spaceURI;
+      this.handler = handler;
+    }
+
+    public int getSpaceId() {
+      return spaceId;
+    }
+
+    public String getSpaceURI() {
+      return spaceURI;
+    }
+
+    public String getHandler() {
+      return handler;
+    }
+  }
+
+  private TableSpaceInternal getTableSpaceInfo(String spaceName) {
+    Connection conn = null;
+    PreparedStatement pstmt = null;
+    ResultSet res = null;
+
+    try {
+      String sql = "SELECT SPACE_ID, SPACE_URI, SPACE_HANDLER from " + TB_SPACES + " WHERE SPACE_NAME = ?";
+      conn = getConnection();
+      pstmt = conn.prepareStatement(sql);
+      pstmt.setString(1, spaceName);
+      res = pstmt.executeQuery();
+      if (!res.next()) {
+        throw new CatalogException("ERROR: there is no SPACE_ID matched to the space name \"" + spaceName + "\"");
+      }
+      return new TableSpaceInternal(res.getInt(1), res.getString(2), res.getString(3));
+    } catch (SQLException se) {
+      throw new NoSuchTablespaceException(spaceName);
+    } finally {
+      CatalogUtil.closeQuietly(conn, pstmt, res);
+    }
   }
 
   private int getTableId(int databaseId, String databaseName, String namespace, String tableName) {

@@ -33,6 +33,8 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_TABLESPACE_NAME;
 import static org.junit.Assert.*;
 
 public class TestLogicalOptimizer {
@@ -48,6 +50,8 @@ public class TestLogicalOptimizer {
     util = new TajoTestingCluster();
     util.startCatalogCluster();
     catalog = util.getMiniCatalogCluster().getCatalog();
+    catalog.createTablespace(DEFAULT_TABLESPACE_NAME, "hdfs://localhost:1234/warehouse");
+    catalog.createDatabase(DEFAULT_DATABASE_NAME, DEFAULT_TABLESPACE_NAME);
     for (FunctionDesc funcDesc : TajoMaster.initBuiltinFunctions()) {
       catalog.createFunction(funcDesc);
     }

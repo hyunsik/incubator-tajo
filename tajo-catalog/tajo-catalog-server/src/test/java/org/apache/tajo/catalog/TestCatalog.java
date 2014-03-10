@@ -41,7 +41,6 @@ import java.util.*;
 
 import static org.apache.tajo.catalog.CatalogConstants.*;
 import static org.junit.Assert.*;
-import static org.junit.Assert.assertEquals;
 
 public class TestCatalog {
 	static final String FieldName1="f1";
@@ -64,6 +63,8 @@ public class TestCatalog {
     server.init(conf);
     server.start();
     catalog = new LocalCatalogWrapper(server);
+    catalog.createTablespace(DEFAULT_TABLESPACE_NAME, path.toUri().toString());
+    catalog.createDatabase(DEFAULT_DATABASE_NAME, DEFAULT_TABLESPACE_NAME);
 
     for(String table : catalog.getAllTableNames(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE)){
       catalog.dropTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, table);
@@ -78,7 +79,7 @@ public class TestCatalog {
   @Test
   public void testCreateAndDropDatabases() throws Exception {
     assertFalse(catalog.existDatabase("testCreateAndDropDatabases"));
-    assertTrue(catalog.createDatabase("testCreateAndDropDatabases"));
+    assertTrue(catalog.createDatabase("testCreateAndDropDatabases", DEFAULT_TABLESPACE_NAME));
     assertTrue(catalog.existDatabase("testCreateAndDropDatabases"));
     assertTrue(catalog.dropDatabase("testCreateAndDropDatabases"));
   }
@@ -91,7 +92,7 @@ public class TestCatalog {
     for (int i = 0; i < NUM; i++) {
       String databaseName = namePrefix + i;
       assertFalse(catalog.existDatabase(databaseName));
-      assertTrue(catalog.createDatabase(databaseName));
+      assertTrue(catalog.createDatabase(databaseName, DEFAULT_TABLESPACE_NAME));
       assertTrue(catalog.existDatabase(databaseName));
       createdDatabases.add(databaseName);
     }
@@ -129,9 +130,9 @@ public class TestCatalog {
 
   @Test
   public void testCreateAndDropTable() throws Exception {
-    assertTrue(catalog.createDatabase("tmpdb1"));
+    assertTrue(catalog.createDatabase("tmpdb1", DEFAULT_TABLESPACE_NAME));
     assertTrue(catalog.existDatabase("tmpdb1"));
-    assertTrue(catalog.createDatabase("tmpdb2"));
+    assertTrue(catalog.createDatabase("tmpdb2", DEFAULT_TABLESPACE_NAME));
     assertTrue(catalog.existDatabase("tmpdb2"));
 
     TableDesc table1 = createMockupTable("tmpdb1", null, "table1");
@@ -176,7 +177,7 @@ public class TestCatalog {
       String databaseName = dbPrefix + dbIdx;
 
       if (!catalog.existDatabase(databaseName)) {
-        assertTrue(catalog.createDatabase(databaseName));
+        assertTrue(catalog.createDatabase(databaseName, DEFAULT_TABLESPACE_NAME));
       }
 
       String tableName = tablePrefix + tableId;

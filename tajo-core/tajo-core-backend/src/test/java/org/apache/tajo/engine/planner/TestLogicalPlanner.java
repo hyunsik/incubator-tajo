@@ -28,6 +28,7 @@ import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.proto.CatalogProtos.FunctionType;
 import org.apache.tajo.catalog.proto.CatalogProtos.StoreType;
 import org.apache.tajo.common.TajoDataTypes.Type;
+import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.engine.eval.EvalType;
 import org.apache.tajo.engine.function.builtin.SumInt;
 import org.apache.tajo.engine.json.CoreGsonHelper;
@@ -44,6 +45,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_TABLESPACE_NAME;
 import static org.junit.Assert.*;
 
 public class TestLogicalPlanner {
@@ -58,6 +61,9 @@ public class TestLogicalPlanner {
     util = new TajoTestingCluster();
     util.startCatalogCluster();
     catalog = util.getMiniCatalogCluster().getCatalog();
+    catalog.createTablespace(DEFAULT_TABLESPACE_NAME, "hdfs://localhost:1234");
+    catalog.createDatabase(DEFAULT_DATABASE_NAME, DEFAULT_TABLESPACE_NAME);
+
     for (FunctionDesc funcDesc : TajoMaster.initBuiltinFunctions()) {
       catalog.createFunction(funcDesc);
     }

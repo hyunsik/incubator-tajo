@@ -42,6 +42,9 @@ import org.junit.Test;
 import java.io.File;
 import java.io.IOException;
 
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_TABLESPACE_NAME;
+
 public class TestGlobalPlanner {
 
   private static TajoTestingCluster util;
@@ -60,6 +63,8 @@ public class TestGlobalPlanner {
     for (FunctionDesc funcDesc : TajoMaster.initBuiltinFunctions()) {
       catalog.createFunction(funcDesc);
     }
+    catalog.createTablespace(DEFAULT_TABLESPACE_NAME, "hdfs://localhost:1234/warehouse");
+    catalog.createDatabase(DEFAULT_DATABASE_NAME, DEFAULT_TABLESPACE_NAME);
 
     // TPC-H Schema for Complex Queries
     String [] tables = {
