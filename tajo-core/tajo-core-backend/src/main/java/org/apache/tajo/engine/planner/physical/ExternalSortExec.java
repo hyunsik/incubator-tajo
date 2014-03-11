@@ -69,7 +69,7 @@ public class ExternalSortExec extends SortExec {
   /** the defaultFanout of external sort */
   private final int defaultFanout;
   /** It's the size of in-memory table. If memory consumption exceeds it, store the memory table into a disk. */
-  private int sortBufferBytesNum;
+  private long sortBufferBytesNum;
   /** the number of available cores */
   private final int allocatedCoreNum;
   /** If there are available multiple cores, it tries parallel merge. */
@@ -111,7 +111,7 @@ public class ExternalSortExec extends SortExec {
       throw new PhysicalPlanningException(ConfVars.EXECUTOR_EXTERNAL_SORT_FANOUT.varname + " cannot be lower than 2");
     }
     // TODO - sort buffer and core num should be changed to use the allocated container resource.
-    this.sortBufferBytesNum = context.getConf().getIntVar(ConfVars.EXECUTOR_EXTERNAL_SORT_BUFFER_SIZE) * 1048576;
+    this.sortBufferBytesNum = context.getConf().getLongVar(ConfVars.EXECUTOR_EXTERNAL_SORT_BUFFER_SIZE) * 1048576L;
     this.allocatedCoreNum = context.getConf().getIntVar(ConfVars.EXECUTOR_EXTERNAL_SORT_THREAD_NUM);
     this.executorService = Executors.newFixedThreadPool(this.allocatedCoreNum);
     this.inMemoryTable = new ArrayList<Tuple>(100000);
@@ -193,7 +193,7 @@ public class ExternalSortExec extends SortExec {
    */
   private List<Path> sortAndStoreAllChunks() throws IOException {
     Tuple tuple;
-    int memoryConsumption = 0;
+    long memoryConsumption = 0;
     List<Path> chunkPaths = TUtil.newList();
 
     int chunkId = 0;

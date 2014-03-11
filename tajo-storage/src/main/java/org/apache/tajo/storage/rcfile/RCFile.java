@@ -32,6 +32,7 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.catalog.TableMeta;
+import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.datum.Datum;
@@ -41,6 +42,7 @@ import org.apache.tajo.storage.fragment.FileFragment;
 import org.apache.tajo.util.Bytes;
 
 import java.io.*;
+import java.io.Closeable;
 import java.rmi.server.UID;
 import java.security.MessageDigest;
 import java.util.Arrays;
@@ -436,7 +438,7 @@ public class RCFile {
    * column_2_row_2_value,....]</li>
    * </ul>
    */
-  public static class ValueBuffer {
+  public static class ValueBuffer implements Closeable{
 
     // used to load columns' value into memory
     private NonSyncByteArrayOutputStream[] loadedColumnsValueBuffer = null;
@@ -453,6 +455,7 @@ public class RCFile {
     CompressionCodec codec;
     Decompressor decompressor = null;
     NonSyncDataInputBuffer decompressBuffer = new NonSyncDataInputBuffer();
+    private long readBytes = 0;
 
 
     public ValueBuffer(KeyBuffer currentKey, int columnNumber,
@@ -463,7 +466,6 @@ public class RCFile {
       this.skippedColIDs = skippedIDs;
       this.codec = codec;
       loadedColumnsValueBuffer = new NonSyncByteArrayOutputStream[targets.length];
-
       if (codec != null) {
         decompressor = org.apache.tajo.storage.compress.CodecPool.getDecompressor(codec);
       }
@@ -521,6 +523,7 @@ public class RCFile {
           valBuf.reset();
           valBuf.write(in, vaRowsLen);
         }
+        readBytes += keyBuffer.eachColumnUncompressedValueLen[i];
         addIndex++;
       }
 
@@ -529,10 +532,16 @@ public class RCFile {
       }
     }
 
-    public void clearColumnBuffer() throws IOException {
-      decompressBuffer.reset();
+    public long getReadBytes() {
+      return readBytes;
     }
 
+    public void clearColumnBuffer() throws IOException {
+      decompressBuffer.reset();
+      readBytes = 0;
+    }
+
+    @Override
     public void close() {
       for (NonSyncByteArrayOutputStream element : loadedColumnsValueBuffer) {
         IOUtils.closeStream(element);
@@ -581,7 +590,7 @@ public class RCFile {
     // how many records the writer buffers before it writes to disk
     private int RECORD_INTERVAL = Integer.MAX_VALUE;
     // the max size of memory for buffering records before writes them out
-    private int COLUMNS_BUFFER_SIZE = 16 * 1024 * 1024; // 4M
+    private int COLUMNS_BUFFER_SIZE = 16 * 1024 * 1024; // 16M
     // the conf string for COLUMNS_BUFFER_SIZE
     public static final String COLUMNS_BUFFER_SIZE_CONF_STR = "hive.io.rcfile.record.buffer.size";
 
@@ -590,7 +599,8 @@ public class RCFile {
     private ColumnBuffer[] columnBuffers = null;
     boolean useNewMagic = true;
     private byte[] nullChars;
-    SerializerDeserializer serde;
+    private SerializerDeserializer serde;
+    private boolean isShuffle;
 
     // Insert a globally unique 16-byte value every few entries, so that one
     // can seek into the middle of a file and then synchronize with record
@@ -713,6 +723,15 @@ public class RCFile {
 
       if (!fs.exists(path.getParent())) {
         throw new FileNotFoundException(path.toString());
+      }
+
+      //determine the intermediate file type
+      String store = conf.get(TajoConf.ConfVars.SHUFFLE_FILE_FORMAT.varname,
+          TajoConf.ConfVars.SHUFFLE_FILE_FORMAT.defaultVal);
+      if (enabledStats && CatalogProtos.StoreType.RCFILE == CatalogProtos.StoreType.valueOf(store.toUpperCase())) {
+        isShuffle = true;
+      } else {
+        isShuffle = false;
       }
 
       String codecClassname = this.meta.getOption(TableMeta.COMPRESSION_CODEC);
@@ -873,7 +892,8 @@ public class RCFile {
         Datum datum = tuple.get(i);
         int length = columnBuffers[i].append(schema.getColumn(i), datum);
         columnBufferSize += length;
-        if (enabledStats) {
+        if (isShuffle) {
+          // it is to calculate min/max values, and it is only used for the intermediate file.
           stats.analyzeField(i, datum);
         }
       }
@@ -881,7 +901,7 @@ public class RCFile {
       if (size < columnNumber) {
         for (int i = size; i < columnNumber; i++) {
           columnBuffers[i].append(schema.getColumn(i), NullDatum.get());
-          if (enabledStats) {
+          if (isShuffle) {
             stats.analyzeField(i, NullDatum.get());
           }
         }
@@ -963,7 +983,7 @@ public class RCFile {
 
         valueBuffer = new NonSyncByteArrayOutputStream();
         deflateFilter = codec.createOutputStream(valueBuffer, compressor);
-        deflateOut = new DataOutputStream(new BufferedOutputStream(deflateFilter));
+        deflateOut = new DataOutputStream(deflateFilter);
       }
 
       try {
@@ -989,7 +1009,7 @@ public class RCFile {
           valueLength += colLen;
         }
       } catch (IOException e) {
-        IOUtils.cleanup(LOG, deflateOut);
+        IOUtils.cleanup(LOG, deflateOut, out);
         throw e;
       }
 
@@ -1008,7 +1028,7 @@ public class RCFile {
         try {
           out.write(valueBuffer.getData(), 0, valueBuffer.getLength());
         } finally {
-          IOUtils.cleanup(LOG, valueBuffer, deflateOut, deflateFilter);
+          IOUtils.cleanup(LOG, valueBuffer);
         }
       } else {
         for (int columnIndex = 0; columnIndex < columnNumber; ++columnIndex) {
@@ -1038,7 +1058,7 @@ public class RCFile {
 
         NonSyncByteArrayOutputStream compressionBuffer = new NonSyncByteArrayOutputStream();
         CompressionOutputStream deflateFilter = codec.createOutputStream(compressionBuffer, compressor);
-        DataOutputStream deflateOut = new DataOutputStream(new BufferedOutputStream(deflateFilter));
+        DataOutputStream deflateOut = new DataOutputStream(deflateFilter);
 
         //compress key and write key out
         compressionBuffer.reset();
@@ -1081,9 +1101,13 @@ public class RCFile {
       clearColumnBuffers();
 
       if (out != null) {
+        // Statistical section
+        if (enabledStats) {
+          stats.setNumBytes(getOffset());
+        }
         // Close the underlying stream if we own it...
         out.flush();
-        out.close();
+        IOUtils.cleanup(LOG, out);
         out = null;
       }
     }
@@ -1137,6 +1161,7 @@ public class RCFile {
 
     private Decompressor keyDecompressor;
 
+    private long readBytes = 0;
 
     //Current state of each selected column - e.g. current run length, etc.
     // The size of the array is equal to the number of selected columns
@@ -1152,19 +1177,19 @@ public class RCFile {
     public RCFileScanner(Configuration conf, final Schema schema, final TableMeta meta,
                          final FileFragment fragment) throws IOException {
       super(conf, schema, meta, fragment);
-
-      rowId = new LongWritable();
       conf.setInt("io.file.buffer.size", 4096); //TODO remove
-
 
       startOffset = fragment.getStartKey();
       endOffset = startOffset + fragment.getEndKey();
-      more = startOffset < endOffset;
       start = 0;
     }
 
     @Override
     public void init() throws IOException {
+      more = startOffset < endOffset;
+      rowId = new LongWritable();
+      readBytes = 0;
+
       String nullCharacters = StringEscapeUtils.unescapeJava(meta.getOption(NULL));
       if (StringUtils.isEmpty(nullCharacters)) {
         nullChars = NullDatum.get().asTextBytes();
@@ -1351,6 +1376,7 @@ public class RCFile {
 
       in.readFully(sync); // read sync bytes
       headerEnd = in.getPos();
+      readBytes += headerEnd;
     }
 
     /**
@@ -1416,6 +1442,7 @@ public class RCFile {
         while (n > 0 && (in.getPos() + n) <= end) {
           position = in.getPos();
           in.readFully(buffer, prefix, n);
+          readBytes += n;
           /* the buffer has n+sync bytes */
           for (int i = 0; i < n; i++) {
             int j;
@@ -1462,11 +1489,13 @@ public class RCFile {
         return -1;
       }
       int length = in.readInt();
+      readBytes += 4;
       if (sync != null && length == SYNC_ESCAPE) { // process
         // a
         // sync entry
         lastSeenSyncPos = in.getPos() - 4; // minus SYNC_ESCAPE's length
         in.readFully(syncCheck); // read syncCheck
+        readBytes += SYNC_HASH_SIZE;
         if (!Arrays.equals(sync, syncCheck)) {
           throw new IOException("File is corrupt!");
         }
@@ -1475,6 +1504,7 @@ public class RCFile {
           return -1;
         }
         length = in.readInt(); // re-read length
+        readBytes += 4;
       } else {
         syncSeen = false;
       }
@@ -1506,6 +1536,7 @@ public class RCFile {
       }
       currentKeyLength = in.readInt();
       compressedKeyLen = in.readInt();
+      readBytes += 8;
       if (decompress) {
 
         byte[] compressedBytes = new byte[compressedKeyLen];
@@ -1535,7 +1566,7 @@ public class RCFile {
       } else {
         currentKey.readFields(in);
       }
-
+      readBytes += currentKeyLength;
       keyInit = true;
       currentValue.inited = false;
 
@@ -1571,6 +1602,12 @@ public class RCFile {
       currentValue.clearColumnBuffer();
       currentValue.readFields(in);
       currentValue.inited = true;
+      readBytes += currentValue.getReadBytes();
+
+      if (tableStats != null) {
+        tableStats.setReadBytes(readBytes);
+        tableStats.setNumRows(passedRowsNum);
+      }
     }
 
     private boolean rowFetched = false;
@@ -1595,6 +1632,25 @@ public class RCFile {
       Tuple tuple = new VTuple(schema.size());
       getCurrentRow(tuple);
       return tuple;
+    }
+
+    @Override
+    public float getProgress() {
+      try {
+        if(!more) {
+          return 1.0f;
+        }
+        long filePos = getPosition();
+        if (startOffset == filePos) {
+          return 0.0f;
+        } else {
+          //if scanner read the header, filePos moved to zero
+          return Math.min(1.0f, (float)(Math.max(filePos - startOffset, 0)) / (float)(fragment.getEndKey()));
+        }
+      } catch (IOException e) {
+        LOG.error(e.getMessage(), e);
+        return 0.0f;
+      }
     }
 
     /**
@@ -1727,8 +1783,12 @@ public class RCFile {
 
     @Override
     public void close() throws IOException {
-      IOUtils.closeStream(in);
-      currentValue.close();
+      if (tableStats != null) {
+        tableStats.setReadBytes(readBytes);  //Actual Processed Bytes. (decompressed bytes + header - seek)
+        tableStats.setNumRows(passedRowsNum);
+      }
+
+      IOUtils.cleanup(LOG, in, currentValue);
       if (keyDecompressor != null) {
         // Make sure we only return decompressor once.
         org.apache.tajo.storage.compress.CodecPool.returnDecompressor(keyDecompressor);

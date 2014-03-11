@@ -18,6 +18,7 @@
 
 package org.apache.tajo.worker;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import org.apache.commons.lang.exception.ExceptionUtils;
@@ -136,8 +137,6 @@ public class Task {
               final QueryUnitRequest request) throws IOException {
     this.request = request;
     this.taskId = taskId;
-    this.reporter = new Reporter(taskId, masterProxy);
-    this.reporter.startCommunicationThread();
 
     this.systemConf = worker.getConf();
     this.queryContext = request.getQueryContext();
@@ -153,6 +152,9 @@ public class Task {
     this.context.setDataChannel(request.getDataChannel());
     this.context.setEnforcer(request.getEnforcer());
     this.inputStats = new TableStats();
+
+    this.reporter = new Reporter(taskId, masterProxy);
+    this.reporter.startCommunicationThread();
 
     plan = CoreGsonHelper.fromJson(request.getSerializedData(), LogicalNode.class);
     LogicalNode [] scanNode = PlannerUtil.findAllNodes(plan, NodeType.SCAN);
@@ -587,6 +589,11 @@ public class Task {
     }
   }
 
+  @VisibleForTesting
+  public static float adjustFetchProcess(int totalFetcher, int remainFetcher) {
+    return ((float)(totalFetcher - remainFetcher)) / (float)totalFetcher * FETCHER_PROGRESS;
+  }
+
   private synchronized void fetcherFinished(TaskAttemptContext ctx) {
     int fetcherSize = fetcherRunners.size();
     if(fetcherSize == 0) {
@@ -598,7 +605,7 @@ public class Task {
       if (numRunningFetcher == 0) {
         context.setProgress(FETCHER_PROGRESS);
       } else {
-        context.setProgress(((float)(fetcherSize - numRunningFetcher)) / numRunningFetcher * FETCHER_PROGRESS);
+        context.setProgress(adjustFetchProcess(fetcherSize, numRunningFetcher));
       }
     } finally {
       ctx.getFetchLatch().countDown();

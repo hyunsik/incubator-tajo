@@ -130,6 +130,9 @@ Release 0.8.0 - unreleased
 
   IMPROVEMENTS
 
+    TAJO-670: Change daemon's hostname to canonical hostname 
+    (hyoungjunkim via hyunsik)
+
     TAJO-638: ExecutionBlock must be sorted by start time in querydetail.jsp.
     (hyoungjunkim via hyunsik)
 
@@ -147,7 +150,8 @@ Release 0.8.0 - unreleased
 
     TAJO-598: Refactoring Tajo RPC. (jinho)
 
-    TAJO-592: HCatalogStore should supports RCFile and default hive field delimiter. (jaehwa)
+    TAJO-592: HCatalogStore should supports RCFile and default hive field 
+    delimiter. (jaehwa)
 
     TAJO-548: Investigate frequent young gc. (Min Zhou via hyunsik)
 
@@ -268,6 +272,33 @@ Release 0.8.0 - unreleased
     (Keuntae Park via jihoon)
 
   BUG FIXES
+
+    TAJO-612: Missing INET4 type in SQLParser. (jihoon)
+
+    TAJO-672: Wrong progress status when overwrites to partition table.
+    (hyoungjunkim via hyunsik)
+
+    TAJO-663: CREATE TABLE USING RAW doesn't throw ERROR. (jaehwa)
+
+    TAJO-665: sort buffer size must be dealt as long type values. 
+    (hyoungjunkim via hyunsik)
+
+    TAJO-427: Empty table makes IndexOutOfBoundsException at LEFT OUTER JOIN clause. (jaehwa)
+
+    TAJO-650: Repartitioner::scheduleHashShuffledFetches should adjust the
+    number of tasks. (hyunsik)
+
+    TAJO-648: TajoWorker does not send correct QM rpc and client rpc ports
+    via heartbeat. (hyunsik)
+
+    TAJO-653: RCFileAppender throws IOException. (jinho)
+
+    TAJO-641: NPE in HCatalogStore.addTable(). (jaehwa)
+
+    TAJO-646: TajoClient is blocked while main thread finished.
+    (hyoungjunkim via jinho)
+
+    TAJO-645: Task.Reporter can cause NPE during reporting. (hyunsik)
 
     TAJO-630: QueryMasterTask never finished when Internal error occurs.
     (hyunsik)
@@ -494,6 +525,14 @@ Release 0.8.0 - unreleased
     TAJO-293: querymasters directory not found in single node setup. (hyunsik)
 
   TASKS
+
+    TAJO-681: Embed sphinx rtd theme into tajo-docs. (hyunsik)
+
+    TAJO-657: Missing table stat in RCFile. (jinho)
+
+    TAJO-659: Add Tajo JDBC documentation. (hyunsik)
+
+    TAJO-642: Change tajo documentation tool to sphinx. (hyunsik)
 
     TAJO-632: add intellij idea projects files into git ignore.
     (Min Zhou via hyunsik)

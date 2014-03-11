@@ -220,7 +220,7 @@ public class TajoClient {
   }
 
   public ExplainQueryResponse explainQuery(final String sql) throws ServiceException {
-    return new ServerCallable<ExplainQueryResponse>(conf, tajoMasterAddr,
+    return new ServerCallable<ExplainQueryResponse>(connPool, tajoMasterAddr,
         TajoMasterClientProtocol.class, false, true) {
       public ExplainQueryResponse call(NettyClientBase client) throws ServiceException {
         checkSessionAndGet(client);
@@ -238,7 +238,7 @@ public class TajoClient {
    * or {@link #getQueryResultAndWait(org.apache.tajo.QueryId)}.
    */
   public GetQueryStatusResponse executeQuery(final String sql) throws ServiceException {
-    return new ServerCallable<GetQueryStatusResponse>(conf, tajoMasterAddr,
+    return new ServerCallable<GetQueryStatusResponse>(connPool, tajoMasterAddr,
         TajoMasterClientProtocol.class, false, true) {
       public GetQueryStatusResponse call(NettyClientBase client) throws ServiceException {
         checkSessionAndGet(client);
@@ -262,7 +262,7 @@ public class TajoClient {
    */
   public ResultSet executeQueryAndGetResult(final String sql)
       throws ServiceException, IOException {
-    GetQueryStatusResponse response = new ServerCallable<GetQueryStatusResponse>(conf, tajoMasterAddr,
+    GetQueryStatusResponse response = new ServerCallable<GetQueryStatusResponse>(connPool, tajoMasterAddr,
         TajoMasterClientProtocol.class, false, true) {
       public GetQueryStatusResponse call(NettyClientBase client) throws ServiceException {
         checkSessionAndGet(client);
@@ -420,7 +420,7 @@ public class TajoClient {
   }
 
   public boolean updateQuery(final String sql) throws ServiceException {
-    return new ServerCallable<Boolean>(conf, tajoMasterAddr,
+    return new ServerCallable<Boolean>(connPool, tajoMasterAddr,
         TajoMasterClientProtocol.class, false, true) {
       public Boolean call(NettyClientBase client) throws ServiceException {
         checkSessionAndGet(client);
@@ -451,7 +451,7 @@ public class TajoClient {
    * @throws ServiceException
    */
   public boolean existTable(final String name) throws ServiceException {
-    return new ServerCallable<Boolean>(conf, tajoMasterAddr,
+    return new ServerCallable<Boolean>(connPool, tajoMasterAddr,
         TajoMasterClientProtocol.class, false, true) {
       public Boolean call(NettyClientBase client) throws ServiceException {
         checkSessionAndGet(client);
@@ -463,7 +463,7 @@ public class TajoClient {
 
   public TableDesc createExternalTable(final String name, final Schema schema, final Path path, final TableMeta meta)
       throws SQLException, ServiceException {
-    return new ServerCallable<TableDesc>(conf, tajoMasterAddr,
+    return new ServerCallable<TableDesc>(connPool, tajoMasterAddr,
         TajoMasterClientProtocol.class, false, true) {
       public TableDesc call(NettyClientBase client) throws ServiceException, SQLException {
         checkSessionAndGet(client);
@@ -497,7 +497,7 @@ public class TajoClient {
    * @throws ServiceException
    */
   public boolean dropTable(final String tableName, final boolean purge) throws ServiceException {
-    return new ServerCallable<Boolean>(conf, tajoMasterAddr,
+    return new ServerCallable<Boolean>(connPool, tajoMasterAddr,
         TajoMasterClientProtocol.class, false, true) {
       public Boolean call(NettyClientBase client) throws ServiceException {
         checkSessionAndGet(client);
@@ -515,7 +515,7 @@ public class TajoClient {
   }
 
   public List<BriefQueryInfo> getQueryList() throws ServiceException {
-    return new ServerCallable<List<BriefQueryInfo>>(conf, tajoMasterAddr,
+    return new ServerCallable<List<BriefQueryInfo>>(connPool, tajoMasterAddr,
         TajoMasterClientProtocol.class, false, true) {
       public List<BriefQueryInfo> call(NettyClientBase client) throws ServiceException {
         checkSessionAndGet(client);
@@ -530,7 +530,7 @@ public class TajoClient {
   }
 
   public List<WorkerResourceInfo> getClusterInfo() throws ServiceException {
-    return new ServerCallable<List<WorkerResourceInfo>>(conf, tajoMasterAddr,
+    return new ServerCallable<List<WorkerResourceInfo>>(connPool, tajoMasterAddr,
         TajoMasterClientProtocol.class, false, true) {
       public List<WorkerResourceInfo> call(NettyClientBase client) throws ServiceException {
         checkSessionAndGet(client);
@@ -550,7 +550,7 @@ public class TajoClient {
    * represented as lower-case letters.
    */
   public List<String> getTableList() throws ServiceException {
-    return new ServerCallable<List<String>>(conf, tajoMasterAddr,
+    return new ServerCallable<List<String>>(connPool, tajoMasterAddr,
         TajoMasterClientProtocol.class, false, true) {
       public List<String> call(NettyClientBase client) throws ServiceException {
         checkSessionAndGet(client);
@@ -566,7 +566,7 @@ public class TajoClient {
   }
 
   public TableDesc getTableDesc(final String tableName) throws SQLException, ServiceException {
-    return new ServerCallable<TableDesc>(conf, tajoMasterAddr,
+    return new ServerCallable<TableDesc>(connPool, tajoMasterAddr,
         TajoMasterClientProtocol.class, false, true) {
       public TableDesc call(NettyClientBase client) throws ServiceException, SQLException {
         checkSessionAndGet(client);
@@ -625,7 +625,7 @@ public class TajoClient {
   }
 
   public List<CatalogProtos.FunctionDescProto> getFunctions(final String functionName) throws ServiceException {
-    return new ServerCallable<List<CatalogProtos.FunctionDescProto>>(conf, tajoMasterAddr,
+    return new ServerCallable<List<CatalogProtos.FunctionDescProto>>(connPool, tajoMasterAddr,
         TajoMasterClientProtocol.class, false, true) {
       public List<CatalogProtos.FunctionDescProto> call(NettyClientBase client) throws ServiceException, SQLException {
         checkSessionAndGet(client);

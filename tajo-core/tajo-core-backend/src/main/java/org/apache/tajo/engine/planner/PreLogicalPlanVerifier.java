@@ -21,6 +21,7 @@ package org.apache.tajo.engine.planner;
 import com.google.common.collect.ObjectArrays;
 import org.apache.tajo.algebra.*;
 import org.apache.tajo.catalog.CatalogService;
+import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.util.TUtil;
 
 import java.util.Arrays;
@@ -140,6 +141,14 @@ public class PreLogicalPlanVerifier extends BaseAlgebraVisitor <VerificationStat
     return true;
   }
 
+  private boolean assertUnsupportedStoreType(VerificationState state, String name) {
+    if (name != null && name.equals(CatalogProtos.StoreType.RAW.name())) {
+      state.addVerification(String.format("Unsupported store type :%s", name));
+      return false;
+    }
+    return true;
+  }
+
   private boolean assertDatabaseExistence(VerificationState state, String name) {
     if (!catalog.existDatabase(name)) {
       state.addVerification(String.format("database \"%s\" does not exist", name));
@@ -180,6 +189,7 @@ public class PreLogicalPlanVerifier extends BaseAlgebraVisitor <VerificationStat
   public Expr visitCreateTable(VerificationState state, Stack<Expr> stack, CreateTable expr) throws PlanningException {
     super.visitCreateTable(state, stack, expr);
     assertRelationNoExistence(state, expr.getTableName());
+    assertUnsupportedStoreType(state, expr.getStorageType());
     return expr;
   }
 
