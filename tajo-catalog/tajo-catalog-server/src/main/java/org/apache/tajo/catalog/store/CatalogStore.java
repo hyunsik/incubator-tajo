@@ -52,22 +52,22 @@ public interface CatalogStore extends Closeable {
   /*************************** TABLE ******************************/
   void createTable(CatalogProtos.TableDescProto desc) throws CatalogException;
   
-  boolean existTable(String databaseName, String namespace, String tableName) throws CatalogException;
+  boolean existTable(String databaseName, String tableName) throws CatalogException;
   
-  void dropTable(String databaseName, String namespace, String tableName) throws CatalogException;
+  void dropTable(String databaseName, String tableName) throws CatalogException;
   
-  CatalogProtos.TableDescProto getTable(String databaseName, String namespace, String name) throws CatalogException;
+  CatalogProtos.TableDescProto getTable(String databaseName, String tableName) throws CatalogException;
   
-  List<String> getAllTableNames(String databaseName, String namespace) throws CatalogException;
+  List<String> getAllTableNames(String databaseName) throws CatalogException;
 
 
   /************************ PARTITION METHOD **************************/
   void addPartitionMethod(PartitionMethodProto partitionMethodProto) throws CatalogException;
 
-  PartitionMethodProto getPartitionMethod(String databaseName, String namespace, String tableName)
+  PartitionMethodProto getPartitionMethod(String databaseName, String tableName)
       throws CatalogException;
 
-  boolean existPartitionMethod(String dbName, String namespace, String tableName) throws CatalogException;
+  boolean existPartitionMethod(String databaseName, String tableName) throws CatalogException;
 
   void dropPartitionMethod(String dbName, String tableName) throws CatalogException;
 
@@ -75,7 +75,7 @@ public interface CatalogStore extends Closeable {
   /************************** PARTITIONS *****************************/
   void addPartitions(CatalogProtos.PartitionsProto partitionsProto) throws CatalogException;
 
-  void addPartition(String databaseName, String namespace, String tableName,
+  void addPartition(String databaseName, String tableName,
                     CatalogProtos.PartitionDescProto partitionDescProto) throws CatalogException;
 
   /**
@@ -95,19 +95,19 @@ public interface CatalogStore extends Closeable {
   /**************************** INDEX *******************************/
   void createIndex(IndexDescProto proto) throws CatalogException;
   
-  void dropIndex(String databaseName, String namespace, String indexName) throws CatalogException;
+  void dropIndex(String databaseName, String indexName) throws CatalogException;
   
-  IndexDescProto getIndexByName(String databaseName, String namespace, String indexName) throws CatalogException;
+  IndexDescProto getIndexByName(String databaseName, String indexName) throws CatalogException;
   
-  IndexDescProto getIndexByColumn(String databaseName, String namespace, String tableName, String columnName)
+  IndexDescProto getIndexByColumn(String databaseName, String tableName, String columnName)
       throws CatalogException;
   
-  boolean existIndexByName(String databaseName, String namespace, String indexName) throws CatalogException;
+  boolean existIndexByName(String databaseName, String indexName) throws CatalogException;
   
-  boolean existIndexByColumn(String databaseName, String namespace, String tableName, String columnName)
+  boolean existIndexByColumn(String databaseName, String tableName, String columnName)
       throws CatalogException;
 
-  IndexDescProto [] getIndexes(String databaseName, String namespace, String tableName) throws CatalogException;
+  IndexDescProto [] getIndexes(String databaseName, String tableName) throws CatalogException;
 
   /************************** FUNCTION *****************************/
 

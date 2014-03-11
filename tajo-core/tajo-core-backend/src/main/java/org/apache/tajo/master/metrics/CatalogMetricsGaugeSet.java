@@ -21,14 +21,12 @@ package org.apache.tajo.master.metrics;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Metric;
 import com.codahale.metrics.MetricSet;
-import org.apache.tajo.catalog.CatalogConstants;
 import org.apache.tajo.master.TajoMaster;
 
 import java.util.HashMap;
 import java.util.Map;
 
 import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
 
 public class CatalogMetricsGaugeSet implements MetricSet {
   TajoMaster.MasterContext tajoMasterContext;
@@ -42,7 +40,7 @@ public class CatalogMetricsGaugeSet implements MetricSet {
     metricsMap.put("numTables", new Gauge<Integer>() {
       @Override
       public Integer getValue() {
-        return tajoMasterContext.getCatalog().getAllTableNames(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE).size();
+        return tajoMasterContext.getCatalog().getAllTableNames(DEFAULT_DATABASE_NAME).size();
       }
     });
 

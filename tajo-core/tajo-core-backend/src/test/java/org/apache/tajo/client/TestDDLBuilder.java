@@ -49,7 +49,6 @@ public class TestDDLBuilder {
     expressionSchema.addColumn("key2", TajoDataTypes.Type.TEXT);
     PartitionMethodDesc partitionMethod = new PartitionMethodDesc(
         "db1",
-        null,
         "table1",
         CatalogProtos.PartitionType.COLUMN,
         "key,key2",

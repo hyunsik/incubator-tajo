@@ -25,6 +25,7 @@ import com.sun.org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.tajo.*;
+import org.apache.tajo.catalog.CatalogConstants;
 import org.apache.tajo.catalog.FunctionDesc;
 import org.apache.tajo.catalog.TableDesc;
 import org.apache.tajo.catalog.proto.CatalogProtos;
@@ -32,6 +33,7 @@ import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.ipc.ClientProtos;
 import org.apache.tajo.storage.StorageUtil;
 import org.apache.tajo.util.CommonTestingUtil;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
@@ -59,10 +61,21 @@ public class TestTajoClient {
     testDir = CommonTestingUtil.getTestDir();
   }
 
+  @AfterClass
+  public static void tearDown() throws Exception {
+    client.close();
+  }
+
   private static Path writeTmpTable(String tableName) throws IOException {
     Path tablePath = StorageUtil.concatPath(testDir, tableName);
     BackendTestingUtil.writeTmpTable(conf, tablePath);
     return tablePath;
+  }
+
+  @Test
+  public final void testCurrentDatabase() throws IOException, ServiceException, InterruptedException {
+    assertEquals(CatalogConstants.DEFAULT_DATABASE_NAME, client.getCurrentDatabase());
+    client.updateQuery("CREATE DATABASE TestTajoClient");
   }
 
   @Test

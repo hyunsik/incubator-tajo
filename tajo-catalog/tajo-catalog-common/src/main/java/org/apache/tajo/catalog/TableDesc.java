@@ -25,7 +25,6 @@ import com.google.gson.annotations.Expose;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
-import org.apache.tajo.annotation.Nullable;
 import org.apache.tajo.catalog.json.CatalogGsonHelper;
 import org.apache.tajo.catalog.partition.PartitionMethodDesc;
 import org.apache.tajo.catalog.proto.CatalogProtos.StoreType;
@@ -36,7 +35,6 @@ import org.apache.tajo.json.GsonObject;
 import org.apache.tajo.util.TUtil;
 
 import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
 
 public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Cloneable {
   private final Log LOG = LogFactory.getLog(TableDesc.class);
@@ -57,11 +55,10 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
 		builder = TableDescProto.newBuilder();
 	}
 
-  public TableDesc(String databaseName, @Nullable String namespace, String tableName, Schema schema, TableMeta meta,
+  public TableDesc(String databaseName, String tableName, Schema schema, TableMeta meta,
                    Path path, boolean external) {
     this();
     this.databaseName = databaseName;
-    this.namespace = namespace;
     this.tableName = tableName.toLowerCase();
     this.schema = schema;
     this.meta = meta;
@@ -70,7 +67,7 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
   }
 
 	public TableDesc(String tableName, Schema schema, TableMeta meta, Path path) {
-		this(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, CatalogUtil.normalizeIdentifier(tableName),
+		this(DEFAULT_DATABASE_NAME, CatalogUtil.normalizeIdentifier(tableName),
         schema, meta, path, true);
 	}
 	
@@ -79,7 +76,7 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
 	}
 	
 	public TableDesc(TableDescProto proto) {
-	  this(proto.getDatabaseName(), proto.getNamespace(), proto.getTableName(), new Schema(proto.getSchema()),
+	  this(proto.getDatabaseName(), proto.getTableName(), new Schema(proto.getSchema()),
         new TableMeta(proto.getMeta()), new Path(proto.getPath()), proto.getIsExternal());
     if(proto.hasStats()) {
       this.stats = new TableStats(proto.getStats());
@@ -223,9 +220,6 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
 
     if (this.databaseName != null) {
       builder.setDatabaseName(this.databaseName);
-    }
-    if (this.namespace != null) {
-      builder.setNamespace(namespace);
     }
     if (this.tableName != null) {
       builder.setTableName(this.tableName);

@@ -48,7 +48,6 @@ import java.util.*;
 
 import static org.apache.tajo.algebra.CreateTable.PartitionType;
 import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
 import static org.apache.tajo.engine.planner.ExprNormalizer.ExprNormalizedResult;
 import static org.apache.tajo.engine.planner.LogicalPlan.BlockType;
 import static org.apache.tajo.engine.planner.LogicalPlanPreprocessor.PreprocessContext;
@@ -1150,7 +1149,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   private InsertNode buildInsertIntoTablePlan(PlanContext context, InsertNode insertNode, Insert expr)
       throws PlanningException {
     // Get and set a target table
-    TableDesc desc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, expr.getTableName());
+    TableDesc desc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, expr.getTableName());
     insertNode.setTargetTable(desc);
 
     //
@@ -1274,6 +1273,22 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
    ===============================================================================================*/
 
   @Override
+  public LogicalNode visitCreateDatabase(PlanContext context, Stack<Expr> stack, CreateDatabase expr)
+      throws PlanningException {
+    CreateDatabaseNode createDatabaseNode = context.queryBlock.getNodeFromExpr(expr);
+    createDatabaseNode.init(expr.getDatabaseName());
+    return createDatabaseNode;
+  }
+
+  @Override
+  public LogicalNode visitDropDatabase(PlanContext context, Stack<Expr> stack, DropDatabase expr)
+      throws PlanningException {
+    DropDatabaseNode dropDatabaseNode = context.plan.createNode(DropDatabaseNode.class);
+    dropDatabaseNode.init(expr.getDatabaseName());
+    return dropDatabaseNode;
+  }
+
+  @Override
   public LogicalNode visitCreateTable(PlanContext context, Stack<Expr> stack, CreateTable expr)
       throws PlanningException {
 
@@ -1367,7 +1382,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
       CreateTable.ColumnPartition partition = (CreateTable.ColumnPartition) expr;
       String partitionExpression = Joiner.on(',').join(partition.getColumns());
 
-      partitionMethodDesc = new PartitionMethodDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName,
+      partitionMethodDesc = new PartitionMethodDesc(DEFAULT_DATABASE_NAME, tableName,
           CatalogProtos.PartitionType.COLUMN, partitionExpression, convertColumnsToSchema(partition.getColumns()));
     } else {
       throw new PlanningException(String.format("Not supported PartitonType: %s", expr.getPartitionType()));

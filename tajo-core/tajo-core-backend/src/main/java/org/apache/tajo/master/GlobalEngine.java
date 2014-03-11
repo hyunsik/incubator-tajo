@@ -56,7 +56,6 @@ import java.util.List;
 import java.util.Stack;
 
 import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
 import static org.apache.tajo.ipc.ClientProtos.GetQueryStatusResponse;
 
 public class GlobalEngine extends AbstractService {
@@ -210,24 +209,28 @@ public class GlobalEngine extends AbstractService {
     // parse the query
     Expr expr = analyzer.parse(sql);
 
-    if (isDDL(expr)) {
+    LogicalPlan plan = createLogicalPlan(expr);
+    LogicalRootNode rootNode = plan.getRootBlock().getRoot();
 
+    if (!PlannerUtil.checkIfDDLPlan(rootNode)) {
+      throw new SQLException("This is not update query:\n" + sql);
     } else {
-      LogicalPlan plan = createLogicalPlan(expr);
-      LogicalRootNode rootNode = plan.getRootBlock().getRoot();
-
-      if (!PlannerUtil.checkIfDDLPlan(rootNode)) {
-        throw new SQLException("This is not update query:\n" + sql);
-      } else {
-        updateQuery(rootNode.getChild());
-        return QueryIdFactory.NULL_QUERY_ID;
-      }
+      updateQuery(rootNode.getChild());
+      return QueryIdFactory.NULL_QUERY_ID;
     }
   }
 
   private boolean updateQuery(LogicalNode root) throws IOException {
 
     switch (root.getType()) {
+      case CREATE_DATABASE:
+        CreateDatabaseNode createDatabase = (CreateDatabaseNode) root;
+        catalog.createDatabase(createDatabase.getDatabaseName(), null);
+        return true;
+      case DROP_DATABASE:
+        DropDatabaseNode dropDatabaseNode = (DropDatabaseNode) root;
+        catalog.dropDatabase(dropDatabaseNode.getDatabaseName());
+        return true;
       case CREATE_TABLE:
         CreateTableNode createTable = (CreateTableNode) root;
         createTable(createTable);
@@ -299,7 +302,7 @@ public class GlobalEngine extends AbstractService {
   public TableDesc createTableOnPath(String tableName, Schema schema, TableMeta meta,
                                      Path path, boolean isExternal, PartitionMethodDesc partitionDesc)
       throws IOException {
-    if (catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName)) {
+    if (catalog.existsTable(DEFAULT_DATABASE_NAME, tableName)) {
       throw new AlreadyExistsTableException(tableName);
     }
 
@@ -324,7 +327,7 @@ public class GlobalEngine extends AbstractService {
 
     TableStats stats = new TableStats();
     stats.setNumBytes(totalSize);
-    TableDesc desc = new TableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName, schema, meta, path, isExternal);
+    TableDesc desc = new TableDesc(DEFAULT_DATABASE_NAME, tableName, schema, meta, path, isExternal);
     desc.setStats(stats);
     if (partitionDesc != null) {
       desc.setPartitionMethod(partitionDesc);
@@ -345,12 +348,12 @@ public class GlobalEngine extends AbstractService {
   public void dropTable(String tableName, boolean purge) {
     CatalogService catalog = context.getCatalog();
 
-    if (!catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName)) {
+    if (!catalog.existsTable(DEFAULT_DATABASE_NAME, tableName)) {
       throw new NoSuchTableException(tableName);
     }
 
-    Path path = catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName).getPath();
-    catalog.dropTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
+    Path path = catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName).getPath();
+    catalog.dropTable(DEFAULT_DATABASE_NAME, tableName);
 
     if (purge) {
       try {

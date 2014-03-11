@@ -47,7 +47,10 @@ public class PlannerUtil {
 
     NodeType type = baseNode.getType();
 
-    return NodeType.CREATE_TABLE && !((CreateTableNode)baseNode).hasSubQuery()) ||
+    return
+        type == NodeType.CREATE_DATABASE ||
+        type == NodeType.DROP_DATABASE ||
+        (type == NodeType.CREATE_TABLE && !((CreateTableNode)baseNode).hasSubQuery()) ||
         baseNode.getType() == NodeType.DROP_TABLE;
   }
 

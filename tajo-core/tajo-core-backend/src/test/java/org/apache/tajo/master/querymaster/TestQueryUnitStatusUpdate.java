@@ -29,10 +29,7 @@ import java.sql.ResultSet;
 import java.util.*;
 
 import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 @Category(IntegrationTest.class)
 public class TestQueryUnitStatusUpdate extends QueryTestCaseBase {
@@ -98,10 +95,10 @@ public class TestQueryUnitStatusUpdate extends QueryTestCaseBase {
         "create table " + tableName + " (col1 int4, col2 int4) partition by column(key float8) ");
     res.close();
 
-    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
-    assertEquals(2, catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName).getSchema().size());
+    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    assertEquals(2, catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName).getSchema().size());
     assertEquals(3,
-        catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName).getLogicalSchema().size());
+        catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName).getLogicalSchema().size());
 
     res = testBase.execute(
         "insert overwrite into " + tableName + " select l_orderkey, l_partkey, l_quantity from lineitem");

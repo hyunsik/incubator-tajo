@@ -35,7 +35,6 @@ import java.sql.ResultSet;
 import java.util.Map;
 
 import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -52,8 +51,8 @@ public class TestCTASQuery extends QueryTestCaseBase {
 
     res.close();
     CatalogService catalog = testBase.getTestingCluster().getMaster().getCatalog();
-    TableDesc desc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, "testCtasWithoutTableDefinition");
-    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, "testCtasWithoutTableDefinition"));
+    TableDesc desc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, "testCtasWithoutTableDefinition");
+    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, "testCtasWithoutTableDefinition"));
 
     assertTrue(desc.getSchema().contains("testCtasWithoutTableDefinition.col1"));
     PartitionMethodDesc partitionDesc = desc.getPartitionMethod();
@@ -93,8 +92,8 @@ public class TestCTASQuery extends QueryTestCaseBase {
 
     TajoTestingCluster cluster = testBase.getTestingCluster();
     CatalogService catalog = cluster.getMaster().getCatalog();
-    TableDesc desc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, "testCtasWithColumnedPartition");
-    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, "testCtasWithColumnedPartition"));
+    TableDesc desc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, "testCtasWithColumnedPartition");
+    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, "testCtasWithColumnedPartition"));
     PartitionMethodDesc partitionDesc = desc.getPartitionMethod();
     assertEquals(partitionDesc.getPartitionType(), CatalogProtos.PartitionType.COLUMN);
     assertEquals("key", partitionDesc.getExpressionSchema().getColumns().get(0).getSimpleName());

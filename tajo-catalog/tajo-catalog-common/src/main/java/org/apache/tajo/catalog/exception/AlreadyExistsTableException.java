@@ -27,8 +27,8 @@ public class AlreadyExistsTableException extends CatalogException {
 	public AlreadyExistsTableException() {		
 	}
 
-  public AlreadyExistsTableException(String databaseName, @Nullable String namespace, String relName) {
-    super(String.format("relation \" %s \" already exists in %s.%s", relName, databaseName, namespace));
+  public AlreadyExistsTableException(String databaseName, String relName) {
+    super(String.format("relation \" %s \" already exists in %s", relName, databaseName));
   }
 
 	public AlreadyExistsTableException(String tableName) {

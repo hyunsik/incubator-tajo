@@ -51,6 +51,7 @@ import org.apache.tajo.master.metrics.WorkerResourceMetricsGaugeSet;
 import org.apache.tajo.master.querymaster.QueryJobManager;
 import org.apache.tajo.master.rm.TajoWorkerResourceManager;
 import org.apache.tajo.master.rm.WorkerResourceManager;
+import org.apache.tajo.master.session.SessionManager;
 import org.apache.tajo.rpc.RpcChannelFactory;
 import org.apache.tajo.storage.AbstractStorageManager;
 import org.apache.tajo.storage.StorageManagerFactory;
@@ -117,6 +118,7 @@ public class TajoMaster extends CompositeService {
   private AsyncDispatcher dispatcher;
   private TajoMasterClientService tajoMasterClientService;
   private TajoMasterService tajoMasterService;
+  private SessionManager sessionManager;
 
   private WorkerResourceManager resourceManager;
   //Web Server
@@ -167,6 +169,9 @@ public class TajoMaster extends CompositeService {
       catalogServer = new CatalogServer(initBuiltinFunctions());
       addIfService(catalogServer);
       catalog = new LocalCatalogWrapper(catalogServer);
+
+      sessionManager = new SessionManager(dispatcher);
+      addIfService(sessionManager);
 
       globalEngine = new GlobalEngine(context);
       addIfService(globalEngine);
@@ -463,6 +468,10 @@ public class TajoMaster extends CompositeService {
 
     public CatalogService getCatalog() {
       return catalog;
+    }
+
+    public SessionManager getSessionManager() {
+      return sessionManager;
     }
 
     public GlobalEngine getGlobalEngine() {

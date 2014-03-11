@@ -137,14 +137,14 @@ public class MemStore implements CatalogStore {
   }
 
   @Override
-  public boolean existTable(String dbName, String namespace, String tbName) throws CatalogException {
+  public boolean existTable(String dbName, String tbName) throws CatalogException {
     Map<String, CatalogProtos.TableDescProto> database = checkAndGetDatabaseNS(databases, dbName);
 
     return database.containsKey(tbName);
   }
 
   @Override
-  public void dropTable(String dbName, String namespace, String tbName) throws CatalogException {
+  public void dropTable(String dbName, String tbName) throws CatalogException {
     Map<String, CatalogProtos.TableDescProto> database = checkAndGetDatabaseNS(databases, dbName);
 
     if (database.containsKey(tbName)) {
@@ -158,7 +158,7 @@ public class MemStore implements CatalogStore {
    * @see CatalogStore#getTable(java.lang.String)
    */
   @Override
-  public CatalogProtos.TableDescProto getTable(String databaseName, String namespace, String tableName)
+  public CatalogProtos.TableDescProto getTable(String databaseName, String tableName)
       throws CatalogException {
     Map<String, CatalogProtos.TableDescProto> database = checkAndGetDatabaseNS(databases, databaseName);
 
@@ -178,7 +178,7 @@ public class MemStore implements CatalogStore {
    * @see CatalogStore#getAllTableNames()
    */
   @Override
-  public List<String> getAllTableNames(String databaseName, String namespace) throws CatalogException {
+  public List<String> getAllTableNames(String databaseName) throws CatalogException {
     Map<String, CatalogProtos.TableDescProto> database = checkAndGetDatabaseNS(databases, databaseName);
     return new ArrayList<String>(database.keySet());
   }
@@ -189,7 +189,7 @@ public class MemStore implements CatalogStore {
   }
 
   @Override
-  public CatalogProtos.PartitionMethodProto getPartitionMethod(String databaseName, String namespace, String tableName)
+  public CatalogProtos.PartitionMethodProto getPartitionMethod(String databaseName, String tableName)
       throws CatalogException {
     Map<String, CatalogProtos.TableDescProto> database = checkAndGetDatabaseNS(databases, databaseName);
 
@@ -202,7 +202,7 @@ public class MemStore implements CatalogStore {
   }
 
   @Override
-  public boolean existPartitionMethod(String databaseName, String namespace, String tableName)
+  public boolean existPartitionMethod(String databaseName, String tableName)
       throws CatalogException {
     Map<String, CatalogProtos.TableDescProto> database = checkAndGetDatabaseNS(databases, databaseName);
 
@@ -215,7 +215,7 @@ public class MemStore implements CatalogStore {
   }
 
   @Override
-  public void dropPartitionMethod(String dbName, String tableName) throws CatalogException {
+  public void dropPartitionMethod(String databaseName, String tableName) throws CatalogException {
     throw new RuntimeException("not supported!");
   }
 
@@ -225,7 +225,7 @@ public class MemStore implements CatalogStore {
   }
 
   @Override
-  public void addPartition(String databaseName, String namespace, String tableName, CatalogProtos.PartitionDescProto
+  public void addPartition(String databaseName, String tableName, CatalogProtos.PartitionDescProto
       partitionDescProto) throws CatalogException {
     throw new RuntimeException("not supported!");
   }
@@ -273,7 +273,7 @@ public class MemStore implements CatalogStore {
    * @see CatalogStore#dropIndex(java.lang.String)
    */
   @Override
-  public void dropIndex(String databaseName, String namespace, String indexName) throws CatalogException {
+  public void dropIndex(String databaseName, String indexName) throws CatalogException {
     Map<String, IndexDescProto> index = checkAndGetDatabaseNS(indexes, databaseName);
     if (!index.containsKey(indexName)) {
       throw new NoSuchIndexException(indexName);
@@ -285,7 +285,7 @@ public class MemStore implements CatalogStore {
    * @see CatalogStore#getIndexByName(java.lang.String)
    */
   @Override
-  public IndexDescProto getIndexByName(String databaseName, String namespace, String indexName) throws CatalogException {
+  public IndexDescProto getIndexByName(String databaseName, String indexName) throws CatalogException {
     Map<String, IndexDescProto> index = checkAndGetDatabaseNS(indexes, databaseName);
     if (!index.containsKey(indexName)) {
       throw new NoSuchIndexException(indexName);
@@ -298,7 +298,7 @@ public class MemStore implements CatalogStore {
    * @see CatalogStore#getIndexByName(java.lang.String, java.lang.String)
    */
   @Override
-  public IndexDescProto getIndexByColumn(String databaseName, String namespace, String tableName, String columnName)
+  public IndexDescProto getIndexByColumn(String databaseName, String tableName, String columnName)
       throws CatalogException {
 
     Map<String, IndexDescProto> indexByColumn = checkAndGetDatabaseNS(indexesByColumn, databaseName);
@@ -310,20 +310,20 @@ public class MemStore implements CatalogStore {
   }
 
   @Override
-  public boolean existIndexByName(String databaseName, String namespace, String indexName) throws CatalogException {
+  public boolean existIndexByName(String databaseName, String indexName) throws CatalogException {
     Map<String, IndexDescProto> index = checkAndGetDatabaseNS(indexes, databaseName);
     return index.containsKey(indexName);
   }
 
   @Override
-  public boolean existIndexByColumn(String databaseName, String namespace, String tableName, String columnName)
+  public boolean existIndexByColumn(String databaseName, String tableName, String columnName)
       throws CatalogException {
     Map<String, IndexDescProto> indexByColumn = checkAndGetDatabaseNS(indexesByColumn, databaseName);
     return indexByColumn.containsKey(columnName);
   }
 
   @Override
-  public IndexDescProto[] getIndexes(String databaseName, String namespace, String tableName) throws CatalogException {
+  public IndexDescProto[] getIndexes(String databaseName, String tableName) throws CatalogException {
     List<IndexDescProto> protos = new ArrayList<IndexDescProto>();
     Map<String, IndexDescProto> indexByColumn = checkAndGetDatabaseNS(indexesByColumn, databaseName);
     for (IndexDescProto proto : indexByColumn.values()) {

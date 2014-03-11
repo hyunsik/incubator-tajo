@@ -89,13 +89,13 @@ public interface CatalogService {
    * @see TableDesc
    * @throws Throwable
    */
-  TableDesc getTableDesc(String databaseName, @Nullable String namespace, String tableName);
+  TableDesc getTableDesc(String databaseName, String tableName);
 
   /**
    *
    * @return All table names which belong to a given database.
    */
-  Collection<String> getAllTableNames(String databaseName, @Nullable String namespace);
+  Collection<String> getAllTableNames(String databaseName);
 
   /**
    *
@@ -117,25 +117,25 @@ public interface CatalogService {
    * @param tableName table name
    * @throws Throwable
    */
-  boolean dropTable(String databaseName, @Nullable String schemaName, String tableName);
+  boolean dropTable(String databaseName, String tableName);
 
-  boolean existsTable(String databaseName, @Nullable String schemaName, String tableName);
+  boolean existsTable(String databaseName, String tableName);
 
-  PartitionMethodDesc getPartitionMethod(String databaseName, @Nullable String schemaName, String tableName);
+  PartitionMethodDesc getPartitionMethod(String databaseName, String tableName);
 
-  boolean existPartitionMethod(String databaseName, @Nullable String schemaName, String tableId);
+  boolean existPartitionMethod(String databaseName, String tableId);
 
   boolean createIndex(IndexDesc index);
 
-  boolean existIndexByName(String databaseName, @Nullable String namespace, String indexName);
+  boolean existIndexByName(String databaseName, String indexName);
 
-  boolean existIndexByColumn(String databaseName, @Nullable String namespace, String tableName, String columnName);
+  boolean existIndexByColumn(String databaseName, String tableName, String columnName);
 
-  IndexDesc getIndexByName(String databaseName, @Nullable String namespace, String indexName);
+  IndexDesc getIndexByName(String databaseName, String indexName);
 
-  IndexDesc getIndexByColumn(String databaseName, @Nullable String namespace, String tableName, String columnName);
+  IndexDesc getIndexByColumn(String databaseName, String tableName, String columnName);
 
-  boolean dropIndex(String databaseName, String namespace, String indexName);
+  boolean dropIndex(String databaseName, String indexName);
 
   boolean createFunction(FunctionDesc funcDesc);
 

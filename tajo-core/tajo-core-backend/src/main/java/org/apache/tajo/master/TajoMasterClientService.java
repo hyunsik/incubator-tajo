@@ -47,17 +47,19 @@ import org.apache.tajo.master.querymaster.QueryJobEvent;
 import org.apache.tajo.master.querymaster.QueryJobManager;
 import org.apache.tajo.master.rm.Worker;
 import org.apache.tajo.master.rm.WorkerResource;
+import org.apache.tajo.master.session.InvalidSessionException;
 import org.apache.tajo.rpc.BlockingRpcServer;
+import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.BoolProto;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.StringProto;
 import org.apache.tajo.util.NetUtils;
+import org.apache.tajo.util.ProtoUtil;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.*;
 
 import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
 
 public class TajoMasterClientService extends AbstractService {
   private final static Log LOG = LogFactory.getLog(TajoMasterClientService.class);
@@ -114,32 +116,113 @@ public class TajoMasterClientService extends AbstractService {
     return this.bindAddress;
   }
 
-  public int getHttpPort() {
-    return 0;
-  }
   /////////////////////////////////////////////////////////////////////////////
   // TajoMasterClientProtocolService
   /////////////////////////////////////////////////////////////////////////////
   public class TajoMasterClientProtocolServiceHandler implements TajoMasterClientProtocolService.BlockingInterface {
     @Override
-    public BoolProto updateSessionVariables(RpcController controller,
-                                            UpdateSessionVariableRequest request)
+    public CreateSessionResponse createSession(RpcController controller, CreateSessionRequest request)
         throws ServiceException {
-      return null;
+      try {
+        // create a new session with base database name. If no database name is give, we use default database.
+        String sessionId =
+            context.getSessionManager().createSession(request.getUsername(),
+            request.hasBaseDatabaseName() ? request.getBaseDatabaseName() : CatalogConstants.DEFAULT_DATABASE_NAME);
+        CreateSessionResponse.Builder builder = CreateSessionResponse.newBuilder();
+        builder.setState(CreateSessionResponse.ResultState.SUCCESS);
+        builder.setSessionId(TajoIdProtos.SessionIdProto.newBuilder().setId(sessionId).build());
+        return builder.build();
+      } catch (InvalidSessionException e) {
+        CreateSessionResponse.Builder builder = CreateSessionResponse.newBuilder();
+        builder.setState(CreateSessionResponse.ResultState.FAILED);
+        builder.setMessage(e.getMessage());
+        return builder.build();
+      }
+    }
+
+    @Override
+    public BoolProto removeSession(RpcController controller, TajoIdProtos.SessionIdProto request)
+        throws ServiceException {
+      context.getSessionManager().removeSession(request.getId());
+      return ProtoUtil.TRUE;
+    }
+
+    @Override
+    public StringProto getSessionVariable(RpcController controller, SessionedStringProto request)
+        throws ServiceException {
+
+      try {
+        return ProtoUtil.convertString(
+            context.getSessionManager().getVariable(request.getSessionId().getId(), request.getValue()));
+      } catch (Throwable t) {
+        throw new ServiceException(t);
+      }
+    }
+
+    @Override
+    public BoolProto updateSessionVariables(RpcController controller, UpdateSessionVariableRequest request)
+        throws ServiceException {
+      try {
+        String sessionId = request.getSessionId().getId();
+        for (CatalogProtos.KeyValueProto kv : request.getSetVariables().getKeyvalList()) {
+          context.getSessionManager().setVariable(sessionId, kv.getKey(), kv.getValue());
+        }
+        return ProtoUtil.TRUE;
+      } catch (Throwable t) {
+        throw new ServiceException(t);
+      }
+    }
+
+    @Override
+    public CatalogProtos.KeyValueSetProto getAllSessionVariables(RpcController controller,
+                                                                 TajoIdProtos.SessionIdProto request)
+        throws ServiceException {
+      try {
+        String sessionId = request.getId();
+        Options options = new Options();
+        options.putAll(context.getSessionManager().getAllVariables(sessionId));
+        return options.getProto();
+      } catch (Throwable t) {
+        throw new ServiceException(t);
+      }
+    }
+
+    @Override
+    public StringProto getCurrentDatabase(RpcController controller, TajoIdProtos.SessionIdProto request)
+        throws ServiceException {
+      try {
+        String sessionId = request.getId();
+        return ProtoUtil.convertString(context.getSessionManager().getSession(sessionId).getCurrentDatabase());
+      } catch (Throwable t) {
+        throw new ServiceException(t);
+      }
+    }
+
+    @Override
+    public BoolProto selectDatabase(RpcController controller, SessionedStringProto request) throws ServiceException {
+      try {
+        String sessionId = request.getSessionId().getId();
+        String databaseName = CatalogUtil.normalizeIdentifier(request.getValue());
+        context.getSessionManager().getSession(sessionId).selectDatabase(databaseName);
+        return ProtoUtil.TRUE;
+      } catch (Throwable t) {
+        throw new ServiceException(t);
+      }
     }
 
     @Override
     public ExplainQueryResponse explainQuery(RpcController controller,
-                                           ExplainQueryRequest request)
-        throws ServiceException {
+                                           SessionedStringProto request) throws ServiceException {
 
       try {
+        context.getSessionManager().touch(request.getSessionId().getId());
+
         if(LOG.isDebugEnabled()) {
-          LOG.debug("ExplainQuery [" + request.getQuery() + "]");
+          LOG.debug("ExplainQuery [" + request.getValue() + "]");
         }
         ClientProtos.ExplainQueryResponse.Builder responseBuilder = ClientProtos.ExplainQueryResponse.newBuilder();
         responseBuilder.setResultCode(ResultCode.OK);
-        String plan = context.getGlobalEngine().explainQuery(request.getQuery());
+        String plan = context.getGlobalEngine().explainQuery(request.getValue());
         if(LOG.isDebugEnabled()) {
           LOG.debug("ExplainQuery [" + plan + "]");
         }
@@ -154,11 +237,12 @@ public class TajoMasterClientService extends AbstractService {
       }
     }
     @Override
-    public GetQueryStatusResponse submitQuery(RpcController controller,
-                                           QueryRequest request)
-        throws ServiceException {
+    public GetQueryStatusResponse submitQuery(RpcController controller, QueryRequest request) throws ServiceException {
+
 
       try {
+        context.getSessionManager().touch(request.getSessionId().getId());
+
         if(LOG.isDebugEnabled()) {
           LOG.debug("Query [" + request.getQuery() + "] is submitted");
         }
@@ -177,86 +261,97 @@ public class TajoMasterClientService extends AbstractService {
     }
 
     @Override
-    public UpdateQueryResponse updateQuery(RpcController controller,
-                                           QueryRequest request)
-        throws ServiceException {
+    public UpdateQueryResponse updateQuery(RpcController controller, QueryRequest request) throws ServiceException {
 
-      UpdateQueryResponse.Builder builder = UpdateQueryResponse.newBuilder();
       try {
-        context.getGlobalEngine().updateQuery(request.getQuery());
-        builder.setResultCode(ResultCode.OK);
-        return builder.build();
-      } catch (Exception e) {
-        builder.setResultCode(ResultCode.ERROR);
-        if (e.getMessage() == null) {
-          builder.setErrorMessage(ExceptionUtils.getStackTrace(e));
+        context.getSessionManager().touch(request.getSessionId().getId());
+        UpdateQueryResponse.Builder builder = UpdateQueryResponse.newBuilder();
+        try {
+          context.getGlobalEngine().updateQuery(request.getQuery());
+          builder.setResultCode(ResultCode.OK);
+          return builder.build();
+        } catch (Exception e) {
+          builder.setResultCode(ResultCode.ERROR);
+          if (e.getMessage() == null) {
+            builder.setErrorMessage(ExceptionUtils.getStackTrace(e));
+          }
+          return builder.build();
         }
-        return builder.build();
+      } catch (Throwable t) {
+        throw new ServiceException(t);
       }
     }
 
     @Override
     public GetQueryResultResponse getQueryResult(RpcController controller,
-                                                 GetQueryResultRequest request)
-        throws ServiceException {
-      QueryId queryId = new QueryId(request.getQueryId());
-      QueryInProgress queryInProgress = context.getQueryJobManager().getQueryInProgress(queryId);
-      QueryInfo queryInfo = queryInProgress.getQueryInfo();
-      GetQueryResultResponse.Builder builder
-          = GetQueryResultResponse.newBuilder();
-
+                                                 GetQueryResultRequest request) throws ServiceException {
       try {
-        //TODO After implementation Tajo's user security feature, Should be modified.
-        builder.setTajoUserName(UserGroupInformation.getCurrentUser().getUserName());
-      } catch (IOException e) {
-        LOG.warn("Can't get current user name");
-      }
-      switch (queryInfo.getQueryState()) {
-        case QUERY_SUCCEEDED:
-          // TODO check this logic needed
-          //builder.setTableDesc((TableDescProto) queryJobManager.getResultDesc().getProto());
-          break;
-        case QUERY_FAILED:
-        case QUERY_ERROR:
-          builder.setErrorMessage("Query " + queryId + " is failed");
-        default:
-          builder.setErrorMessage("Query " + queryId + " is still running");
-      }
+        context.getSessionManager().touch(request.getSessionId().getId());
+        QueryId queryId = new QueryId(request.getQueryId());
+        QueryInProgress queryInProgress = context.getQueryJobManager().getQueryInProgress(queryId);
+        QueryInfo queryInfo = queryInProgress.getQueryInfo();
+        GetQueryResultResponse.Builder builder
+            = GetQueryResultResponse.newBuilder();
 
-      return builder.build();
+        try {
+          //TODO After implementation Tajo's user security feature, Should be modified.
+          builder.setTajoUserName(UserGroupInformation.getCurrentUser().getUserName());
+        } catch (IOException e) {
+          LOG.warn("Can't get current user name");
+        }
+        switch (queryInfo.getQueryState()) {
+          case QUERY_SUCCEEDED:
+            // TODO check this logic needed
+            //builder.setTableDesc((TableDescProto) queryJobManager.getResultDesc().getProto());
+            break;
+          case QUERY_FAILED:
+          case QUERY_ERROR:
+            builder.setErrorMessage("Query " + queryId + " is failed");
+          default:
+            builder.setErrorMessage("Query " + queryId + " is still running");
+        }
+
+        return builder.build();
+      } catch (Throwable t) {
+        throw new ServiceException(t);
+      }
     }
 
     @Override
-    public GetQueryListResponse getQueryList(RpcController controller,
-                                             GetQueryListRequest request)
+    public GetQueryListResponse getQueryList(RpcController controller, GetQueryListRequest request)
         throws ServiceException {
-      GetQueryListResponse.Builder builder
-        = GetQueryListResponse.newBuilder(); 
-       
-      Collection<QueryInProgress> queries 
-        = context.getQueryJobManager().getRunningQueries();
 
-      BriefQueryInfo.Builder infoBuilder = BriefQueryInfo.newBuilder();
- 
-      for (QueryInProgress queryInProgress : queries) {
-        QueryInfo queryInfo = queryInProgress.getQueryInfo();
+      try {
+        context.getSessionManager().touch(request.getSessionId().getId());
+        GetQueryListResponse.Builder builder= GetQueryListResponse.newBuilder();
 
-        infoBuilder.setQueryId(queryInfo.getQueryId().getProto());
-        infoBuilder.setState(queryInfo.getQueryState());
-        infoBuilder.setQuery(queryInfo.getSql());
-        infoBuilder.setStartTime(queryInfo.getStartTime());
-        long endTime = (queryInfo.getFinishTime() == 0) ? 
-                       System.currentTimeMillis() : queryInfo.getFinishTime();
-        infoBuilder.setFinishTime(endTime);
-        infoBuilder.setProgress(queryInfo.getProgress());
-        infoBuilder.setQueryMasterPort(queryInfo.getQueryMasterPort());
-        infoBuilder.setQueryMasterHost(queryInfo.getQueryMasterHost());
+        Collection<QueryInProgress> queries
+          = context.getQueryJobManager().getRunningQueries();
 
-        builder.addQueryList(infoBuilder.build());
+        BriefQueryInfo.Builder infoBuilder = BriefQueryInfo.newBuilder();
+
+        for (QueryInProgress queryInProgress : queries) {
+          QueryInfo queryInfo = queryInProgress.getQueryInfo();
+
+          infoBuilder.setQueryId(queryInfo.getQueryId().getProto());
+          infoBuilder.setState(queryInfo.getQueryState());
+          infoBuilder.setQuery(queryInfo.getSql());
+          infoBuilder.setStartTime(queryInfo.getStartTime());
+          long endTime = (queryInfo.getFinishTime() == 0) ?
+                         System.currentTimeMillis() : queryInfo.getFinishTime();
+          infoBuilder.setFinishTime(endTime);
+          infoBuilder.setProgress(queryInfo.getProgress());
+          infoBuilder.setQueryMasterPort(queryInfo.getQueryMasterPort());
+          infoBuilder.setQueryMasterHost(queryInfo.getQueryMasterHost());
+
+          builder.addQueryList(infoBuilder.build());
+        }
+
+        GetQueryListResponse result = builder.build();
+        return result;
+      } catch (Throwable t) {
+        throw new ServiceException(t);
       }
-
-      GetQueryListResponse result = builder.build();
-      return result;
     }
 
     @Override
@@ -264,136 +359,162 @@ public class TajoMasterClientService extends AbstractService {
                                                  GetQueryStatusRequest request)
         throws ServiceException {
 
-      GetQueryStatusResponse.Builder builder
-          = GetQueryStatusResponse.newBuilder();
-      QueryId queryId = new QueryId(request.getQueryId());
-      builder.setQueryId(request.getQueryId());
+      try {
+        context.getSessionManager().touch(request.getSessionId().getId());
 
-      if (queryId.equals(QueryIdFactory.NULL_QUERY_ID)) {
-        builder.setResultCode(ResultCode.OK);
-        builder.setState(TajoProtos.QueryState.QUERY_SUCCEEDED);
-      } else {
-        QueryInProgress queryInProgress = context.getQueryJobManager().getQueryInProgress(queryId);
-        if (queryInProgress != null) {
-          QueryInfo queryInfo = queryInProgress.getQueryInfo();
+        GetQueryStatusResponse.Builder builder = GetQueryStatusResponse.newBuilder();
+        QueryId queryId = new QueryId(request.getQueryId());
+        builder.setQueryId(request.getQueryId());
+
+        if (queryId.equals(QueryIdFactory.NULL_QUERY_ID)) {
           builder.setResultCode(ResultCode.OK);
-          builder.setState(queryInfo.getQueryState());
-          builder.setProgress(queryInfo.getProgress());
-          builder.setSubmitTime(queryInfo.getStartTime());
-          if(queryInfo.getQueryMasterHost() != null) {
-            builder.setQueryMasterHost(queryInfo.getQueryMasterHost());
-            builder.setQueryMasterPort(queryInfo.getQueryMasterClientPort());
-          }
-          //builder.setInitTime(queryJobManager.getInitializationTime());
-          //builder.setHasResult(!queryJobManager.isCreateTableStmt());
-          if (queryInfo.getQueryState() == TajoProtos.QueryState.QUERY_SUCCEEDED) {
-            builder.setFinishTime(queryInfo.getFinishTime());
-          } else {
-            builder.setFinishTime(System.currentTimeMillis());
-          }
+          builder.setState(TajoProtos.QueryState.QUERY_SUCCEEDED);
         } else {
-          builder.setResultCode(ResultCode.ERROR);
-          builder.setErrorMessage("No such query: " + queryId.toString());
+          QueryInProgress queryInProgress = context.getQueryJobManager().getQueryInProgress(queryId);
+          if (queryInProgress != null) {
+            QueryInfo queryInfo = queryInProgress.getQueryInfo();
+            builder.setResultCode(ResultCode.OK);
+            builder.setState(queryInfo.getQueryState());
+            builder.setProgress(queryInfo.getProgress());
+            builder.setSubmitTime(queryInfo.getStartTime());
+            if(queryInfo.getQueryMasterHost() != null) {
+              builder.setQueryMasterHost(queryInfo.getQueryMasterHost());
+              builder.setQueryMasterPort(queryInfo.getQueryMasterClientPort());
+            }
+            //builder.setInitTime(queryJobManager.getInitializationTime());
+            //builder.setHasResult(!queryJobManager.isCreateTableStmt());
+            if (queryInfo.getQueryState() == TajoProtos.QueryState.QUERY_SUCCEEDED) {
+              builder.setFinishTime(queryInfo.getFinishTime());
+            } else {
+              builder.setFinishTime(System.currentTimeMillis());
+            }
+          } else {
+            builder.setResultCode(ResultCode.ERROR);
+            builder.setErrorMessage("No such query: " + queryId.toString());
+          }
         }
-      }
+        return builder.build();
 
-      return builder.build();
+      } catch (Throwable t) {
+        throw new  ServiceException(t);
+      }
     }
 
     /**
      * It is invoked by TajoContainerProxy.
      */
     @Override
-    public BoolProto killQuery(RpcController controller, TajoIdProtos.QueryIdProto request) throws ServiceException {
-      QueryId queryId = new QueryId(request);
-      QueryJobManager queryJobManager = context.getQueryJobManager();
-      queryJobManager.getEventHandler().handle(new QueryJobEvent(QueryJobEvent.Type.QUERY_JOB_KILL,
-          new QueryInfo(queryId)));
-      return BOOL_TRUE;
+    public BoolProto killQuery(RpcController controller, KillQueryRequest request) throws ServiceException {
+      try {
+        context.getSessionManager().touch(request.getSessionId().getId());
+        QueryId queryId = new QueryId(request.getQueryId());
+        QueryJobManager queryJobManager = context.getQueryJobManager();
+        queryJobManager.getEventHandler().handle(new QueryJobEvent(QueryJobEvent.Type.QUERY_JOB_KILL,
+            new QueryInfo(queryId)));
+        return BOOL_TRUE;
+      } catch (Throwable t) {
+        throw new ServiceException(t);
+      }
     }
 
     @Override
     public GetClusterInfoResponse getClusterInfo(RpcController controller,
                                                  GetClusterInfoRequest request)
         throws ServiceException {
-      GetClusterInfoResponse.Builder builder
-        = GetClusterInfoResponse.newBuilder(); 
-       
-      Map<String, Worker> workers = context.getResourceManager().getWorkers();
+      try {
+        context.getSessionManager().touch(request.getSessionId().getId());
+        GetClusterInfoResponse.Builder builder= GetClusterInfoResponse.newBuilder();
 
-      List<String> wokerKeys = new ArrayList<String>(workers.keySet());
-      Collections.sort(wokerKeys);
+        Map<String, Worker> workers = context.getResourceManager().getWorkers();
 
-      WorkerResourceInfo.Builder workerBuilder
-        = WorkerResourceInfo.newBuilder();
+        List<String> wokerKeys = new ArrayList<String>(workers.keySet());
+        Collections.sort(wokerKeys);
 
-      for(Worker worker: workers.values()) {
-        WorkerResource workerResource = worker.getResource();
-        workerBuilder.setAllocatedHost(worker.getHostName());
-        workerBuilder.setDiskSlots(workerResource.getDiskSlots());
-        workerBuilder.setCpuCoreSlots(workerResource.getCpuCoreSlots());
-        workerBuilder.setMemoryMB(workerResource.getMemoryMB());
-        workerBuilder.setLastHeartbeat(worker.getLastHeartbeatTime());
-        workerBuilder.setUsedMemoryMB(workerResource.getUsedMemoryMB());
-        workerBuilder.setUsedCpuCoreSlots(workerResource.getUsedCpuCoreSlots());
-        workerBuilder.setUsedDiskSlots(workerResource.getUsedDiskSlots());
-        workerBuilder.setWorkerStatus(worker.getState().toString());
-        workerBuilder.setQueryMasterMode(workerResource.isQueryMasterMode());
-        workerBuilder.setTaskRunnerMode(workerResource.isTaskRunnerMode());
-        workerBuilder.setPeerRpcPort(worker.getPeerRpcPort());
-        workerBuilder.setQueryMasterPort(worker.getQueryMasterPort());
-        workerBuilder.setClientPort(worker.getClientPort());
-        workerBuilder.setPullServerPort(worker.getPullServerPort());
-        workerBuilder.setHttpPort(worker.getHttpPort());
-        workerBuilder.setMaxHeap(workerResource.getMaxHeap());
-        workerBuilder.setFreeHeap(workerResource.getFreeHeap());
-        workerBuilder.setTotalHeap(workerResource.getTotalHeap());
-        workerBuilder.setNumRunningTasks(workerResource.getNumRunningTasks());
-        workerBuilder.setNumQueryMasterTasks(workerResource.getNumQueryMasterTasks());
+        WorkerResourceInfo.Builder workerBuilder
+          = WorkerResourceInfo.newBuilder();
 
-        builder.addWorkerList(workerBuilder.build());
+        for(Worker worker: workers.values()) {
+          WorkerResource workerResource = worker.getResource();
+          workerBuilder.setAllocatedHost(worker.getHostName());
+          workerBuilder.setDiskSlots(workerResource.getDiskSlots());
+          workerBuilder.setCpuCoreSlots(workerResource.getCpuCoreSlots());
+          workerBuilder.setMemoryMB(workerResource.getMemoryMB());
+          workerBuilder.setLastHeartbeat(worker.getLastHeartbeatTime());
+          workerBuilder.setUsedMemoryMB(workerResource.getUsedMemoryMB());
+          workerBuilder.setUsedCpuCoreSlots(workerResource.getUsedCpuCoreSlots());
+          workerBuilder.setUsedDiskSlots(workerResource.getUsedDiskSlots());
+          workerBuilder.setWorkerStatus(worker.getState().toString());
+          workerBuilder.setQueryMasterMode(workerResource.isQueryMasterMode());
+          workerBuilder.setTaskRunnerMode(workerResource.isTaskRunnerMode());
+          workerBuilder.setPeerRpcPort(worker.getPeerRpcPort());
+          workerBuilder.setQueryMasterPort(worker.getQueryMasterPort());
+          workerBuilder.setClientPort(worker.getClientPort());
+          workerBuilder.setPullServerPort(worker.getPullServerPort());
+          workerBuilder.setHttpPort(worker.getHttpPort());
+          workerBuilder.setMaxHeap(workerResource.getMaxHeap());
+          workerBuilder.setFreeHeap(workerResource.getFreeHeap());
+          workerBuilder.setTotalHeap(workerResource.getTotalHeap());
+          workerBuilder.setNumRunningTasks(workerResource.getNumRunningTasks());
+          workerBuilder.setNumQueryMasterTasks(workerResource.getNumQueryMasterTasks());
+
+          builder.addWorkerList(workerBuilder.build());
+        }
+
+        return builder.build();
+      } catch (Throwable t) {
+        throw new ServiceException(t);
       }
-
-      return builder.build();
     }
 
     @Override
-    public BoolProto existTable(RpcController controller,
-                                StringProto tableNameProto)
-        throws ServiceException {
-      String tableName = tableNameProto.getValue();
-      if (catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName)) {
-        return BOOL_TRUE;
-      } else {
-        return BOOL_FALSE;
+    public BoolProto existTable(RpcController controller, SessionedStringProto request) throws ServiceException {
+      try {
+        context.getSessionManager().touch(request.getSessionId().getId());
+        String tableName = request.getValue();
+        if (catalog.existsTable(DEFAULT_DATABASE_NAME, tableName)) {
+          return BOOL_TRUE;
+        } else {
+          return BOOL_FALSE;
+        }
+      } catch (Throwable e) {
+        throw new ServiceException(e);
       }
     }
 
     @Override
     public GetTableListResponse getTableList(RpcController controller,
-                                             GetTableListRequest request)
-        throws ServiceException {
-      Collection<String> tableNames = catalog.getAllTableNames(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE);
-      GetTableListResponse.Builder builder = GetTableListResponse.newBuilder();
-      builder.addAllTables(tableNames);
-      return builder.build();
+                                             GetTableListRequest request) throws ServiceException {
+      try {
+        context.getSessionManager().touch(request.getSessionId().getId());
+        Collection<String> tableNames = catalog.getAllTableNames(DEFAULT_DATABASE_NAME);
+        GetTableListResponse.Builder builder = GetTableListResponse.newBuilder();
+        builder.addAllTables(tableNames);
+        return builder.build();
+      } catch (Throwable t) {
+        throw new ServiceException(t);
+      }
     }
 
     @Override
     public TableResponse getTableDesc(RpcController controller,
                                       GetTableDescRequest request)
         throws ServiceException {
-      String name = request.getTableName();
-      if (catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, name)) {
-        return TableResponse.newBuilder()
-            .setResultCode(ResultCode.OK)
-            .setTableDesc(catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, name).getProto())
-            .build();
-      } else {
-        return TableResponse.newBuilder()
-            .setResultCode(ResultCode.ERROR)
-            .setErrorMessage("ERROR: no such a table: " + request.getTableName())
-            .build();
+      try {
+        context.getSessionManager().touch(request.getSessionId().getId());
+        String name = request.getTableName();
+        if (catalog.existsTable(DEFAULT_DATABASE_NAME, name)) {
+          return TableResponse.newBuilder()
+              .setResultCode(ResultCode.OK)
+              .setTableDesc(catalog.getTableDesc(DEFAULT_DATABASE_NAME, name).getProto())
+              .build();
+        } else {
+          return TableResponse.newBuilder()
+              .setResultCode(ResultCode.ERROR)
+              .setErrorMessage("ERROR: no such a table: " + request.getTableName())
+              .build();
+        }
+      } catch (Throwable t) {
+        throw new ServiceException(t);
       }
     }
 
@@ -401,6 +522,8 @@ public class TajoMasterClientService extends AbstractService {
     public TableResponse createExternalTable(RpcController controller, CreateTableRequest request)
         throws ServiceException {
       try {
+        context.getSessionManager().touch(request.getSessionId().getId());
+
         Path path = new Path(request.getPath());
         FileSystem fs = path.getFileSystem(conf);
 
@@ -428,6 +551,10 @@ public class TajoMasterClientService extends AbstractService {
         return TableResponse.newBuilder()
             .setResultCode(ResultCode.OK)
             .setTableDesc(desc.getProto()).build();
+      } catch (InvalidSessionException ise) {
+        return TableResponse.newBuilder()
+            .setResultCode(ResultCode.ERROR)
+            .setErrorMessage(ise.getMessage()).build();
       } catch (IOException ioe) {
         return TableResponse.newBuilder()
             .setResultCode(ResultCode.ERROR)
@@ -437,30 +564,43 @@ public class TajoMasterClientService extends AbstractService {
 
     @Override
     public BoolProto dropTable(RpcController controller, DropTableRequest dropTable) throws ServiceException {
-      context.getGlobalEngine().dropTable(dropTable.getName(), dropTable.getPurge());
-      return BOOL_TRUE;
+      try {
+        context.getSessionManager().touch(dropTable.getSessionId().getId());
+        context.getGlobalEngine().dropTable(dropTable.getName(), dropTable.getPurge());
+        return BOOL_TRUE;
+      } catch (Throwable t) {
+        throw new ServiceException(t);
+      }
     }
 
     @Override
-    public FunctionResponse getFunctionList(RpcController controller, StringProto request) throws ServiceException {
-      String functionName = request.getValue();
-      Collection<FunctionDesc> functions = catalog.getFunctions();
+    public FunctionResponse getFunctionList(RpcController controller, SessionedStringProto request)
+        throws ServiceException {
 
-      List<CatalogProtos.FunctionDescProto> functionProtos = new ArrayList<CatalogProtos.FunctionDescProto>();
+      try {
+        context.getSessionManager().touch(request.getSessionId().getId());
 
-      for (FunctionDesc eachFunction: functions) {
-        if (functionName == null || functionName.isEmpty()) {
-          functionProtos.add(eachFunction.getProto());
-        } else {
-          if(functionName.equals(eachFunction.getSignature())) {
+        String functionName = request.getValue();
+        Collection<FunctionDesc> functions = catalog.getFunctions();
+
+        List<CatalogProtos.FunctionDescProto> functionProtos = new ArrayList<CatalogProtos.FunctionDescProto>();
+
+        for (FunctionDesc eachFunction: functions) {
+          if (functionName == null || functionName.isEmpty()) {
             functionProtos.add(eachFunction.getProto());
+          } else {
+            if(functionName.equals(eachFunction.getSignature())) {
+              functionProtos.add(eachFunction.getProto());
+            }
           }
         }
+        return FunctionResponse.newBuilder()
+            .setResultCode(ResultCode.OK)
+            .addAllFunctions(functionProtos)
+            .build();
+      } catch (Throwable t) {
+        throw new ServiceException(t);
       }
-      return FunctionResponse.newBuilder()
-          .setResultCode(ResultCode.OK)
-          .addAllFunctions(functionProtos)
-          .build();
     }
   }
 }

@@ -20,7 +20,6 @@ package org.apache.tajo.engine.planner;
 
 import com.google.common.collect.ObjectArrays;
 import org.apache.tajo.algebra.*;
-import org.apache.tajo.catalog.CatalogConstants;
 import org.apache.tajo.catalog.CatalogService;
 import org.apache.tajo.util.TUtil;
 
@@ -29,7 +28,6 @@ import java.util.Set;
 import java.util.Stack;
 
 import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
 
 public class PreLogicalPlanVerifier extends BaseAlgebraVisitor <VerificationState, Expr> {
   private CatalogService catalog;
@@ -127,7 +125,7 @@ public class PreLogicalPlanVerifier extends BaseAlgebraVisitor <VerificationStat
   }
 
   private boolean assertRelationExistence(VerificationState state, String name) {
-    if (!catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, name)) {
+    if (!catalog.existsTable(DEFAULT_DATABASE_NAME, name)) {
       state.addVerification(String.format("relation \"%s\" does not exist", name));
       return false;
     }
@@ -135,8 +133,24 @@ public class PreLogicalPlanVerifier extends BaseAlgebraVisitor <VerificationStat
   }
 
   private boolean assertRelationNoExistence(VerificationState state, String name) {
-    if (catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, name)) {
+    if (catalog.existsTable(DEFAULT_DATABASE_NAME, name)) {
       state.addVerification(String.format("relation \"%s\" already exists", name));
+      return false;
+    }
+    return true;
+  }
+
+  private boolean assertDatabaseExistence(VerificationState state, String name) {
+    if (!catalog.existDatabase(name)) {
+      state.addVerification(String.format("database \"%s\" does not exist", name));
+      return false;
+    }
+    return true;
+  }
+
+  private boolean assertDatabaseNoExistence(VerificationState state, String name) {
+    if (catalog.existDatabase(name)) {
+      state.addVerification(String.format("database \"%s\" already exists", name));
       return false;
     }
     return true;
@@ -145,6 +159,22 @@ public class PreLogicalPlanVerifier extends BaseAlgebraVisitor <VerificationStat
   ///////////////////////////////////////////////////////////////////////////////////////////////////////////
   // Data Definition Language Section
   ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+  @Override
+  public Expr visitCreateDatabase(VerificationState ctx, Stack<Expr> stack, CreateDatabase expr)
+      throws PlanningException {
+    super.visitCreateDatabase(ctx, stack, expr);
+    assertDatabaseNoExistence(ctx, expr.getDatabaseName());
+    return expr;
+  }
+
+  @Override
+  public Expr visitDropDatabase(VerificationState ctx, Stack<Expr> stack, DropDatabase expr) throws PlanningException {
+    super.visitDropDatabase(ctx, stack, expr);
+    assertDatabaseExistence(ctx, expr.getDatabaseName());
+    return expr;
+  }
 
   @Override
   public Expr visitCreateTable(VerificationState state, Stack<Expr> stack, CreateTable expr) throws PlanningException {

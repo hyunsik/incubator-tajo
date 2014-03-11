@@ -88,14 +88,8 @@ public class CatalogUtil {
     }
   }
 
-  public static String getCanonicalTableName(String databaseName, @Nullable String namespace, String tableName) {
+  public static String getCanonicalTableName(String databaseName, String tableName) {
     StringBuilder sb = new StringBuilder(databaseName);
-    sb.append(IDENTIFIER_DELIMITER);
-    if (namespace != null) {
-      sb.append(namespace);
-    } else {
-      sb.append(CatalogConstants.DEFAULT_NAMESPACE);
-    }
     sb.append(IDENTIFIER_DELIMITER);
     sb.append(tableName);
     return sb.toString();
@@ -220,14 +214,9 @@ public class CatalogUtil {
     return sb.toString();
   }
 
-  public static CatalogProtos.TableIdentifierProto buildTableIdentifier(String databaseName,
-                                                                        @Nullable String namespace,
-                                                                        String tableName) {
+  public static CatalogProtos.TableIdentifierProto buildTableIdentifier(String databaseName, String tableName) {
     CatalogProtos.TableIdentifierProto.Builder builder = CatalogProtos.TableIdentifierProto.newBuilder();
     builder.setDatabaseName(databaseName);
-    if (namespace != null) {
-      builder.setNamespace(namespace);
-    }
     builder.setTableName(tableName);
     return builder.build();
   }

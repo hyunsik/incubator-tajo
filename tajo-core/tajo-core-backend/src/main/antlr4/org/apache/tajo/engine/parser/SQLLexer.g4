@@ -202,6 +202,7 @@ COUNT : C O U N T;
 CUBE : C U B E;
 
 DAY : D A Y;
+DATABASE : D A T A B A S E;
 DEC : D E C;
 DECADE : D E C A D E;
 DOW : D O W;

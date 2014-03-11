@@ -39,7 +39,6 @@ public class PartitionMethodDesc implements ProtoObject<CatalogProtos.PartitionM
   private CatalogProtos.PartitionMethodProto.Builder builder;
 
   @Expose private String databaseName;                         // required
-  @Expose private String namespace;                            // optional
   @Expose private String tableName;                            // required
   @Expose private PartitionType partitionType;                 // required
   @Expose private String expression;                           // required
@@ -49,11 +48,10 @@ public class PartitionMethodDesc implements ProtoObject<CatalogProtos.PartitionM
     builder = CatalogProtos.PartitionMethodProto.newBuilder();
   }
 
-  public PartitionMethodDesc(String databaseName, String namespace, String tableName,
+  public PartitionMethodDesc(String databaseName, String tableName,
                              PartitionType partitionType, String expression,
                              Schema expressionSchema) {
     this.databaseName = databaseName;
-    this.namespace = namespace;
     this.tableName = tableName;
     this.partitionType = partitionType;
     this.expression = expression;
@@ -62,7 +60,6 @@ public class PartitionMethodDesc implements ProtoObject<CatalogProtos.PartitionM
 
   public PartitionMethodDesc(CatalogProtos.PartitionMethodProto proto) {
     this(proto.getTableIdentifier().getDatabaseName(),
-        proto.getTableIdentifier().getNamespace(),
         proto.getTableIdentifier().getTableName(),
         proto.getPartitionType(), proto.getExpression(),
         new Schema(proto.getExpressionSchema()));
@@ -128,9 +125,6 @@ public class PartitionMethodDesc implements ProtoObject<CatalogProtos.PartitionM
     TableIdentifierProto.Builder tableIdentifierBuilder = TableIdentifierProto.newBuilder();
     if (databaseName != null) {
       tableIdentifierBuilder.setDatabaseName(databaseName);
-    }
-    if (namespace != null) {
-      tableIdentifierBuilder.setNamespace(namespace);
     }
     if (tableName != null) {
       tableIdentifierBuilder.setTableName(tableName);

@@ -16,10 +16,10 @@
  * limitations under the License.
  */
 
-package org.apache.tajo.cli;
+package org.apache.tajo.master.session;
 
-public class InvalidStatement extends Exception {
-  public InvalidStatement(String message) {
-    super(message);
+public class InvalidSessionException extends Exception {
+  public InvalidSessionException(String sessionId) {
+    super("Invalid session id \"" + sessionId + "\"");
   }
 }

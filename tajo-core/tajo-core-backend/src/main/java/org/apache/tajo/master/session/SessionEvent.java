@@ -16,31 +16,19 @@
  * limitations under the License.
  */
 
-option java_package = "org.apache.tajo";
-option java_outer_classname = "TajoIdProtos";
-option java_generic_services = false;
-option java_generate_equals_and_hash = true;
+package org.apache.tajo.master.session;
 
-message QueryIdProto {
-    required string id = 1;
-    required int32 seq = 2;
-}
+import org.apache.hadoop.yarn.event.AbstractEvent;
 
-message ExecutionBlockIdProto {
-    required QueryIdProto queryId = 1;
-    required int32 id = 2;
-}
+public class SessionEvent extends AbstractEvent<SessionEventType> {
+  private final String sessionId;
 
-message QueryUnitIdProto {
-    required ExecutionBlockIdProto executionBlockId = 1;
-    required int32 id = 2;
-}
+  public SessionEvent(String sessionId, SessionEventType sessionEventType) {
+    super(sessionEventType);
+    this.sessionId = sessionId;
+  }
 
-message QueryUnitAttemptIdProto {
-  required QueryUnitIdProto queryUnitId = 1;
-  required int32 id = 2;
-}
-
-message SessionIdProto {
-  required string id = 1;
+  public String getSessionId() {
+    return sessionId;
+  }
 }

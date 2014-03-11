@@ -28,7 +28,7 @@ import static org.junit.Assert.assertTrue;
 public class TestSimpleScanner {
 
   @Test
-  public final void testMetaCommands() throws InvalidStatement {
+  public final void testMetaCommands() throws InvalidStatementException {
     List<String> res1 = SimpleScanner.scanStatements("\\d");
     assertEquals(1, res1.size());
     assertEquals("\\d", res1.get(0));
@@ -47,7 +47,7 @@ public class TestSimpleScanner {
   }
 
   @Test
-  public final void testStatements() throws InvalidStatement {
+  public final void testStatements() throws InvalidStatementException {
     List<String> res1 = SimpleScanner.scanStatements("select * from test");
     assertEquals(1, res1.size());
     assertEquals("select * from test", res1.get(0));
@@ -76,7 +76,7 @@ public class TestSimpleScanner {
   }
 
   @Test
-  public final void testQuoted() throws InvalidStatement {
+  public final void testQuoted() throws InvalidStatementException {
     List<String> res1 = SimpleScanner.scanStatements("select '\n;' from test");
     assertEquals(1, res1.size());
     assertEquals("select '\n;' from test", res1.get(0));
@@ -88,7 +88,7 @@ public class TestSimpleScanner {
     boolean exception = false;
     try {
       SimpleScanner.scanStatements("select 'abc");
-    } catch (InvalidStatement is) {
+    } catch (InvalidStatementException is) {
       System.out.println(is.getMessage());
       exception = true;
     }

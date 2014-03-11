@@ -16,14 +16,9 @@
  * limitations under the License.
  */
 
-package org.apache.tajo.engine.utils;
+package org.apache.tajo.master.session;
 
-import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.StringProto;
-
-public class ProtoUtil {
-  public static StringProto newProto(String val) {
-    StringProto.Builder builder = StringProto.newBuilder();
-    builder.setValue(val);
-    return builder.build();
-  }
+public enum SessionEventType {
+  EXPIRE,
+  PING
 }

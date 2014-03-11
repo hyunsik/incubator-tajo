@@ -16,31 +16,10 @@
  * limitations under the License.
  */
 
-option java_package = "org.apache.tajo";
-option java_outer_classname = "TajoIdProtos";
-option java_generic_services = false;
-option java_generate_equals_and_hash = true;
+package org.apache.tajo.cli;
 
-message QueryIdProto {
-    required string id = 1;
-    required int32 seq = 2;
-}
-
-message ExecutionBlockIdProto {
-    required QueryIdProto queryId = 1;
-    required int32 id = 2;
-}
-
-message QueryUnitIdProto {
-    required ExecutionBlockIdProto executionBlockId = 1;
-    required int32 id = 2;
-}
-
-message QueryUnitAttemptIdProto {
-  required QueryUnitIdProto queryUnitId = 1;
-  required int32 id = 2;
-}
-
-message SessionIdProto {
-  required string id = 1;
+public class InvalidStatementException extends Exception {
+  public InvalidStatementException(String message) {
+    super(message);
+  }
 }

@@ -24,7 +24,7 @@ public class NoPartitionedTableException extends Exception {
 
   public NoPartitionedTableException() {}
 
-  public NoPartitionedTableException(String databaseName, @Nullable String namespace, String relName) {
-    super(String.format("ERROR: \"%s.%s.%s\" is not a partitioned table", databaseName, namespace, relName));
+  public NoPartitionedTableException(String databaseName, String relName) {
+    super(String.format("ERROR: \"%s.%s\" is not a partitioned table", databaseName, relName));
   }
 }

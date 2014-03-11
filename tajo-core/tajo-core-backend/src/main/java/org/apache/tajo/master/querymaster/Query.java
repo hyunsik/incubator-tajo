@@ -37,12 +37,12 @@ import org.apache.tajo.catalog.TableDesc;
 import org.apache.tajo.catalog.TableMeta;
 import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.conf.TajoConf;
-import org.apache.tajo.engine.planner.logical.InsertNode;
 import org.apache.tajo.engine.planner.global.DataChannel;
 import org.apache.tajo.engine.planner.global.ExecutionBlock;
 import org.apache.tajo.engine.planner.global.ExecutionBlockCursor;
 import org.apache.tajo.engine.planner.global.MasterPlan;
 import org.apache.tajo.engine.planner.logical.CreateTableNode;
+import org.apache.tajo.engine.planner.logical.InsertNode;
 import org.apache.tajo.engine.planner.logical.NodeType;
 import org.apache.tajo.engine.query.QueryContext;
 import org.apache.tajo.master.event.*;
@@ -56,7 +56,6 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
 
 public class Query implements EventHandler<QueryEvent> {
   private static final Log LOG = LogFactory.getLog(Query.class);
@@ -522,7 +521,7 @@ public class Query implements EventHandler<QueryEvent> {
         TableDesc finalTable;
         if (insertNode.hasTargetTable()) {
           String tableName = insertNode.getTableName();
-          finalTable = catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
+          finalTable = catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName);
         } else {
           String tableName = query.getId().toString();
           finalTable = new TableDesc(tableName, lastStage.getSchema(), meta, finalOutputDir);
@@ -533,7 +532,7 @@ public class Query implements EventHandler<QueryEvent> {
         finalTable.setStats(stats);
 
         if (insertNode.hasTargetTable()) {
-          catalog.dropTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, insertNode.getTableName());
+          catalog.dropTable(DEFAULT_DATABASE_NAME, insertNode.getTableName());
           catalog.createTable(finalTable);
         }
 

@@ -21,7 +21,6 @@ package org.apache.tajo.engine.query;
 import org.apache.tajo.IntegrationTest;
 import org.apache.tajo.QueryTestCaseBase;
 import org.apache.tajo.TajoTestingCluster;
-import org.apache.tajo.catalog.CatalogConstants;
 import org.apache.tajo.catalog.CatalogService;
 import org.apache.tajo.catalog.TableDesc;
 import org.junit.Test;
@@ -30,7 +29,6 @@ import org.junit.experimental.categories.Category;
 import java.sql.ResultSet;
 
 import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -230,9 +228,8 @@ public class TestSelectQuery extends QueryTestCaseBase {
     res.close();
     TajoTestingCluster cluster = testBase.getTestingCluster();
     CatalogService catalog = cluster.getMaster().getCatalog();
-    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE,
-        "orderkeys"));
-    TableDesc orderKeys = catalog.getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, "orderkeys");
+    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, "orderkeys"));
+    TableDesc orderKeys = catalog.getTableDesc(DEFAULT_DATABASE_NAME, "orderkeys");
     assertEquals(5, orderKeys.getStats().getNumRows().intValue());
   }
 

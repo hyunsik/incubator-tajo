@@ -32,7 +32,6 @@ public class IndexDesc implements ProtoObject<IndexDescProto>, Cloneable {
   
   private String indexName;            // required
   private String databaseName;         // required
-  private String namespace;            // required
   private String tableName;            // required
   private Column column;               // required
   private IndexMethod indexMethod;     // required
@@ -44,12 +43,11 @@ public class IndexDesc implements ProtoObject<IndexDescProto>, Cloneable {
     this.builder = IndexDescProto.newBuilder();
   }
   
-  public IndexDesc(String idxName, String databaseName, @Nullable String namespace, String tableName, Column column,
+  public IndexDesc(String idxName, String databaseName, String tableName, Column column,
                    IndexMethod type,  boolean isUnique, boolean isClustered, boolean isAscending) {
     this();
     this.indexName = idxName.toLowerCase();
     this.databaseName = databaseName;
-    this.namespace = namespace;
     this.tableName = tableName.toLowerCase();
     this.column = column;
     this.indexMethod = type;
@@ -61,7 +59,6 @@ public class IndexDesc implements ProtoObject<IndexDescProto>, Cloneable {
   public IndexDesc(IndexDescProto proto) {
     this(proto.getName(),
         proto.getTableIdentifier().getDatabaseName(),
-        proto.getTableIdentifier().getNamespace(),
         proto.getTableIdentifier().getTableName(),
         new Column(proto.getColumn()),
         proto.getIndexMethod(), proto.getIsUnique(), proto.getIsClustered(), proto.getIsAscending());
@@ -104,9 +101,6 @@ public class IndexDesc implements ProtoObject<IndexDescProto>, Cloneable {
     CatalogProtos.TableIdentifierProto.Builder tableIdentifierBuilder = CatalogProtos.TableIdentifierProto.newBuilder();
     if (databaseName != null) {
       tableIdentifierBuilder.setDatabaseName(databaseName);
-    }
-    if (namespace != null) {
-      tableIdentifierBuilder.setNamespace(namespace);
     }
     if (tableName != null) {
       tableIdentifierBuilder.setTableName(tableName);

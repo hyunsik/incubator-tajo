@@ -31,7 +31,6 @@ public class CatalogConstants {
 
   public static final String DEFAULT_TABLESPACE_NAME = "default";
   public static final String DEFAULT_DATABASE_NAME = "default";
-  public static final String DEFAULT_NAMESPACE = "public";
 
 
   public static final String TB_META = "META";

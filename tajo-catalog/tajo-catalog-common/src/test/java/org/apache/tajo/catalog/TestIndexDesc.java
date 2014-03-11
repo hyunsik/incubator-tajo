@@ -18,15 +18,14 @@
 
 package org.apache.tajo.catalog;
 
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
 import org.apache.tajo.catalog.proto.CatalogProtos.IndexDescProto;
 import org.apache.tajo.catalog.proto.CatalogProtos.IndexMethod;
 import org.apache.tajo.common.TajoDataTypes.Type;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
 import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotSame;
 
@@ -37,15 +36,15 @@ public class TestIndexDesc {
   
   static {
     desc1 = new IndexDesc(
-        "idx_test", DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, "indexed", new Column("id", Type.INT4),
+        "idx_test", DEFAULT_DATABASE_NAME, "indexed", new Column("id", Type.INT4),
         IndexMethod.TWO_LEVEL_BIN_TREE, true, true, true);
     
     desc2 = new IndexDesc(
-        "idx_test2", DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, "indexed", new Column("score", Type.FLOAT8),
+        "idx_test2", DEFAULT_DATABASE_NAME, "indexed", new Column("score", Type.FLOAT8),
         IndexMethod.TWO_LEVEL_BIN_TREE, false, false, false);
     
     desc3 = new IndexDesc(
-        "idx_test", DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, "indexed", new Column("id", Type.INT4),
+        "idx_test", DEFAULT_DATABASE_NAME, "indexed", new Column("id", Type.INT4),
         IndexMethod.TWO_LEVEL_BIN_TREE, true, true, true);
   }
 

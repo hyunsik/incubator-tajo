@@ -42,7 +42,6 @@ import java.io.IOException;
 import java.util.Stack;
 
 import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
 import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_TABLESPACE_NAME;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -166,7 +165,7 @@ public class ExprTestBase {
       assertFalse(e.getMessage(), true);
     } finally {
       if (schema != null) {
-        cat.dropTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
+        cat.dropTable(DEFAULT_DATABASE_NAME, tableName);
       }
     }
   }

@@ -23,7 +23,7 @@ import java.util.List;
 
 public class SimpleScanner {
 
-  public static List<String> scanStatements(String str) throws InvalidStatement {
+  public static List<String> scanStatements(String str) throws InvalidStatementException {
 
     ScanState state = ScanState.TOK_START;
     int idx = 0;
@@ -104,7 +104,7 @@ public class SimpleScanner {
         statements.add(str.subSequence(startIdx, endIdx).toString());
         state = ScanState.TOK_START;
       } else {
-        throw new InvalidStatement("ERROR: " + errorMessage);
+        throw new InvalidStatementException("ERROR: " + errorMessage);
       }
     }
 

@@ -96,7 +96,6 @@ message CreateDatabaseRequest {
 
 message TableDescProto {
   required string database_name = 1;
-  optional string namespace = 2;
 	required string table_name = 3;
 	optional string path = 4;
 	required TableProto meta = 5;
@@ -108,7 +107,6 @@ message TableDescProto {
 
 message TableIdentifierProto {
   required string database_name = 1;
-  optional string namespace = 2;
   required string table_name = 3;
 }
 

@@ -66,7 +66,7 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
   }
 
   @Override
-  public boolean existTable(String databaseName, String namespace, final String tableName) throws CatalogException {
+  public boolean existTable(String databaseName, final String tableName) throws CatalogException {
     boolean exist = false;
 
     org.apache.hadoop.hive.ql.metadata.Table table = null;
@@ -93,7 +93,7 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
   }
 
   @Override
-  public final CatalogProtos.TableDescProto getTable(final String databaseName, String namespace, final String tableName)
+  public final CatalogProtos.TableDescProto getTable(final String databaseName, final String tableName)
       throws CatalogException {
 
     org.apache.hadoop.hive.ql.metadata.Table table = null;
@@ -213,7 +213,6 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
           }
           partitions = new PartitionMethodDesc(
               databaseName,
-              namespace,
               tableName,
               PartitionType.COLUMN,
               sb.toString(),
@@ -246,7 +245,7 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
   }
 
   @Override
-  public final List<String> getAllTableNames(String databaseName, String namespace) throws CatalogException {
+  public final List<String> getAllTableNames(String databaseName) throws CatalogException {
     List<String> allTables = new ArrayList<String>();
     HCatalogStoreClientPool.HCatalogStoreClient client = null;
 
@@ -421,7 +420,7 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
   }
 
   @Override
-  public final void dropTable(String databaseName, String namespace, final String tableName) throws CatalogException {
+  public final void dropTable(String databaseName, final String tableName) throws CatalogException {
     HCatalogStoreClientPool.HCatalogStoreClient client = null;
 
     try {
@@ -441,12 +440,12 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
   }
 
   @Override
-  public CatalogProtos.PartitionMethodProto getPartitionMethod(String databaseName, String namespace, String tableName) throws CatalogException {
+  public CatalogProtos.PartitionMethodProto getPartitionMethod(String databaseName, String tableName) throws CatalogException {
     return null;
   }
 
   @Override
-  public boolean existPartitionMethod(String dbName, String namespace, String tableName) throws CatalogException {
+  public boolean existPartitionMethod(String dbName, String tableName) throws CatalogException {
     return false;
   }
 
@@ -461,7 +460,7 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
   }
 
   @Override
-  public void addPartition(String databaseName, String namespace, String tableName, CatalogProtos.PartitionDescProto partitionDescProto) throws CatalogException {
+  public void addPartition(String databaseName, String tableName, CatalogProtos.PartitionDescProto partitionDescProto) throws CatalogException {
 
   }
 
@@ -512,33 +511,33 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
   }
 
   @Override
-  public void dropIndex(String databaseName, String namespace, String indexName) throws CatalogException {
+  public void dropIndex(String databaseName, String indexName) throws CatalogException {
 
   }
 
   @Override
-  public CatalogProtos.IndexDescProto getIndexByName(String databaseName, String namespace, String indexName) throws CatalogException {
+  public CatalogProtos.IndexDescProto getIndexByName(String databaseName, String indexName) throws CatalogException {
     return null;
   }
 
   @Override
-  public CatalogProtos.IndexDescProto getIndexByColumn(String databaseName, String namespace, String tableName,
+  public CatalogProtos.IndexDescProto getIndexByColumn(String databaseName, String tableName,
                                                        String columnName) throws CatalogException {
     return null;
   }
 
   @Override
-  public boolean existIndexByName(String databaseName, String namespace, String indexName) throws CatalogException {
+  public boolean existIndexByName(String databaseName, String indexName) throws CatalogException {
     return false;
   }
 
   @Override
-  public boolean existIndexByColumn(String databaseName, String namespace, String tableName, String columnName) throws CatalogException {
+  public boolean existIndexByColumn(String databaseName, String tableName, String columnName) throws CatalogException {
     return false;
   }
 
   @Override
-  public CatalogProtos.IndexDescProto[] getIndexes(String databaseName, String namespace, String tableName) throws CatalogException {
+  public CatalogProtos.IndexDescProto[] getIndexes(String databaseName, String tableName) throws CatalogException {
     return new CatalogProtos.IndexDescProto[0];
   }
 

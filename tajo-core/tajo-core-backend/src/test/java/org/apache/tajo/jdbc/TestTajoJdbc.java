@@ -38,7 +38,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
 import static org.junit.Assert.*;
 
 @Category(IntegrationTest.class)
@@ -200,7 +199,7 @@ public class TestTajoJdbc {
       int numTables = 0;
 
       List<String> tableNames = new ArrayList<String>(
-          tpch.getTestingCluster().getMaster().getCatalog().getAllTableNames(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE));
+          tpch.getTestingCluster().getMaster().getCatalog().getAllTableNames(DEFAULT_DATABASE_NAME));
 
       Collections.sort(tableNames);
 
@@ -234,7 +233,7 @@ public class TestTajoJdbc {
       int numColumns = 0;
 
       TableDesc tableDesc = tpch.getTestingCluster().getMaster().getCatalog()
-          .getTableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName);
+          .getTableDesc(DEFAULT_DATABASE_NAME, tableName);
       assertNotNull(tableDesc);
 
       List<Column> columns = tableDesc.getSchema().getColumns();
