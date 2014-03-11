@@ -45,6 +45,7 @@ import org.junit.Test;
 
 import java.io.IOException;
 
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_TABLESPACE_NAME;
 import static org.apache.tajo.ipc.TajoWorkerProtocol.JoinEnforce.JoinAlgorithm;
 import static org.junit.Assert.*;
 
@@ -67,6 +68,8 @@ public class TestHashJoinExec {
     util.initTestDir();
     catalog = util.startCatalogCluster().getCatalog();
     testDir = CommonTestingUtil.getTestDir(TEST_PATH);
+    catalog.createTablespace(DEFAULT_TABLESPACE_NAME, testDir.toUri().toString());
+    catalog.createDatabase(CatalogConstants.DEFAULT_DATABASE_NAME, DEFAULT_TABLESPACE_NAME);
     conf = util.getConfiguration();
     sm = StorageManagerFactory.getStorageManager(conf, testDir);
 

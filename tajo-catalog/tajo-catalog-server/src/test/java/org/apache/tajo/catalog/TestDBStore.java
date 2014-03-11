@@ -38,9 +38,7 @@ import org.junit.Test;
 import java.io.File;
 import java.io.IOException;
 
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_NAMESPACE;
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_TABLESPACE_NAME;
+import static org.apache.tajo.catalog.CatalogConstants.*;
 import static org.junit.Assert.*;
 
 public class TestDBStore {
@@ -108,12 +106,13 @@ public class TestDBStore {
     stat.setNumBytes(1023234);
 
     TableDesc desc = new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "gettable"));
+    desc.setExternal(true);
     desc.setStats(stat);
 
     store.createTable(desc.getProto());
     TableDesc retrieved = new TableDesc(store.getTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
     assertEquals(",", retrieved.getMeta().getOption("file.delimiter"));
-    assertEquals(desc, retrieved);
+    assertTrue(desc.equals(retrieved));
     assertTrue(957685 == desc.getStats().getNumRows());
     assertTrue(1023234 == desc.getStats().getNumBytes());
     // Schema order check
@@ -249,7 +248,8 @@ public class TestDBStore {
         new PartitionMethodDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName, CatalogProtos.PartitionType.HASH,
             "id", partSchema);
 
-    TableDesc desc = new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
+    TableDesc desc =
+        new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
     assertFalse(store.existTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
     store.createTable(desc.getProto());
@@ -282,7 +282,8 @@ public class TestDBStore {
         new PartitionMethodDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName, CatalogProtos.PartitionType.HASH,
             "id", partSchema);
 
-    TableDesc desc = new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
+    TableDesc desc =
+        new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
     assertFalse(store.existTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
     store.createTable(desc.getProto());
@@ -315,7 +316,8 @@ public class TestDBStore {
         new PartitionMethodDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName, CatalogProtos.PartitionType.LIST,
             "id", partSchema);
 
-    TableDesc desc = new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
+    TableDesc desc =
+        new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
     assertFalse(store.existTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
     store.createTable(desc.getProto());
@@ -348,7 +350,8 @@ public class TestDBStore {
         new PartitionMethodDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName, CatalogProtos.PartitionType.RANGE,
             "id", partSchema);
 
-    TableDesc desc = new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
+    TableDesc desc =
+        new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
     assertFalse(store.existTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
     store.createTable(desc.getProto());
@@ -381,7 +384,8 @@ public class TestDBStore {
         new PartitionMethodDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName, CatalogProtos.PartitionType.COLUMN,
             "id", partSchema);
 
-    TableDesc desc = new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
+    TableDesc desc =
+        new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
     assertFalse(store.existTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
     store.createTable(desc.getProto());

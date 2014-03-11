@@ -962,6 +962,16 @@ public class SQLAnalyzer extends SQLParserBaseVisitor<Expr> {
   }
 
   @Override
+  public Expr visitDatabase_definition(@NotNull SQLParser.Database_definitionContext ctx) {
+    return new CreateDatabase(ctx.identifier().getText(), null);
+  }
+
+  @Override
+  public Expr visitDrop_database_statement(@NotNull SQLParser.Drop_database_statementContext ctx) {
+    return new DropDatabase(ctx.identifier().getText());
+  }
+
+  @Override
   public Expr visitCreate_table_statement(SQLParser.Create_table_statementContext ctx) {
     String tableName = ctx.table_name().getText();
     CreateTable createTable = new CreateTable(tableName);

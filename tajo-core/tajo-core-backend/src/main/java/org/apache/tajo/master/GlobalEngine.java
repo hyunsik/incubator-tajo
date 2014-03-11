@@ -29,6 +29,7 @@ import org.apache.tajo.QueryId;
 import org.apache.tajo.QueryIdFactory;
 import org.apache.tajo.TajoProtos;
 import org.apache.tajo.algebra.Expr;
+import org.apache.tajo.algebra.OpType;
 import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.exception.AlreadyExistsTableException;
 import org.apache.tajo.catalog.exception.NoSuchTableException;
@@ -200,18 +201,27 @@ public class GlobalEngine extends AbstractService {
     return plan.toString();
   }
 
+  private boolean isDDL(Expr expr) {
+    return expr.getType() == OpType.CreateDatabase || expr.getType() == OpType.DropDatabase;
+  }
+
   public QueryId updateQuery(String sql) throws IOException, SQLException, PlanningException {
     LOG.info("SQL: " + sql);
     // parse the query
     Expr expr = analyzer.parse(sql);
-    LogicalPlan plan = createLogicalPlan(expr);
-    LogicalRootNode rootNode = plan.getRootBlock().getRoot();
 
-    if (!PlannerUtil.checkIfDDLPlan(rootNode)) {
-      throw new SQLException("This is not update query:\n" + sql);
+    if (isDDL(expr)) {
+
     } else {
-      updateQuery(rootNode.getChild());
-      return QueryIdFactory.NULL_QUERY_ID;
+      LogicalPlan plan = createLogicalPlan(expr);
+      LogicalRootNode rootNode = plan.getRootBlock().getRoot();
+
+      if (!PlannerUtil.checkIfDDLPlan(rootNode)) {
+        throw new SQLException("This is not update query:\n" + sql);
+      } else {
+        updateQuery(rootNode.getChild());
+        return QueryIdFactory.NULL_QUERY_ID;
+      }
     }
   }
 
@@ -283,11 +293,11 @@ public class GlobalEngine extends AbstractService {
     }
 
     return createTableOnPath(createTable.getTableName(), createTable.getTableSchema(), meta,
-        createTable.getPath(), !createTable.isExternal(), createTable.getPartitionMethod());
+        createTable.getPath(), createTable.isExternal(), createTable.getPartitionMethod());
   }
 
   public TableDesc createTableOnPath(String tableName, Schema schema, TableMeta meta,
-                                     Path path, boolean isCreated, PartitionMethodDesc partitionDesc)
+                                     Path path, boolean isExternal, PartitionMethodDesc partitionDesc)
       throws IOException {
     if (catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName)) {
       throw new AlreadyExistsTableException(tableName);
@@ -295,7 +305,7 @@ public class GlobalEngine extends AbstractService {
 
     FileSystem fs = path.getFileSystem(context.getConf());
 
-    if (isCreated) {
+    if (!isExternal) {
       fs.mkdirs(path);
     }
 
@@ -314,7 +324,7 @@ public class GlobalEngine extends AbstractService {
 
     TableStats stats = new TableStats();
     stats.setNumBytes(totalSize);
-    TableDesc desc = CatalogUtil.newTableDesc(tableName, schema, meta, path);
+    TableDesc desc = new TableDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName, schema, meta, path, isExternal);
     desc.setStats(stats);
     if (partitionDesc != null) {
       desc.setPartitionMethod(partitionDesc);

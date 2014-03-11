@@ -285,7 +285,7 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
   }
 
   @Override
-  public void createDatabase(String databaseName) throws CatalogException {
+  public void createDatabase(String databaseName, String tablespaceName) throws CatalogException {
     HCatalogStoreClientPool.HCatalogStoreClient client = null;
 
     String databaseUri = defaultSpaceUri + "/" + databaseName;

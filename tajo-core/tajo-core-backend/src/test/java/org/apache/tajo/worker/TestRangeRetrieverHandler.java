@@ -55,6 +55,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_TABLESPACE_NAME;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -75,10 +76,12 @@ public class TestRangeRetrieverHandler {
   public void setUp() throws Exception {
     util = new TajoTestingCluster();
     conf = util.getConfiguration();
-    testDir = CommonTestingUtil.getTestDir("target/test-data/TestRangeRetrieverHandler");
+    testDir = CommonTestingUtil.getTestDir();
     fs = testDir.getFileSystem(conf);
     util.startCatalogCluster();
     catalog = util.getMiniCatalogCluster().getCatalog();
+    catalog.createTablespace(DEFAULT_TABLESPACE_NAME, testDir.toUri().toString());
+    catalog.createDatabase(CatalogConstants.DEFAULT_DATABASE_NAME, DEFAULT_TABLESPACE_NAME);
     sm = StorageManagerFactory.getStorageManager(conf, testDir);
 
     analyzer = new SQLAnalyzer();

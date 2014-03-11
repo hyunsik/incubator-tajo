@@ -449,6 +449,7 @@ public class Query implements EventHandler<QueryEvent> {
                 lastStage.getSchema(),
                 meta,
                 finalOutputDir);
+        resultTableDesc.setExternal(true);
 
         stats.setNumBytes(getTableVolume(query.systemConf, finalOutputDir));
         resultTableDesc.setStats(stats);
@@ -482,6 +483,7 @@ public class Query implements EventHandler<QueryEvent> {
                 createTableNode.getTableSchema(),
                 meta,
                 finalOutputDir);
+        tableDescTobeCreated.setExternal(createTableNode.isExternal());
 
         if (createTableNode.hasPartition()) {
           tableDescTobeCreated.setPartitionMethod(createTableNode.getPartitionMethod());

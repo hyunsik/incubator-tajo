@@ -98,11 +98,12 @@ message TableDescProto {
   required string database_name = 1;
   optional string namespace = 2;
 	required string table_name = 3;
-	required string path = 4;
+	optional string path = 4;
 	required TableProto meta = 5;
 	required SchemaProto schema = 6;
 	optional TableStatsProto stats = 7;
   optional PartitionMethodProto partition = 8;
+  optional bool isExternal = 9 [default = false];
 }
 
 message TableIdentifierProto {

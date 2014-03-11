@@ -53,6 +53,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.Stack;
 
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_TABLESPACE_NAME;
 import static org.junit.Assert.assertEquals;
 
 public class TestBSTIndexExec {
@@ -85,7 +86,9 @@ public class TestBSTIndexExec {
     util.startCatalogCluster();
     catalog = util.getMiniCatalogCluster().getCatalog();
 
-    Path workDir = CommonTestingUtil.getTestDir("target/test-data/TestPhysicalPlanner");
+    Path workDir = CommonTestingUtil.getTestDir();
+    catalog.createTablespace(DEFAULT_TABLESPACE_NAME, workDir.toUri().toString());
+    catalog.createDatabase(CatalogConstants.DEFAULT_DATABASE_NAME, DEFAULT_TABLESPACE_NAME);
     sm = StorageManagerFactory.getStorageManager(conf, workDir);
 
     idxPath = new Path(workDir, "test.idx");

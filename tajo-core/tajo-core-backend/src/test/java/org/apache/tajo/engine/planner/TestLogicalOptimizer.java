@@ -74,10 +74,12 @@ public class TestLogicalOptimizer {
     TableDesc people = new TableDesc("employee", schema, meta, CommonTestingUtil.getTestDir());
     catalog.createTable(people);
 
-    TableDesc student = new TableDesc("dept", schema2, StoreType.CSV, new Options(), CommonTestingUtil.getTestDir());
+    TableDesc student =
+        new TableDesc("dept", schema2, StoreType.CSV, new Options(), CommonTestingUtil.getTestDir());
     catalog.createTable(student);
 
-    TableDesc score = new TableDesc("score", schema3, StoreType.CSV, new Options(), CommonTestingUtil.getTestDir());
+    TableDesc score =
+        new TableDesc("score", schema3, StoreType.CSV, new Options(), CommonTestingUtil.getTestDir());
     catalog.createTable(score);
 
     FunctionDesc funcDesc = new FunctionDesc("sumtest", SumInt.class, FunctionType.GENERAL,

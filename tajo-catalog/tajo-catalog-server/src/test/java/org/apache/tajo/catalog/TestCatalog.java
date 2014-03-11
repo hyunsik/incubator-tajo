@@ -124,7 +124,7 @@ public class TestCatalog {
         tableName,
         schema1,
         new TableMeta(StoreType.CSV, new Options()),
-        path);
+        path, true);
     return table;
   }
 
@@ -416,7 +416,8 @@ public class TestCatalog {
         new PartitionMethodDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName,
             CatalogProtos.PartitionType.HASH, "id", partSchema);
 
-    TableDesc desc = new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
+    TableDesc desc =
+        new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
 
     assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
@@ -452,7 +453,8 @@ public class TestCatalog {
         new PartitionMethodDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName,
             CatalogProtos.PartitionType.HASH, "id", partSchema);
 
-    TableDesc desc = new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
+    TableDesc desc =
+        new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
 
     assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
@@ -488,7 +490,8 @@ public class TestCatalog {
         new PartitionMethodDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName,
             CatalogProtos.PartitionType.LIST, "id", partSchema);
 
-    TableDesc desc = new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
+    TableDesc desc =
+        new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
     assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
     catalog.createTable(desc);
@@ -523,7 +526,8 @@ public class TestCatalog {
         new PartitionMethodDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName, CatalogProtos.PartitionType.RANGE,
             "id", partSchema);
 
-    TableDesc desc = new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
+    TableDesc desc =
+        new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
     assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
     catalog.createTable(desc);
@@ -559,7 +563,8 @@ public class TestCatalog {
         new PartitionMethodDesc(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName,
             CatalogProtos.PartitionType.COLUMN, "id", partSchema);
 
-    TableDesc desc = new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
+    TableDesc desc =
+        new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
     assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, DEFAULT_NAMESPACE, tableName));
     catalog.createTable(desc);

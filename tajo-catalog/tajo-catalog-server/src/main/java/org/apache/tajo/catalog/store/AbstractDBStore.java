@@ -39,6 +39,7 @@ import org.apache.tajo.common.TajoDataTypes.Type;
 import org.apache.tajo.exception.InternalException;
 import org.apache.tajo.exception.UnimplementedException;
 import org.apache.tajo.util.FileUtil;
+import org.apache.tajo.util.Pair;
 
 import java.io.File;
 import java.net.URL;
@@ -561,6 +562,11 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     }
   }
 
+  enum TableType {
+    BASE_TABLE,
+    EXTERNAL
+  }
+
   @Override
   public void createTable(final CatalogProtos.TableDescProto table) throws CatalogException {
     Connection conn = null;
@@ -575,19 +581,37 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       String tableName = CatalogUtil.normalizeIdentifier(table.getTableName());
 
       int dbid = getDatabaseId(databaseName);
-      String sql = "INSERT INTO TABLES (db_id, TABLE_ID, path, store_type) VALUES(?, ?, ?, ?) ";
 
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(sql);
+      if (table.getIsExternal()) {
+        String sql = "INSERT INTO TABLES (db_id, TABLE_ID, TABLE_TYPE, path, store_type) VALUES(?, ?, ?, ?, ?) ";
+
+        if (LOG.isDebugEnabled()) {
+          LOG.debug(sql);
+        }
+
+        pstmt = conn.prepareStatement(sql);
+        pstmt.setInt(1, dbid);
+        pstmt.setString(2, tableName);
+        pstmt.setString(3, TableType.EXTERNAL.name());
+        pstmt.setString(4, table.getPath());
+        pstmt.setString(5, table.getMeta().getStoreType().name());
+        pstmt.executeUpdate();
+        pstmt.close();
+      } else {
+        String sql = "INSERT INTO TABLES (db_id, TABLE_ID, TABLE_TYPE, store_type) VALUES(?, ?, ?, ?) ";
+
+        if (LOG.isDebugEnabled()) {
+          LOG.debug(sql);
+        }
+
+        pstmt = conn.prepareStatement(sql);
+        pstmt.setInt(1, dbid);
+        pstmt.setString(2, tableName);
+        pstmt.setString(3, TableType.BASE_TABLE.name());
+        pstmt.setString(4, table.getMeta().getStoreType().name());
+        pstmt.executeUpdate();
+        pstmt.close();
       }
-
-      pstmt = conn.prepareStatement(sql);
-      pstmt.setInt(1, dbid);
-      pstmt.setString(2, tableName);
-      pstmt.setString(3, table.getPath());
-      pstmt.setString(4, table.getMeta().getStoreType().name());
-      pstmt.executeUpdate();
-      pstmt.close();
 
       String tidSql = "SELECT TID from TABLES WHERE db_id = ? AND TABLE_ID = ?";
       pstmt = conn.prepareStatement(tidSql);
@@ -607,7 +631,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
           "INSERT INTO " + TB_COLUMNS + " (TID, COLUMN_NAME, COLUMN_ID, data_type, type_length) VALUES(?, ?, ?, ?, ?) ";
 
       if (LOG.isDebugEnabled()) {
-        LOG.debug(sql);
+        LOG.debug(colSql);
       }
 
       pstmt = conn.prepareStatement(colSql);
@@ -848,6 +872,33 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     }
   }
 
+  public Pair<Integer, String> getDatabaseIdAndUri(String databaseName) throws SQLException {
+    String sql =
+        "SELECT DB_ID, SPACE_URI from " + TB_DATABASES + " natural join " + TB_SPACES + " WHERE db_name = ?";
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(sql);
+    }
+
+    Connection conn = null;
+    PreparedStatement pstmt = null;
+    ResultSet res = null;
+
+    try {
+      conn = getConnection();
+      pstmt = conn.prepareStatement(sql);
+      pstmt.setString(1, databaseName);
+      res = pstmt.executeQuery();
+      if (!res.next()) {
+        throw new NoSuchDatabaseException(databaseName);
+      }
+
+      return new Pair<Integer, String>(res.getInt(1), res.getString(2) + "/" + databaseName);
+    } finally {
+      CatalogUtil.closeQuietly(conn, pstmt, res);
+    }
+  }
+
   @Override
   public CatalogProtos.TableDescProto getTable(String databaseName, String namespace, String tableName)
       throws CatalogException {
@@ -861,13 +912,13 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     try {
       tableBuilder = CatalogProtos.TableDescProto.newBuilder();
 
-      int dbid = getDatabaseId(databaseName);
+      Pair<Integer, String> databaseIdAndUri = getDatabaseIdAndUri(databaseName);
       tableBuilder.setDatabaseName(databaseName);
 
       //////////////////////////////////////////
       // Geting Table Description
       //////////////////////////////////////////
-      String sql = "SELECT TID, TABLE_ID, path, store_type FROM TABLES WHERE db_id = ? AND TABLE_ID = ?";
+      String sql = "SELECT TID, TABLE_ID, TABLE_TYPE, PATH, STORE_TYPE FROM TABLES WHERE db_id = ? AND TABLE_ID = ?";
 
 
       if (LOG.isDebugEnabled()) {
@@ -876,7 +927,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
 
       conn = getConnection();
       pstmt = conn.prepareStatement(sql);
-      pstmt.setInt(1, dbid);
+      pstmt.setInt(1, databaseIdAndUri.getFirst());
       pstmt.setString(2, tableName);
       res = pstmt.executeQuery();
 
@@ -884,10 +935,19 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
         return null;
       }
 
-      int tableId = res.getInt("TID");
-      tableBuilder.setTableName(res.getString(COL_TABLES_NAME).trim());
-      tableBuilder.setPath(res.getString("path").trim());
-      storeType = CatalogUtil.getStoreType(res.getString("store_type").trim());
+      int tableId = res.getInt(1);
+      tableBuilder.setTableName(res.getString(2).trim());
+      TableType tableType = TableType.valueOf(res.getString(3));
+      if (tableType == TableType.EXTERNAL) {
+        tableBuilder.setIsExternal(true);
+      }
+
+      if (tableType == TableType.BASE_TABLE) {
+        tableBuilder.setPath(databaseIdAndUri.getSecond() + "/" + tableName);
+      } else {
+        tableBuilder.setPath(res.getString(4).trim());
+      }
+      storeType = CatalogUtil.getStoreType(res.getString(5).trim());
 
       res.close();
       pstmt.close();

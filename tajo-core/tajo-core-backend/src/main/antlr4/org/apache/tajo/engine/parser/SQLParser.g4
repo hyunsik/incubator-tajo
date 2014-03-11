@@ -54,13 +54,22 @@ data_change_statement
   ;
 
 schema_statement
-  : create_table_statement
+  : database_definition
+  | create_table_statement
   | drop_table_statement
   ;
 
 index_statement
   : CREATE (u=UNIQUE)? INDEX n=identifier ON t=table_name (m=method_specifier)?
     LEFT_PAREN s=sort_specifier_list RIGHT_PAREN p=param_clause?
+  ;
+
+database_definition
+  : CREATE DATABASE dbname = identifier
+  ;
+
+drop_database_statement
+  : DROP DATABASE dbname = identifier
   ;
 
 create_table_statement
