@@ -61,7 +61,7 @@ public abstract class AbstractCatalogClient implements CatalogService {
   @Override
   public final Boolean createTablespace(final String tablespaceName, final String tablespaceUri) {
     try {
-      return new ServerCallable<Boolean>(conf, catalogServerAddr, CatalogProtocol.class, false) {
+      return new ServerCallable<Boolean>(pool, catalogServerAddr, CatalogProtocol.class, false) {
         public Boolean call(NettyClientBase client) throws ServiceException {
           CatalogProtocolService.BlockingInterface stub = getStub(client);
 
@@ -80,7 +80,7 @@ public abstract class AbstractCatalogClient implements CatalogService {
   @Override
   public final Boolean dropTablespace(final String tablespaceName) {
     try {
-      return new ServerCallable<Boolean>(conf, catalogServerAddr, CatalogProtocol.class, false) {
+      return new ServerCallable<Boolean>(pool, catalogServerAddr, CatalogProtocol.class, false) {
         public Boolean call(NettyClientBase client) throws ServiceException {
           CatalogProtocolService.BlockingInterface stub = getStub(client);
           return stub.dropTablespace(null, ProtoUtil.convertString(tablespaceName)).getValue();
@@ -95,7 +95,7 @@ public abstract class AbstractCatalogClient implements CatalogService {
   @Override
   public final Boolean existTablespace(final String tablespaceName) {
     try {
-      return new ServerCallable<Boolean>(conf, catalogServerAddr, CatalogProtocol.class, false) {
+      return new ServerCallable<Boolean>(pool, catalogServerAddr, CatalogProtocol.class, false) {
         public Boolean call(NettyClientBase client) throws ServiceException {
           CatalogProtocolService.BlockingInterface stub = getStub(client);
           return stub.existTablespace(null, ProtoUtil.convertString(tablespaceName)).getValue();
@@ -110,7 +110,7 @@ public abstract class AbstractCatalogClient implements CatalogService {
   @Override
   public final Collection<String> getAllTablespaceNames() {
     try {
-      return new ServerCallable<Collection<String>>(conf, catalogServerAddr, CatalogProtocol.class, false) {
+      return new ServerCallable<Collection<String>>(pool, catalogServerAddr, CatalogProtocol.class, false) {
         public Collection<String> call(NettyClientBase client) throws ServiceException {
           CatalogProtocolService.BlockingInterface stub = getStub(client);
           PrimitiveProtos.StringListProto response = stub.getAllTablespaceNames(null, ProtoUtil.NULL_PROTO);
@@ -126,7 +126,7 @@ public abstract class AbstractCatalogClient implements CatalogService {
   @Override
   public final Boolean createDatabase(final String databaseName, final String tablespaceName) {
     try {
-      return new ServerCallable<Boolean>(conf, catalogServerAddr, CatalogProtocol.class, false) {
+      return new ServerCallable<Boolean>(pool, catalogServerAddr, CatalogProtocol.class, false) {
         public Boolean call(NettyClientBase client) throws ServiceException {
           CatalogProtocolService.BlockingInterface stub = getStub(client);
 
@@ -145,7 +145,7 @@ public abstract class AbstractCatalogClient implements CatalogService {
   @Override
   public final Boolean dropDatabase(final String databaseName) {
     try {
-      return new ServerCallable<Boolean>(conf, catalogServerAddr, CatalogProtocol.class, false) {
+      return new ServerCallable<Boolean>(pool, catalogServerAddr, CatalogProtocol.class, false) {
         public Boolean call(NettyClientBase client) throws ServiceException {
           CatalogProtocolService.BlockingInterface stub = getStub(client);
           return stub.dropDatabase(null, ProtoUtil.convertString(databaseName)).getValue();
@@ -160,7 +160,7 @@ public abstract class AbstractCatalogClient implements CatalogService {
   @Override
   public final Boolean existDatabase(final String databaseName) {
     try {
-      return new ServerCallable<Boolean>(conf, catalogServerAddr, CatalogProtocol.class, false) {
+      return new ServerCallable<Boolean>(pool, catalogServerAddr, CatalogProtocol.class, false) {
         public Boolean call(NettyClientBase client) throws ServiceException {
           CatalogProtocolService.BlockingInterface stub = getStub(client);
           return stub.existDatabase(null, ProtoUtil.convertString(databaseName)).getValue();
@@ -175,7 +175,7 @@ public abstract class AbstractCatalogClient implements CatalogService {
   @Override
   public final Collection<String> getAllDatabaseNames() {
     try {
-      return new ServerCallable<Collection<String>>(conf, catalogServerAddr, CatalogProtocol.class, false) {
+      return new ServerCallable<Collection<String>>(pool, catalogServerAddr, CatalogProtocol.class, false) {
         public Collection<String> call(NettyClientBase client) throws ServiceException {
           CatalogProtocolService.BlockingInterface stub = getStub(client);
           PrimitiveProtos.StringListProto response = stub.getAllDatabaseNames(null, ProtoUtil.NULL_PROTO);

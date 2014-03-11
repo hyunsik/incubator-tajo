@@ -32,6 +32,7 @@ import org.apache.tajo.QueryIdFactory;
 import org.apache.tajo.TajoIdProtos;
 import org.apache.tajo.TajoProtos;
 import org.apache.tajo.catalog.*;
+import org.apache.tajo.catalog.exception.NoSuchDatabaseException;
 import org.apache.tajo.catalog.partition.PartitionMethodDesc;
 import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.conf.TajoConf;
@@ -48,6 +49,8 @@ import org.apache.tajo.master.querymaster.QueryJobManager;
 import org.apache.tajo.master.rm.Worker;
 import org.apache.tajo.master.rm.WorkerResource;
 import org.apache.tajo.master.session.InvalidSessionException;
+import org.apache.tajo.master.session.NoSuchSessionVariableException;
+import org.apache.tajo.master.session.Session;
 import org.apache.tajo.rpc.BlockingRpcServer;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos;
 import org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.BoolProto;
@@ -60,6 +63,7 @@ import java.net.InetSocketAddress;
 import java.util.*;
 
 import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_TABLESPACE_NAME;
 
 public class TajoMasterClientService extends AbstractService {
   private final static Log LOG = LogFactory.getLog(TajoMasterClientService.class);
@@ -148,6 +152,23 @@ public class TajoMasterClientService extends AbstractService {
     }
 
     @Override
+    public BoolProto updateSessionVariables(RpcController controller, UpdateSessionVariableRequest request)
+        throws ServiceException {
+      try {
+        String sessionId = request.getSessionId().getId();
+        for (CatalogProtos.KeyValueProto kv : request.getSetVariables().getKeyvalList()) {
+          context.getSessionManager().setVariable(sessionId, kv.getKey(), kv.getValue());
+        }
+        for (String unsetVariable : request.getUnsetVariablesList()) {
+          context.getSessionManager().removeVariable(sessionId, unsetVariable);
+        }
+        return ProtoUtil.TRUE;
+      } catch (Throwable t) {
+        throw new ServiceException(t);
+      }
+    }
+
+    @Override
     public StringProto getSessionVariable(RpcController controller, SessionedStringProto request)
         throws ServiceException {
 
@@ -160,14 +181,16 @@ public class TajoMasterClientService extends AbstractService {
     }
 
     @Override
-    public BoolProto updateSessionVariables(RpcController controller, UpdateSessionVariableRequest request)
-        throws ServiceException {
+    public BoolProto existSessionVariable(RpcController controller, SessionedStringProto request) throws ServiceException {
       try {
-        String sessionId = request.getSessionId().getId();
-        for (CatalogProtos.KeyValueProto kv : request.getSetVariables().getKeyvalList()) {
-          context.getSessionManager().setVariable(sessionId, kv.getKey(), kv.getValue());
+        String value = context.getSessionManager().getVariable(request.getSessionId().getId(), request.getValue());
+        if (value != null) {
+          return ProtoUtil.TRUE;
+        } else {
+          return ProtoUtil.FALSE;
         }
-        return ProtoUtil.TRUE;
+      } catch (NoSuchSessionVariableException nssv) {
+        return ProtoUtil.FALSE;
       } catch (Throwable t) {
         throw new ServiceException(t);
       }
@@ -203,8 +226,13 @@ public class TajoMasterClientService extends AbstractService {
       try {
         String sessionId = request.getSessionId().getId();
         String databaseName = CatalogUtil.normalizeIdentifier(request.getValue());
-        context.getSessionManager().getSession(sessionId).selectDatabase(databaseName);
-        return ProtoUtil.TRUE;
+
+        if (context.getCatalog().existDatabase(databaseName)) {
+          context.getSessionManager().getSession(sessionId).selectDatabase(databaseName);
+          return ProtoUtil.TRUE;
+        } else {
+          throw new NoSuchDatabaseException(databaseName);
+        }
       } catch (Throwable t) {
         throw new ServiceException(t);
       }
@@ -463,6 +491,64 @@ public class TajoMasterClientService extends AbstractService {
         return builder.build();
       } catch (Throwable t) {
         throw new ServiceException(t);
+      }
+    }
+
+    @Override
+    public BoolProto createDatabase(RpcController controller, SessionedStringProto request) throws ServiceException {
+      try {
+        context.getSessionManager().touch(request.getSessionId().getId());
+        if (catalog.createDatabase(request.getValue(), DEFAULT_TABLESPACE_NAME)) {
+          return BOOL_TRUE;
+        } else {
+          return BOOL_FALSE;
+        }
+      } catch (Throwable e) {
+        throw new ServiceException(e);
+      }
+    }
+
+    @Override
+    public BoolProto existDatabase(RpcController controller, SessionedStringProto request) throws ServiceException {
+      try {
+        context.getSessionManager().touch(request.getSessionId().getId());
+        if (catalog.existDatabase(request.getValue())) {
+          return BOOL_TRUE;
+        } else {
+          return BOOL_FALSE;
+        }
+      } catch (Throwable e) {
+        throw new ServiceException(e);
+      }
+    }
+
+    @Override
+    public BoolProto dropDatabase(RpcController controller, SessionedStringProto request) throws ServiceException {
+      try {
+        Session session = context.getSessionManager().getSession(request.getSessionId().getId());
+        String databaseNameToBeDropped = CatalogUtil.normalizeIdentifier(request.getValue());
+        if (session.getCurrentDatabase().equals(databaseNameToBeDropped)) {
+          throw new ServiceException("ERROR: Cannot drop the current open database");
+        }
+
+        if (catalog.dropDatabase(request.getValue())) {
+          return BOOL_TRUE;
+        } else {
+          return BOOL_FALSE;
+        }
+      } catch (Throwable e) {
+        throw new ServiceException(e);
+      }
+    }
+
+    @Override
+    public PrimitiveProtos.StringListProto getAllDatabases(RpcController controller, TajoIdProtos.SessionIdProto
+        request) throws ServiceException {
+      try {
+        context.getSessionManager().touch(request.getId());
+        return ProtoUtil.convertStrings(catalog.getAllDatabaseNames());
+      } catch (Throwable e) {
+        throw new ServiceException(e);
       }
     }
 

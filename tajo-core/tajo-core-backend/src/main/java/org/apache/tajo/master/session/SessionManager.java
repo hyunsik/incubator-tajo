@@ -102,6 +102,12 @@ public class SessionManager extends CompositeService implements EventHandler<Ses
     return sessions.get(sessionId).getVariable(name);
   }
 
+  public void removeVariable(String sessionId, String name) throws InvalidSessionException {
+    assertSessionExistence(sessionId);
+    touch(sessionId);
+    sessions.get(sessionId).removeVariable(name);
+  }
+
   public Map<String, String> getAllVariables(String sessionId) throws InvalidSessionException {
     assertSessionExistence(sessionId);
     touch(sessionId);

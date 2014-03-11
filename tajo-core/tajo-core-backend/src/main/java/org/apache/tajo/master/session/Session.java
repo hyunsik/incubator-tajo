@@ -69,6 +69,12 @@ public class Session implements SessionConstants {
     }
   }
 
+  public void removeVariable(String name) {
+    synchronized (sessionVariables) {
+      sessionVariables.remove(name);
+    }
+  }
+
   public synchronized Map<String, String> getAllVariables() {
     synchronized (sessionVariables) {
       return ImmutableMap.copyOf(sessionVariables);
