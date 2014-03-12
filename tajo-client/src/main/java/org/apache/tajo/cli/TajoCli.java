@@ -18,11 +18,10 @@
 
 package org.apache.tajo.cli;
 
+import com.google.protobuf.ServiceException;
 import jline.console.ConsoleReader;
 import jline.console.history.FileHistory;
-import jline.console.history.PersistentHistory;
 import org.apache.commons.cli.*;
-import org.apache.commons.lang.StringUtils;
 import org.apache.tajo.QueryId;
 import org.apache.tajo.QueryIdFactory;
 import org.apache.tajo.TajoProtos.QueryState;
@@ -44,8 +43,13 @@ import java.io.PrintWriter;
 import java.lang.reflect.Constructor;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+
+import static org.apache.tajo.cli.ParsedResult.StatementType.META;
+import static org.apache.tajo.cli.SimpleParser.ParsingState;
 
 public class TajoCli {
   public static final int PRINT_LIMIT = 24;
@@ -130,7 +134,7 @@ public class TajoCli {
     initCommands();
 
     if (cmd.hasOption("c")) {
-      executeStatements(cmd.getOptionValue("c"));
+      executeScript(cmd.getOptionValue("c"));
       sout.flush();
       System.exit(0);
     }
@@ -138,7 +142,7 @@ public class TajoCli {
       File sqlFile = new File(cmd.getOptionValue("f"));
       if (sqlFile.exists()) {
         String contents = FileUtil.readTextFile(new File(cmd.getOptionValue("f")));
-        executeStatements(contents);
+        executeScript(contents);
         sout.flush();
         System.exit(0);
       } else {
@@ -176,81 +180,63 @@ public class TajoCli {
   }
 
   public int runShell() throws Exception {
-
-    String raw;
     String line;
-    StringBuffer accumulatedLine = new StringBuffer();
-    String prompt = "tajo";
-    String curPrompt = prompt;
-    boolean newStatement = true;
+    String curPrompt = "tajo";
     int code = 0;
 
     sout.write("Try \\? for help.\n");
-    while((raw = reader.readLine(curPrompt + "> ")) != null) {
-      // each accumulated line has a space delimiter
-      if (accumulatedLine.length() > 0) {
-        accumulatedLine.append(' ');
-      }
 
-      line = raw.trim();
+    SimpleParser parser = new SimpleParser();
+    while((line = reader.readLine(curPrompt + "> ")) != null) {
 
-      if (line.length() == 0) { // if empty line
-        continue;
+      performParsedResults(parser.parseLines(line));
 
-      } else if (line.charAt(0) == '/') { // warning for legacy usage
-        printInvalidCommand(line);
-        continue;
-
-      } else if (line.charAt(0) == '\\') { // command mode
-        ((PersistentHistory)reader.getHistory()).flush();
-        executeCommand(line);
-
-      } else if (line.endsWith(";") && !line.endsWith("\\;")) {
-
-        // remove a trailing newline
-        line = StringUtils.chomp(line).trim();
-
-        // get a punctuated statement
-        String punctuated = accumulatedLine + line;
-
-        if (!newStatement) {
-          // why do two lines are removed?
-          // First history line indicates an accumulated line.
-          // Second history line is a just typed line.
-          reader.getHistory().removeLast();
-          reader.getHistory().removeLast();
-          reader.getHistory().add(punctuated);
-          ((PersistentHistory)reader.getHistory()).flush();
-        }
-
-        code = executeStatements(punctuated);
-
-        // reset accumulated lines
-        newStatement = true;
-        accumulatedLine = new StringBuffer();
-        curPrompt = prompt;
-
-      } else {
-        line = StringUtils.chomp(raw).trim();
-
-        // accumulate a line
-        accumulatedLine.append(line);
-
-        // replace the latest line with a accumulated line
-        if (!newStatement) { // if this is not first line, remove one more line.
-          reader.getHistory().removeLast();
-        } else {
-          newStatement = false;
-        }
-        reader.getHistory().removeLast();
-        reader.getHistory().add(accumulatedLine.toString());
-
-        // use an alternative prompt during accumulating lines
-        curPrompt = StringUtils.repeat(" ", prompt.length());
-        continue;
+      if (parser.getState() == ParsingState.WITHIN_QUOTE) {
+        curPrompt = "";
       }
     }
     return code;
+  }
+
+  private void performParsedResults(Collection<ParsedResult> parsedResults) throws ServiceException {
+    for (ParsedResult parsedResult : parsedResults) {
+      if (parsedResult.getType() == META) {
+        executeMetaCommand(parsedResult.getStatement());
+      } else {
+        executeQuery(parsedResult.getStatement());
+      }
+    }
+  }
+
+  private void executeMetaCommand(String statement) {
+    String [] cmds = statement.split(" ");
+    invokeCommand(cmds);
+  }
+
+  private void executeQuery(String statement) throws ServiceException {
+    ClientProtos.GetQueryStatusResponse response = client.executeQuery(statement);
+    if (response == null) {
+      sout.println("response is null");
+    }
+    else if (response.getResultCode() == ClientProtos.ResultCode.OK) {
+      QueryId queryId = null;
+      try {
+        queryId = new QueryId(response.getQueryId());
+        if (queryId.equals(QueryIdFactory.NULL_QUERY_ID)) {
+          sout.println("OK");
+        } else {
+          waitForQueryCompleted(queryId);
+        }
+      } finally {
+        if(queryId != null) {
+          client.closeQuery(queryId);
+        }
+      }
+    } else {
+      if (response.hasErrorMessage()) {
+        sout.println(response.getErrorMessage());
+      }
+    }
   }
 
   private void invokeCommand(String [] cmds) {
@@ -264,70 +250,9 @@ public class TajoCli {
     }
   }
 
-  public int executeStatements(String line) throws Exception {
-
-    // TODO - comment handling and multi line queries should be improved
-    // remove comments
-    String filtered = line.replaceAll("--[^\\r\\n]*", "").trim();
-
-    String stripped;
-    for (String statement : filtered.split(";")) {
-      stripped = StringUtils.chomp(statement);
-      if (StringUtils.isBlank(stripped)) {
-        continue;
-      }
-
-      String [] cmds = stripped.split(" ");
-      if (cmds[0].equalsIgnoreCase("exit") || cmds[0].equalsIgnoreCase("quit")) {
-        sout.println("\n\nbye!");
-        sout.flush();
-        ((PersistentHistory)this.reader.getHistory()).flush();
-        System.exit(0);
-      } else if (cmds[0].equalsIgnoreCase("detach") && cmds.length > 1 && cmds[1].equalsIgnoreCase("table")) {
-        // this command should be moved to GlobalEngine
-        invokeCommand(cmds);
-      } else if (cmds[0].equalsIgnoreCase("explain") && cmds.length > 1) {
-        String sql = stripped.substring(8);
-        ClientProtos.ExplainQueryResponse response = client.explainQuery(sql);
-        if (response == null) {
-          sout.println("response is null");
-        } else {
-          if (response.hasExplain()) {
-            sout.println(response.getExplain());
-          } else {
-            if (response.hasErrorMessage()) {
-              sout.println(response.getErrorMessage());
-            } else {
-              sout.println("No Explain");
-            }
-          }
-        }
-      } else { // submit a query to TajoMaster
-        ClientProtos.GetQueryStatusResponse response = client.executeQuery(stripped);
-        if (response == null) {
-          sout.println("response is null");
-        }
-        else if (response.getResultCode() == ClientProtos.ResultCode.OK) {
-          QueryId queryId = null;
-          try {
-            queryId = new QueryId(response.getQueryId());
-            if (queryId.equals(QueryIdFactory.NULL_QUERY_ID)) {
-              sout.println("OK");
-            } else {
-              waitForQueryCompleted(queryId);
-            }
-          } finally {
-            if(queryId != null) {
-              client.closeQuery(queryId);
-            }
-          }
-        } else {
-          if (response.hasErrorMessage()) {
-            sout.println(response.getErrorMessage());
-          }
-        }
-      }
-    }
+  public int executeScript(String script) throws Exception {
+    List<ParsedResult> results = SimpleParser.doProcessScripts(script);
+    performParsedResults(results);
     return 0;
   }
 
