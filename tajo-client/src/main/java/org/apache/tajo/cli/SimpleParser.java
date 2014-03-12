@@ -38,7 +38,6 @@ public class SimpleParser {
 
   ParsingState state = START_STATE;
   int lineNum;
-  int startIdx = 0;
   int endIdx = 0;
   StringBuilder appender = new StringBuilder();
 
@@ -95,7 +94,7 @@ public class SimpleParser {
       lineStartIdx = idx;
 
       if (state == ParsingState.TOK_START && str.charAt(idx) == '\\') {
-        startIdx = idx;
+        int endIdx = 0;
         state = ParsingState.META;
 
         ////////////////////////////
@@ -113,59 +112,55 @@ public class SimpleParser {
           }
         }
 
-        // if the token is last without semicolon
-        if (state == ParsingState.META && idx == str.length()) {
-          state = ParsingState.META_EOS;
-        }
+        appender.append(str.subSequence(lineStartIdx, endIdx).toString());
 
       /////////////////////////////////
       //    TOK_START     -> STATEMENT
       // or TOK_STATEMENT -> STATEMENT
       ////////////////////////////////
       } else if (isStatementContinue() || isStatementStart(str.charAt(idx))) {
-        startIdx = idx;
-
-        if (!isStatementContinue()) {
+        int endIdx = 0;
+        if (!isStatementContinue()) { // TOK_START -> STATEMENT
           state = ParsingState.STATEMENT;
-          idx++;
         }
 
         while (!isTerminateState(state) && idx < str.length()) {
-          char character = str.charAt(idx);
+          char character = str.charAt(idx++);
 
-          // If quote starts in the previous line or if quote starts here
-          if ((state == ParsingState.WITHIN_QUOTE || character == '\'') && idx < str.length()) {
+          if (character == ';') {
+            state = ParsingState.STATEMENT_EOS;
+            endIdx = idx - 1;
+          } else if (state == ParsingState.STATEMENT && character == '\'') { // TOK_STATEMENT -> WITHIN_QUOTE
+            state = ParsingState.WITHIN_QUOTE;
 
-            if (state != ParsingState.WITHIN_QUOTE && character == '\'') {
-              state = ParsingState.WITHIN_QUOTE;
+            if (idx < str.length()) {
               character = str.charAt(idx++);
+            } else {
+              continue;
             }
+          }
 
-            ///////////////////////////////
-            // WITHIN_QUOTE --> STATEMENT
-            ///////////////////////////////
-            while(state == ParsingState.WITHIN_QUOTE && character != '\'' && idx < str.length()) {
-              character = str.charAt(idx++);
+          if (state == ParsingState.WITHIN_QUOTE) {
+            do {
+              ///////////////////////////////
+              // WITHIN_QUOTE --> STATEMENT
+              ///////////////////////////////
               if (character == '\'') {
                 state = ParsingState.STATEMENT;
+                break;
               }
-            }
-
-            ///////////////////////////////
-            // STATEMENT --> QUOTE
-            ///////////////////////////////
-            endIdx = idx;
-          } else if (character == ';') {
-            state = ParsingState.STATEMENT_EOS;
-            endIdx = idx;
-          } else {
-            endIdx = idx + 1;
+              character = str.charAt(idx++);
+            } while(idx < str.length());
           }
-          idx++;
+        }
+
+        if (state == ParsingState.STATEMENT_EOS) {
+          appender.append(str.subSequence(lineStartIdx, endIdx).toString());
+        } else {
+          appender.append(str.subSequence(lineStartIdx, idx).toString());
         }
       }
 
-      appender.append(str.subSequence(lineStartIdx, endIdx).toString());
       lineNum++;
 
       statements.addAll(doProcessEndOfStatement(false));
