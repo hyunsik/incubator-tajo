@@ -23,19 +23,14 @@ package org.apache.tajo.catalog.store;
 
 import com.google.common.collect.Maps;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.tajo.catalog.CatalogConstants;
 import org.apache.tajo.catalog.CatalogUtil;
 import org.apache.tajo.catalog.FunctionDesc;
 import org.apache.tajo.catalog.exception.*;
 import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.catalog.proto.CatalogProtos.IndexDescProto;
-import org.apache.tajo.conf.TajoConf;
 
 import java.io.IOException;
 import java.util.*;
-
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_TABLESPACE_NAME;
 
 /**
  * CatalogServer guarantees that all operations are thread-safe.
@@ -165,7 +160,8 @@ public class MemStore implements CatalogStore {
     if (database.containsKey(tableName)) {
       CatalogProtos.TableDescProto unqualified = database.get(tableName);
       CatalogProtos.TableDescProto.Builder builder = CatalogProtos.TableDescProto.newBuilder();
-      CatalogProtos.SchemaProto schemaProto = CatalogUtil.getQualfiedSchema(tableName, unqualified.getSchema());
+      CatalogProtos.SchemaProto schemaProto =
+          CatalogUtil.getQualfiedSchema(databaseName, tableName, unqualified.getSchema());
       builder.mergeFrom(unqualified);
       builder.setSchema(schemaProto);
       return builder.build();

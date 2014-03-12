@@ -20,6 +20,7 @@ package org.apache.tajo.catalog;
 
 import com.google.common.collect.Sets;
 import org.apache.hadoop.fs.Path;
+import org.apache.tajo.TajoConstants;
 import org.apache.tajo.catalog.exception.NoSuchFunctionException;
 import org.apache.tajo.catalog.function.Function;
 import org.apache.tajo.catalog.partition.PartitionMethodDesc;
@@ -63,11 +64,11 @@ public class TestCatalog {
     server.init(conf);
     server.start();
     catalog = new LocalCatalogWrapper(server);
-    catalog.createTablespace(DEFAULT_TABLESPACE_NAME, path.toUri().toString());
-    catalog.createDatabase(DEFAULT_DATABASE_NAME, DEFAULT_TABLESPACE_NAME);
+    catalog.createTablespace(TajoConstants.DEFAULT_TABLESPACE_NAME, path.toUri().toString());
+    catalog.createDatabase(TajoConstants.DEFAULT_DATABASE_NAME, TajoConstants.DEFAULT_TABLESPACE_NAME);
 
-    for(String table : catalog.getAllTableNames(DEFAULT_DATABASE_NAME)){
-      catalog.dropTable(DEFAULT_DATABASE_NAME, table);
+    for(String table : catalog.getAllTableNames(TajoConstants.DEFAULT_DATABASE_NAME)){
+      catalog.dropTable(TajoConstants.DEFAULT_DATABASE_NAME, table);
     }
 	}
 	
@@ -79,7 +80,7 @@ public class TestCatalog {
   @Test
   public void testCreateAndDropDatabases() throws Exception {
     assertFalse(catalog.existDatabase("testCreateAndDropDatabases"));
-    assertTrue(catalog.createDatabase("testCreateAndDropDatabases", DEFAULT_TABLESPACE_NAME));
+    assertTrue(catalog.createDatabase("testCreateAndDropDatabases", TajoConstants.DEFAULT_TABLESPACE_NAME));
     assertTrue(catalog.existDatabase("testCreateAndDropDatabases"));
     assertTrue(catalog.dropDatabase("testCreateAndDropDatabases"));
   }
@@ -92,14 +93,14 @@ public class TestCatalog {
     for (int i = 0; i < NUM; i++) {
       String databaseName = namePrefix + i;
       assertFalse(catalog.existDatabase(databaseName));
-      assertTrue(catalog.createDatabase(databaseName, DEFAULT_TABLESPACE_NAME));
+      assertTrue(catalog.createDatabase(databaseName, TajoConstants.DEFAULT_TABLESPACE_NAME));
       assertTrue(catalog.existDatabase(databaseName));
       createdDatabases.add(databaseName);
     }
 
     Collection<String> allDatabaseNames = catalog.getAllDatabaseNames();
     for (String databaseName : allDatabaseNames) {
-      assertTrue(databaseName.equals(DEFAULT_DATABASE_NAME) || createdDatabases.contains(databaseName));
+      assertTrue(databaseName.equals(TajoConstants.DEFAULT_DATABASE_NAME) || createdDatabases.contains(databaseName));
     }
     // additional one is 'default' database.
     assertEquals(NUM + 1, allDatabaseNames.size());
@@ -129,9 +130,9 @@ public class TestCatalog {
 
   @Test
   public void testCreateAndDropTable() throws Exception {
-    assertTrue(catalog.createDatabase("tmpdb1", DEFAULT_TABLESPACE_NAME));
+    assertTrue(catalog.createDatabase("tmpdb1", TajoConstants.DEFAULT_TABLESPACE_NAME));
     assertTrue(catalog.existDatabase("tmpdb1"));
-    assertTrue(catalog.createDatabase("tmpdb2", DEFAULT_TABLESPACE_NAME));
+    assertTrue(catalog.createDatabase("tmpdb2", TajoConstants.DEFAULT_TABLESPACE_NAME));
     assertTrue(catalog.existDatabase("tmpdb2"));
 
     TableDesc table1 = createMockupTable("tmpdb1", "table1");
@@ -176,7 +177,7 @@ public class TestCatalog {
       String databaseName = dbPrefix + dbIdx;
 
       if (!catalog.existDatabase(databaseName)) {
-        assertTrue(catalog.createDatabase(databaseName, DEFAULT_TABLESPACE_NAME));
+        assertTrue(catalog.createDatabase(databaseName, TajoConstants.DEFAULT_TABLESPACE_NAME));
       }
 
       String tableName = tablePrefix + tableId;
@@ -246,12 +247,12 @@ public class TestCatalog {
         new Options(),
         path);
 
-		assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, "getTable"));
+		assertFalse(catalog.existsTable(TajoConstants.DEFAULT_DATABASE_NAME, "getTable"));
     catalog.createTable(meta);
-    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, "getTable"));
+    assertTrue(catalog.existsTable(TajoConstants.DEFAULT_DATABASE_NAME, "getTable"));
 
-    catalog.dropTable(DEFAULT_DATABASE_NAME, "getTable");
-    assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, "getTable"));
+    catalog.dropTable(TajoConstants.DEFAULT_DATABASE_NAME, "getTable");
+    assertFalse(catalog.existsTable(TajoConstants.DEFAULT_DATABASE_NAME, "getTable"));
 	}
 
   static IndexDesc desc1;
@@ -260,15 +261,15 @@ public class TestCatalog {
 
   static {
     desc1 = new IndexDesc(
-        "idx_test", DEFAULT_DATABASE_NAME, "indexed", new Column("id", Type.INT4),
+        "idx_test", TajoConstants.DEFAULT_DATABASE_NAME, "indexed", new Column("id", Type.INT4),
         IndexMethod.TWO_LEVEL_BIN_TREE, true, true, true);
 
     desc2 = new IndexDesc(
-        "idx_test2", DEFAULT_DATABASE_NAME, "indexed", new Column("score", Type.FLOAT8),
+        "idx_test2", TajoConstants.DEFAULT_DATABASE_NAME, "indexed", new Column("score", Type.FLOAT8),
         IndexMethod.TWO_LEVEL_BIN_TREE, false, false, false);
 
     desc3 = new IndexDesc(
-        "idx_test", DEFAULT_DATABASE_NAME, "indexed", new Column("id", Type.INT4),
+        "idx_test", TajoConstants.DEFAULT_DATABASE_NAME, "indexed", new Column("id", Type.INT4),
         IndexMethod.TWO_LEVEL_BIN_TREE, true, true, true);
   }
 	
@@ -278,25 +279,25 @@ public class TestCatalog {
 	  assertTrue(catalog.createTable(desc));
 	  
 	  assertFalse(catalog.existIndexByName("db1", desc1.getIndexName()));
-	  assertFalse(catalog.existIndexByColumn(DEFAULT_DATABASE_NAME, "indexed", "id"));
+	  assertFalse(catalog.existIndexByColumn(TajoConstants.DEFAULT_DATABASE_NAME, "indexed", "id"));
 	  catalog.createIndex(desc1);
-	  assertTrue(catalog.existIndexByName(DEFAULT_DATABASE_NAME, desc1.getIndexName()));
-	  assertTrue(catalog.existIndexByColumn(DEFAULT_DATABASE_NAME, "indexed", "id"));
+	  assertTrue(catalog.existIndexByName(TajoConstants.DEFAULT_DATABASE_NAME, desc1.getIndexName()));
+	  assertTrue(catalog.existIndexByColumn(TajoConstants.DEFAULT_DATABASE_NAME, "indexed", "id"));
 
 
-	  assertFalse(catalog.existIndexByName(DEFAULT_DATABASE_NAME, desc2.getIndexName()));
-	  assertFalse(catalog.existIndexByColumn(DEFAULT_DATABASE_NAME, "indexed", "score"));
+	  assertFalse(catalog.existIndexByName(TajoConstants.DEFAULT_DATABASE_NAME, desc2.getIndexName()));
+	  assertFalse(catalog.existIndexByColumn(TajoConstants.DEFAULT_DATABASE_NAME, "indexed", "score"));
 	  catalog.createIndex(desc2);
-	  assertTrue(catalog.existIndexByName(DEFAULT_DATABASE_NAME, desc2.getIndexName()));
-	  assertTrue(catalog.existIndexByColumn(DEFAULT_DATABASE_NAME, "indexed", "score"));
+	  assertTrue(catalog.existIndexByName(TajoConstants.DEFAULT_DATABASE_NAME, desc2.getIndexName()));
+	  assertTrue(catalog.existIndexByColumn(TajoConstants.DEFAULT_DATABASE_NAME, "indexed", "score"));
 	  
-	  catalog.dropIndex(DEFAULT_DATABASE_NAME, desc1.getIndexName());
-	  assertFalse(catalog.existIndexByName(DEFAULT_DATABASE_NAME, desc1.getIndexName()));
-	  catalog.dropIndex(DEFAULT_DATABASE_NAME, desc2.getIndexName());
-	  assertFalse(catalog.existIndexByName(DEFAULT_DATABASE_NAME, desc2.getIndexName()));
+	  catalog.dropIndex(TajoConstants.DEFAULT_DATABASE_NAME, desc1.getIndexName());
+	  assertFalse(catalog.existIndexByName(TajoConstants.DEFAULT_DATABASE_NAME, desc1.getIndexName()));
+	  catalog.dropIndex(TajoConstants.DEFAULT_DATABASE_NAME, desc2.getIndexName());
+	  assertFalse(catalog.existIndexByName(TajoConstants.DEFAULT_DATABASE_NAME, desc2.getIndexName()));
 	  
-	  catalog.dropTable(DEFAULT_DATABASE_NAME, desc.getName());
-    assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, desc.getName()));
+	  catalog.dropTable(TajoConstants.DEFAULT_DATABASE_NAME, desc.getName());
+    assertFalse(catalog.existsTable(TajoConstants.DEFAULT_DATABASE_NAME, desc.getName()));
   }
 	
 	public static class TestFunc1 extends Function {
@@ -412,24 +413,24 @@ public class TestCatalog {
     partSchema.addColumn("id", Type.INT4);
 
     PartitionMethodDesc partitionDesc =
-        new PartitionMethodDesc(DEFAULT_DATABASE_NAME, tableName,
+        new PartitionMethodDesc(TajoConstants.DEFAULT_DATABASE_NAME, tableName,
             CatalogProtos.PartitionType.HASH, "id", partSchema);
 
     TableDesc desc =
         new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
 
-    assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    assertFalse(catalog.existsTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName));
     catalog.createTable(desc);
-    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
-    TableDesc retrieved = catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName);
+    assertTrue(catalog.existsTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName));
+    TableDesc retrieved = catalog.getTableDesc(TajoConstants.DEFAULT_DATABASE_NAME, tableName);
 
     assertEquals(retrieved.getName(), tableName);
     assertEquals(retrieved.getPartitionMethod().getPartitionType(), CatalogProtos.PartitionType.HASH);
     assertEquals(retrieved.getPartitionMethod().getExpressionSchema().getColumn(0).getSimpleName(), "id");
 
-    catalog.dropTable(DEFAULT_DATABASE_NAME, tableName);
-    assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    catalog.dropTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName);
+    assertFalse(catalog.existsTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName));
   }
 
 
@@ -449,25 +450,25 @@ public class TestCatalog {
     Schema partSchema = new Schema();
     partSchema.addColumn("id", Type.INT4);
     PartitionMethodDesc partitionDesc =
-        new PartitionMethodDesc(DEFAULT_DATABASE_NAME, tableName,
+        new PartitionMethodDesc(TajoConstants.DEFAULT_DATABASE_NAME, tableName,
             CatalogProtos.PartitionType.HASH, "id", partSchema);
 
     TableDesc desc =
         new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
 
-    assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    assertFalse(catalog.existsTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName));
     catalog.createTable(desc);
-    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    assertTrue(catalog.existsTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName));
 
-    TableDesc retrieved = catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName);
+    TableDesc retrieved = catalog.getTableDesc(TajoConstants.DEFAULT_DATABASE_NAME, tableName);
 
     assertEquals(retrieved.getName(), tableName);
     assertEquals(retrieved.getPartitionMethod().getPartitionType(), CatalogProtos.PartitionType.HASH);
     assertEquals(retrieved.getPartitionMethod().getExpressionSchema().getColumn(0).getSimpleName(), "id");
 
-    catalog.dropTable(DEFAULT_DATABASE_NAME, tableName);
-    assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    catalog.dropTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName);
+    assertFalse(catalog.existsTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName));
   }
 
   @Test
@@ -486,24 +487,24 @@ public class TestCatalog {
     Schema partSchema = new Schema();
     partSchema.addColumn("id", Type.INT4);
     PartitionMethodDesc partitionDesc =
-        new PartitionMethodDesc(DEFAULT_DATABASE_NAME, tableName,
+        new PartitionMethodDesc(TajoConstants.DEFAULT_DATABASE_NAME, tableName,
             CatalogProtos.PartitionType.LIST, "id", partSchema);
 
     TableDesc desc =
         new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
-    assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    assertFalse(catalog.existsTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName));
     catalog.createTable(desc);
-    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    assertTrue(catalog.existsTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName));
 
-    TableDesc retrieved = catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName);
+    TableDesc retrieved = catalog.getTableDesc(TajoConstants.DEFAULT_DATABASE_NAME, tableName);
 
     assertEquals(retrieved.getName(), tableName);
     assertEquals(retrieved.getPartitionMethod().getPartitionType(), CatalogProtos.PartitionType.LIST);
     assertEquals(retrieved.getPartitionMethod().getExpressionSchema().getColumn(0).getSimpleName(), "id");
 
-    catalog.dropTable(DEFAULT_DATABASE_NAME, tableName);
-    assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    catalog.dropTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName);
+    assertFalse(catalog.existsTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName));
   }
 
   @Test
@@ -522,24 +523,24 @@ public class TestCatalog {
     Schema partSchema = new Schema();
     partSchema.addColumn("id", Type.INT4);
     PartitionMethodDesc partitionDesc =
-        new PartitionMethodDesc(DEFAULT_DATABASE_NAME, tableName, CatalogProtos.PartitionType.RANGE,
+        new PartitionMethodDesc(TajoConstants.DEFAULT_DATABASE_NAME, tableName, CatalogProtos.PartitionType.RANGE,
             "id", partSchema);
 
     TableDesc desc =
         new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
-    assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    assertFalse(catalog.existsTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName));
     catalog.createTable(desc);
-    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    assertTrue(catalog.existsTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName));
 
-    TableDesc retrieved = catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName);
+    TableDesc retrieved = catalog.getTableDesc(TajoConstants.DEFAULT_DATABASE_NAME, tableName);
 
     assertEquals(retrieved.getName(), tableName);
     assertEquals(retrieved.getPartitionMethod().getPartitionType(), CatalogProtos.PartitionType.RANGE);
     assertEquals(retrieved.getPartitionMethod().getExpressionSchema().getColumn(0).getSimpleName(), "id");
 
-    catalog.dropTable(DEFAULT_DATABASE_NAME, tableName);
-    assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    catalog.dropTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName);
+    assertFalse(catalog.existsTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName));
   }
 
   @Test
@@ -559,23 +560,23 @@ public class TestCatalog {
     partSchema.addColumn("id", Type.INT4);
 
     PartitionMethodDesc partitionDesc =
-        new PartitionMethodDesc(DEFAULT_DATABASE_NAME, tableName,
+        new PartitionMethodDesc(TajoConstants.DEFAULT_DATABASE_NAME, tableName,
             CatalogProtos.PartitionType.COLUMN, "id", partSchema);
 
     TableDesc desc =
         new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
-    assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    assertFalse(catalog.existsTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName));
     catalog.createTable(desc);
-    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    assertTrue(catalog.existsTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName));
 
-    TableDesc retrieved = catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName);
+    TableDesc retrieved = catalog.getTableDesc(TajoConstants.DEFAULT_DATABASE_NAME, tableName);
 
     assertEquals(retrieved.getName(), tableName);
     assertEquals(retrieved.getPartitionMethod().getPartitionType(), CatalogProtos.PartitionType.COLUMN);
     assertEquals(retrieved.getPartitionMethod().getExpressionSchema().getColumn(0).getSimpleName(), "id");
 
-    catalog.dropTable(DEFAULT_DATABASE_NAME, tableName);
-    assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    catalog.dropTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName);
+    assertFalse(catalog.existsTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName));
   }
 }

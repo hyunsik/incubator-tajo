@@ -33,8 +33,8 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_TABLESPACE_NAME;
+import static org.apache.tajo.TajoConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.TajoConstants.DEFAULT_TABLESPACE_NAME;
 import static org.junit.Assert.*;
 
 public class TestLogicalOptimizer {

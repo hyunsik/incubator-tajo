@@ -26,12 +26,7 @@ import com.sun.org.apache.commons.logging.Log;
 import com.sun.org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.log4j.ConsoleAppender;
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
-import org.apache.log4j.SimpleLayout;
 import org.apache.tajo.*;
-import org.apache.tajo.catalog.CatalogConstants;
 import org.apache.tajo.catalog.CatalogUtil;
 import org.apache.tajo.catalog.FunctionDesc;
 import org.apache.tajo.catalog.TableDesc;
@@ -81,7 +76,7 @@ public class TestTajoClient {
   @Test
   public final void testCreateAndDropDatabases() throws ServiceException {
     assertEquals(1, client.getAllDatabaseNames().size());
-    assertEquals(CatalogConstants.DEFAULT_DATABASE_NAME, client.getAllDatabaseNames().get(0));
+    assertEquals(TajoConstants.DEFAULT_DATABASE_NAME, client.getAllDatabaseNames().get(0));
 
     String prefix = CatalogUtil.normalizeIdentifier("testCreateDatabase_");
     for (int i = 0; i < 10; i++) {
@@ -113,11 +108,11 @@ public class TestTajoClient {
   @Test
   public final void testCurrentDatabase() throws IOException, ServiceException, InterruptedException {
     assertEquals(1, client.getAllDatabaseNames().size());
-    assertEquals(CatalogConstants.DEFAULT_DATABASE_NAME, client.getCurrentDatabase());
+    assertEquals(TajoConstants.DEFAULT_DATABASE_NAME, client.getCurrentDatabase());
 
     assertTrue(client.createDatabase("testcurrentdatabase"));
     assertEquals(2, client.getAllDatabaseNames().size());
-    assertEquals(CatalogConstants.DEFAULT_DATABASE_NAME, client.getCurrentDatabase());
+    assertEquals(TajoConstants.DEFAULT_DATABASE_NAME, client.getCurrentDatabase());
     assertTrue(client.selectDatabase("testcurrentdatabase"));
     assertEquals("testcurrentdatabase", client.getCurrentDatabase());
     assertTrue(client.selectDatabase("default"));

@@ -34,7 +34,7 @@ import org.apache.tajo.util.TUtil;
 
 import java.util.*;
 
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.TajoConstants.DEFAULT_DATABASE_NAME;
 
 /**
  * It finds all relations for each block and builds base schema information.

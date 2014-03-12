@@ -965,7 +965,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
         schemaBuilder.addFields(resultToColumnProto(res));
       }
 
-      tableBuilder.setSchema(CatalogUtil.getQualfiedSchema(tableName, schemaBuilder.build()));
+      tableBuilder.setSchema(CatalogUtil.getQualfiedSchema(databaseName, tableName, schemaBuilder.build()));
 
       res.close();
       pstmt.close();

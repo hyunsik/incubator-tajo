@@ -27,10 +27,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.AbstractService;
-import org.apache.tajo.QueryId;
-import org.apache.tajo.QueryIdFactory;
-import org.apache.tajo.TajoIdProtos;
-import org.apache.tajo.TajoProtos;
+import org.apache.tajo.*;
 import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.exception.NoSuchDatabaseException;
 import org.apache.tajo.catalog.partition.PartitionMethodDesc;
@@ -62,8 +59,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.*;
 
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_TABLESPACE_NAME;
+import static org.apache.tajo.TajoConstants.DEFAULT_TABLESPACE_NAME;
 
 public class TajoMasterClientService extends AbstractService {
   private final static Log LOG = LogFactory.getLog(TajoMasterClientService.class);
@@ -131,7 +127,7 @@ public class TajoMasterClientService extends AbstractService {
         // create a new session with base database name. If no database name is give, we use default database.
         String sessionId =
             context.getSessionManager().createSession(request.getUsername(),
-            request.hasBaseDatabaseName() ? request.getBaseDatabaseName() : CatalogConstants.DEFAULT_DATABASE_NAME);
+            request.hasBaseDatabaseName() ? request.getBaseDatabaseName() : TajoConstants.DEFAULT_DATABASE_NAME);
         CreateSessionResponse.Builder builder = CreateSessionResponse.newBuilder();
         builder.setState(CreateSessionResponse.ResultState.SUCCESS);
         builder.setSessionId(TajoIdProtos.SessionIdProto.newBuilder().setId(sessionId).build());

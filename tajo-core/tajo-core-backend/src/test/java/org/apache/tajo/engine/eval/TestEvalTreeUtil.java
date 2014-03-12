@@ -19,6 +19,7 @@
 package org.apache.tajo.engine.eval;
 
 import com.google.common.collect.Sets;
+import org.apache.tajo.TajoConstants;
 import org.apache.tajo.TajoTestingCluster;
 import org.apache.tajo.algebra.Expr;
 import org.apache.tajo.algebra.OpType;
@@ -50,7 +51,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_TABLESPACE_NAME;
+import static org.apache.tajo.TajoConstants.DEFAULT_TABLESPACE_NAME;
 import static org.apache.tajo.common.TajoDataTypes.Type.INT4;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -89,7 +90,7 @@ public class TestEvalTreeUtil {
       catalog.createFunction(funcDesc);
     }
     catalog.createTablespace(DEFAULT_TABLESPACE_NAME, "hdfs://localhost:1234/warehouse");
-    catalog.createDatabase(CatalogConstants.DEFAULT_DATABASE_NAME, DEFAULT_TABLESPACE_NAME);
+    catalog.createDatabase(TajoConstants.DEFAULT_DATABASE_NAME, DEFAULT_TABLESPACE_NAME);
 
     Schema schema = new Schema();
     schema.addColumn("name", TajoDataTypes.Type.TEXT);

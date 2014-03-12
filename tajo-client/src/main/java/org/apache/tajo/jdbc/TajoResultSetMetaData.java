@@ -31,7 +31,6 @@ import java.sql.SQLFeatureNotSupportedException;
 
 public class TajoResultSetMetaData implements ResultSetMetaData {
   Schema schema;
-
   
   public TajoResultSetMetaData(Schema schema) {
     this.schema = schema;
@@ -49,7 +48,7 @@ public class TajoResultSetMetaData implements ResultSetMetaData {
 
   @Override
   public String getCatalogName(int column) throws SQLException {
-    throw new SQLFeatureNotSupportedException("getCatalogName not supported");
+    return schema.getColumn(column - 1).getQualifier();
   }
 
   @Override

@@ -34,7 +34,7 @@ import org.junit.experimental.categories.Category;
 import java.sql.ResultSet;
 import java.util.Map;
 
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.TajoConstants.DEFAULT_DATABASE_NAME;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 

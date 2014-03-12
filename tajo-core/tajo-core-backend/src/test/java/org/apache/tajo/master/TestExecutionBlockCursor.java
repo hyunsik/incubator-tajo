@@ -16,6 +16,7 @@ package org.apache.tajo.master;
 
 import org.apache.hadoop.yarn.event.AsyncDispatcher;
 import org.apache.tajo.LocalTajoTestingUtility;
+import org.apache.tajo.TajoConstants;
 import org.apache.tajo.TajoTestingCluster;
 import org.apache.tajo.algebra.Expr;
 import org.apache.tajo.benchmark.TPCH;
@@ -38,7 +39,7 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_TABLESPACE_NAME;
+import static org.apache.tajo.TajoConstants.DEFAULT_TABLESPACE_NAME;
 import static org.junit.Assert.assertEquals;
 
 public class TestExecutionBlockCursor {
@@ -59,7 +60,7 @@ public class TestExecutionBlockCursor {
     conf = util.getConfiguration();
     catalog = util.getMiniCatalogCluster().getCatalog();
     catalog.createTablespace(DEFAULT_TABLESPACE_NAME, "hdfs://localhost:!234/warehouse");
-    catalog.createDatabase(CatalogConstants.DEFAULT_DATABASE_NAME, DEFAULT_TABLESPACE_NAME);
+    catalog.createDatabase(TajoConstants.DEFAULT_DATABASE_NAME, DEFAULT_TABLESPACE_NAME);
     TPCH tpch = new TPCH();
     tpch.loadSchemas();
     tpch.loadOutSchema();

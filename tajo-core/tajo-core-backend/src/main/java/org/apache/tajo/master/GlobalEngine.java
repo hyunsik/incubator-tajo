@@ -30,7 +30,6 @@ import org.apache.tajo.QueryId;
 import org.apache.tajo.QueryIdFactory;
 import org.apache.tajo.TajoProtos;
 import org.apache.tajo.algebra.Expr;
-import org.apache.tajo.algebra.OpType;
 import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.exception.AlreadyExistsTableException;
 import org.apache.tajo.catalog.exception.NoSuchTableException;
@@ -57,8 +56,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
 
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_TABLESPACE_NAME;
+import static org.apache.tajo.TajoConstants.DEFAULT_TABLESPACE_NAME;
 import static org.apache.tajo.ipc.ClientProtos.GetQueryStatusResponse;
 
 public class GlobalEngine extends AbstractService {

@@ -165,12 +165,13 @@ public class CatalogUtil {
   *
   * @return
   */
-  public static SchemaProto getQualfiedSchema(String tableName, SchemaProto schema) {
+  public static SchemaProto getQualfiedSchema(String databaseName, String tableName, SchemaProto schema) {
     SchemaProto.Builder revisedSchema = SchemaProto.newBuilder(schema);
     revisedSchema.clearFields();
     for (ColumnProto col : schema.getFieldsList()) {
       ColumnProto.Builder builder = ColumnProto.newBuilder(col);
-      builder.setName(tableName + IDENTIFIER_DELIMITER + extractSimpleName(col.getName()));
+      builder.setName(
+          databaseName + IDENTIFIER_DELIMITER + tableName + IDENTIFIER_DELIMITER + extractSimpleName(col.getName()));
       revisedSchema.addFields(builder.build());
     }
 

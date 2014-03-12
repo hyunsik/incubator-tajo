@@ -26,7 +26,7 @@ import org.apache.tajo.master.TajoMaster;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.TajoConstants.DEFAULT_DATABASE_NAME;
 
 public class CatalogMetricsGaugeSet implements MetricSet {
   TajoMaster.MasterContext tajoMasterContext;

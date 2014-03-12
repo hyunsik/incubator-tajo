@@ -1,4 +1,4 @@
-package org.apache.tajo.jdbc; /**
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,6 +16,10 @@ package org.apache.tajo.jdbc; /**
  * limitations under the License.
  */
 
+package org.apache.tajo.jdbc;
+
+import com.google.protobuf.ServiceException;
+import org.apache.tajo.TajoConstants;
 import org.apache.tajo.client.TajoClient;
 import org.apache.tajo.conf.TajoConf;
 
@@ -88,7 +92,7 @@ public class TajoConnection implements Connection {
     }
 
     try {
-      tajoClient = new TajoClient(tajoConf);
+      tajoClient = new TajoClient(tajoConf, databaseName);
     } catch (Exception e) {
       throw new SQLException("Can't create tajo client:" + e.getMessage(), "TAJO-002");
     }
@@ -181,7 +185,11 @@ public class TajoConnection implements Connection {
 
   @Override
   public String getCatalog() throws SQLException {
-    return "";
+    try {
+      return tajoClient.getCurrentDatabase();
+    } catch (ServiceException e) {
+      throw new SQLException(e);
+    }
   }
 
   @Override
@@ -313,7 +321,11 @@ public class TajoConnection implements Connection {
 
   @Override
   public void setCatalog(String catalog) throws SQLException {
-    throw new SQLFeatureNotSupportedException("setCatalog");
+    try {
+      tajoClient.selectDatabase(catalog);
+    } catch (ServiceException e) {
+      throw new SQLException(e);
+    }
   }
 
   @Override
@@ -387,8 +399,7 @@ public class TajoConnection implements Connection {
   }
 
   public String getSchema() throws SQLException {
-    // JDK 1.7
-    throw new SQLFeatureNotSupportedException("getSchema not supported");
+    return TajoConstants.DEFAULT_SCHEMA_NAME;
   }
 
   public void setSchema(String schema) throws SQLException {

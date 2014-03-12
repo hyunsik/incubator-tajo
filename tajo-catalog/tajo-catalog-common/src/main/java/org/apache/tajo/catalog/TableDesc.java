@@ -34,7 +34,7 @@ import org.apache.tajo.common.ProtoObject;
 import org.apache.tajo.json.GsonObject;
 import org.apache.tajo.util.TUtil;
 
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.TajoConstants.DEFAULT_DATABASE_NAME;
 
 public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Cloneable {
   private final Log LOG = LogFactory.getLog(TableDesc.class);
@@ -100,7 +100,7 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
   }
 	
   public String getName() {
-    return this.tableName;
+    return databaseName + CatalogUtil.IDENTIFIER_DELIMITER + this.tableName;
   }
 	
 	public void setPath(Path uri) {

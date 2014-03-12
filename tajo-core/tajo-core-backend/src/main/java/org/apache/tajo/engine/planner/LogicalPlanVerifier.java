@@ -27,7 +27,7 @@ import org.apache.tajo.engine.planner.logical.*;
 
 import java.util.Stack;
 
-import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.TajoConstants.DEFAULT_DATABASE_NAME;
 
 public class LogicalPlanVerifier extends BasicLogicalPlanVisitor<VerificationState, LogicalNode> {
   private TajoConf conf;
