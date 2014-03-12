@@ -42,7 +42,6 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
   protected TableDescProto.Builder builder = null;
 
   @Expose protected String databaseName;                     // required
-  @Expose protected String namespace;                        // optional
 	@Expose protected String tableName;                        // required
   @Expose protected Schema schema;
   @Expose protected TableMeta meta;                          // required
@@ -94,13 +93,9 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
   public String getDatabaseName() {
     return this.databaseName;
   }
-
-  public String getNamespace() {
-    return this.namespace;
-  }
 	
   public String getName() {
-    return databaseName + CatalogUtil.IDENTIFIER_DELIMITER + this.tableName;
+    return this.tableName;
   }
 	
 	public void setPath(Path uri) {
