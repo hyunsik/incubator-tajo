@@ -18,14 +18,21 @@
 
 package org.apache.tajo.client;
 
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.protobuf.ServiceException;
 import com.sun.org.apache.commons.logging.Log;
 import com.sun.org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.log4j.ConsoleAppender;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
+import org.apache.log4j.SimpleLayout;
 import org.apache.tajo.*;
 import org.apache.tajo.catalog.CatalogConstants;
+import org.apache.tajo.catalog.CatalogUtil;
 import org.apache.tajo.catalog.FunctionDesc;
 import org.apache.tajo.catalog.TableDesc;
 import org.apache.tajo.catalog.proto.CatalogProtos;
@@ -40,11 +47,10 @@ import org.junit.experimental.categories.Category;
 
 import java.io.IOException;
 import java.sql.SQLException;
-import java.util.Collection;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 @Category(IntegrationTest.class)
 public class TestTajoClient {
@@ -73,9 +79,113 @@ public class TestTajoClient {
   }
 
   @Test
+  public final void testCreateAndDropDatabases() throws ServiceException {
+    assertEquals(1, client.getAllDatabaseNames().size());
+    assertEquals(CatalogConstants.DEFAULT_DATABASE_NAME, client.getAllDatabaseNames().get(0));
+
+    String prefix = CatalogUtil.normalizeIdentifier("testCreateDatabase_");
+    for (int i = 0; i < 10; i++) {
+      // test allDatabaseNames
+      assertEquals(i + 1, client.getAllDatabaseNames().size());
+
+      // test existence
+      assertFalse(client.existDatabase(prefix + i));
+      assertTrue(client.createDatabase(prefix + i));
+      assertTrue(client.existDatabase(prefix + i));
+
+      // test allDatabaseNames
+      assertEquals(i + 2, client.getAllDatabaseNames().size());
+      assertTrue(client.getAllDatabaseNames().contains(prefix + i));
+    }
+
+    // test dropDatabase, existDatabase and getAllDatabaseNames()
+    for (int i = 0; i < 10; i++) {
+      assertTrue(client.existDatabase(prefix + i));
+      assertTrue(client.getAllDatabaseNames().contains(prefix + i));
+      assertTrue(client.dropDatabase(prefix + i));
+      assertFalse(client.existDatabase(prefix + i));
+      assertFalse(client.getAllDatabaseNames().contains(prefix + i));
+    }
+  }
+
+  @Test
   public final void testCurrentDatabase() throws IOException, ServiceException, InterruptedException {
+    assertEquals(1, client.getAllDatabaseNames().size());
     assertEquals(CatalogConstants.DEFAULT_DATABASE_NAME, client.getCurrentDatabase());
-    client.updateQuery("CREATE DATABASE TestTajoClient");
+
+    assertTrue(client.createDatabase("testcurrentdatabase"));
+    assertEquals(2, client.getAllDatabaseNames().size());
+    assertEquals(CatalogConstants.DEFAULT_DATABASE_NAME, client.getCurrentDatabase());
+    assertTrue(client.selectDatabase("testcurrentdatabase"));
+    assertEquals("testcurrentdatabase", client.getCurrentDatabase());
+    assertTrue(client.dropDatabase("testcurrentdatabase"));
+
+    assertEquals(1, client.getAllDatabaseNames().size());
+  }
+
+  @Test
+  public final void testSelectDatabaseToInvalidOne() throws IOException, ServiceException, InterruptedException {
+    assertEquals(1, client.getAllDatabaseNames().size());
+    assertFalse(client.existDatabase("invaliddatabase"));
+
+    try {
+      assertTrue(client.selectDatabase("invaliddatabase"));
+      assertFalse(true);
+    } catch (Throwable t) {
+      assertFalse(false);
+    }
+  }
+
+  @Test
+  public final void testDropCurrentDatabase() throws IOException, ServiceException, InterruptedException {
+    assertEquals(1, client.getAllDatabaseNames().size());
+    assertTrue(client.selectDatabase("testdropcurrentdatabase"));
+    assertEquals("testdropcurrentdatabase", client.getCurrentDatabase());
+
+    try {
+      client.dropDatabase("testdropcurrentdatabase");
+      assertFalse(true);
+    } catch (Throwable t) {
+      assertFalse(false);
+    }
+  }
+
+  @Test
+  public final void testSessionVariables() throws IOException, ServiceException, InterruptedException {
+    String prefixName = "key_";
+    String prefixValue = "val_";
+    for (int i = 0; i < 10; i++) {
+      String key = prefixName + i;
+      String val = prefixValue + i;
+
+      assertEquals(i + 1, client.getAllSessionVariables().size());
+      assertFalse(client.getAllSessionVariables().containsKey(key));
+      assertFalse(client.existSessionVariable(key));
+
+      Map<String, String> map = Maps.newHashMap();
+      map.put(key, val);
+      client.updateSessionVariables(map);
+
+      assertEquals(i + 2, client.getAllSessionVariables().size());
+      assertTrue(client.getAllSessionVariables().containsKey(key));
+      assertTrue(client.existSessionVariable(key));
+    }
+
+    int totalSessionVarNum = client.getAllSessionVariables().size();
+
+    for (int i = 0; i < 10; i++) {
+      String key = prefixName + i;
+
+      assertTrue(client.getAllSessionVariables().containsKey(key));
+      assertTrue(client.existSessionVariable(key));
+
+      client.unsetSessionVariables(Lists.newArrayList(key));
+
+      assertFalse(client.getAllSessionVariables().containsKey(key));
+      assertFalse(client.existSessionVariable(key));
+    }
+
+    assertEquals(totalSessionVarNum - 10, client.getAllSessionVariables().size());
   }
 
   @Test
