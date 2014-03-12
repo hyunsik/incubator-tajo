@@ -27,6 +27,7 @@ import org.apache.tajo.QueryId;
 import org.apache.tajo.QueryIdFactory;
 import org.apache.tajo.TajoIdProtos;
 import org.apache.tajo.TajoProtos.QueryState;
+import org.apache.tajo.annotation.Nullable;
 import org.apache.tajo.annotation.ThreadSafe;
 import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.proto.CatalogProtos;
@@ -44,6 +45,7 @@ import org.apache.tajo.rpc.RpcConnectionPool;
 import org.apache.tajo.rpc.ServerCallable;
 import org.apache.tajo.util.NetUtils;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.sql.ResultSet;
@@ -53,7 +55,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @ThreadSafe
-public class TajoClient {
+public class TajoClient implements Closeable {
   private final Log LOG = LogFactory.getLog(TajoClient.class);
 
   private final TajoConf conf;
@@ -64,15 +66,21 @@ public class TajoClient {
 
   private final RpcConnectionPool connPool;
 
+  private final String baseDatabase;
+
   private final UserGroupInformation userInfo;
 
   private volatile TajoIdProtos.SessionIdProto sessionId;
 
   public TajoClient(TajoConf conf) throws IOException {
-    this(conf, NetUtils.createSocketAddr(conf.getVar(ConfVars.TAJO_MASTER_CLIENT_RPC_ADDRESS)));
+    this(conf, NetUtils.createSocketAddr(conf.getVar(ConfVars.TAJO_MASTER_CLIENT_RPC_ADDRESS)), null);
   }
 
-  public TajoClient(TajoConf conf, InetSocketAddress addr) throws IOException {
+  public TajoClient(TajoConf conf, String baseDatabase) throws IOException {
+    this(conf, NetUtils.createSocketAddr(conf.getVar(ConfVars.TAJO_MASTER_CLIENT_RPC_ADDRESS)), baseDatabase);
+  }
+
+  public TajoClient(TajoConf conf, InetSocketAddress addr, @Nullable String baseDatabase) throws IOException {
     this.conf = conf;
     this.conf.set("tajo.disk.scheduler.report.interval", "0");
     this.tajoMasterAddr = addr;
@@ -80,18 +88,19 @@ public class TajoClient {
     //Don't share connection pool per client
     connPool = RpcConnectionPool.newPool(conf, getClass().getSimpleName(), workerNum);
     userInfo = UserGroupInformation.getCurrentUser();
+    this.baseDatabase = baseDatabase;
   }
 
   public TajoClient(InetSocketAddress addr) throws IOException {
-    this(new TajoConf(), addr);
+    this(new TajoConf(), addr, null);
   }
 
-  public TajoClient(String hostname, int port) throws IOException {
-    this(new TajoConf(), NetUtils.createSocketAddr(hostname, port));
+  public TajoClient(String hostname, int port, String baseDatabase) throws IOException {
+    this(new TajoConf(), NetUtils.createSocketAddr(hostname, port), baseDatabase);
   }
 
+  @Override
   public void close() {
-
     // remove session
     try {
       NettyClientBase client = connPool.getConnection(tajoMasterAddr, TajoMasterClientProtocol.class, false);
@@ -109,6 +118,10 @@ public class TajoClient {
 
   public TajoConf getConf() {
     return conf;
+  }
+
+  public UserGroupInformation getUserInfo() {
+    return userInfo;
   }
 
   /**
@@ -134,8 +147,12 @@ public class TajoClient {
   private void checkSessionAndGet(NettyClientBase client) throws ServiceException {
     if (sessionId == null) {
       TajoMasterClientProtocolService.BlockingInterface tajoMasterService = client.getStub();
-      CreateSessionRequest request = CreateSessionRequest.newBuilder().setUsername(userInfo.getUserName()).build();
-      CreateSessionResponse response = tajoMasterService.createSession(null, request);
+      CreateSessionRequest.Builder builder = CreateSessionRequest.newBuilder();
+      builder.setUsername(userInfo.getUserName()).build();
+      if (baseDatabase != null) {
+        builder.setBaseDatabaseName(baseDatabase);
+      }
+      CreateSessionResponse response = tajoMasterService.createSession(null, builder.build());
       if (response.getState() == CreateSessionResponse.ResultState.SUCCESS) {
         sessionId = response.getSessionId();
         LOG.info(String.format("Got session %s as a user '%s'.", sessionId.getId(), userInfo.getUserName()));

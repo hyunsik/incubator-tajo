@@ -264,8 +264,20 @@ public class QueryTestCaseBase {
     }
   }
 
+  public void assertDatabaseExists(String databaseName) throws ServiceException {
+    assertTrue(client.existDatabase(databaseName));
+  }
+
+  public void assertDatabaseNotExists(String databaseName) throws ServiceException {
+    assertTrue(!client.existDatabase(databaseName));
+  }
+
   public void assertTableExists(String tableName) throws ServiceException {
     assertTrue(client.existTable(tableName));
+  }
+
+  public void assertTableNotExists(String tableName) throws ServiceException {
+    assertTrue(!client.existTable(tableName));
   }
 
   /**

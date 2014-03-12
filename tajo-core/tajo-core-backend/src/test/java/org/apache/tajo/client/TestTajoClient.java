@@ -106,6 +106,8 @@ public class TestTajoClient {
       assertFalse(client.existDatabase(prefix + i));
       assertFalse(client.getAllDatabaseNames().contains(prefix + i));
     }
+
+    assertEquals(1, client.getAllDatabaseNames().size());
   }
 
   @Test
@@ -118,6 +120,7 @@ public class TestTajoClient {
     assertEquals(CatalogConstants.DEFAULT_DATABASE_NAME, client.getCurrentDatabase());
     assertTrue(client.selectDatabase("testcurrentdatabase"));
     assertEquals("testcurrentdatabase", client.getCurrentDatabase());
+    assertTrue(client.selectDatabase("default"));
     assertTrue(client.dropDatabase("testcurrentdatabase"));
 
     assertEquals(1, client.getAllDatabaseNames().size());
@@ -134,11 +137,14 @@ public class TestTajoClient {
     } catch (Throwable t) {
       assertFalse(false);
     }
+
+    assertEquals(1, client.getAllDatabaseNames().size());
   }
 
   @Test
   public final void testDropCurrentDatabase() throws IOException, ServiceException, InterruptedException {
     assertEquals(1, client.getAllDatabaseNames().size());
+    assertTrue(client.createDatabase("testdropcurrentdatabase"));
     assertTrue(client.selectDatabase("testdropcurrentdatabase"));
     assertEquals("testdropcurrentdatabase", client.getCurrentDatabase());
 
@@ -148,6 +154,10 @@ public class TestTajoClient {
     } catch (Throwable t) {
       assertFalse(false);
     }
+
+    assertTrue(client.selectDatabase("default"));
+    assertTrue(client.dropDatabase("testdropcurrentdatabase"));
+    assertEquals(1, client.getAllDatabaseNames().size());
   }
 
   @Test

@@ -58,7 +58,7 @@ public class CreateDatabaseNode extends LogicalNode {
 
   @Override
   public String toString() {
-    return "DROP DATABASE " + databaseName;
+    return "CREATE DATABASE " + databaseName;
   }
 
   @Override

@@ -18,13 +18,9 @@
 
 package org.apache.tajo.cli;
 
-import org.apache.tajo.client.TajoClient;
-
-import java.io.PrintWriter;
-
 public class HelpCommand extends TajoShellCommand {
-  public HelpCommand(TajoClient client, PrintWriter sout) {
-    super(client, sout);
+  public HelpCommand(TajoCli.TajoCliContext context) {
+    super(context);
   }
 
   @Override

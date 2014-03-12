@@ -16,36 +16,28 @@
  * limitations under the License.
  */
 
-package org.apache.tajo.cli;
+package org.apache.tajo.engine.query;
 
-import org.apache.tajo.TajoConstants;
-import org.apache.tajo.client.TajoClient;
+import org.apache.tajo.IntegrationTest;
+import org.apache.tajo.QueryTestCaseBase;
+import org.junit.Test;
+import org.junit.experimental.categories.Category;
 
-import java.io.PrintWriter;
+import java.sql.ResultSet;
 
-public class VersionCommand extends TajoShellCommand {
+@Category(IntegrationTest.class)
+public class TestCreateDatabase extends QueryTestCaseBase {
 
-  public VersionCommand(TajoCli.TajoCliContext context) {
-    super(context);
-  }
-
-  @Override
-  public String getCommand() {
-    return "\\version";
-  }
-
-  @Override
-  public void invoke(String[] cmd) throws Exception {
-    sout.println(TajoConstants.TAJO_VERSION);
-  }
-
-  @Override
-  public String getUsage() {
-    return "";
-  }
-
-  @Override
-  public String getDescription() {
-    return "show Apache License 2.0";
+  @Test
+  public final void testCreateAndDropDatabase() throws Exception {
+    ResultSet res = null;
+    try {
+      res = executeString("CREATE DATABASE testCreateAndDropDatabase;");
+      assertDatabaseExists("testCreateAndDropDatabase");
+      executeString("DROP DATABASE testCreateAndDropDatabase;");
+      assertDatabaseNotExists("testCreateAndDropDatabase");
+    } finally {
+      cleanupQuery(res);
+    }
   }
 }

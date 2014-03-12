@@ -18,25 +18,24 @@
 
 package org.apache.tajo.cli;
 
-import org.apache.tajo.TajoConstants;
-import org.apache.tajo.client.TajoClient;
+import com.google.protobuf.ServiceException;
 
-import java.io.PrintWriter;
+public class ListDatabaseCommand extends TajoShellCommand {
 
-public class VersionCommand extends TajoShellCommand {
-
-  public VersionCommand(TajoCli.TajoCliContext context) {
+  public ListDatabaseCommand(TajoCli.TajoCliContext context) {
     super(context);
   }
 
   @Override
   public String getCommand() {
-    return "\\version";
+    return "\\l";
   }
 
   @Override
   public void invoke(String[] cmd) throws Exception {
-    sout.println(TajoConstants.TAJO_VERSION);
+    for (String databaseName : client.getAllDatabaseNames()) {
+      sout.println(databaseName);
+    }
   }
 
   @Override
@@ -46,6 +45,6 @@ public class VersionCommand extends TajoShellCommand {
 
   @Override
   public String getDescription() {
-    return "show Apache License 2.0";
+    return "list all databases";
   }
 }

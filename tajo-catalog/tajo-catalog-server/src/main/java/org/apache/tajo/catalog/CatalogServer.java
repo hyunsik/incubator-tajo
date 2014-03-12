@@ -215,6 +215,7 @@ public class CatalogServer extends AbstractService {
         }
 
         store.createTablespace(tablespaceName, uri);
+        LOG.info(String.format("tablespace \"%s\" is created", tablespaceName));
         return ProtoUtil.TRUE;
 
       } catch (Exception e) {
@@ -290,8 +291,8 @@ public class CatalogServer extends AbstractService {
         }
 
         store.createDatabase(databaseName, tablespaceName);
+        LOG.info(String.format("database \"%s\" is created", databaseName));
         return ProtoUtil.TRUE;
-
       } catch (Exception e) {
         LOG.error(e);
         throw new ServiceException(e);

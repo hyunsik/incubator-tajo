@@ -30,8 +30,8 @@ import java.util.List;
 import java.util.Map;
 
 public class DescTableCommand extends TajoShellCommand {
-  public DescTableCommand(TajoClient client, PrintWriter sout) {
-    super(client, sout);
+  public DescTableCommand(TajoCli.TajoCliContext context) {
+    super(context);
   }
 
   @Override

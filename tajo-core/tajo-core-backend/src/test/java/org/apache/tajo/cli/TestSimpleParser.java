@@ -29,12 +29,12 @@ public class TestSimpleParser {
 
   @Test
   public final void testMetaCommands() throws InvalidStatementException {
-    List<ParsedResult> res1 = SimpleParser.doProcessScripts("\\d");
+    List<ParsedResult> res1 = SimpleParser.parseScript("\\d");
     assertEquals(1, res1.size());
     assertEquals(ParsedResult.StatementType.META, res1.get(0).getType());
     assertEquals("\\d", res1.get(0).getStatement());
 
-    List<ParsedResult> res2 = SimpleParser.doProcessScripts("\\d;\\c;\\f;");
+    List<ParsedResult> res2 = SimpleParser.parseScript("\\d;\\c;\\f;");
     assertEquals(3, res2.size());
     assertEquals(ParsedResult.StatementType.META, res2.get(0).getType());
     assertEquals("\\d", res2.get(0).getStatement());
@@ -43,7 +43,7 @@ public class TestSimpleParser {
     assertEquals(ParsedResult.StatementType.META, res2.get(2).getType());
     assertEquals("\\f", res2.get(2).getStatement());
 
-    List<ParsedResult> res3 = SimpleParser.doProcessScripts("\n\t\t  \\d;\n\\c;\t\t\\f  ;");
+    List<ParsedResult> res3 = SimpleParser.parseScript("\n\t\t  \\d;\n\\c;\t\t\\f  ;");
     assertEquals(3, res3.size());
     assertEquals(ParsedResult.StatementType.META, res3.get(0).getType());
     assertEquals("\\d", res3.get(0).getStatement());
@@ -51,28 +51,32 @@ public class TestSimpleParser {
     assertEquals("\\c", res3.get(1).getStatement());
     assertEquals(ParsedResult.StatementType.META, res3.get(2).getType());
     assertEquals("\\f  ", res3.get(2).getStatement());
+
+    List<ParsedResult> res4 = SimpleParser.parseScript("\\\td;");
+    assertEquals(1, res4.size());
+    assertEquals("\\\td", res4.get(0).getStatement());
   }
 
   @Test
   public final void testStatements() throws InvalidStatementException {
-    List<ParsedResult> res1 = SimpleParser.doProcessScripts("select * from test;");
+    List<ParsedResult> res1 = SimpleParser.parseScript("select * from test;");
     assertEquals(1, res1.size());
     assertEquals(ParsedResult.StatementType.STATEMENT, res1.get(0).getType());
     assertEquals("select * from test", res1.get(0).getStatement());
 
-    List<ParsedResult> res2 = SimpleParser.doProcessScripts("select * from test;");
+    List<ParsedResult> res2 = SimpleParser.parseScript("select * from test;");
     assertEquals(1, res2.size());
     assertEquals(ParsedResult.StatementType.STATEMENT, res2.get(0).getType());
     assertEquals("select * from test", res2.get(0).getStatement());
 
-    List<ParsedResult> res3 = SimpleParser.doProcessScripts("select * from test1;select * from test2;");
+    List<ParsedResult> res3 = SimpleParser.parseScript("select * from test1;select * from test2;");
     assertEquals(2, res3.size());
     assertEquals(ParsedResult.StatementType.STATEMENT, res3.get(0).getType());
     assertEquals("select * from test1", res3.get(0).getStatement());
     assertEquals(ParsedResult.StatementType.STATEMENT, res3.get(1).getType());
     assertEquals("select * from test2", res3.get(1).getStatement());
 
-    List<ParsedResult> res4 = SimpleParser.doProcessScripts("\t\t\n\rselect * from \ntest1;select * from test2\n;");
+    List<ParsedResult> res4 = SimpleParser.parseScript("\t\t\n\rselect * from \ntest1;select * from test2\n;");
     assertEquals(2, res4.size());
     assertEquals(ParsedResult.StatementType.STATEMENT, res4.get(0).getType());
     assertEquals("select * from \ntest1", res4.get(0).getStatement());
@@ -80,7 +84,7 @@ public class TestSimpleParser {
     assertEquals("select * from test2\n", res4.get(1).getStatement());
 
     List<ParsedResult> res5 =
-        SimpleParser.doProcessScripts("\t\t\n\rselect * from \ntest1;\\d test;select * from test2;\n\nselect 1;");
+        SimpleParser.parseScript("\t\t\n\rselect * from \ntest1;\\d test;select * from test2;\n\nselect 1;");
     assertEquals(4, res5.size());
     assertEquals(ParsedResult.StatementType.STATEMENT, res5.get(0).getType());
     assertEquals("select * from \ntest1", res5.get(0).getStatement());
@@ -94,18 +98,18 @@ public class TestSimpleParser {
 
   @Test
   public final void testQuoted() throws InvalidStatementException {
-    List<ParsedResult> res1 = SimpleParser.doProcessScripts("select '\n;' from test;");
+    List<ParsedResult> res1 = SimpleParser.parseScript("select '\n;' from test;");
     assertEquals(1, res1.size());
     assertEquals(ParsedResult.StatementType.STATEMENT, res1.get(0).getType());
     assertEquals("select '\n;' from test", res1.get(0).getStatement());
 
-    List<ParsedResult> res2 = SimpleParser.doProcessScripts("select 'abc\nbbc\nddf' from test;");
+    List<ParsedResult> res2 = SimpleParser.parseScript("select 'abc\nbbc\nddf' from test;");
     assertEquals(1, res2.size());
     assertEquals(ParsedResult.StatementType.STATEMENT, res2.get(0).getType());
     assertEquals("select 'abc\nbbc\nddf' from test", res2.get(0).getStatement());
 
     try {
-      SimpleParser.doProcessScripts("select 'abc");
+      SimpleParser.parseScript("select 'abc");
       assertTrue(false);
     } catch (InvalidStatementException is) {
       assertTrue(true);

@@ -1,1 +1,0 @@
-SELECT version FROM meta

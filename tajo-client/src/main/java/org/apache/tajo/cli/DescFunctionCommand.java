@@ -27,8 +27,8 @@ import java.io.PrintWriter;
 import java.util.*;
 
 public class DescFunctionCommand extends TajoShellCommand {
-  public DescFunctionCommand(TajoClient client, PrintWriter sout) {
-    super(client, sout);
+  public DescFunctionCommand(TajoCli.TajoCliContext context) {
+    super(context);
   }
 
   @Override

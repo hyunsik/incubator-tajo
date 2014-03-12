@@ -18,25 +18,42 @@
 
 package org.apache.tajo.cli;
 
-import org.apache.tajo.TajoConstants;
+import com.google.protobuf.ServiceException;
 import org.apache.tajo.client.TajoClient;
 
 import java.io.PrintWriter;
 
-public class VersionCommand extends TajoShellCommand {
+public class ConnectDatabaseCommand extends TajoShellCommand {
 
-  public VersionCommand(TajoCli.TajoCliContext context) {
+  public ConnectDatabaseCommand(TajoCli.TajoCliContext context) {
     super(context);
   }
 
   @Override
   public String getCommand() {
-    return "\\version";
+    return "\\c";
   }
 
   @Override
   public void invoke(String[] cmd) throws Exception {
-    sout.println(TajoConstants.TAJO_VERSION);
+    if (cmd.length == 1) {
+      sout.write(String.format("You are now connected to database \"%s\" as user \"%s\".\n",
+          client.getCurrentDatabase(), client.getUserInfo().getUserName()));
+    } else if (cmd.length == 2) {
+      try {
+        if (client.selectDatabase(cmd[1])) {
+          context.setCurrentDatabase(client.getCurrentDatabase());
+          sout.write(String.format("You are now connected to database \"%s\" as user \"%s\".\n",
+              context.getCurrentDatabase(), client.getUserInfo().getUserName()));
+        }
+      } catch (ServiceException se) {
+        if (se.getMessage() != null) {
+          sout.write(se.getMessage());
+        } else {
+          sout.write(String.format("cannot connect the database \"%s\"", cmd[1]));
+        }
+      }
+    }
   }
 
   @Override
@@ -46,6 +63,6 @@ public class VersionCommand extends TajoShellCommand {
 
   @Override
   public String getDescription() {
-    return "show Apache License 2.0";
+    return "connect to new database";
   }
 }

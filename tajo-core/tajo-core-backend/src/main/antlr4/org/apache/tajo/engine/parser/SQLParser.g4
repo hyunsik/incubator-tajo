@@ -55,6 +55,7 @@ data_change_statement
 
 schema_statement
   : database_definition
+  | drop_database_statement
   | create_table_statement
   | drop_table_statement
   ;

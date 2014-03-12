@@ -38,7 +38,6 @@ public class SimpleParser {
 
   ParsingState state = START_STATE;
   int lineNum;
-  int endIdx = 0;
   StringBuilder appender = new StringBuilder();
 
   public static final ParsingState START_STATE = ParsingState.TOK_START;
@@ -61,7 +60,7 @@ public class SimpleParser {
    * </pre>
    */
 
-  public static List<ParsedResult> doProcessScripts(String str) throws InvalidStatementException {
+  public static List<ParsedResult> parseScript(String str) throws InvalidStatementException {
     SimpleParser parser = new SimpleParser();
     List<ParsedResult> parsedResults = new ArrayList<ParsedResult>();
     parsedResults.addAll(parser.parseLines(str));
@@ -94,7 +93,6 @@ public class SimpleParser {
       lineStartIdx = idx;
 
       if (state == ParsingState.TOK_START && str.charAt(idx) == '\\') {
-        int endIdx = 0;
         state = ParsingState.META;
 
         ////////////////////////////
@@ -105,14 +103,15 @@ public class SimpleParser {
           if (Character.isWhitespace(character)) {
             // skip
           } else if (character == ';') {
-            endIdx = idx - 1;
             state = ParsingState.META_EOS;
-          } else {
-            endIdx = idx;
           }
         }
 
-        appender.append(str.subSequence(lineStartIdx, endIdx).toString());
+        if (state == ParsingState.META_EOS) {
+          appender.append(str.subSequence(lineStartIdx, idx - 1).toString());
+        } else {
+          appender.append(str.subSequence(lineStartIdx, idx).toString());
+        }
 
       /////////////////////////////////
       //    TOK_START     -> STATEMENT
@@ -162,8 +161,7 @@ public class SimpleParser {
       }
 
       lineNum++;
-
-      statements.addAll(doProcessEndOfStatement(false));
+      statements.addAll(doProcessEndOfStatement(state == ParsingState.META));
     }
 
     return statements;

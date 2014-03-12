@@ -124,7 +124,7 @@ public abstract class AbstractCatalogClient implements CatalogService {
   }
 
   @Override
-  public final Boolean createDatabase(final String databaseName, final String tablespaceName) {
+  public final Boolean createDatabase(final String databaseName, @Nullable final String tablespaceName) {
     try {
       return new ServerCallable<Boolean>(pool, catalogServerAddr, CatalogProtocol.class, false) {
         public Boolean call(NettyClientBase client) throws ServiceException {
@@ -132,7 +132,9 @@ public abstract class AbstractCatalogClient implements CatalogService {
 
           CreateDatabaseRequest.Builder builder = CreateDatabaseRequest.newBuilder();
           builder.setDatabaseName(databaseName);
-          builder.setTablespaceName(tablespaceName);
+          if (tablespaceName != null) {
+            builder.setTablespaceName(tablespaceName);
+          }
           return stub.createDatabase(null, builder.build()).getValue();
         }
       }.withRetries();

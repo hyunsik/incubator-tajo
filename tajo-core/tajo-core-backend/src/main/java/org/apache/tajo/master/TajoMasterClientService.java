@@ -231,7 +231,7 @@ public class TajoMasterClientService extends AbstractService {
           context.getSessionManager().getSession(sessionId).selectDatabase(databaseName);
           return ProtoUtil.TRUE;
         } else {
-          throw new NoSuchDatabaseException(databaseName);
+          throw new ServiceException(new NoSuchDatabaseException(databaseName));
         }
       } catch (Throwable t) {
         throw new ServiceException(t);
@@ -269,12 +269,12 @@ public class TajoMasterClientService extends AbstractService {
 
 
       try {
-        context.getSessionManager().touch(request.getSessionId().getId());
+        Session session = context.getSessionManager().getSession(request.getSessionId().getId());
 
         if(LOG.isDebugEnabled()) {
           LOG.debug("Query [" + request.getQuery() + "] is submitted");
         }
-        return context.getGlobalEngine().executeQuery(request.getQuery());
+        return context.getGlobalEngine().executeQuery(session, request.getQuery());
       } catch (Exception e) {
         LOG.error(e.getMessage(), e);
         ClientProtos.GetQueryStatusResponse.Builder responseBuilder = ClientProtos.GetQueryStatusResponse.newBuilder();
@@ -292,10 +292,10 @@ public class TajoMasterClientService extends AbstractService {
     public UpdateQueryResponse updateQuery(RpcController controller, QueryRequest request) throws ServiceException {
 
       try {
-        context.getSessionManager().touch(request.getSessionId().getId());
+        Session session = context.getSessionManager().getSession(request.getSessionId().getId());
         UpdateQueryResponse.Builder builder = UpdateQueryResponse.newBuilder();
         try {
-          context.getGlobalEngine().updateQuery(request.getQuery());
+          context.getGlobalEngine().updateQuery(session, request.getQuery());
           builder.setResultCode(ResultCode.OK);
           return builder.build();
         } catch (Exception e) {
@@ -526,12 +526,8 @@ public class TajoMasterClientService extends AbstractService {
     public BoolProto dropDatabase(RpcController controller, SessionedStringProto request) throws ServiceException {
       try {
         Session session = context.getSessionManager().getSession(request.getSessionId().getId());
-        String databaseNameToBeDropped = CatalogUtil.normalizeIdentifier(request.getValue());
-        if (session.getCurrentDatabase().equals(databaseNameToBeDropped)) {
-          throw new ServiceException("ERROR: Cannot drop the current open database");
-        }
 
-        if (catalog.dropDatabase(request.getValue())) {
+        if (context.getGlobalEngine().dropDatabase(session, request.getValue())) {
           return BOOL_TRUE;
         } else {
           return BOOL_FALSE;
@@ -555,9 +551,9 @@ public class TajoMasterClientService extends AbstractService {
     @Override
     public BoolProto existTable(RpcController controller, SessionedStringProto request) throws ServiceException {
       try {
-        context.getSessionManager().touch(request.getSessionId().getId());
+        Session session = context.getSessionManager().getSession(request.getSessionId().getId());
         String tableName = request.getValue();
-        if (catalog.existsTable(DEFAULT_DATABASE_NAME, tableName)) {
+        if (catalog.existsTable(session.getCurrentDatabase(), tableName)) {
           return BOOL_TRUE;
         } else {
           return BOOL_FALSE;
@@ -571,8 +567,8 @@ public class TajoMasterClientService extends AbstractService {
     public GetTableListResponse getTableList(RpcController controller,
                                              GetTableListRequest request) throws ServiceException {
       try {
-        context.getSessionManager().touch(request.getSessionId().getId());
-        Collection<String> tableNames = catalog.getAllTableNames(DEFAULT_DATABASE_NAME);
+        Session session = context.getSessionManager().getSession(request.getSessionId().getId());
+        Collection<String> tableNames = catalog.getAllTableNames(session.getCurrentDatabase());
         GetTableListResponse.Builder builder = GetTableListResponse.newBuilder();
         builder.addAllTables(tableNames);
         return builder.build();
@@ -586,12 +582,12 @@ public class TajoMasterClientService extends AbstractService {
                                       GetTableDescRequest request)
         throws ServiceException {
       try {
-        context.getSessionManager().touch(request.getSessionId().getId());
+        Session session = context.getSessionManager().getSession(request.getSessionId().getId());
         String name = request.getTableName();
-        if (catalog.existsTable(DEFAULT_DATABASE_NAME, name)) {
+        if (catalog.existsTable(session.getCurrentDatabase(), name)) {
           return TableResponse.newBuilder()
               .setResultCode(ResultCode.OK)
-              .setTableDesc(catalog.getTableDesc(DEFAULT_DATABASE_NAME, name).getProto())
+              .setTableDesc(catalog.getTableDesc(session.getCurrentDatabase(), name).getProto())
               .build();
         } else {
           return TableResponse.newBuilder()
@@ -608,7 +604,7 @@ public class TajoMasterClientService extends AbstractService {
     public TableResponse createExternalTable(RpcController controller, CreateTableRequest request)
         throws ServiceException {
       try {
-        context.getSessionManager().touch(request.getSessionId().getId());
+        Session session = context.getSessionManager().getSession(request.getSessionId().getId());
 
         Path path = new Path(request.getPath());
         FileSystem fs = path.getFileSystem(conf);
@@ -626,7 +622,7 @@ public class TajoMasterClientService extends AbstractService {
 
         TableDesc desc;
         try {
-          desc = context.getGlobalEngine().createTableOnPath(request.getName(), schema,
+          desc = context.getGlobalEngine().createTableOnPath(session.getCurrentDatabase(), request.getName(), schema,
               meta, path, true, partitionDesc);
         } catch (Exception e) {
           return TableResponse.newBuilder()
@@ -651,8 +647,8 @@ public class TajoMasterClientService extends AbstractService {
     @Override
     public BoolProto dropTable(RpcController controller, DropTableRequest dropTable) throws ServiceException {
       try {
-        context.getSessionManager().touch(dropTable.getSessionId().getId());
-        context.getGlobalEngine().dropTable(dropTable.getName(), dropTable.getPurge());
+        Session session = context.getSessionManager().getSession(dropTable.getSessionId().getId());
+        context.getGlobalEngine().dropTable(session, dropTable.getName(), dropTable.getPurge());
         return BOOL_TRUE;
       } catch (Throwable t) {
         throw new ServiceException(t);

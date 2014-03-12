@@ -42,6 +42,7 @@ import org.apache.tajo.util.FileUtil;
 import org.apache.tajo.util.Pair;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URL;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -140,19 +141,11 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
   public abstract int getDriverVersion();
 
   public String readSchemaFile(String path) throws CatalogException {
-    URL schema = ClassLoader.getSystemResource("schemas/" + path);
-
-    if (schema == null) {
-      throw new CatalogException(String.format("No such a schema file \'%s'", path));
-    }
-
-    String sql;
     try {
-      sql = FileUtil.readTextFile(new File(schema.toURI()));
-    } catch (Exception e) {
+      return FileUtil.readTextFileFromResource("schemas/" + path);
+    } catch (IOException e) {
       throw new CatalogException(e);
     }
-    return sql;
   }
 
   protected String getCatalogUri(){
@@ -178,7 +171,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     ResultSet result = null;
 
     try {
-      String sql = readSchemaFile("common/get_version");
+      String sql = "SELECT version FROM meta";
       if (LOG.isDebugEnabled()) {
         LOG.debug(sql.toString());
       }
@@ -214,7 +207,8 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       CatalogUtil.closeQuietly(conn, pstmt, result);
     }
 
-    LOG.info(String.format("The compatibility of the catalog schema (version: %d) has been verified."));
+    LOG.info(String.format("The compatibility of the catalog schema (version: %d) has been verified.",
+        getDriverVersion()));
   }
 
   /**

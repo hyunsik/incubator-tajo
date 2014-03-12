@@ -19,6 +19,7 @@
 package org.apache.tajo.master;
 
 import com.google.common.base.Preconditions;
+import com.google.protobuf.ServiceException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
@@ -47,6 +48,7 @@ import org.apache.tajo.ipc.ClientProtos;
 import org.apache.tajo.master.TajoMaster.MasterContext;
 import org.apache.tajo.master.querymaster.QueryInfo;
 import org.apache.tajo.master.querymaster.QueryJobManager;
+import org.apache.tajo.master.session.Session;
 import org.apache.tajo.storage.AbstractStorageManager;
 
 import java.io.IOException;
@@ -56,6 +58,7 @@ import java.util.List;
 import java.util.Stack;
 
 import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.catalog.CatalogConstants.DEFAULT_TABLESPACE_NAME;
 import static org.apache.tajo.ipc.ClientProtos.GetQueryStatusResponse;
 
 public class GlobalEngine extends AbstractService {
@@ -103,7 +106,7 @@ public class GlobalEngine extends AbstractService {
     super.stop();
   }
 
-  public GetQueryStatusResponse executeQuery(String sql)
+  public GetQueryStatusResponse executeQuery(Session session, String sql)
       throws InterruptedException, IOException, IllegalQueryStatusException {
 
     LOG.info("SQL: " + sql);
@@ -141,7 +144,7 @@ public class GlobalEngine extends AbstractService {
       GetQueryStatusResponse.Builder responseBuilder = GetQueryStatusResponse.newBuilder();
       if (PlannerUtil.checkIfDDLPlan(rootNode)) {
         context.getSystemMetrics().counter("Query", "numDDLQuery").inc();
-        updateQuery(rootNode.getChild());
+        updateQuery(session, rootNode.getChild());
         responseBuilder.setQueryId(QueryIdFactory.NULL_QUERY_ID.getProto());
         responseBuilder.setResultCode(ClientProtos.ResultCode.OK);
         responseBuilder.setState(TajoProtos.QueryState.QUERY_SUCCEEDED);
@@ -200,11 +203,7 @@ public class GlobalEngine extends AbstractService {
     return plan.toString();
   }
 
-  private boolean isDDL(Expr expr) {
-    return expr.getType() == OpType.CreateDatabase || expr.getType() == OpType.DropDatabase;
-  }
-
-  public QueryId updateQuery(String sql) throws IOException, SQLException, PlanningException {
+  public QueryId updateQuery(Session session, String sql) throws IOException, SQLException, PlanningException {
     LOG.info("SQL: " + sql);
     // parse the query
     Expr expr = analyzer.parse(sql);
@@ -215,17 +214,17 @@ public class GlobalEngine extends AbstractService {
     if (!PlannerUtil.checkIfDDLPlan(rootNode)) {
       throw new SQLException("This is not update query:\n" + sql);
     } else {
-      updateQuery(rootNode.getChild());
+      updateQuery(session, rootNode.getChild());
       return QueryIdFactory.NULL_QUERY_ID;
     }
   }
 
-  private boolean updateQuery(LogicalNode root) throws IOException {
+  private boolean updateQuery(Session session, LogicalNode root) throws IOException {
 
     switch (root.getType()) {
       case CREATE_DATABASE:
         CreateDatabaseNode createDatabase = (CreateDatabaseNode) root;
-        catalog.createDatabase(createDatabase.getDatabaseName(), null);
+        catalog.createDatabase(createDatabase.getDatabaseName(), DEFAULT_TABLESPACE_NAME);
         return true;
       case DROP_DATABASE:
         DropDatabaseNode dropDatabaseNode = (DropDatabaseNode) root;
@@ -233,11 +232,11 @@ public class GlobalEngine extends AbstractService {
         return true;
       case CREATE_TABLE:
         CreateTableNode createTable = (CreateTableNode) root;
-        createTable(createTable);
+        createTable(session, createTable);
         return true;
       case DROP_TABLE:
         DropTableNode dropTable = (DropTableNode) root;
-        dropTable(dropTable.getTableName(), dropTable.isPurge());
+        dropTable(session, dropTable.getTableName(), dropTable.isPurge());
         return true;
 
       default:
@@ -279,7 +278,7 @@ public class GlobalEngine extends AbstractService {
     return plan;
   }
 
-  private TableDesc createTable(CreateTableNode createTable) throws IOException {
+  private TableDesc createTable(Session session, CreateTableNode createTable) throws IOException {
     TableMeta meta;
 
     if (createTable.hasOptions()) {
@@ -295,14 +294,14 @@ public class GlobalEngine extends AbstractService {
       createTable.setPath(tablePath);
     }
 
-    return createTableOnPath(createTable.getTableName(), createTable.getTableSchema(), meta,
-        createTable.getPath(), createTable.isExternal(), createTable.getPartitionMethod());
+    return createTableOnPath(session.getCurrentDatabase(), createTable.getTableName(), createTable.getTableSchema(),
+        meta, createTable.getPath(), createTable.isExternal(), createTable.getPartitionMethod());
   }
 
-  public TableDesc createTableOnPath(String tableName, Schema schema, TableMeta meta,
+  public TableDesc createTableOnPath(String databaseName, String tableName, Schema schema, TableMeta meta,
                                      Path path, boolean isExternal, PartitionMethodDesc partitionDesc)
       throws IOException {
-    if (catalog.existsTable(DEFAULT_DATABASE_NAME, tableName)) {
+    if (catalog.existsTable(databaseName, tableName)) {
       throw new AlreadyExistsTableException(tableName);
     }
 
@@ -327,7 +326,7 @@ public class GlobalEngine extends AbstractService {
 
     TableStats stats = new TableStats();
     stats.setNumBytes(totalSize);
-    TableDesc desc = new TableDesc(DEFAULT_DATABASE_NAME, tableName, schema, meta, path, isExternal);
+    TableDesc desc = new TableDesc(databaseName, tableName, schema, meta, path, isExternal);
     desc.setStats(stats);
     if (partitionDesc != null) {
       desc.setPartitionMethod(partitionDesc);
@@ -339,21 +338,32 @@ public class GlobalEngine extends AbstractService {
     return desc;
   }
 
+
+  public boolean dropDatabase(Session session, String databaseName) throws ServiceException {
+    if (session.getCurrentDatabase().equals(databaseName)) {
+      throw new ServiceException("ERROR: Cannot drop the current open database");
+    }
+
+    boolean result = catalog.dropDatabase(databaseName);
+    LOG.info(String.format("database \"%s.\" is dropped.", session.getCurrentDatabase()));
+    return result;
+  }
+
   /**
    * Drop a given named table
    *
    * @param tableName to be dropped
    * @param purge Remove all data if purge is true.
    */
-  public void dropTable(String tableName, boolean purge) {
+  public void dropTable(Session session, String tableName, boolean purge) {
     CatalogService catalog = context.getCatalog();
 
-    if (!catalog.existsTable(DEFAULT_DATABASE_NAME, tableName)) {
+    if (!catalog.existsTable(session.getCurrentDatabase(), tableName)) {
       throw new NoSuchTableException(tableName);
     }
 
-    Path path = catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName).getPath();
-    catalog.dropTable(DEFAULT_DATABASE_NAME, tableName);
+    Path path = catalog.getTableDesc(session.getCurrentDatabase(), tableName).getPath();
+    catalog.dropTable(session.getCurrentDatabase(), tableName);
 
     if (purge) {
       try {
@@ -364,7 +374,8 @@ public class GlobalEngine extends AbstractService {
       }
     }
 
-    LOG.info("Table \"" + tableName + "\" is " + (purge ? " purged." : " dropped."));
+    LOG.info(String.format("relation \"%s.%s\" is " + (purge ? " purged." : " dropped."),
+        session.getCurrentDatabase(), tableName));
   }
 
   public interface DistributedQueryHook {

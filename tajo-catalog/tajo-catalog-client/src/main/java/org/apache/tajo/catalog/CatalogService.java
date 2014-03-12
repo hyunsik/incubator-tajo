@@ -18,7 +18,6 @@
 
 package org.apache.tajo.catalog;
 
-import org.apache.tajo.annotation.Nullable;
 import org.apache.tajo.catalog.partition.PartitionMethodDesc;
 import org.apache.tajo.common.TajoDataTypes.DataType;
 
