@@ -155,7 +155,8 @@ public class TestNLJoinExec {
         LocalTajoTestingUtility.newQueryUnitAttemptId(), merged, workDir);
     ctx.setEnforcer(new Enforcer());
     Expr context = analyzer.parse(QUERIES[0]);
-    LogicalNode plan = planner.createPlan(context).getRootBlock().getRoot();
+    LogicalNode plan = planner.createPlan(LocalTajoTestingUtility.createDummySession(),
+        context).getRootBlock().getRoot();
 
     PhysicalPlanner phyPlanner = new PhysicalPlannerImpl(conf, sm);
     PhysicalExec exec = phyPlanner.createPlan(ctx, plan);
@@ -183,7 +184,8 @@ public class TestNLJoinExec {
         LocalTajoTestingUtility.newQueryUnitAttemptId(masterPlan), merged, workDir);
     ctx.setEnforcer(new Enforcer());
     Expr context =  analyzer.parse(QUERIES[1]);
-    LogicalNode plan = planner.createPlan(context).getRootBlock().getRoot();
+    LogicalNode plan = planner.createPlan(LocalTajoTestingUtility.createDummySession(),
+        context).getRootBlock().getRoot();
     //LogicalOptimizer.optimize(ctx, plan);
 
     PhysicalPlanner phyPlanner = new PhysicalPlannerImpl(conf, sm);

@@ -215,7 +215,7 @@ public class CatalogServer extends AbstractService {
         }
 
         store.createTablespace(tablespaceName, uri);
-        LOG.info(String.format("tablespace \"%s\" is created", tablespaceName));
+        LOG.info(String.format("tablespace \"%s\" (%s) is created", tablespaceName, uri));
         return ProtoUtil.TRUE;
 
       } catch (Exception e) {

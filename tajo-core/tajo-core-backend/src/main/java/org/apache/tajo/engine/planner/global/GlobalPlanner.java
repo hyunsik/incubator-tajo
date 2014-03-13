@@ -46,6 +46,7 @@ import org.apache.tajo.worker.TajoWorker;
 import java.io.IOException;
 import java.util.*;
 
+import static org.apache.tajo.TajoConstants.DEFAULT_DATABASE_NAME;
 import static org.apache.tajo.conf.TajoConf.ConfVars;
 import static org.apache.tajo.ipc.TajoWorkerProtocol.ShuffleType.*;
 
@@ -141,9 +142,11 @@ public class GlobalPlanner {
 
   public static ScanNode buildInputExecutor(LogicalPlan plan, DataChannel channel) {
     Preconditions.checkArgument(channel.getSchema() != null,
-        "Channel schema (" + channel.getSrcId().getId() + " -> " + channel.getTargetId().getId() + ") is not initialized");
+        "Channel schema (" + channel.getSrcId().getId() + " -> " + channel.getTargetId().getId() +
+            ") is not initialized");
     TableMeta meta = new TableMeta(channel.getStoreType(), new Options());
-    TableDesc desc = new TableDesc(channel.getSrcId().toString(), channel.getSchema(), meta, new Path("/"));
+    TableDesc desc = new TableDesc(DEFAULT_DATABASE_NAME, channel.getSrcId().toString(), channel.getSchema(), meta,
+        new Path("/"));
     ScanNode scanNode = plan.createNode(ScanNode.class);
     scanNode.init(desc);
     return scanNode;

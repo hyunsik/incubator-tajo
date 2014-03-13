@@ -23,6 +23,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.tajo.benchmark.TPCH;
 import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.proto.CatalogProtos;
@@ -30,10 +31,13 @@ import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.client.TajoClient;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.engine.planner.global.MasterPlan;
+import org.apache.tajo.master.session.Session;
+import org.apache.tajo.master.session.SessionManager;
 import org.apache.tajo.util.TajoIdUtils;
 
 import java.io.IOException;
 import java.sql.ResultSet;
+import java.util.UUID;
 
 public class LocalTajoTestingUtility {
   private static final Log LOG = LogFactory.getLog(LocalTajoTestingUtility.class);
@@ -41,6 +45,16 @@ public class LocalTajoTestingUtility {
   private TajoTestingCluster util;
   private TajoConf conf;
   private TajoClient client;
+
+  private static UserGroupInformation dummyUserInfo;
+
+  static {
+    try {
+      dummyUserInfo = UserGroupInformation.getCurrentUser();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
 
   private static int taskAttemptId;
 
@@ -50,6 +64,9 @@ public class LocalTajoTestingUtility {
   }
   public static QueryUnitAttemptId newQueryUnitAttemptId(MasterPlan plan) {
     return QueryIdFactory.newQueryUnitAttemptId(QueryIdFactory.newQueryUnitId(plan.newExecutionBlockId()), 0);
+  }
+  public static Session createDummySession() {
+    return new Session(UUID.randomUUID().toString(), dummyUserInfo.getUserName(), TajoConstants.DEFAULT_DATABASE_NAME);
   }
 
   /**
@@ -88,7 +105,7 @@ public class LocalTajoTestingUtility {
       // It gives more various situations to unit tests.
       TableStats stats = new TableStats();
       stats.setNumBytes(TPCH.tableVolumes.get(names[i]));
-      TableDesc tableDesc = new TableDesc(names[i], schemas[i], meta, tablePath);
+      TableDesc tableDesc = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, names[i], schemas[i], meta, tablePath);
       tableDesc.setStats(stats);
       util.getMaster().getCatalog().createTable(tableDesc);
     }

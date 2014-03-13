@@ -35,6 +35,7 @@ import org.apache.tajo.engine.planner.PhysicalPlannerImpl;
 import org.apache.tajo.engine.planner.PlanningException;
 import org.apache.tajo.engine.planner.enforce.Enforcer;
 import org.apache.tajo.engine.planner.logical.LogicalNode;
+import org.apache.tajo.master.session.Session;
 import org.apache.tajo.storage.*;
 import org.apache.tajo.storage.fragment.FileFragment;
 import org.apache.tajo.util.CommonTestingUtil;
@@ -58,6 +59,7 @@ public class TestLeftOuterNLJoinExec {
   private CatalogService catalog;
   private SQLAnalyzer analyzer;
   private LogicalPlanner planner;
+  private static final Session session = LocalTajoTestingUtility.createDummySession();
   private AbstractStorageManager sm;
   private Path testDir;
 
@@ -257,7 +259,7 @@ public class TestLeftOuterNLJoinExec {
         LocalTajoTestingUtility.newQueryUnitAttemptId(), merged, workDir);
     ctx.setEnforcer(new Enforcer());
     Expr context =  analyzer.parse(QUERIES[0]);
-    LogicalNode plan = planner.createPlan(context).getRootBlock().getRoot();
+    LogicalNode plan = planner.createPlan(session, context).getRootBlock().getRoot();
 
 
     PhysicalPlanner phyPlanner = new PhysicalPlannerImpl(conf, sm);
@@ -299,7 +301,7 @@ public class TestLeftOuterNLJoinExec {
         LocalTajoTestingUtility.newQueryUnitAttemptId(), merged, workDir);
     ctx.setEnforcer(new Enforcer());
     Expr context =  analyzer.parse(QUERIES[1]);
-    LogicalNode plan = planner.createPlan(context).getRootBlock().getRoot();
+    LogicalNode plan = planner.createPlan(session, context).getRootBlock().getRoot();
 
 
     PhysicalPlanner phyPlanner = new PhysicalPlannerImpl(conf, sm);
@@ -343,7 +345,7 @@ public class TestLeftOuterNLJoinExec {
         LocalTajoTestingUtility.newQueryUnitAttemptId(), merged, workDir);
     ctx.setEnforcer(new Enforcer());
     Expr context =  analyzer.parse(QUERIES[2]);
-    LogicalNode plan = planner.createPlan(context).getRootBlock().getRoot();
+    LogicalNode plan = planner.createPlan(session, context).getRootBlock().getRoot();
 
 
     PhysicalPlanner phyPlanner = new PhysicalPlannerImpl(conf, sm);
@@ -388,7 +390,7 @@ public class TestLeftOuterNLJoinExec {
         LocalTajoTestingUtility.newQueryUnitAttemptId(), merged, workDir);
     ctx.setEnforcer(new Enforcer());
     Expr context =  analyzer.parse(QUERIES[3]);
-    LogicalNode plan = planner.createPlan(context).getRootBlock().getRoot();
+    LogicalNode plan = planner.createPlan(session, context).getRootBlock().getRoot();
 
 
     PhysicalPlanner phyPlanner = new PhysicalPlannerImpl(conf, sm);
@@ -432,7 +434,7 @@ public class TestLeftOuterNLJoinExec {
         LocalTajoTestingUtility.newQueryUnitAttemptId(), merged, workDir);
     ctx.setEnforcer(new Enforcer());
     Expr context =  analyzer.parse(QUERIES[4]);
-    LogicalNode plan = planner.createPlan(context).getRootBlock().getRoot();
+    LogicalNode plan = planner.createPlan(session, context).getRootBlock().getRoot();
 
 
     PhysicalPlanner phyPlanner = new PhysicalPlannerImpl(conf, sm);

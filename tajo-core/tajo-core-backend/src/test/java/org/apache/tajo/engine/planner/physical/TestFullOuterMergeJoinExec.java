@@ -35,6 +35,7 @@ import org.apache.tajo.engine.planner.enforce.Enforcer;
 import org.apache.tajo.engine.planner.logical.JoinNode;
 import org.apache.tajo.engine.planner.logical.LogicalNode;
 import org.apache.tajo.engine.planner.logical.NodeType;
+import org.apache.tajo.master.session.Session;
 import org.apache.tajo.storage.*;
 import org.apache.tajo.storage.fragment.FileFragment;
 import org.apache.tajo.util.CommonTestingUtil;
@@ -59,7 +60,7 @@ public class TestFullOuterMergeJoinExec {
   private LogicalPlanner planner;
   private AbstractStorageManager sm;
   private Path testDir;
-  private static final int UNGENERATED_PID = -1;
+  private static final Session session = LocalTajoTestingUtility.createDummySession();
 
   private TableDesc dep3;
   private TableDesc dep4;
@@ -295,7 +296,7 @@ public class TestFullOuterMergeJoinExec {
   @Test
   public final void testFullOuterMergeJoin0() throws IOException, PlanningException {
     Expr expr = analyzer.parse(QUERIES[0]);
-    LogicalNode plan = planner.createPlan(expr).getRootBlock().getRoot();
+    LogicalNode plan = planner.createPlan(session, expr).getRootBlock().getRoot();
     JoinNode joinNode = PlannerUtil.findTopNode(plan, NodeType.JOIN);
     Enforcer enforcer = new Enforcer();
     enforcer.enforceJoinAlgorithm(joinNode.getPID(), JoinAlgorithm.MERGE_JOIN);
@@ -330,7 +331,7 @@ public class TestFullOuterMergeJoinExec {
   @Test
   public final void testFullOuterMergeJoin1() throws IOException, PlanningException {
     Expr expr = analyzer.parse(QUERIES[1]);
-    LogicalNode plan = planner.createPlan(expr).getRootBlock().getRoot();
+    LogicalNode plan = planner.createPlan(session, expr).getRootBlock().getRoot();
     JoinNode joinNode = PlannerUtil.findTopNode(plan, NodeType.JOIN);
     Enforcer enforcer = new Enforcer();
     enforcer.enforceJoinAlgorithm(joinNode.getPID(), JoinAlgorithm.MERGE_JOIN);
@@ -365,7 +366,7 @@ public class TestFullOuterMergeJoinExec {
   @Test
   public final void testFullOuterMergeJoin2() throws IOException, PlanningException {
     Expr expr = analyzer.parse(QUERIES[2]);
-    LogicalNode plan = planner.createPlan(expr).getRootBlock().getRoot();
+    LogicalNode plan = planner.createPlan(session, expr).getRootBlock().getRoot();
     JoinNode joinNode = PlannerUtil.findTopNode(plan, NodeType.JOIN);
     Enforcer enforcer = new Enforcer();
     enforcer.enforceJoinAlgorithm(joinNode.getPID(), JoinAlgorithm.MERGE_JOIN);
@@ -401,7 +402,7 @@ public class TestFullOuterMergeJoinExec {
   @Test
   public final void testFullOuterMergeJoin3() throws IOException, PlanningException {
     Expr expr = analyzer.parse(QUERIES[3]);
-    LogicalNode plan = planner.createPlan(expr).getRootBlock().getRoot();
+    LogicalNode plan = planner.createPlan(session, expr).getRootBlock().getRoot();
     JoinNode joinNode = PlannerUtil.findTopNode(plan, NodeType.JOIN);
     Enforcer enforcer = new Enforcer();
     enforcer.enforceJoinAlgorithm(joinNode.getPID(), JoinAlgorithm.MERGE_JOIN);
@@ -439,7 +440,7 @@ public class TestFullOuterMergeJoinExec {
   @Test
   public final void testFullOuterMergeJoin4() throws IOException, PlanningException {
     Expr expr = analyzer.parse(QUERIES[4]);
-    LogicalNode plan = planner.createPlan(expr).getRootBlock().getRoot();
+    LogicalNode plan = planner.createPlan(session, expr).getRootBlock().getRoot();
     JoinNode joinNode = PlannerUtil.findTopNode(plan, NodeType.JOIN);
     Enforcer enforcer = new Enforcer();
     enforcer.enforceJoinAlgorithm(joinNode.getPID(), JoinAlgorithm.MERGE_JOIN);
@@ -476,7 +477,7 @@ public class TestFullOuterMergeJoinExec {
   @Test
   public final void testFullOuterMergeJoin5() throws IOException, PlanningException {
     Expr expr = analyzer.parse(QUERIES[5]);
-    LogicalNode plan = planner.createPlan(expr).getRootBlock().getRoot();
+    LogicalNode plan = planner.createPlan(session, expr).getRootBlock().getRoot();
     JoinNode joinNode = PlannerUtil.findTopNode(plan, NodeType.JOIN);
     Enforcer enforcer = new Enforcer();
     enforcer.enforceJoinAlgorithm(joinNode.getPID(), JoinAlgorithm.MERGE_JOIN);

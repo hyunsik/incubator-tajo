@@ -31,6 +31,7 @@ public class SimpleParser {
     META,      // Meta Command
     STATEMENT, // Statement
     WITHIN_QUOTE,     // Within Quote
+    COMMENT,
     INVALID,   // Invalid Statement
     STATEMENT_EOS, // End State (End of Statement)
     META_EOS       // End State (End of Statement)
@@ -102,7 +103,7 @@ public class SimpleParser {
           char character = str.charAt(idx++);
           if (Character.isWhitespace(character)) {
             // skip
-          } else if (character == ';') {
+          } else if (isEndOfMeta(character)) {
             state = ParsingState.META_EOS;
           }
         }
@@ -113,6 +114,11 @@ public class SimpleParser {
           appender.append(str.subSequence(lineStartIdx, idx).toString());
         }
 
+      } else if (isCommentStart(str.charAt(idx))) {
+        idx++;
+        while (!isLineEnd(str.charAt(idx)) && idx < str.length()) {
+          idx++;
+        }
       /////////////////////////////////
       //    TOK_START     -> STATEMENT
       // or TOK_STATEMENT -> STATEMENT
@@ -126,7 +132,7 @@ public class SimpleParser {
         while (!isTerminateState(state) && idx < str.length()) {
           char character = str.charAt(idx++);
 
-          if (character == ';') {
+          if (isEndOfStatement(character)) {
             state = ParsingState.STATEMENT_EOS;
             endIdx = idx - 1;
           } else if (state == ParsingState.STATEMENT && character == '\'') { // TOK_STATEMENT -> WITHIN_QUOTE
@@ -167,8 +173,24 @@ public class SimpleParser {
     return statements;
   }
 
+  private static boolean isEndOfMeta(char character) {
+    return character == ';' || character == '\n';
+  }
+
+  private static boolean isEndOfStatement(char character) {
+    return character == ';';
+  }
+
+  private boolean isCommentStart(char character) {
+    return state == ParsingState.TOK_START && character == '-';
+  }
+
+  private boolean isLineEnd(char character) {
+    return character == '\n';
+  }
+
   private boolean isStatementStart(char character) {
-    return state == ParsingState.TOK_START && Character.isLetterOrDigit(character);
+    return state == ParsingState.TOK_START && (Character.isLetterOrDigit(character));
   }
 
   private boolean isStatementContinue() {

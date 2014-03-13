@@ -141,7 +141,7 @@ public class CatalogUtil {
   }
 
   public static TableDesc newTableDesc(String tableName, Schema schema, TableMeta meta, Path path) {
-    return new TableDesc(tableName, schema, meta, path);
+    return new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, tableName, schema, meta, path);
   }
 
   public static TableDesc newTableDesc(TableDescProto proto) {
@@ -150,10 +150,6 @@ public class CatalogUtil {
 
   public static PartitionMethodDesc newPartitionMethodDesc(CatalogProtos.PartitionMethodProto proto) {
     return new PartitionMethodDesc(proto);
-  }
-
-  public static TableDesc newTableDesc(String tableName, Schema schema, StoreType type, Options options, Path path) {
-    return new TableDesc(tableName, schema, type, options, path);
   }
 
   /**

@@ -29,6 +29,7 @@ import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hcatalog.common.HCatUtil;
 import org.apache.hcatalog.data.schema.HCatFieldSchema;
 import org.apache.hcatalog.data.schema.HCatSchema;
+import org.apache.tajo.TajoConstants;
 import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.Schema;
 import org.apache.tajo.catalog.exception.CatalogException;
@@ -241,7 +242,8 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
     }
     TableMeta meta = new TableMeta(storeType, options);
 
-    TableDesc tableDesc = new TableDesc(databaseName + "." + tableName, schema, meta, path);
+    TableDesc tableDesc = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, databaseName + "." + tableName, schema,
+        meta, path);
     if (stats != null) {
       tableDesc.setStats(stats);
     }

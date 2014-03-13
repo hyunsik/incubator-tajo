@@ -20,6 +20,7 @@ package org.apache.tajo.engine.planner.physical;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.tajo.LocalTajoTestingUtility;
+import org.apache.tajo.TajoConstants;
 import org.apache.tajo.TajoTestingCluster;
 import org.apache.tajo.TpchTestBase;
 import org.apache.tajo.algebra.Expr;
@@ -91,7 +92,7 @@ public class TestSortExec {
     appender.flush();
     appender.close();
 
-    TableDesc desc = new TableDesc("employee", schema, employeeMeta, tablePath);
+    TableDesc desc = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, "employee", schema, employeeMeta, tablePath);
     catalog.createTable(desc);
 
     analyzer = new SQLAnalyzer();
@@ -110,7 +111,7 @@ public class TestSortExec {
         .newQueryUnitAttemptId(), new FileFragment[] { frags[0] }, workDir);
     ctx.setEnforcer(new Enforcer());
     Expr context = analyzer.parse(QUERIES[0]);
-    LogicalPlan plan = planner.createPlan(context);
+    LogicalPlan plan = planner.createPlan(LocalTajoTestingUtility.createDummySession(), context);
     LogicalNode rootNode = optimizer.optimize(plan);
 
     PhysicalPlanner phyPlanner = new PhysicalPlannerImpl(conf, sm);

@@ -31,6 +31,7 @@ import org.apache.tajo.annotation.Nullable;
 import org.apache.tajo.annotation.ThreadSafe;
 import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.proto.CatalogProtos;
+import org.apache.tajo.cli.InvalidClientSessionException;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.conf.TajoConf.ConfVars;
 import org.apache.tajo.ipc.ClientProtos.*;
@@ -157,7 +158,7 @@ public class TajoClient implements Closeable {
         sessionId = response.getSessionId();
         LOG.info(String.format("Got session %s as a user '%s'.", sessionId.getId(), userInfo.getUserName()));
       } else {
-        throw new ServiceException("Cannot obtain client session");
+        throw new InvalidClientSessionException(response.getMessage());
       }
     }
   }

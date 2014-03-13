@@ -133,7 +133,7 @@ public class TestRangeRetrieverHandler {
     appender.flush();
     appender.close();
 
-    TableDesc employee = new TableDesc("employee", schema, employeeMeta, tableDir);
+    TableDesc employee = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, "employee", schema, employeeMeta, tableDir);
     catalog.createTable(employee);
 
     FileFragment[] frags = StorageManager.splitNG(conf, "employee", employeeMeta, tableDir, Integer.MAX_VALUE);
@@ -142,7 +142,7 @@ public class TestRangeRetrieverHandler {
         new FileFragment[] {frags[0]}, testDir);
     ctx.setEnforcer(new Enforcer());
     Expr expr = analyzer.parse(SORT_QUERY[0]);
-    LogicalPlan plan = planner.createPlan(expr);
+    LogicalPlan plan = planner.createPlan(LocalTajoTestingUtility.createDummySession(), expr);
     LogicalNode rootNode = optimizer.optimize(plan);
 
     PhysicalPlanner phyPlanner = new PhysicalPlannerImpl(conf,sm);
@@ -254,7 +254,7 @@ public class TestRangeRetrieverHandler {
     appender.flush();
     appender.close();
 
-    TableDesc employee = new TableDesc("employee", schema, meta, tablePath);
+    TableDesc employee = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, "employee", schema, meta, tablePath);
     catalog.createTable(employee);
 
     FileFragment[] frags = sm.splitNG(conf, "employee", meta, tablePath, Integer.MAX_VALUE);
@@ -264,7 +264,7 @@ public class TestRangeRetrieverHandler {
         new FileFragment[] {frags[0]}, testDir);
     ctx.setEnforcer(new Enforcer());
     Expr expr = analyzer.parse(SORT_QUERY[1]);
-    LogicalPlan plan = planner.createPlan(expr);
+    LogicalPlan plan = planner.createPlan(LocalTajoTestingUtility.createDummySession(), expr);
     LogicalNode rootNode = optimizer.optimize(plan);
 
     PhysicalPlanner phyPlanner = new PhysicalPlannerImpl(conf,sm);

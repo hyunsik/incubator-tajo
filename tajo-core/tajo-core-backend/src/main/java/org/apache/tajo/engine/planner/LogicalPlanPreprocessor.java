@@ -30,11 +30,10 @@ import org.apache.tajo.engine.exception.NoSuchColumnException;
 import org.apache.tajo.engine.planner.LogicalPlan.QueryBlock;
 import org.apache.tajo.engine.planner.logical.*;
 import org.apache.tajo.engine.utils.SchemaUtil;
+import org.apache.tajo.master.session.Session;
 import org.apache.tajo.util.TUtil;
 
 import java.util.*;
-
-import static org.apache.tajo.TajoConstants.DEFAULT_DATABASE_NAME;
 
 /**
  * It finds all relations for each block and builds base schema information.
@@ -43,15 +42,18 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
   private ExprAnnotator annotator;
 
   static class PreprocessContext {
+    Session session;
     LogicalPlan plan;
     LogicalPlan.QueryBlock currentBlock;
 
-    public PreprocessContext(LogicalPlan plan, LogicalPlan.QueryBlock currentBlock) {
+    public PreprocessContext(Session session, LogicalPlan plan, LogicalPlan.QueryBlock currentBlock) {
+      this.session = session;
       this.plan = plan;
       this.currentBlock = currentBlock;
     }
 
     public PreprocessContext(PreprocessContext context, LogicalPlan.QueryBlock currentBlock) {
+      this.session = context.session;
       this.plan = context.plan;
       this.currentBlock = currentBlock;
     }
@@ -330,7 +332,7 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
       throws PlanningException {
 
     Relation relation = expr;
-    TableDesc desc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, relation.getName());
+    TableDesc desc = catalog.getTableDesc(ctx.session.getCurrentDatabase(), relation.getName());
 
     ScanNode scanNode = ctx.plan.createNode(ScanNode.class);
     if (relation.hasAlias()) {

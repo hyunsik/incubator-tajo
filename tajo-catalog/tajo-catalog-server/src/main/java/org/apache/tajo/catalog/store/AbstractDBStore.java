@@ -249,6 +249,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       pstmt.setString(2, spaceUri);
       pstmt.executeUpdate();
       pstmt.close();
+      conn.commit();
     } catch (SQLException se) {
       try {
         // If there is any error, rollback the changes.
@@ -381,6 +382,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       pstmt.setInt(2, spaceInfo.getSpaceId());
       pstmt.executeUpdate();
       pstmt.close();
+      conn.commit();
     } catch (SQLException se) {
       try {
         // If there is any error, rollback the changes.

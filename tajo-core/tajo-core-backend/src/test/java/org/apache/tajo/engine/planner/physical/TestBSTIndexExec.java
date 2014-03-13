@@ -143,7 +143,8 @@ public class TestBSTIndexExec {
     appender.close();
     writer.close();
 
-    TableDesc desc = new TableDesc("employee", schema, meta, sm.getTablePath("employee"));
+    TableDesc desc = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, "employee", schema, meta,
+        sm.getTablePath("employee"));
     catalog.createTable(desc);
 
     analyzer = new SQLAnalyzer();
@@ -169,7 +170,7 @@ public class TestBSTIndexExec {
     TaskAttemptContext ctx = new TaskAttemptContext(conf,
         LocalTajoTestingUtility.newQueryUnitAttemptId(), new FileFragment[] { frags[0] }, workDir);
     Expr expr = analyzer.parse(QUERY);
-    LogicalPlan plan = planner.createPlan(expr);
+    LogicalPlan plan = planner.createPlan(LocalTajoTestingUtility.createDummySession(), expr);
     LogicalNode rootNode = optimizer.optimize(plan);
 
     TmpPlanner phyPlanner = new TmpPlanner(conf, sm);

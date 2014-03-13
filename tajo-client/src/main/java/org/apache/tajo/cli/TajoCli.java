@@ -43,10 +43,7 @@ import java.io.PrintWriter;
 import java.lang.reflect.Constructor;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 
 import static org.apache.tajo.cli.ParsedResult.StatementType.META;
 import static org.apache.tajo.cli.SimpleParser.ParsingState;
@@ -63,6 +60,7 @@ public class TajoCli {
   private final PrintWriter sout;
 
   // Current States
+  private List<String> arguments = new ArrayList<String>();
   private String currentDatabase;
 
   private static final Class [] registeredCommands = {
@@ -133,8 +131,8 @@ public class TajoCli {
     }
 
     String baseDatabase = null;
-    if (args.length > 0) {
-      baseDatabase = args[0];
+    if (cmd.getArgList().size() > 0) {
+      baseDatabase = (String) cmd.getArgList().get(0);
     }
 
     // if there is no "-h" option,

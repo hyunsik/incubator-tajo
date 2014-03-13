@@ -99,7 +99,7 @@ public class TestExecutionBlockCursor {
             "join supplier on s_nationkey = n_nationkey " +
             "join partsupp on s_suppkey = ps_suppkey " +
             "join part on p_partkey = ps_partkey and p_type like '%BRASS' and p_size = 15");
-    LogicalPlan logicalPlan = logicalPlanner.createPlan(context);
+    LogicalPlan logicalPlan = logicalPlanner.createPlan(LocalTajoTestingUtility.createDummySession(), context);
     optimizer.optimize(logicalPlan);
     QueryContext queryContext = new QueryContext();
     MasterPlan plan = new MasterPlan(LocalTajoTestingUtility.newQueryId(), queryContext, logicalPlan);

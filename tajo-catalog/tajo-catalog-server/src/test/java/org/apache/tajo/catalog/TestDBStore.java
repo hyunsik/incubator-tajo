@@ -76,7 +76,8 @@ public class TestDBStore {
     Options opts = new Options();
     opts.put("file.delimiter", ",");
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV, opts);
-    TableDesc desc = new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
+    TableDesc desc = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, tableName, schema, meta,
+        new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     assertFalse(store.existTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName));
     store.createTable(desc.getProto());
     assertTrue(store.existTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName));
@@ -105,7 +106,8 @@ public class TestDBStore {
     stat.setNumRows(957685);
     stat.setNumBytes(1023234);
 
-    TableDesc desc = new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "gettable"));
+    TableDesc desc = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, tableName, schema, meta,
+        new Path(CommonTestingUtil.getTestDir(), "gettable"));
     desc.setExternal(true);
     desc.setStats(stat);
 
@@ -132,7 +134,7 @@ public class TestDBStore {
     for (int i = 0; i < numTables; i++) {
       String tableName = "tableA_" + i;
       TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV);
-      TableDesc desc = new TableDesc(tableName, schema, meta,
+      TableDesc desc = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, tableName, schema, meta,
           new Path(CommonTestingUtil.getTestDir(), "tableA_" + i));
       store.createTable(desc.getProto());
     }
@@ -215,7 +217,8 @@ public class TestDBStore {
     String tableName = "indexed";
     
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV);
-    return new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "indexed"));
+    return new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, tableName, schema, meta,
+        new Path(CommonTestingUtil.getTestDir(), "indexed"));
   }
 
   public static void assertSchemaOrder(Schema s1, Schema s2) {
@@ -249,7 +252,8 @@ public class TestDBStore {
             "id", partSchema);
 
     TableDesc desc =
-        new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
+        new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, tableName, schema, meta,
+            new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
     assertFalse(store.existTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName));
     store.createTable(desc.getProto());
@@ -283,7 +287,8 @@ public class TestDBStore {
             "id", partSchema);
 
     TableDesc desc =
-        new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
+        new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, tableName, schema, meta,
+            new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
     assertFalse(store.existTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName));
     store.createTable(desc.getProto());
@@ -317,7 +322,8 @@ public class TestDBStore {
             "id", partSchema);
 
     TableDesc desc =
-        new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
+        new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, tableName, schema, meta,
+            new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
     assertFalse(store.existTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName));
     store.createTable(desc.getProto());
@@ -351,7 +357,8 @@ public class TestDBStore {
             "id", partSchema);
 
     TableDesc desc =
-        new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
+        new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, tableName, schema, meta,
+            new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
     assertFalse(store.existTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName));
     store.createTable(desc.getProto());
@@ -385,7 +392,8 @@ public class TestDBStore {
             "id", partSchema);
 
     TableDesc desc =
-        new TableDesc(tableName, schema, meta, new Path(CommonTestingUtil.getTestDir(), "addedtable"));
+        new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, tableName, schema, meta,
+            new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
     assertFalse(store.existTable(TajoConstants.DEFAULT_DATABASE_NAME, tableName));
     store.createTable(desc.getProto());

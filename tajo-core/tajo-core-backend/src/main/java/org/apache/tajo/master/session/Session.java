@@ -19,22 +19,35 @@
 package org.apache.tajo.master.session;
 
 import com.google.common.collect.ImmutableMap;
+import org.apache.tajo.catalog.Options;
+import org.apache.tajo.common.ProtoObject;
+import org.apache.tajo.ipc.TajoWorkerProtocol;
 
 import java.util.HashMap;
 import java.util.Map;
 
-public class Session implements SessionConstants {
+import static org.apache.tajo.ipc.TajoWorkerProtocol.SessionProto;
+
+public class Session implements SessionConstants, ProtoObject<SessionProto> {
   private final String sessionId;
   private final String userName;
   private long lastAccessTime;
-  private final Map<String, String> sessionVariables = new HashMap<String, String>();
+  private final Map<String, String> sessionVariables;
 
   public Session(String sessionId, String userName, String databaseName) {
     this.sessionId = sessionId;
     this.userName = userName;
     this.lastAccessTime = System.currentTimeMillis();
-
+    this.sessionVariables = new HashMap<String, String>();
     selectDatabase(databaseName);
+  }
+
+  public Session(SessionProto proto) {
+    sessionId = proto.getSessionId();
+    userName = proto.getUsername();
+    lastAccessTime = proto.getLastAccessTime();
+    Options options = new Options(proto.getVariables());
+    sessionVariables = options.getAllKeyValus();
   }
 
   public String getSessionId() {
@@ -91,5 +104,17 @@ public class Session implements SessionConstants {
     synchronized (sessionVariables) {
       return sessionVariables.get(CURRENT_DATABASE);
     }
+  }
+
+  @Override
+  public SessionProto getProto() {
+    SessionProto.Builder builder = SessionProto.newBuilder();
+    builder.setSessionId(sessionId);
+    builder.setUsername(userName);
+    builder.setLastAccessTime(lastAccessTime);
+    Options variables = new Options();
+    variables.putAll(this.sessionVariables);
+    builder.setVariables(variables.getProto());
+    return builder.build();
   }
 }

@@ -59,6 +59,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.*;
 
+import static org.apache.tajo.TajoConstants.DEFAULT_DATABASE_NAME;
 import static org.apache.tajo.TajoConstants.DEFAULT_TABLESPACE_NAME;
 
 public class TajoMasterClientService extends AbstractService {
@@ -125,12 +126,23 @@ public class TajoMasterClientService extends AbstractService {
         throws ServiceException {
       try {
         // create a new session with base database name. If no database name is give, we use default database.
+        String databaseName = request.hasBaseDatabaseName() ? request.getBaseDatabaseName() : DEFAULT_DATABASE_NAME;
+
+        if (!context.getCatalog().existDatabase(databaseName)) {
+          LOG.info("Session creation is canceled due to absent base database \"" + databaseName + "\".");
+          throw new NoSuchDatabaseException(databaseName);
+        }
+
         String sessionId =
-            context.getSessionManager().createSession(request.getUsername(),
-            request.hasBaseDatabaseName() ? request.getBaseDatabaseName() : TajoConstants.DEFAULT_DATABASE_NAME);
+            context.getSessionManager().createSession(request.getUsername(), databaseName);
         CreateSessionResponse.Builder builder = CreateSessionResponse.newBuilder();
         builder.setState(CreateSessionResponse.ResultState.SUCCESS);
         builder.setSessionId(TajoIdProtos.SessionIdProto.newBuilder().setId(sessionId).build());
+        return builder.build();
+      } catch (NoSuchDatabaseException nsde) {
+        CreateSessionResponse.Builder builder = CreateSessionResponse.newBuilder();
+        builder.setState(CreateSessionResponse.ResultState.FAILED);
+        builder.setMessage(nsde.getMessage());
         return builder.build();
       } catch (InvalidSessionException e) {
         CreateSessionResponse.Builder builder = CreateSessionResponse.newBuilder();
@@ -239,14 +251,14 @@ public class TajoMasterClientService extends AbstractService {
                                            SessionedStringProto request) throws ServiceException {
 
       try {
-        context.getSessionManager().touch(request.getSessionId().getId());
+        Session session = context.getSessionManager().getSession(request.getSessionId().getId());
 
         if(LOG.isDebugEnabled()) {
           LOG.debug("ExplainQuery [" + request.getValue() + "]");
         }
         ClientProtos.ExplainQueryResponse.Builder responseBuilder = ClientProtos.ExplainQueryResponse.newBuilder();
         responseBuilder.setResultCode(ResultCode.OK);
-        String plan = context.getGlobalEngine().explainQuery(request.getValue());
+        String plan = context.getGlobalEngine().explainQuery(session, request.getValue());
         if(LOG.isDebugEnabled()) {
           LOG.debug("ExplainQuery [" + plan + "]");
         }
@@ -493,8 +505,8 @@ public class TajoMasterClientService extends AbstractService {
     @Override
     public BoolProto createDatabase(RpcController controller, SessionedStringProto request) throws ServiceException {
       try {
-        context.getSessionManager().touch(request.getSessionId().getId());
-        if (catalog.createDatabase(request.getValue(), DEFAULT_TABLESPACE_NAME)) {
+        Session session = context.getSessionManager().getSession(request.getSessionId().getId());
+        if (context.getGlobalEngine().createDatabase(session, request.getValue())) {
           return BOOL_TRUE;
         } else {
           return BOOL_FALSE;

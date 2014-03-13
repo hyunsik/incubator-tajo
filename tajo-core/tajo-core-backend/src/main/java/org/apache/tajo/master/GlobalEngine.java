@@ -24,6 +24,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.tajo.QueryId;
@@ -49,12 +50,12 @@ import org.apache.tajo.master.querymaster.QueryInfo;
 import org.apache.tajo.master.querymaster.QueryJobManager;
 import org.apache.tajo.master.session.Session;
 import org.apache.tajo.storage.AbstractStorageManager;
+import org.apache.tajo.storage.StorageUtil;
 
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Stack;
 
 import static org.apache.tajo.TajoConstants.DEFAULT_TABLESPACE_NAME;
 import static org.apache.tajo.ipc.ClientProtos.GetQueryStatusResponse;
@@ -136,7 +137,7 @@ public class GlobalEngine extends AbstractService {
       context.getSystemMetrics().counter("Query", "totalQuery").inc();
 
       Expr planningContext = hiveQueryMode ? converter.parse(sql) : analyzer.parse(sql);
-      LogicalPlan plan = createLogicalPlan(planningContext);
+      LogicalPlan plan = createLogicalPlan(session, planningContext);
       LogicalRootNode rootNode = plan.getRootBlock().getRoot();
 
       GetQueryStatusResponse.Builder responseBuilder = GetQueryStatusResponse.newBuilder();
@@ -153,7 +154,7 @@ public class GlobalEngine extends AbstractService {
         QueryJobManager queryJobManager = this.context.getQueryJobManager();
         QueryInfo queryInfo;
 
-        queryInfo = queryJobManager.createNewQueryJob(queryContext, sql, rootNode);
+        queryInfo = queryJobManager.createNewQueryJob(session, queryContext, sql, rootNode);
 
         if(queryInfo == null) {
           responseBuilder.setQueryId(QueryIdFactory.NULL_QUERY_ID.getProto());
@@ -189,7 +190,7 @@ public class GlobalEngine extends AbstractService {
     }
   }
 
-  public String explainQuery(String sql) throws IOException, SQLException, PlanningException {
+  public String explainQuery(Session session, String sql) throws IOException, SQLException, PlanningException {
     LOG.info("SQL: " + sql);
     // parse the query
 
@@ -197,7 +198,7 @@ public class GlobalEngine extends AbstractService {
     Expr planningContext = hiveQueryMode ? converter.parse(sql) : analyzer.parse(sql);
     LOG.info("hive.query.mode:" + hiveQueryMode);
 
-    LogicalPlan plan = createLogicalPlan(planningContext);
+    LogicalPlan plan = createLogicalPlan(session, planningContext);
     return plan.toString();
   }
 
@@ -222,11 +223,11 @@ public class GlobalEngine extends AbstractService {
     switch (root.getType()) {
       case CREATE_DATABASE:
         CreateDatabaseNode createDatabase = (CreateDatabaseNode) root;
-        catalog.createDatabase(createDatabase.getDatabaseName(), DEFAULT_TABLESPACE_NAME);
+        createDatabase(session, createDatabase.getDatabaseName());
         return true;
       case DROP_DATABASE:
         DropDatabaseNode dropDatabaseNode = (DropDatabaseNode) root;
-        catalog.dropDatabase(dropDatabaseNode.getDatabaseName());
+        dropDatabase(session, dropDatabaseNode.getDatabaseName());
         return true;
       case CREATE_TABLE:
         CreateTableNode createTable = (CreateTableNode) root;
@@ -245,7 +246,7 @@ public class GlobalEngine extends AbstractService {
   private LogicalPlan createLogicalPlan(Session session, Expr expression) throws PlanningException {
 
     VerificationState state = new VerificationState();
-    preVerifier.visit(state, new Stack<Expr>(), expression);
+    preVerifier.verify(session, expression);
     if (!state.verified()) {
       StringBuilder sb = new StringBuilder();
       for (String error : state.getErrorMessages()) {
@@ -254,7 +255,7 @@ public class GlobalEngine extends AbstractService {
       throw new VerifyException(sb.toString());
     }
 
-    LogicalPlan plan = planner.createPlan(expression);
+    LogicalPlan plan = planner.createPlan(session, expression);
     LOG.info("=============================================");
     LOG.info("Non Optimized Query: \n" + plan.toString());
     LOG.info("=============================================");
@@ -263,7 +264,7 @@ public class GlobalEngine extends AbstractService {
     LOG.info("Optimized Query: \n" + plan.toString());
     LOG.info("=============================================");
 
-    annotatedPlanVerifier.visit(state, plan, plan.getRootBlock());
+    annotatedPlanVerifier.verify(session, plan);
 
     if (!state.verified()) {
       StringBuilder sb = new StringBuilder();
@@ -336,10 +337,19 @@ public class GlobalEngine extends AbstractService {
     return desc;
   }
 
+  public boolean createDatabase(Session session, String databaseName) throws IOException {
+    String normalized = CatalogUtil.normalizeIdentifier(databaseName);
+    catalog.createDatabase(databaseName, DEFAULT_TABLESPACE_NAME);
+    Path databaseDir =
+        StorageUtil.concatPath(context.getConf().getVar(TajoConf.ConfVars.WAREHOUSE_DIR), normalized);
+    FileSystem fs = databaseDir.getFileSystem(context.getConf());
+    fs.mkdirs(databaseDir);
+    return true;
+  }
 
-  public boolean dropDatabase(Session session, String databaseName) throws ServiceException {
+  public boolean dropDatabase(Session session, String databaseName) {
     if (session.getCurrentDatabase().equals(databaseName)) {
-      throw new ServiceException("ERROR: Cannot drop the current open database");
+      throw new RuntimeException("ERROR: Cannot drop the current open database");
     }
 
     boolean result = catalog.dropDatabase(databaseName);
@@ -412,9 +422,11 @@ public class GlobalEngine extends AbstractService {
     public void hook(QueryContext queryContext, LogicalPlan plan) throws Exception {
       LogicalRootNode rootNode = plan.getRootBlock().getRoot();
       CreateTableNode createTableNode = rootNode.getChild();
+      String databaseName = createTableNode.getDatabaseName();
       String tableName = createTableNode.getTableName();
       queryContext.setOutputTable(tableName);
-      queryContext.setOutputPath(new Path(TajoConf.getWarehouseDir(context.getConf()), tableName));
+      queryContext.setOutputPath(
+          StorageUtil.concatPath(TajoConf.getWarehouseDir(context.getConf()), databaseName, tableName));
       if(createTableNode.getPartitionMethod() != null) {
         queryContext.setPartitionMethod(createTableNode.getPartitionMethod());
       }

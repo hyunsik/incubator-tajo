@@ -389,11 +389,15 @@ public class TajoMaster extends CompositeService {
 
   private void checkBaseTBSpaceAndDatabase() {
     if (!catalog.existTablespace(DEFAULT_TABLESPACE_NAME)) {
-      catalog.createTablespace(DEFAULT_TABLESPACE_NAME, context.getConf().getVar(ConfVars.ROOT_DIR));
+      catalog.createTablespace(DEFAULT_TABLESPACE_NAME, context.getConf().getVar(ConfVars.WAREHOUSE_DIR));
+    } else {
+      LOG.info(String.format("Default tablespace (%s) is already prepared.", DEFAULT_TABLESPACE_NAME));
     }
 
     if (!catalog.existDatabase(DEFAULT_DATABASE_NAME)) {
       catalog.createDatabase(DEFAULT_DATABASE_NAME, DEFAULT_TABLESPACE_NAME);
+    } else {
+      LOG.info(String.format("Default database (%s) is already prepared.", DEFAULT_DATABASE_NAME));
     }
   }
 

@@ -65,13 +65,13 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
     this.external = external;
   }
 
-	public TableDesc(String tableName, Schema schema, TableMeta meta, Path path) {
-		this(DEFAULT_DATABASE_NAME, CatalogUtil.normalizeIdentifier(tableName),
+	public TableDesc(String databaseName, String tableName, Schema schema, TableMeta meta, Path path) {
+		this(databaseName, CatalogUtil.normalizeIdentifier(tableName),
         schema, meta, path, true);
 	}
 	
-	public TableDesc(String tableName, Schema schema, StoreType type, Options options, Path path) {
-	  this(tableName, schema, new TableMeta(type, options), path);
+	public TableDesc(String databaseName, String tableName, Schema schema, StoreType type, Options options, Path path) {
+	  this(databaseName, tableName, schema, new TableMeta(type, options), path);
 	}
 	
 	public TableDesc(TableDescProto proto) {

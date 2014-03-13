@@ -20,6 +20,7 @@ package org.apache.tajo.client;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.compress.GzipCodec;
+import org.apache.tajo.TajoConstants;
 import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.partition.PartitionMethodDesc;
 import org.apache.tajo.catalog.proto.CatalogProtos;
@@ -42,7 +43,7 @@ public class TestDDLBuilder {
     meta.putOption("csv.delimiter", "|");
     meta.putOption(TableMeta.COMPRESSION_CODEC, GzipCodec.class.getName());
 
-    TableDesc desc = new TableDesc("table1", schema, meta, new Path("/table1"));
+    TableDesc desc = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, "table1", schema, meta, new Path("/table1"));
 
     Schema expressionSchema = new Schema();
     expressionSchema.addColumn("key", TajoDataTypes.Type.INT4);

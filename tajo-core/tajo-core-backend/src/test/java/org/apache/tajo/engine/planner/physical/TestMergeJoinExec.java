@@ -153,7 +153,7 @@ public class TestMergeJoinExec {
   @Test
   public final void testMergeInnerJoin() throws IOException, PlanningException {
     Expr expr = analyzer.parse(QUERIES[0]);
-    LogicalPlan plan = planner.createPlan(expr);
+    LogicalPlan plan = planner.createPlan(LocalTajoTestingUtility.createDummySession(), expr);
     LogicalNode root = plan.getRootBlock().getRoot();
 
     JoinNode joinNode = PlannerUtil.findTopNode(root, NodeType.JOIN);

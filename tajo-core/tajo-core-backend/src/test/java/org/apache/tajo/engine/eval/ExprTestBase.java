@@ -18,6 +18,7 @@
 
 package org.apache.tajo.engine.eval;
 
+import org.apache.tajo.LocalTajoTestingUtility;
 import org.apache.tajo.TajoTestingCluster;
 import org.apache.tajo.algebra.Expr;
 import org.apache.tajo.catalog.*;
@@ -30,6 +31,7 @@ import org.apache.tajo.engine.planner.*;
 import org.apache.tajo.engine.planner.logical.LogicalNode;
 import org.apache.tajo.engine.utils.SchemaUtil;
 import org.apache.tajo.master.TajoMaster;
+import org.apache.tajo.master.session.Session;
 import org.apache.tajo.storage.LazyTuple;
 import org.apache.tajo.storage.Tuple;
 import org.apache.tajo.storage.VTuple;
@@ -93,19 +95,20 @@ public class ExprTestBase {
    * @throws PlanningException
    */
   private static Target[] getRawTargets(String query, boolean condition) throws PlanningException {
+    Session session = LocalTajoTestingUtility.createDummySession();
     Expr expr = analyzer.parse(query);
     VerificationState state = new VerificationState();
-    preLogicalPlanVerifier.visit(state, new Stack<Expr>(), expr);
+    preLogicalPlanVerifier.verify(session, expr);
     if (state.getErrorMessages().size() > 0) {
       if (!condition && state.getErrorMessages().size() > 0) {
         throw new PlanningException(state.getErrorMessages().get(0));
       }
       assertFalse(state.getErrorMessages().get(0), true);
     }
-    LogicalPlan plan = planner.createPlan(expr, true);
+    LogicalPlan plan = planner.createPlan(session, expr, true);
     optimizer.optimize(plan);
-    annotatedPlanVerifier.visit(state, plan, plan.getRootBlock(), plan.getRootBlock().getRoot(),
-        new Stack<LogicalNode>());
+    annotatedPlanVerifier.verify(session, plan);
+
     if (state.getErrorMessages().size() > 0) {
       assertFalse(state.getErrorMessages().get(0), true);
     }
@@ -158,8 +161,8 @@ public class ExprTestBase {
           vtuple.put(i, lazyTuple.get(i));
         }
       }
-      cat.createTable(new TableDesc(tableName, inputSchema, CatalogProtos.StoreType.CSV, new Options(),
-          CommonTestingUtil.getTestDir()));
+      cat.createTable(new TableDesc(DEFAULT_DATABASE_NAME, tableName, inputSchema, CatalogProtos.StoreType.CSV,
+          new Options(), CommonTestingUtil.getTestDir()));
     }
 
     Target [] targets;

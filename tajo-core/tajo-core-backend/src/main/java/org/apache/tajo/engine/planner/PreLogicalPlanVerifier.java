@@ -22,6 +22,7 @@ import com.google.common.collect.ObjectArrays;
 import org.apache.tajo.algebra.*;
 import org.apache.tajo.catalog.CatalogService;
 import org.apache.tajo.catalog.proto.CatalogProtos;
+import org.apache.tajo.master.session.Session;
 import org.apache.tajo.util.TUtil;
 
 import java.util.Arrays;
@@ -30,15 +31,31 @@ import java.util.Stack;
 
 import static org.apache.tajo.TajoConstants.DEFAULT_DATABASE_NAME;
 
-public class PreLogicalPlanVerifier extends BaseAlgebraVisitor <VerificationState, Expr> {
+public class PreLogicalPlanVerifier extends BaseAlgebraVisitor <PreLogicalPlanVerifier.Context, Expr> {
   private CatalogService catalog;
 
   public PreLogicalPlanVerifier(CatalogService catalog) {
     this.catalog = catalog;
   }
 
-  public Expr visitProjection(VerificationState state, Stack<Expr> stack, Projection expr) throws PlanningException {
-    super.visitProjection(state, stack, expr);
+  public static class Context {
+    Session session;
+    VerificationState state;
+
+    public Context(Session session, VerificationState state) {
+      this.session = session;
+      this.state = state;
+    }
+  }
+
+  public VerificationState verify(Session session, Expr expr) throws PlanningException {
+    Context context = new Context(session, new VerificationState());
+    visit(context, new Stack<Expr>(), expr);
+    return context.state;
+  }
+
+  public Expr visitProjection(Context context, Stack<Expr> stack, Projection expr) throws PlanningException {
+    super.visitProjection(context, stack, expr);
 
     Set<String> names = TUtil.newHashSet();
     Expr [] distinctValues = null;
@@ -47,7 +64,8 @@ public class PreLogicalPlanVerifier extends BaseAlgebraVisitor <VerificationStat
 
       if (namedExpr.hasAlias()) {
         if (names.contains(namedExpr.getAlias())) {
-          state.addVerification(String.format("column name \"%s\" specified more than once", namedExpr.getAlias()));
+          context.state.addVerification(String.format("column name \"%s\" specified more than once",
+              namedExpr.getAlias()));
         } else {
           names.add(namedExpr.getAlias());
         }
@@ -94,13 +112,13 @@ public class PreLogicalPlanVerifier extends BaseAlgebraVisitor <VerificationStat
   }
 
   @Override
-  public Expr visitGroupBy(VerificationState ctx, Stack<Expr> stack, Aggregation expr) throws PlanningException {
-    super.visitGroupBy(ctx, stack, expr);
+  public Expr visitGroupBy(Context context, Stack<Expr> stack, Aggregation expr) throws PlanningException {
+    super.visitGroupBy(context, stack, expr);
 
     // Enforcer only ordinary grouping set.
     for (Aggregation.GroupElement groupingElement : expr.getGroupSet()) {
       if (groupingElement.getType() != Aggregation.GroupType.OrdinaryGroup) {
-        ctx.addVerification(groupingElement.getType() + " is not supported yet");
+        context.state.addVerification(groupingElement.getType() + " is not supported yet");
       }
     }
 
@@ -120,14 +138,14 @@ public class PreLogicalPlanVerifier extends BaseAlgebraVisitor <VerificationStat
   }
 
   @Override
-  public Expr visitRelation(VerificationState state, Stack<Expr> stack, Relation expr) throws PlanningException {
-    assertRelationExistence(state, expr.getName());
+  public Expr visitRelation(Context context, Stack<Expr> stack, Relation expr) throws PlanningException {
+    assertRelationExistence(context, expr.getName());
     return expr;
   }
 
-  private boolean assertRelationExistence(VerificationState state, String name) {
-    if (!catalog.existsTable(DEFAULT_DATABASE_NAME, name)) {
-      state.addVerification(String.format("relation \"%s\" does not exist", name));
+  private boolean assertRelationExistence(Context context, String name) {
+    if (!catalog.existsTable(context.session.getCurrentDatabase(), name)) {
+      context.state.addVerification(String.format("relation \"%s\" does not exist", name));
       return false;
     }
     return true;
@@ -171,25 +189,25 @@ public class PreLogicalPlanVerifier extends BaseAlgebraVisitor <VerificationStat
 
 
   @Override
-  public Expr visitCreateDatabase(VerificationState ctx, Stack<Expr> stack, CreateDatabase expr)
+  public Expr visitCreateDatabase(Context context, Stack<Expr> stack, CreateDatabase expr)
       throws PlanningException {
-    super.visitCreateDatabase(ctx, stack, expr);
-    assertDatabaseNoExistence(ctx, expr.getDatabaseName());
+    super.visitCreateDatabase(context, stack, expr);
+    assertDatabaseNoExistence(context.state, expr.getDatabaseName());
     return expr;
   }
 
   @Override
-  public Expr visitDropDatabase(VerificationState ctx, Stack<Expr> stack, DropDatabase expr) throws PlanningException {
-    super.visitDropDatabase(ctx, stack, expr);
-    assertDatabaseExistence(ctx, expr.getDatabaseName());
+  public Expr visitDropDatabase(Context context, Stack<Expr> stack, DropDatabase expr) throws PlanningException {
+    super.visitDropDatabase(context, stack, expr);
+    assertDatabaseExistence(context.state, expr.getDatabaseName());
     return expr;
   }
 
   @Override
-  public Expr visitCreateTable(VerificationState state, Stack<Expr> stack, CreateTable expr) throws PlanningException {
-    super.visitCreateTable(state, stack, expr);
-    assertRelationNoExistence(state, expr.getTableName());
-    assertUnsupportedStoreType(state, expr.getStorageType());
+  public Expr visitCreateTable(Context context, Stack<Expr> stack, CreateTable expr) throws PlanningException {
+    super.visitCreateTable(context, stack, expr);
+    assertRelationNoExistence(context.state, expr.getTableName());
+    assertUnsupportedStoreType(context.state, expr.getStorageType());
     return expr;
   }
 
@@ -197,11 +215,11 @@ public class PreLogicalPlanVerifier extends BaseAlgebraVisitor <VerificationStat
   // Insert or Update Section
   ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  public Expr visitInsert(VerificationState state, Stack<Expr> stack, Insert expr) throws PlanningException {
-    Expr child = super.visitInsert(state, stack, expr);
+  public Expr visitInsert(Context context, Stack<Expr> stack, Insert expr) throws PlanningException {
+    Expr child = super.visitInsert(context, stack, expr);
 
     if (expr.hasTableName()) {
-      assertRelationExistence(state, expr.getTableName());
+      assertRelationExistence(context, expr.getTableName());
     }
 
     if (child != null && child.getType() == OpType.Projection) {
@@ -211,9 +229,9 @@ public class PreLogicalPlanVerifier extends BaseAlgebraVisitor <VerificationStat
         int targetColumnNum = expr.getTargetColumns().length;
 
         if (targetColumnNum > projectColumnNum)  {
-          state.addVerification("INSERT has more target columns than expressions");
+          context.state.addVerification("INSERT has more target columns than expressions");
         } else if (targetColumnNum < projectColumnNum) {
-          state.addVerification("INSERT has more expressions than target columns");
+          context.state.addVerification("INSERT has more expressions than target columns");
         }
       }
     }

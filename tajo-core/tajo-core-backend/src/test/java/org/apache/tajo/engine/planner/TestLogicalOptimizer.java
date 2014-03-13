@@ -18,6 +18,8 @@
 
 package org.apache.tajo.engine.planner;
 
+import org.apache.tajo.LocalTajoTestingUtility;
+import org.apache.tajo.TajoConstants;
 import org.apache.tajo.TajoTestingCluster;
 import org.apache.tajo.algebra.Expr;
 import org.apache.tajo.catalog.*;
@@ -28,6 +30,7 @@ import org.apache.tajo.engine.function.builtin.SumInt;
 import org.apache.tajo.engine.parser.SQLAnalyzer;
 import org.apache.tajo.engine.planner.logical.*;
 import org.apache.tajo.master.TajoMaster;
+import org.apache.tajo.master.session.Session;
 import org.apache.tajo.util.CommonTestingUtil;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -44,6 +47,7 @@ public class TestLogicalOptimizer {
   private static SQLAnalyzer sqlAnalyzer;
   private static LogicalPlanner planner;
   private static LogicalOptimizer optimizer;
+  private static Session session = LocalTajoTestingUtility.createDummySession();
 
   @BeforeClass
   public static void setUp() throws Exception {
@@ -71,15 +75,18 @@ public class TestLogicalOptimizer {
     schema3.addColumn("phone", Type.INT4);
 
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV);
-    TableDesc people = new TableDesc("employee", schema, meta, CommonTestingUtil.getTestDir());
+    TableDesc people = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, "employee", schema, meta,
+        CommonTestingUtil.getTestDir());
     catalog.createTable(people);
 
     TableDesc student =
-        new TableDesc("dept", schema2, StoreType.CSV, new Options(), CommonTestingUtil.getTestDir());
+        new TableDesc(DEFAULT_DATABASE_NAME, "dept", schema2, StoreType.CSV, new Options(),
+            CommonTestingUtil.getTestDir());
     catalog.createTable(student);
 
     TableDesc score =
-        new TableDesc("score", schema3, StoreType.CSV, new Options(), CommonTestingUtil.getTestDir());
+        new TableDesc(DEFAULT_DATABASE_NAME, "score", schema3, StoreType.CSV, new Options(),
+            CommonTestingUtil.getTestDir());
     catalog.createTable(score);
 
     FunctionDesc funcDesc = new FunctionDesc("sumtest", SumInt.class, FunctionType.GENERAL,
@@ -110,7 +117,7 @@ public class TestLogicalOptimizer {
   public final void testProjectionPushWithNaturalJoin() throws PlanningException, CloneNotSupportedException {
     // two relations
     Expr expr = sqlAnalyzer.parse(QUERIES[4]);
-    LogicalPlan newPlan = planner.createPlan(expr);
+    LogicalPlan newPlan = planner.createPlan(session, expr);
     LogicalNode plan = newPlan.getRootBlock().getRoot();
     assertEquals(NodeType.ROOT, plan.getType());
     LogicalRootNode root = (LogicalRootNode) plan;
@@ -137,7 +144,7 @@ public class TestLogicalOptimizer {
   public final void testProjectionPushWithInnerJoin() throws PlanningException {
     // two relations
     Expr expr = sqlAnalyzer.parse(QUERIES[5]);
-    LogicalPlan newPlan = planner.createPlan(expr);
+    LogicalPlan newPlan = planner.createPlan(session, expr);
     optimizer.optimize(newPlan);
   }
   
@@ -145,7 +152,7 @@ public class TestLogicalOptimizer {
   public final void testProjectionPush() throws CloneNotSupportedException, PlanningException {
     // two relations
     Expr expr = sqlAnalyzer.parse(QUERIES[2]);
-    LogicalPlan newPlan = planner.createPlan(expr);
+    LogicalPlan newPlan = planner.createPlan(session, expr);
     LogicalNode plan = newPlan.getRootBlock().getRoot();
     
     assertEquals(NodeType.ROOT, plan.getType());
@@ -167,7 +174,7 @@ public class TestLogicalOptimizer {
   @Test
   public final void testOptimizeWithGroupBy() throws CloneNotSupportedException, PlanningException {
     Expr expr = sqlAnalyzer.parse(QUERIES[3]);
-    LogicalPlan newPlan = planner.createPlan(expr);
+    LogicalPlan newPlan = planner.createPlan(session, expr);
     LogicalNode plan = newPlan.getRootBlock().getRoot();
         
     assertEquals(NodeType.ROOT, plan.getType());
@@ -194,7 +201,7 @@ public class TestLogicalOptimizer {
   public final void testPushable() throws CloneNotSupportedException, PlanningException {
     // two relations
     Expr expr = sqlAnalyzer.parse(QUERIES[0]);
-    LogicalPlan newPlan = planner.createPlan(expr);
+    LogicalPlan newPlan = planner.createPlan(session, expr);
     LogicalNode plan = newPlan.getRootBlock().getRoot();
     
     assertEquals(NodeType.ROOT, plan.getType());
@@ -225,7 +232,7 @@ public class TestLogicalOptimizer {
     
     // Scan Pushable Test
     expr = sqlAnalyzer.parse(QUERIES[1]);
-    newPlan = planner.createPlan(expr);
+    newPlan = planner.createPlan(session, expr);
     plan = newPlan.getRootBlock().getRoot();
     
     assertEquals(NodeType.ROOT, plan.getType());
@@ -247,7 +254,7 @@ public class TestLogicalOptimizer {
   @Test
   public final void testInsertInto() throws CloneNotSupportedException, PlanningException {
     Expr expr = sqlAnalyzer.parse(TestLogicalPlanner.insertStatements[0]);
-    LogicalPlan newPlan = planner.createPlan(expr);
+    LogicalPlan newPlan = planner.createPlan(session, expr);
     optimizer.optimize(newPlan);
   }
 }

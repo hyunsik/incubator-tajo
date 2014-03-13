@@ -19,6 +19,7 @@
 package org.apache.tajo.catalog;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.tajo.TajoConstants;
 import org.apache.tajo.catalog.json.CatalogGsonHelper;
 import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.catalog.statistics.ColumnStats;
@@ -47,7 +48,7 @@ public class TestTableDesc {
     schema.addColumn("addr", Type.TEXT);
     info = CatalogUtil.newTableMeta(StoreType.CSV);
     path = new Path(CommonTestingUtil.getTestDir(), "table1");
-    desc = new TableDesc("table1", schema, info, path);
+    desc = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, "table1", schema, info, path);
     stats = new TableStats();
     stats.setNumRows(957685);
     stats.setNumBytes(1023234);
@@ -76,7 +77,7 @@ public class TestTableDesc {
 
     Path path = new Path(CommonTestingUtil.getTestDir(), "tajo");
 
-    TableDesc desc = new TableDesc("table1", schema, info, path);
+    TableDesc desc = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, "table1", schema, info, path);
     assertEquals("table1", desc.getName());
     
     assertEquals(path, desc.getPath());
@@ -87,7 +88,7 @@ public class TestTableDesc {
   @Test
   public void testGetProto() throws CloneNotSupportedException, IOException {
     Path path = new Path(CommonTestingUtil.getTestDir(), "tajo");
-    TableDesc desc = new TableDesc("table1", schema, info, path);
+    TableDesc desc = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, "table1", schema, info, path);
     desc.setStats(stats);
     CatalogProtos.TableDescProto proto = desc.getProto();
 
@@ -98,7 +99,7 @@ public class TestTableDesc {
   @Test
   public void testToJson() throws CloneNotSupportedException, IOException {
     Path path = new Path(CommonTestingUtil.getTestDir(), "tajo");
-    TableDesc desc = new TableDesc("table1", schema, info, path);
+    TableDesc desc = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, "table1", schema, info, path);
     desc.setStats(stats);
     String json = desc.toJson();
 

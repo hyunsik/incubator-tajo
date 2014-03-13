@@ -46,6 +46,7 @@ import org.apache.tajo.engine.planner.logical.InsertNode;
 import org.apache.tajo.engine.planner.logical.NodeType;
 import org.apache.tajo.engine.query.QueryContext;
 import org.apache.tajo.master.event.*;
+import org.apache.tajo.master.session.Session;
 import org.apache.tajo.storage.AbstractStorageManager;
 import org.apache.tajo.util.TUtil;
 
@@ -54,8 +55,6 @@ import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-
-import static org.apache.tajo.TajoConstants.DEFAULT_DATABASE_NAME;
 
 public class Query implements EventHandler<QueryEvent> {
   private static final Log LOG = LogFactory.getLog(Query.class);
@@ -133,6 +132,20 @@ public class Query implements EventHandler<QueryEvent> {
               QueryEventType.KILL,
               new KillSubQueriesTransition())
           .addTransition(QueryState.QUERY_RUNNING, QueryState.QUERY_ERROR,
+              QueryEventType.INTERNAL_ERROR,
+              INTERNAL_ERROR_TRANSITION)
+
+          // Transitions from QUERY_SUCCEEDED state
+          .addTransition(QueryState.QUERY_SUCCEEDED, QueryState.QUERY_SUCCEEDED,
+              QueryEventType.DIAGNOSTIC_UPDATE,
+              DIAGNOSTIC_UPDATE_TRANSITION)
+          // ignore-able transitions
+          .addTransition(QueryState.QUERY_SUCCEEDED, QueryState.QUERY_SUCCEEDED,
+              QueryEventType.SUBQUERY_COMPLETED,
+              SUBQUERY_COMPLETED_TRANSITION)
+          .addTransition(QueryState.QUERY_SUCCEEDED, QueryState.QUERY_SUCCEEDED,
+              QueryEventType.KILL)
+          .addTransition(QueryState.QUERY_SUCCEEDED, QueryState.QUERY_ERROR,
               QueryEventType.INTERNAL_ERROR,
               INTERNAL_ERROR_TRANSITION)
 
@@ -435,8 +448,8 @@ public class Query implements EventHandler<QueryEvent> {
       }
 
       @Override
-      public void execute(QueryMaster.QueryMasterContext context, QueryContext queryContext, Query query,
-                          ExecutionBlockId finalExecBlockId,
+      public void execute(QueryMaster.QueryMasterContext context, QueryContext queryContext,
+                          Query query, ExecutionBlockId finalExecBlockId,
                           Path finalOutputDir) throws Exception {
         SubQuery lastStage = query.getSubQuery(finalExecBlockId);
         TableMeta meta = lastStage.getTableMeta();
@@ -444,6 +457,7 @@ public class Query implements EventHandler<QueryEvent> {
 
         TableDesc resultTableDesc =
             new TableDesc(
+                TajoConstants.DEFAULT_DATABASE_NAME,
                 query.getId().toString(),
                 lastStage.getSchema(),
                 meta,
@@ -466,9 +480,8 @@ public class Query implements EventHandler<QueryEvent> {
       }
 
       @Override
-      public void execute(QueryMaster.QueryMasterContext context, QueryContext queryContext, Query query,
-                          ExecutionBlockId finalExecBlockId,
-                          Path finalOutputDir) throws Exception {
+      public void execute(QueryMaster.QueryMasterContext context, QueryContext queryContext,
+                          Query query, ExecutionBlockId finalExecBlockId, Path finalOutputDir) throws Exception {
         CatalogService catalog = context.getWorkerContext().getCatalog();
         SubQuery lastStage = query.getSubQuery(finalExecBlockId);
         TableMeta meta = lastStage.getTableMeta();
@@ -478,6 +491,7 @@ public class Query implements EventHandler<QueryEvent> {
 
         TableDesc tableDescTobeCreated =
             new TableDesc(
+                createTableNode.getDatabaseName(),
                 createTableNode.getTableName(),
                 createTableNode.getTableSchema(),
                 meta,
@@ -506,9 +520,8 @@ public class Query implements EventHandler<QueryEvent> {
       }
 
       @Override
-      public void execute(QueryMaster.QueryMasterContext context, QueryContext queryContext, Query query,
-                          ExecutionBlockId finalExecBlockId,
-                          Path finalOutputDir)
+      public void execute(QueryMaster.QueryMasterContext context, QueryContext queryContext,
+                          Query query, ExecutionBlockId finalExecBlockId, Path finalOutputDir)
           throws Exception {
 
         CatalogService catalog = context.getWorkerContext().getCatalog();
@@ -520,11 +533,13 @@ public class Query implements EventHandler<QueryEvent> {
 
         TableDesc finalTable;
         if (insertNode.hasTargetTable()) {
+          String databaseName = insertNode.getDatabaseName();
           String tableName = insertNode.getTableName();
-          finalTable = catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName);
+          finalTable = catalog.getTableDesc(databaseName, tableName);
         } else {
           String tableName = query.getId().toString();
-          finalTable = new TableDesc(tableName, lastStage.getSchema(), meta, finalOutputDir);
+          finalTable = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, tableName, lastStage.getSchema(), meta,
+              finalOutputDir);
         }
 
         long volume = getTableVolume(query.systemConf, finalOutputDir);
@@ -532,7 +547,7 @@ public class Query implements EventHandler<QueryEvent> {
         finalTable.setStats(stats);
 
         if (insertNode.hasTargetTable()) {
-          catalog.dropTable(DEFAULT_DATABASE_NAME, insertNode.getTableName());
+          catalog.dropTable(insertNode.getDatabaseName(), insertNode.getTableName());
           catalog.createTable(finalTable);
         }
 

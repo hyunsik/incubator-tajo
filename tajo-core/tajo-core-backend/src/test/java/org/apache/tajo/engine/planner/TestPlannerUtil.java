@@ -18,6 +18,8 @@
 
 package org.apache.tajo.engine.planner;
 
+import org.apache.tajo.LocalTajoTestingUtility;
+import org.apache.tajo.TajoConstants;
 import org.apache.tajo.TajoTestingCluster;
 import org.apache.tajo.algebra.Expr;
 import org.apache.tajo.catalog.*;
@@ -29,6 +31,7 @@ import org.apache.tajo.engine.eval.*;
 import org.apache.tajo.engine.function.builtin.SumInt;
 import org.apache.tajo.engine.parser.SQLAnalyzer;
 import org.apache.tajo.engine.planner.logical.*;
+import org.apache.tajo.master.session.Session;
 import org.apache.tajo.storage.Tuple;
 import org.apache.tajo.storage.TupleComparator;
 import org.apache.tajo.storage.VTuple;
@@ -48,6 +51,7 @@ public class TestPlannerUtil {
   private static CatalogService catalog;
   private static SQLAnalyzer analyzer;
   private static LogicalPlanner planner;
+  private static Session session = LocalTajoTestingUtility.createDummySession();
 
   @BeforeClass
   public static void setUp() throws Exception {
@@ -71,15 +75,18 @@ public class TestPlannerUtil {
     schema3.addColumn("score", CatalogUtil.newSimpleDataType(Type.INT4));
 
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV);
-    TableDesc people = new TableDesc("employee", schema, meta, CommonTestingUtil.getTestDir());
+    TableDesc people = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, "employee", schema, meta,
+        CommonTestingUtil.getTestDir());
     catalog.createTable(people);
 
     TableDesc student =
-        new TableDesc("dept", schema2, StoreType.CSV, new Options(), CommonTestingUtil.getTestDir());
+        new TableDesc(DEFAULT_DATABASE_NAME, "dept", schema2, StoreType.CSV, new Options(),
+            CommonTestingUtil.getTestDir());
     catalog.createTable(student);
 
     TableDesc score =
-        new TableDesc("score", schema3, StoreType.CSV, new Options(), CommonTestingUtil.getTestDir());
+        new TableDesc(DEFAULT_DATABASE_NAME, "score", schema3, StoreType.CSV, new Options(),
+            CommonTestingUtil.getTestDir());
     catalog.createTable(score);
 
     FunctionDesc funcDesc = new FunctionDesc("sumtest", SumInt.class, FunctionType.AGGREGATION,
@@ -100,7 +107,7 @@ public class TestPlannerUtil {
   public final void testFindTopNode() throws CloneNotSupportedException, PlanningException {
     // two relations
     Expr expr = analyzer.parse(TestLogicalPlanner.QUERIES[1]);
-    LogicalNode plan = planner.createPlan(expr).getRootBlock().getRoot();
+    LogicalNode plan = planner.createPlan(session, expr).getRootBlock().getRoot();
 
     assertEquals(NodeType.ROOT, plan.getType());
     LogicalRootNode root = (LogicalRootNode) plan;

@@ -40,6 +40,7 @@ import org.apache.tajo.engine.planner.logical.GroupbyNode;
 import org.apache.tajo.engine.planner.logical.NodeType;
 import org.apache.tajo.exception.InternalException;
 import org.apache.tajo.master.TajoMaster;
+import org.apache.tajo.master.session.Session;
 import org.apache.tajo.storage.Tuple;
 import org.apache.tajo.util.CommonTestingUtil;
 import org.junit.AfterClass;
@@ -64,6 +65,8 @@ public class TestEvalTreeUtil {
   static EvalNode expr3;
   static SQLAnalyzer analyzer;
   static LogicalPlanner planner;
+  static Session session;
+
   public static class TestSum extends GeneralFunction {
     private Integer x;
     private Integer y;
@@ -98,7 +101,8 @@ public class TestEvalTreeUtil {
     schema.addColumn("age", TajoDataTypes.Type.INT4);
 
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV);
-    TableDesc desc = new TableDesc("people", schema, meta, CommonTestingUtil.getTestDir());
+    TableDesc desc = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, "people", schema, meta,
+        CommonTestingUtil.getTestDir());
     catalog.createTable(desc);
 
     FunctionDesc funcMeta = new FunctionDesc("test_sum", TestSum.class,
@@ -130,7 +134,7 @@ public class TestEvalTreeUtil {
     Expr expr = analyzer.parse(query);
     LogicalPlan plan = null;
     try {
-      plan = planner.createPlan(expr);
+      plan = planner.createPlan(session, expr);
     } catch (PlanningException e) {
       e.printStackTrace();
     }
@@ -142,7 +146,7 @@ public class TestEvalTreeUtil {
     Expr block = analyzer.parse(query);
     LogicalPlan plan = null;
     try {
-      plan = planner.createPlan(block);
+      plan = planner.createPlan(session, block);
     } catch (PlanningException e) {
       e.printStackTrace();
     }
@@ -217,7 +221,7 @@ public class TestEvalTreeUtil {
   @Test
   public final void testGetContainExprs() throws CloneNotSupportedException, PlanningException {
     Expr expr = analyzer.parse(QUERIES[1]);
-    LogicalPlan plan = planner.createPlan(expr, true);
+    LogicalPlan plan = planner.createPlan(session, expr, true);
     Target [] targets = plan.getRootBlock().getRawTargets();
     Column col1 = new Column("people.score", TajoDataTypes.Type.INT4);
     Collection<EvalNode> exprs =
@@ -295,7 +299,7 @@ public class TestEvalTreeUtil {
     assertTrue(7.0d == node.eval(null, null).asFloat8());
 
     Expr expr = analyzer.parse(QUERIES[1]);
-    LogicalPlan plan = planner.createPlan(expr, true);
+    LogicalPlan plan = planner.createPlan(session, expr, true);
     targets = plan.getRootBlock().getRawTargets();
     Column col1 = new Column("people.score", TajoDataTypes.Type.INT4);
     Collection<EvalNode> exprs =
@@ -335,7 +339,7 @@ public class TestEvalTreeUtil {
   public final void testFindDistinctAggFunctions() throws PlanningException {
     String query = "select sum(score) + max(age) from people";
     Expr expr = analyzer.parse(query);
-    LogicalPlan plan = planner.createPlan(expr);
+    LogicalPlan plan = planner.createPlan(session, expr);
     GroupbyNode groupByNode = plan.getRootBlock().getNode(NodeType.GROUP_BY);
     EvalNode [] aggEvals = groupByNode.getAggFunctions();
 
