@@ -21,6 +21,7 @@ package org.apache.tajo.catalog;
 import com.google.common.collect.Sets;
 import org.apache.hadoop.fs.Path;
 import org.apache.tajo.TajoConstants;
+import org.apache.tajo.catalog.exception.CatalogException;
 import org.apache.tajo.catalog.exception.NoSuchFunctionException;
 import org.apache.tajo.catalog.function.Function;
 import org.apache.tajo.catalog.partition.PartitionMethodDesc;
@@ -28,6 +29,9 @@ import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.catalog.proto.CatalogProtos.FunctionType;
 import org.apache.tajo.catalog.proto.CatalogProtos.IndexMethod;
 import org.apache.tajo.catalog.proto.CatalogProtos.StoreType;
+import org.apache.tajo.catalog.store.DerbyStore;
+import org.apache.tajo.catalog.store.MemStore;
+import org.apache.tajo.catalog.store.MySQLStore;
 import org.apache.tajo.common.TajoDataTypes;
 import org.apache.tajo.common.TajoDataTypes.Type;
 import org.apache.tajo.conf.TajoConf;
@@ -36,11 +40,14 @@ import org.apache.tajo.util.TUtil;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import java.io.IOException;
 import java.util.*;
 
 import static org.apache.tajo.TajoConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.TajoConstants.DEFAULT_TABLESPACE_NAME;
 import static org.apache.tajo.catalog.CatalogConstants.*;
 import static org.junit.Assert.*;
 
@@ -54,19 +61,59 @@ public class TestCatalog {
 	static CatalogServer server;
 	static CatalogService catalog;
 
+  @Parameterized.Parameters
+  public static Collection<Object[]> generateParameters() {
+    return Arrays.asList(new Object[][] {
+        {StoreType.CSV, true, true},
+        {StoreType.RAW, false, false},
+        {StoreType.RCFILE, true, true},
+        {StoreType.TREVNI, false, true},
+    });
+  }
+
 	@BeforeClass
 	public static void setUp() throws Exception {
+
+    String driverClass = System.getProperty(CatalogConstants.STORE_CLASS);
+    if (driverClass == null) {
+      driverClass = DerbyStore.class.getCanonicalName();
+    }
+    String catalogURI = System.getProperty(CatalogConstants.CATALOG_URI);
+    if (catalogURI == null) {
+      Path path = CommonTestingUtil.getTestDir();
+      catalogURI = String.format("jdbc:derby:%s/db;create=true", path.toUri().getPath());
+    }
+    String connectionId = System.getProperty(CatalogConstants.CONNECTION_ID);
+    String password = System.getProperty(CatalogConstants.CONNECTION_PASSWORD);
+
     TajoConf conf = new TajoConf();
-    Path path = CommonTestingUtil.getTestDir();
-    conf.set(CATALOG_URI, String.format("jdbc:derby:%s/db;create=true", path.toUri().getPath()));
+    conf.set(CatalogConstants.STORE_CLASS, driverClass);
+    conf.set(CATALOG_URI, catalogURI);
     conf.setVar(TajoConf.ConfVars.CATALOG_ADDRESS, "127.0.0.1:0");
+
+    // MySQLStore requires password
+    if (driverClass.equals(MySQLStore.class.getCanonicalName())) {
+      if (connectionId == null) {
+        throw new CatalogException(String.format("%s driver requires %s", driverClass, CatalogConstants.CONNECTION_ID));
+      }
+      conf.set(CatalogConstants.CONNECTION_ID, connectionId);
+      if (password != null) {
+        conf.set(CatalogConstants.CONNECTION_PASSWORD, password);
+      }
+    }
+
+    Path defaultTableSpace = CommonTestingUtil.getTestDir();
 
 	  server = new CatalogServer();
     server.init(conf);
     server.start();
     catalog = new LocalCatalogWrapper(server);
-    catalog.createTablespace(TajoConstants.DEFAULT_TABLESPACE_NAME, path.toUri().toString());
-    catalog.createDatabase(DEFAULT_DATABASE_NAME, TajoConstants.DEFAULT_TABLESPACE_NAME);
+    if (!catalog.existTablespace(TajoConstants.DEFAULT_TABLESPACE_NAME)) {
+      catalog.createTablespace(TajoConstants.DEFAULT_TABLESPACE_NAME, defaultTableSpace.toUri().toString());
+    }
+    if (!catalog.existDatabase(DEFAULT_DATABASE_NAME)) {
+      catalog.createDatabase(DEFAULT_DATABASE_NAME, TajoConstants.DEFAULT_TABLESPACE_NAME);
+    }
 
     for(String table : catalog.getAllTableNames(DEFAULT_DATABASE_NAME)){
       catalog.dropTable(DEFAULT_DATABASE_NAME, table);

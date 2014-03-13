@@ -279,13 +279,13 @@ public class DerbyStore extends AbstractDBStore {
     } catch (SQLException se) {
       throw new CatalogException("failed to create base tables for Derby catalog store.", se);
     } finally {
-      CatalogUtil.closeQuietly(conn, stmt);
+      CatalogUtil.closeQuietly(stmt);
     }
   }
 
   @Override
   protected void dropBaseTable() throws CatalogException {
-    Connection conn = null;
+    Connection conn;
     Statement stmt = null;
     Map<String, Boolean> droppedTable = new HashMap<String, Boolean>();
 
@@ -313,7 +313,7 @@ public class DerbyStore extends AbstractDBStore {
     } catch (SQLException se) {
       throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, stmt);
+      CatalogUtil.closeQuietly(stmt);
     }
   }
 
@@ -344,7 +344,7 @@ public class DerbyStore extends AbstractDBStore {
     } catch (SQLException se){
       throw  new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, res);
+      CatalogUtil.closeQuietly(res);
     }
 
     for(Map.Entry<String, Boolean> entry : baseTableMaps.entrySet()) {

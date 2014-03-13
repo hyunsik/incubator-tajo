@@ -31,7 +31,7 @@ public class CatalogConstants {
 
   public static final String TB_META = "META";
   public static final String TB_SPACES = "TABLESPACES";
-  public static final String TB_DATABASES = "DATABASES";
+  public static final String TB_DATABASES = "DATABASES_";
   public static final String TB_TABLES = "TABLES";
   public static final String TB_COLUMNS = "COLUMNS";
   public static final String TB_OPTIONS = "OPTIONS";

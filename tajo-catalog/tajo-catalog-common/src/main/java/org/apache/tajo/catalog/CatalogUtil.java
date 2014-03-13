@@ -241,31 +241,11 @@ public class CatalogUtil {
     }
   }
 
-  public static void closeQuietly(Connection conn, Statement stmt)  {
+  public static void closeQuietly(Statement stmt, ResultSet res) {
     try {
+      closeQuietly(res);
+    } finally {
       closeQuietly(stmt);
-    } finally {
-      closeQuietly(conn);
-    }
-  }
-
-  public static void closeQuietly(Connection conn, ResultSet res) {
-    try {
-      closeQuietly(res);
-    } finally {
-      closeQuietly(conn);
-    }
-  }
-
-  public static void closeQuietly(Connection conn, Statement stmt, ResultSet res) {
-    try {
-      closeQuietly(res);
-    } finally {
-      try {
-        closeQuietly(stmt);
-      } finally {
-        closeQuietly(conn);
-      }
     }
   }
 }

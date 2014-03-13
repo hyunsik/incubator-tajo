@@ -171,7 +171,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     ResultSet result = null;
 
     try {
-      String sql = "SELECT version FROM meta";
+      String sql = "SELECT version FROM META";
       if (LOG.isDebugEnabled()) {
         LOG.debug(sql.toString());
       }
@@ -204,7 +204,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     } catch (SQLException e) {
       throw new CatalogException(e);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt, result);
+      CatalogUtil.closeQuietly(pstmt, result);
     }
 
     LOG.info(String.format("The compatibility of the catalog schema (version: %d) has been verified.",
@@ -219,13 +219,13 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     PreparedStatement pstmt = null;
     try {
       conn = getConnection();
-      pstmt = conn.prepareStatement("INSERT INTO meta VALUES (?)");
+      pstmt = conn.prepareStatement("INSERT INTO META VALUES (?)");
       pstmt.setInt(1, getDriverVersion());
       pstmt.executeUpdate();
     } catch (SQLException se) {
-      throw new CatalogException("cannot insert catalog schema version");
+      throw new CatalogException("cannot insert catalog schema version", se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt);
+      CatalogUtil.closeQuietly(pstmt);
     }
   }
 
@@ -259,7 +259,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       }
       throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt, res);
+      CatalogUtil.closeQuietly(pstmt, res);
     }
   }
 
@@ -285,7 +285,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     } catch (SQLException se) {
       throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt, res);
+      CatalogUtil.closeQuietly(pstmt, res);
     }
 
     return exist;
@@ -321,7 +321,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       }
       throw new CatalogException(String.format("Failed to drop tablespace \"%s\"", tableSpaceName), se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt);
+      CatalogUtil.closeQuietly(pstmt);
     }
   }
 
@@ -354,7 +354,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     } catch (SQLException se) {
       throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt, resultSet);
+      CatalogUtil.closeQuietly(pstmt, resultSet);
     }
 
     return tablespaceNames;
@@ -369,7 +369,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     try {
       TableSpaceInternal spaceInfo = getTableSpaceInfo(tablespaceName);
 
-      String sql = String.format("INSERT INTO %s (DB_NAME, SPACE_ID) VALUES (?, ?)", TB_DATABASES);
+      String sql = "INSERT INTO " + TB_DATABASES + " (DB_NAME, SPACE_ID) VALUES (?, ?)";
 
       if (LOG.isDebugEnabled()) {
         LOG.debug(sql);
@@ -392,7 +392,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       }
       throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt, res);
+      CatalogUtil.closeQuietly(pstmt, res);
     }
   }
 
@@ -405,7 +405,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
 
     try {
       StringBuilder sql = new StringBuilder();
-      sql.append("SELECT DB_NAME FROM DATABASES WHERE DB_NAME = ?");
+      sql.append("SELECT DB_NAME FROM " + TB_DATABASES + " WHERE DB_NAME = ?");
       if (LOG.isDebugEnabled()) {
         LOG.debug(sql.toString());
       }
@@ -418,7 +418,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     } catch (SQLException se) {
       throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt, res);
+      CatalogUtil.closeQuietly(pstmt, res);
     }
 
     return exist;
@@ -438,7 +438,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
         dropTableInternal(conn, databaseName, tableName);
       }
 
-      String sql = "DELETE FROM DATABASES WHERE DB_NAME = ?";
+      String sql = "DELETE FROM " + TB_DATABASES + " WHERE DB_NAME = ?";
       pstmt = conn.prepareStatement(sql);
       pstmt.setString(1, databaseName);
       pstmt.executeUpdate();
@@ -451,7 +451,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       }
       throw new CatalogException(String.format("Failed to drop database \"%s\"", databaseName), se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt);
+      CatalogUtil.closeQuietly(pstmt);
     }
   }
 
@@ -483,7 +483,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     } catch (SQLException se) {
       throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt, resultSet);
+      CatalogUtil.closeQuietly(pstmt, resultSet);
     }
 
     return databaseNames;
@@ -531,7 +531,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     } catch (SQLException se) {
       throw new NoSuchTablespaceException(spaceName);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt, res);
+      CatalogUtil.closeQuietly(pstmt, res);
     }
   }
 
@@ -554,7 +554,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     } catch (SQLException se) {
       throw new NoSuchTableException(databaseName, tableName);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt, res);
+      CatalogUtil.closeQuietly(pstmt, res);
     }
   }
 
@@ -579,7 +579,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       int dbid = getDatabaseId(databaseName);
 
       if (table.getIsExternal()) {
-        String sql = "INSERT INTO TABLES (db_id, TABLE_ID, TABLE_TYPE, path, store_type) VALUES(?, ?, ?, ?, ?) ";
+        String sql = "INSERT INTO TABLES (DB_ID, TABLE_ID, TABLE_TYPE, PATH, STORE_TYPE) VALUES(?, ?, ?, ?, ?) ";
 
         if (LOG.isDebugEnabled()) {
           LOG.debug(sql);
@@ -594,7 +594,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
         pstmt.executeUpdate();
         pstmt.close();
       } else {
-        String sql = "INSERT INTO TABLES (db_id, TABLE_ID, TABLE_TYPE, store_type) VALUES(?, ?, ?, ?) ";
+        String sql = "INSERT INTO TABLES (DB_ID, TABLE_ID, TABLE_TYPE, STORE_TYPE) VALUES(?, ?, ?, ?) ";
 
         if (LOG.isDebugEnabled()) {
           LOG.debug(sql);
@@ -609,14 +609,15 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
         pstmt.close();
       }
 
-      String tidSql = "SELECT TID from TABLES WHERE db_id = ? AND TABLE_ID = ?";
+      String tidSql =
+          "SELECT TID from " + TB_TABLES + " WHERE " + COL_DATABASES_PK + "=? AND " + COL_TABLES_NAME + "=?";
       pstmt = conn.prepareStatement(tidSql);
       pstmt.setInt(1, dbid);
       pstmt.setString(2, tableName);
       res = pstmt.executeQuery();
 
       if (!res.next()) {
-        throw new CatalogException("ERROR: there is no tid matched to " + table.getTableName());
+        throw new CatalogException("ERROR: there is no TID matched to " + table.getTableName());
       }
 
       int tableId = res.getInt("TID");
@@ -624,7 +625,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       pstmt.close();
 
       String colSql =
-          "INSERT INTO " + TB_COLUMNS + " (TID, COLUMN_NAME, COLUMN_ID, data_type, type_length) VALUES(?, ?, ?, ?, ?) ";
+          "INSERT INTO " + TB_COLUMNS + " (TID, COLUMN_NAME, COLUMN_ID, DATA_TYPE, TYPE_LENGTH) VALUES(?, ?, ?, ?, ?) ";
 
       if (LOG.isDebugEnabled()) {
         LOG.debug(colSql);
@@ -645,7 +646,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       pstmt.close();
 
       if(table.getMeta().hasParams()) {
-        String propSQL = "INSERT INTO " + TB_OPTIONS + "(TID, key_, value_) VALUES(?, ?, ?)";
+        String propSQL = "INSERT INTO " + TB_OPTIONS + "(TID, KEY_, VALUE_) VALUES(?, ?, ?)";
 
         if (LOG.isDebugEnabled()) {
           LOG.debug(propSQL);
@@ -665,7 +666,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
 
       if (table.hasStats()) {
 
-        String statSql = "INSERT INTO " + TB_STATISTICS + " (TID, num_rows, num_bytes) VALUES(?, ?, ?)";
+        String statSql = "INSERT INTO " + TB_STATISTICS + " (TID, NUM_ROWS, NUM_BYTES) VALUES(?, ?, ?)";
 
         if (LOG.isDebugEnabled()) {
           LOG.debug(statSql);
@@ -705,12 +706,12 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       }
       throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt, res);
+      CatalogUtil.closeQuietly(pstmt, res);
     }
   }
 
   private int getDatabaseId(String databaseName) throws SQLException {
-    String sql = String.format("SELECT db_id from %s WHERE db_name = ?", TB_DATABASES);
+    String sql = String.format("SELECT DB_ID from %s WHERE DB_NAME = ?", TB_DATABASES);
 
     if (LOG.isDebugEnabled()) {
       LOG.debug(sql);
@@ -729,9 +730,9 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
         throw new NoSuchDatabaseException(databaseName);
       }
 
-      return res.getInt("db_id");
+      return res.getInt("DB_ID");
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt, res);
+      CatalogUtil.closeQuietly(pstmt, res);
     }
   }
 
@@ -745,7 +746,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     try {
       int dbid = getDatabaseId(databaseName);
 
-      String sql = "SELECT TID FROM TABLES WHERE db_id = ? AND TABLE_ID = ?";
+      String sql = "SELECT TID FROM TABLES WHERE DB_ID = ? AND TABLE_ID = ?";
 
       if (LOG.isDebugEnabled()) {
         LOG.debug(sql.toString());
@@ -761,7 +762,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     } catch (SQLException se) {
       throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt, res);
+      CatalogUtil.closeQuietly(pstmt, res);
     }
 
     return exist;
@@ -833,7 +834,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       pstmt.executeUpdate();
       pstmt.close();
 
-      sql = "DELETE FROM TABLES WHERE db_id = ? AND " + COL_TABLES_PK + " = ?";
+      sql = "DELETE FROM TABLES WHERE DB_ID = ? AND " + COL_TABLES_PK + " = ?";
 
       if (LOG.isDebugEnabled()) {
         LOG.debug(sql);
@@ -845,7 +846,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       pstmt.executeUpdate();
 
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt);
+      CatalogUtil.closeQuietly(pstmt);
     }
   }
 
@@ -891,7 +892,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
 
       return new Pair<Integer, String>(res.getInt(1), res.getString(2) + "/" + databaseName);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt, res);
+      CatalogUtil.closeQuietly(pstmt, res);
     }
   }
 
@@ -1035,7 +1036,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     } catch (SQLException se) {
       throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt, res);
+      CatalogUtil.closeQuietly(pstmt, res);
     }
 
     return tableBuilder.build();
@@ -1062,7 +1063,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
 
       int dbid = getDatabaseId(databaseName);
 
-      String sql = "SELECT TABLE_ID FROM TABLES WHERE db_id = ?";
+      String sql = "SELECT TABLE_ID FROM TABLES WHERE DB_ID = ?";
 
       if (LOG.isDebugEnabled()) {
         LOG.debug(sql);
@@ -1078,7 +1079,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     } catch (SQLException se) {
       throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt, res);
+      CatalogUtil.closeQuietly(pstmt, res);
     }
     return tables;
   }
@@ -1119,7 +1120,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       }
       throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt);
+      CatalogUtil.closeQuietly(pstmt);
     }
   }
 
@@ -1162,7 +1163,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     } catch (SQLException se) {
       throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt);
+      CatalogUtil.closeQuietly(pstmt);
     }
   }
 
@@ -1185,7 +1186,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     } catch (SQLException se) {
       throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt);
+      CatalogUtil.closeQuietly(pstmt);
     }
   }
 
@@ -1217,7 +1218,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     } catch (SQLException se) {
       throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt, res);
+      CatalogUtil.closeQuietly(pstmt, res);
     }
     return null;
   }
@@ -1246,7 +1247,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     } catch (SQLException se) {
       throw new CatalogException(se);
     } finally {                           
-      CatalogUtil.closeQuietly(conn, pstmt, res);
+      CatalogUtil.closeQuietly(pstmt, res);
     }
     return exist;
   }
@@ -1272,7 +1273,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     } catch (SQLException se) {
       throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt);
+      CatalogUtil.closeQuietly(pstmt);
     }
   }
 
@@ -1309,7 +1310,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     } catch (SQLException se) {
       throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt);
+      CatalogUtil.closeQuietly(pstmt);
     }
   }
 
@@ -1332,7 +1333,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     } catch (SQLException se) {
       throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt);
+      CatalogUtil.closeQuietly(pstmt);
     }
   }
 
@@ -1359,8 +1360,9 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       }
 
       conn = getConnection();
-      pstmt = conn.prepareStatement(sql);
+      conn.setAutoCommit(false);
 
+      pstmt = conn.prepareStatement(sql);
       pstmt.setInt(1, databaseId);
       pstmt.setInt(2, tableId);
       pstmt.setString(3, proto.getName());
@@ -1371,11 +1373,11 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       pstmt.setBoolean(8, proto.hasIsClustered() && proto.getIsClustered());
       pstmt.setBoolean(9, proto.hasIsAscending() && proto.getIsAscending());
       pstmt.executeUpdate();
-
+      conn.commit();
     } catch (SQLException se) {
       throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt);
+      CatalogUtil.closeQuietly(pstmt);
     }
   }
 
@@ -1386,7 +1388,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
 
     try {
       int databaseId = getDatabaseId(databaseName);
-      String sql = "DELETE FROM " + TB_INDEXES + " WHERE " + COL_DATABASES_PK + "=? AND index_name=?";
+      String sql = "DELETE FROM " + TB_INDEXES + " WHERE " + COL_DATABASES_PK + "=? AND INDEX_NAME=?";
 
       if (LOG.isDebugEnabled()) {
         LOG.debug(sql);
@@ -1400,7 +1402,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     } catch (SQLException se) {
       throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt);
+      CatalogUtil.closeQuietly(pstmt);
     }
   }
 
@@ -1418,7 +1420,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       }
       return res.getString(1);
     } finally {
-      CatalogUtil.closeQuietly(null, pstmt, res);
+      CatalogUtil.closeQuietly(pstmt, res);
     }
   }
 
@@ -1459,7 +1461,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     } catch (SQLException se) {
       throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt, res);
+      CatalogUtil.closeQuietly(pstmt, res);
     }
 
     return proto;
@@ -1498,7 +1500,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     } catch (SQLException se) {
       throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt, res);
+      CatalogUtil.closeQuietly(pstmt, res);
     }
 
     return proto;
@@ -1531,7 +1533,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     } catch (SQLException se) {
       throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt, res);
+      CatalogUtil.closeQuietly(pstmt, res);
     }
 
     return exist;
@@ -1565,7 +1567,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     } catch (SQLException se) {
       throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt, res);
+      CatalogUtil.closeQuietly(pstmt, res);
     }
     return exist;
   }
@@ -1606,7 +1608,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
     } catch (SQLException se) {
       throw new CatalogException(se);
     } finally {
-      CatalogUtil.closeQuietly(conn, pstmt, res);
+      CatalogUtil.closeQuietly(pstmt, res);
     }
 
     return protos.toArray(new IndexDescProto[protos.size()]);
