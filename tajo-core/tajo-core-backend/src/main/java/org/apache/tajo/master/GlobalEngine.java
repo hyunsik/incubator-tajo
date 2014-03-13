@@ -206,7 +206,7 @@ public class GlobalEngine extends AbstractService {
     // parse the query
     Expr expr = analyzer.parse(sql);
 
-    LogicalPlan plan = createLogicalPlan(expr);
+    LogicalPlan plan = createLogicalPlan(session, expr);
     LogicalRootNode rootNode = plan.getRootBlock().getRoot();
 
     if (!PlannerUtil.checkIfDDLPlan(rootNode)) {
@@ -242,7 +242,7 @@ public class GlobalEngine extends AbstractService {
     }
   }
 
-  private LogicalPlan createLogicalPlan(Expr expression) throws PlanningException {
+  private LogicalPlan createLogicalPlan(Session session, Expr expression) throws PlanningException {
 
     VerificationState state = new VerificationState();
     preVerifier.visit(state, new Stack<Expr>(), expression);

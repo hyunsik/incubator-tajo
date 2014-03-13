@@ -161,7 +161,7 @@ public class MemStore implements CatalogStore {
       CatalogProtos.TableDescProto unqualified = database.get(tableName);
       CatalogProtos.TableDescProto.Builder builder = CatalogProtos.TableDescProto.newBuilder();
       CatalogProtos.SchemaProto schemaProto =
-          CatalogUtil.getQualfiedSchema(databaseName, tableName, unqualified.getSchema());
+          CatalogUtil.getQualfiedSchema(tableName, unqualified.getSchema());
       builder.mergeFrom(unqualified);
       builder.setSchema(schemaProto);
       return builder.build();
