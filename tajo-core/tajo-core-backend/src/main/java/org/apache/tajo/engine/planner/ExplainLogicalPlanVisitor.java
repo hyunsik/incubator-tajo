@@ -166,7 +166,7 @@ public class ExplainLogicalPlanVisitor extends BasicLogicalPlanVisitor<ExplainLo
                                         TableSubQueryNode node, Stack<LogicalNode> stack) throws PlanningException {
     context.depth++;
     stack.push(node);
-    super.visitTableSubQuery(context, plan, block, node, stack);
+    visit(context, plan, block, node.getSubQuery(), new Stack<LogicalNode>());
     stack.pop();
     context.depth--;
     context.add(context.depth, node.getPlanString());

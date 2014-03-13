@@ -155,7 +155,9 @@ public class TajoMasterClientService extends AbstractService {
     @Override
     public BoolProto removeSession(RpcController controller, TajoIdProtos.SessionIdProto request)
         throws ServiceException {
-      context.getSessionManager().removeSession(request.getId());
+      if (request != null) {
+        context.getSessionManager().removeSession(request.getId());
+      }
       return ProtoUtil.TRUE;
     }
 
