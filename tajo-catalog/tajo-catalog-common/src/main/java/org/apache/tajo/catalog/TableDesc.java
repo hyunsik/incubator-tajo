@@ -84,15 +84,19 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
       this.partitionMethodDesc = new PartitionMethodDesc(proto.getPartition());
     }
 	}
+
+  public void setDatabaseName(String databaseName) {
+    this.databaseName = databaseName;
+  }
+
+  public String getDatabaseName() {
+    return this.databaseName;
+  }
 	
 	public void setName(String tableId) {
 	  // tajo deems all identifiers as lowcase characters
 		this.tableName = tableId.toLowerCase();
 	}
-
-  public String getDatabaseName() {
-    return this.databaseName;
-  }
 	
   public String getName() {
     return this.tableName;

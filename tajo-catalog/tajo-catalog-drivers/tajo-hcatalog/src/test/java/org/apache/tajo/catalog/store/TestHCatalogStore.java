@@ -141,7 +141,8 @@ public class TestHCatalogStore {
   public void testAddTable1() throws Exception {
     TableDesc table = new TableDesc();
 
-    table.setName(DB_NAME + "." + CUSTOMER);
+    table.setDatabaseName(DB_NAME);
+    table.setName(CUSTOMER);
 
     Options options = new Options();
     options.put(HCatalogStore.CSVFILE_DELIMITER, "\u0001");
@@ -168,7 +169,8 @@ public class TestHCatalogStore {
   public void testAddTable2() throws Exception {
     TableDesc table = new TableDesc();
 
-    table.setName(DB_NAME + "." + REGION);
+    table.setDatabaseName(DB_NAME);
+    table.setName(REGION);
 
     Options options = new Options();
     options.put(HCatalogStore.CSVFILE_DELIMITER, "|");
@@ -191,7 +193,8 @@ public class TestHCatalogStore {
   public void testAddTable3() throws Exception {
     TableDesc table = new TableDesc();
 
-    table.setName(DB_NAME + "." + SUPPLIER);
+    table.setDatabaseName(DB_NAME);
+    table.setName(SUPPLIER);
 
     Options options = new Options();
     options.put(HCatalogStore.CSVFILE_DELIMITER, "\t");
@@ -218,7 +221,8 @@ public class TestHCatalogStore {
   public void testAddTableByPartition() throws Exception {
     TableDesc table = new TableDesc();
 
-    table.setName(DB_NAME + "." + NATION);
+    table.setDatabaseName(DB_NAME);
+    table.setName(NATION);
 
     Options options = new Options();
     options.put(HCatalogStore.CSVFILE_DELIMITER, "\u0001");
@@ -356,13 +360,13 @@ public class TestHCatalogStore {
 
 
   @Test
-  public void testGetAllTableNames() throws Exception{
+  public void testGetAllTableNames() throws Exception {
     Set<String> tables = new HashSet<String>(store.getAllTableNames(DB_NAME));
     assertEquals(4, tables.size());
-    assertTrue(tables.contains(DB_NAME + "." + CUSTOMER));
-    assertTrue(tables.contains(DB_NAME + "." + NATION));
-    assertTrue(tables.contains(DB_NAME + "." + REGION));
-    assertTrue(tables.contains(DB_NAME + "." + SUPPLIER));
+    assertTrue(tables.contains(CUSTOMER));
+    assertTrue(tables.contains(NATION));
+    assertTrue(tables.contains(REGION));
+    assertTrue(tables.contains(SUPPLIER));
   }
 
   @Test
