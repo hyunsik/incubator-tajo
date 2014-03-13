@@ -48,8 +48,8 @@ public class PreLogicalPlanVerifier extends BaseAlgebraVisitor <PreLogicalPlanVe
     }
   }
 
-  public VerificationState verify(Session session, Expr expr) throws PlanningException {
-    Context context = new Context(session, new VerificationState());
+  public VerificationState verify(Session session, VerificationState state, Expr expr) throws PlanningException {
+    Context context = new Context(session, state);
     visit(context, new Stack<Expr>(), expr);
     return context.state;
   }

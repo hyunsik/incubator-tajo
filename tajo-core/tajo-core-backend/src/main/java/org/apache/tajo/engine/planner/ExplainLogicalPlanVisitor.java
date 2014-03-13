@@ -195,6 +195,18 @@ public class ExplainLogicalPlanVisitor extends BasicLogicalPlanVisitor<ExplainLo
     return visitUnaryNode(context, plan, block, node, stack);
   }
 
+  public LogicalNode visitCreateDatabase(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block,
+                                         CreateDatabaseNode node, Stack<LogicalNode> stack) throws PlanningException {
+    context.add(context.depth, node.getPlanString());
+    return node;
+  }
+
+  public LogicalNode visitDropDatabase(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block,
+                                         DropDatabaseNode node, Stack<LogicalNode> stack) throws PlanningException {
+    context.add(context.depth, node.getPlanString());
+    return node;
+  }
+
   @Override
   public LogicalNode visitInsert(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block, InsertNode node,
                                  Stack<LogicalNode> stack) throws PlanningException {

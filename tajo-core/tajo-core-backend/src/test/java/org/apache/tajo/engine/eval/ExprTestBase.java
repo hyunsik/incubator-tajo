@@ -98,7 +98,7 @@ public class ExprTestBase {
     Session session = LocalTajoTestingUtility.createDummySession();
     Expr expr = analyzer.parse(query);
     VerificationState state = new VerificationState();
-    preLogicalPlanVerifier.verify(session, expr);
+    preLogicalPlanVerifier.verify(session, state, expr);
     if (state.getErrorMessages().size() > 0) {
       if (!condition && state.getErrorMessages().size() > 0) {
         throw new PlanningException(state.getErrorMessages().get(0));
@@ -107,7 +107,7 @@ public class ExprTestBase {
     }
     LogicalPlan plan = planner.createPlan(session, expr, true);
     optimizer.optimize(plan);
-    annotatedPlanVerifier.verify(session, plan);
+    annotatedPlanVerifier.verify(session, state, plan);
 
     if (state.getErrorMessages().size() > 0) {
       assertFalse(state.getErrorMessages().get(0), true);

@@ -106,7 +106,8 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
   }
 
   @Override
-  public final CatalogProtos.TableDescProto getTable(String databaseName, final String tableName) throws CatalogException {
+  public final CatalogProtos.TableDescProto getTable(String databaseName, final String tableName)
+      throws CatalogException {
     org.apache.hadoop.hive.ql.metadata.Table table;
     HCatalogStoreClientPool.HCatalogStoreClient client = null;
     Path path = null;
@@ -347,15 +348,19 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
       ArrayList<FieldSchema> cols = new ArrayList<FieldSchema>(tableDesc.getSchema().getFieldsCount());
 
       for (CatalogProtos.ColumnProto eachField : tableDesc.getSchema().getFieldsList()) {
-        cols.add(new FieldSchema( eachField.getName(), HCatalogUtil.getHiveFieldType(eachField.getDataType().getType().name()), ""));
+        cols.add(new FieldSchema( eachField.getName(),
+            HCatalogUtil.getHiveFieldType(eachField.getDataType().getType().name()), ""));
       }
       sd.setCols(cols);
 
       // set partition keys
-      if (tableDesc.getPartition() != null && tableDesc.getPartition().getPartitionType().equals(PartitionType.COLUMN)) {
+      if (tableDesc.getPartition() != null &&
+          tableDesc.getPartition().getPartitionType().equals(PartitionType.COLUMN)) {
         List<FieldSchema> partitionKeys = new ArrayList<FieldSchema>();
-        for(CatalogProtos.ColumnProto eachPartitionKey: tableDesc.getPartition().getExpressionSchema().getFieldsList()) {
-          partitionKeys.add(new FieldSchema( eachPartitionKey.getName(), HCatalogUtil.getHiveFieldType(eachPartitionKey.getDataType().getType().name()), ""));
+        for(CatalogProtos.ColumnProto eachPartitionKey:
+            tableDesc.getPartition().getExpressionSchema().getFieldsList()) {
+          partitionKeys.add(new FieldSchema( eachPartitionKey.getName(),
+              HCatalogUtil.getHiveFieldType(eachPartitionKey.getDataType().getType().name()), ""));
         }
         table.setPartitionKeys(partitionKeys);
       }
@@ -367,7 +372,8 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
           if (entry.getKey().equals("compression.codec")) {
             sd.setCompressed(true);
           } else if (entry.getKey().equals(CSVFILE_NULL)) {
-            sd.getSerdeInfo().getParameters().put(serdeConstants.SERIALIZATION_NULL_FORMAT, StringEscapeUtils.unescapeJava(entry.getValue()));
+            sd.getSerdeInfo().getParameters().put(serdeConstants.SERIALIZATION_NULL_FORMAT,
+                StringEscapeUtils.unescapeJava(entry.getValue()));
           } else if (entry.getKey().equals(CSVFILE_DELIMITER)) {
             String fieldDelimiter = entry.getValue();
 
@@ -376,8 +382,10 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
             // And hive will un-espace this value again.
             // As a result, user can use right field delimiter.
             // So, we have to un-escape this value.
-            sd.getSerdeInfo().getParameters().put(serdeConstants.SERIALIZATION_FORMAT, StringEscapeUtils.unescapeJava(fieldDelimiter));
-            sd.getSerdeInfo().getParameters().put(serdeConstants.FIELD_DELIM, StringEscapeUtils.unescapeJava(fieldDelimiter));
+            sd.getSerdeInfo().getParameters().put(serdeConstants.SERIALIZATION_FORMAT,
+                StringEscapeUtils.unescapeJava(fieldDelimiter));
+            sd.getSerdeInfo().getParameters().put(serdeConstants.FIELD_DELIM,
+                StringEscapeUtils.unescapeJava(fieldDelimiter));
           }
         }
       }

@@ -31,6 +31,7 @@ import org.apache.tajo.QueryId;
 import org.apache.tajo.QueryIdFactory;
 import org.apache.tajo.TajoProtos;
 import org.apache.tajo.algebra.Expr;
+import org.apache.tajo.annotation.Nullable;
 import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.exception.AlreadyExistsTableException;
 import org.apache.tajo.catalog.exception.NoSuchTableException;
@@ -223,7 +224,7 @@ public class GlobalEngine extends AbstractService {
     switch (root.getType()) {
       case CREATE_DATABASE:
         CreateDatabaseNode createDatabase = (CreateDatabaseNode) root;
-        createDatabase(session, createDatabase.getDatabaseName());
+        createDatabase(session, createDatabase.getDatabaseName(), null);
         return true;
       case DROP_DATABASE:
         DropDatabaseNode dropDatabaseNode = (DropDatabaseNode) root;
@@ -246,7 +247,7 @@ public class GlobalEngine extends AbstractService {
   private LogicalPlan createLogicalPlan(Session session, Expr expression) throws PlanningException {
 
     VerificationState state = new VerificationState();
-    preVerifier.verify(session, expression);
+    preVerifier.verify(session, state, expression);
     if (!state.verified()) {
       StringBuilder sb = new StringBuilder();
       for (String error : state.getErrorMessages()) {
@@ -264,7 +265,7 @@ public class GlobalEngine extends AbstractService {
     LOG.info("Optimized Query: \n" + plan.toString());
     LOG.info("=============================================");
 
-    annotatedPlanVerifier.verify(session, plan);
+    annotatedPlanVerifier.verify(session, state, plan);
 
     if (!state.verified()) {
       StringBuilder sb = new StringBuilder();
@@ -337,9 +338,16 @@ public class GlobalEngine extends AbstractService {
     return desc;
   }
 
-  public boolean createDatabase(Session session, String databaseName) throws IOException {
+  public boolean createDatabase(@Nullable Session session, String databaseName, @Nullable String tablespace)
+      throws IOException {
     String normalized = CatalogUtil.normalizeIdentifier(databaseName);
-    catalog.createDatabase(databaseName, DEFAULT_TABLESPACE_NAME);
+    String tablespaceName;
+    if (tablespace == null) {
+      tablespaceName = DEFAULT_TABLESPACE_NAME;
+    } else {
+      tablespaceName = tablespace;
+    }
+    catalog.createDatabase(databaseName, tablespaceName);
     Path databaseDir =
         StorageUtil.concatPath(context.getConf().getVar(TajoConf.ConfVars.WAREHOUSE_DIR), normalized);
     FileSystem fs = databaseDir.getFileSystem(context.getConf());

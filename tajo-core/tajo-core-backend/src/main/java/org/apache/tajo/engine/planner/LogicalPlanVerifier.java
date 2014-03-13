@@ -49,8 +49,8 @@ public class LogicalPlanVerifier extends BasicLogicalPlanVisitor<LogicalPlanVeri
     }
   }
 
-  public VerificationState verify(Session session, LogicalPlan plan) throws PlanningException {
-    Context context = new Context(session, new VerificationState());
+  public VerificationState verify(Session session, VerificationState state, LogicalPlan plan) throws PlanningException {
+    Context context = new Context(session, state);
     visit(context, plan, plan.getRootBlock());
     return context.state;
   }

@@ -506,7 +506,7 @@ public class TajoMasterClientService extends AbstractService {
     public BoolProto createDatabase(RpcController controller, SessionedStringProto request) throws ServiceException {
       try {
         Session session = context.getSessionManager().getSession(request.getSessionId().getId());
-        if (context.getGlobalEngine().createDatabase(session, request.getValue())) {
+        if (context.getGlobalEngine().createDatabase(session, request.getValue(), null)) {
           return BOOL_TRUE;
         } else {
           return BOOL_FALSE;

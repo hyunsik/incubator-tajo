@@ -344,13 +344,13 @@ public class TajoMaster extends CompositeService {
   }
 
   @Override
-  public void start() {
-    LOG.info("TajoMaster startup");
+  public void serviceStart() throws Exception {
+    LOG.info("TajoMaster is starting up");
 
     // check base tablespace and databases
     checkBaseTBSpaceAndDatabase();
 
-    super.start();
+    super.serviceStart();
 
     // Setting the system global configs
     systemConf.setSocketAddr(ConfVars.CATALOG_ADDRESS.varname,
@@ -387,7 +387,7 @@ public class TajoMaster extends CompositeService {
     defaultFS.setReplication(systemConfPath, (short) systemConf.getIntVar(ConfVars.SYSTEM_CONF_REPLICA_COUNT));
   }
 
-  private void checkBaseTBSpaceAndDatabase() {
+  private void checkBaseTBSpaceAndDatabase() throws IOException {
     if (!catalog.existTablespace(DEFAULT_TABLESPACE_NAME)) {
       catalog.createTablespace(DEFAULT_TABLESPACE_NAME, context.getConf().getVar(ConfVars.WAREHOUSE_DIR));
     } else {
@@ -395,7 +395,7 @@ public class TajoMaster extends CompositeService {
     }
 
     if (!catalog.existDatabase(DEFAULT_DATABASE_NAME)) {
-      catalog.createDatabase(DEFAULT_DATABASE_NAME, DEFAULT_TABLESPACE_NAME);
+      globalEngine.createDatabase(null, DEFAULT_DATABASE_NAME, DEFAULT_TABLESPACE_NAME);
     } else {
       LOG.info(String.format("Default database (%s) is already prepared.", DEFAULT_DATABASE_NAME));
     }
