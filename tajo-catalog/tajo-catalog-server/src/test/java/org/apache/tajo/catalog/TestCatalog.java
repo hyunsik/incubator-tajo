@@ -30,7 +30,6 @@ import org.apache.tajo.catalog.proto.CatalogProtos.FunctionType;
 import org.apache.tajo.catalog.proto.CatalogProtos.IndexMethod;
 import org.apache.tajo.catalog.proto.CatalogProtos.StoreType;
 import org.apache.tajo.catalog.store.DerbyStore;
-import org.apache.tajo.catalog.store.MemStore;
 import org.apache.tajo.catalog.store.MySQLStore;
 import org.apache.tajo.common.TajoDataTypes;
 import org.apache.tajo.common.TajoDataTypes.Type;
@@ -40,14 +39,12 @@ import org.apache.tajo.util.TUtil;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import java.io.IOException;
 import java.util.*;
 
 import static org.apache.tajo.TajoConstants.DEFAULT_DATABASE_NAME;
-import static org.apache.tajo.TajoConstants.DEFAULT_TABLESPACE_NAME;
 import static org.apache.tajo.catalog.CatalogConstants.*;
 import static org.junit.Assert.*;
 
@@ -116,7 +113,7 @@ public class TestCatalog {
     }
 
     for(String table : catalog.getAllTableNames(DEFAULT_DATABASE_NAME)){
-      catalog.dropTable(DEFAULT_DATABASE_NAME, table);
+      catalog.dropTable(table);
     }
 	}
 	
@@ -168,7 +165,7 @@ public class TestCatalog {
     schema1.addColumn(FieldName3, Type.INT8);
     Path path = new Path(CommonTestingUtil.getTestDir(), tableName);
     TableDesc table = new TableDesc(
-        CatalogUtil.buildQualifiedIdentifier(databaseName,tableName),
+        CatalogUtil.buildFQName(databaseName, tableName),
         schema1,
         new TableMeta(StoreType.CSV, new Options()),
         path, true);
@@ -271,7 +268,7 @@ public class TestCatalog {
         Collection<String> tablesForThisDatabase = catalog.getAllTableNames(entry.getKey());
         assertEquals(createdTablesMap.get(entry.getKey()).size(), tablesForThisDatabase.size());
         for (String tableName : tablesForThisDatabase) {
-          assertTrue(createdTablesMap.get(entry.getKey()).contains(tableName));
+          assertTrue(createdTablesMap.get(entry.getKey()).contains(CatalogUtil.extractSimpleName(tableName)));
         }
       }
     }
@@ -288,7 +285,7 @@ public class TestCatalog {
 		schema1.addColumn(FieldName3, Type.INT8);
     Path path = new Path(CommonTestingUtil.getTestDir(), "table1");
     TableDesc meta = new TableDesc(
-        CatalogUtil.buildQualifiedIdentifier(DEFAULT_DATABASE_NAME, "getTable"),
+        CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "getTable"),
         schema1,
         StoreType.CSV,
         new Options(),
@@ -298,7 +295,7 @@ public class TestCatalog {
     catalog.createTable(meta);
     assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, "getTable"));
 
-    catalog.dropTable(DEFAULT_DATABASE_NAME, "getTable");
+    catalog.dropTable(CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "getTable"));
     assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, "getTable"));
 	}
 
@@ -319,10 +316,25 @@ public class TestCatalog {
         "idx_test", DEFAULT_DATABASE_NAME, "indexed", new Column("id", Type.INT4),
         IndexMethod.TWO_LEVEL_BIN_TREE, true, true, true);
   }
+
+  public static TableDesc prepareTable() throws IOException {
+    Schema schema = new Schema();
+    schema.addColumn("indexed.id", Type.INT4)
+        .addColumn("indexed.name", Type.TEXT)
+        .addColumn("indexed.age", Type.INT4)
+        .addColumn("indexed.score", Type.FLOAT8);
+
+    String tableName = "indexed";
+
+    TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV);
+    return new TableDesc(
+        CatalogUtil.buildFQName(TajoConstants.DEFAULT_DATABASE_NAME, tableName), schema, meta,
+        new Path(CommonTestingUtil.getTestDir(), "indexed"));
+  }
 	
 	@Test
 	public void testAddAndDelIndex() throws Exception {
-	  TableDesc desc = TestDBStore.prepareTable();
+	  TableDesc desc = prepareTable();
 	  assertTrue(catalog.createTable(desc));
 	  
 	  assertFalse(catalog.existIndexByName("db1", desc1.getIndexName()));
@@ -343,8 +355,8 @@ public class TestCatalog {
 	  catalog.dropIndex(DEFAULT_DATABASE_NAME, desc2.getIndexName());
 	  assertFalse(catalog.existIndexByName(DEFAULT_DATABASE_NAME, desc2.getIndexName()));
 	  
-	  catalog.dropTable(DEFAULT_DATABASE_NAME, desc.getName());
-    assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, desc.getName()));
+	  catalog.dropTable(desc.getName());
+    assertFalse(catalog.existsTable(desc.getName()));
   }
 	
 	public static class TestFunc1 extends Function {
@@ -450,7 +462,7 @@ public class TestCatalog {
         .addColumn("age", Type.INT4)
         .addColumn("score", Type.FLOAT8);
 
-    String tableName = "addedtable";
+    String tableName = CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "addedtable");
     Options opts = new Options();
     opts.put("file.delimiter", ",");
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV, opts);
@@ -464,22 +476,21 @@ public class TestCatalog {
             CatalogProtos.PartitionType.HASH, "id", partSchema);
 
     TableDesc desc =
-        new TableDesc(
-            CatalogUtil.buildQualifiedIdentifier(DEFAULT_DATABASE_NAME, tableName), schema, meta,
+        new TableDesc(tableName, schema, meta,
             new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
 
-    assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    assertFalse(catalog.existsTable(tableName));
     catalog.createTable(desc);
-    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
-    TableDesc retrieved = catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName);
+    assertTrue(catalog.existsTable(tableName));
+    TableDesc retrieved = catalog.getTableDesc(tableName);
 
     assertEquals(retrieved.getName(), tableName);
     assertEquals(retrieved.getPartitionMethod().getPartitionType(), CatalogProtos.PartitionType.HASH);
     assertEquals(retrieved.getPartitionMethod().getExpressionSchema().getColumn(0).getSimpleName(), "id");
 
-    catalog.dropTable(DEFAULT_DATABASE_NAME, tableName);
-    assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    catalog.dropTable(tableName);
+    assertFalse(catalog.existsTable(tableName));
   }
 
 
@@ -491,7 +502,7 @@ public class TestCatalog {
         .addColumn("age", Type.INT4)
         .addColumn("score", Type.FLOAT8);
 
-    String tableName = "addedtable";
+    String tableName = CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "addedtable");
     Options opts = new Options();
     opts.put("file.delimiter", ",");
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV, opts);
@@ -503,23 +514,22 @@ public class TestCatalog {
             CatalogProtos.PartitionType.HASH, "id", partSchema);
 
     TableDesc desc =
-        new TableDesc(
-            CatalogUtil.buildQualifiedIdentifier(DEFAULT_DATABASE_NAME, tableName), schema, meta,
+        new TableDesc(tableName, schema, meta,
             new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
 
-    assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    assertFalse(catalog.existsTable(tableName));
     catalog.createTable(desc);
-    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    assertTrue(catalog.existsTable(tableName));
 
-    TableDesc retrieved = catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName);
+    TableDesc retrieved = catalog.getTableDesc(tableName);
 
     assertEquals(retrieved.getName(), tableName);
     assertEquals(retrieved.getPartitionMethod().getPartitionType(), CatalogProtos.PartitionType.HASH);
     assertEquals(retrieved.getPartitionMethod().getExpressionSchema().getColumn(0).getSimpleName(), "id");
 
-    catalog.dropTable(DEFAULT_DATABASE_NAME, tableName);
-    assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    catalog.dropTable(tableName);
+    assertFalse(catalog.existsTable(tableName));
   }
 
   @Test
@@ -530,7 +540,7 @@ public class TestCatalog {
         .addColumn("age", Type.INT4)
         .addColumn("score", Type.FLOAT8);
 
-    String tableName = "addedtable";
+    String tableName = CatalogUtil.buildFQName(TajoConstants.DEFAULT_DATABASE_NAME, "addedtable");
     Options opts = new Options();
     opts.put("file.delimiter", ",");
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV, opts);
@@ -542,22 +552,21 @@ public class TestCatalog {
             CatalogProtos.PartitionType.LIST, "id", partSchema);
 
     TableDesc desc =
-        new TableDesc(
-            CatalogUtil.buildQualifiedIdentifier(TajoConstants.DEFAULT_DATABASE_NAME, tableName), schema, meta,
+        new TableDesc(tableName, schema, meta,
             new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
-    assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    assertFalse(catalog.existsTable(tableName));
     catalog.createTable(desc);
-    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    assertTrue(catalog.existsTable(tableName));
 
-    TableDesc retrieved = catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName);
+    TableDesc retrieved = catalog.getTableDesc(tableName);
 
     assertEquals(retrieved.getName(), tableName);
     assertEquals(retrieved.getPartitionMethod().getPartitionType(), CatalogProtos.PartitionType.LIST);
     assertEquals(retrieved.getPartitionMethod().getExpressionSchema().getColumn(0).getSimpleName(), "id");
 
-    catalog.dropTable(DEFAULT_DATABASE_NAME, tableName);
-    assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    catalog.dropTable(tableName);
+    assertFalse(catalog.existsTable(tableName));
   }
 
   @Test
@@ -568,7 +577,7 @@ public class TestCatalog {
         .addColumn("age", Type.INT4)
         .addColumn("score", Type.FLOAT8);
 
-    String tableName = "addedtable";
+    String tableName = CatalogUtil.buildFQName(TajoConstants.DEFAULT_DATABASE_NAME, "addedtable");
     Options opts = new Options();
     opts.put("file.delimiter", ",");
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV, opts);
@@ -580,22 +589,21 @@ public class TestCatalog {
             "id", partSchema);
 
     TableDesc desc =
-        new TableDesc(
-            CatalogUtil.buildQualifiedIdentifier(TajoConstants.DEFAULT_DATABASE_NAME, tableName), schema, meta,
+        new TableDesc(tableName, schema, meta,
             new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
-    assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    assertFalse(catalog.existsTable(tableName));
     catalog.createTable(desc);
-    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    assertTrue(catalog.existsTable(tableName));
 
-    TableDesc retrieved = catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName);
+    TableDesc retrieved = catalog.getTableDesc(tableName);
 
     assertEquals(retrieved.getName(), tableName);
     assertEquals(retrieved.getPartitionMethod().getPartitionType(), CatalogProtos.PartitionType.RANGE);
     assertEquals(retrieved.getPartitionMethod().getExpressionSchema().getColumn(0).getSimpleName(), "id");
 
-    catalog.dropTable(DEFAULT_DATABASE_NAME, tableName);
-    assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    catalog.dropTable(tableName);
+    assertFalse(catalog.existsTable(tableName));
   }
 
   @Test
@@ -606,7 +614,7 @@ public class TestCatalog {
         .addColumn("age", Type.INT4)
         .addColumn("score", Type.FLOAT8);
 
-    String tableName = "addedtable";
+    String tableName = CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "addedtable");
     Options opts = new Options();
     opts.put("file.delimiter", ",");
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV, opts);
@@ -619,21 +627,20 @@ public class TestCatalog {
             CatalogProtos.PartitionType.COLUMN, "id", partSchema);
 
     TableDesc desc =
-        new TableDesc(
-            CatalogUtil.buildQualifiedIdentifier(DEFAULT_DATABASE_NAME, tableName), schema, meta,
+        new TableDesc(tableName, schema, meta,
             new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
-    assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    assertFalse(catalog.existsTable(tableName));
     catalog.createTable(desc);
-    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    assertTrue(catalog.existsTable(tableName));
 
-    TableDesc retrieved = catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName);
+    TableDesc retrieved = catalog.getTableDesc(tableName);
 
     assertEquals(retrieved.getName(), tableName);
     assertEquals(retrieved.getPartitionMethod().getPartitionType(), CatalogProtos.PartitionType.COLUMN);
     assertEquals(retrieved.getPartitionMethod().getExpressionSchema().getColumn(0).getSimpleName(), "id");
 
-    catalog.dropTable(DEFAULT_DATABASE_NAME, tableName);
-    assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    catalog.dropTable(tableName);
+    assertFalse(catalog.existsTable(tableName));
   }
 }

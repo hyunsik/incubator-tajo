@@ -75,18 +75,21 @@ public class TestPlannerUtil {
     schema3.addColumn("score", CatalogUtil.newSimpleDataType(Type.INT4));
 
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV);
-    TableDesc people = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, "employee", schema, meta,
+    TableDesc people = new TableDesc(
+        CatalogUtil.buildFQName(TajoConstants.DEFAULT_DATABASE_NAME, "employee"), schema, meta,
         CommonTestingUtil.getTestDir());
     catalog.createTable(people);
 
     TableDesc student =
-        new TableDesc(DEFAULT_DATABASE_NAME, "dept", schema2, StoreType.CSV, new Options(),
-            CommonTestingUtil.getTestDir());
+        new TableDesc(
+            CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "dept"), schema2, StoreType.CSV,
+            new Options(), CommonTestingUtil.getTestDir());
     catalog.createTable(student);
 
     TableDesc score =
-        new TableDesc(DEFAULT_DATABASE_NAME, "score", schema3, StoreType.CSV, new Options(),
-            CommonTestingUtil.getTestDir());
+        new TableDesc(
+            CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "score"), schema3, StoreType.CSV,
+            new Options(), CommonTestingUtil.getTestDir());
     catalog.createTable(score);
 
     FunctionDesc funcDesc = new FunctionDesc("sumtest", SumInt.class, FunctionType.AGGREGATION,
@@ -114,17 +117,17 @@ public class TestPlannerUtil {
     TestLogicalNode.testCloneLogicalNode(root);
 
     assertEquals(NodeType.PROJECTION, root.getChild().getType());
-    ProjectionNode projNode = (ProjectionNode) root.getChild();
+    ProjectionNode projNode = root.getChild();
 
     assertEquals(NodeType.JOIN, projNode.getChild().getType());
-    JoinNode joinNode = (JoinNode) projNode.getChild();
+    JoinNode joinNode = projNode.getChild();
 
     assertEquals(NodeType.SCAN, joinNode.getLeftChild().getType());
-    ScanNode leftNode = (ScanNode) joinNode.getLeftChild();
-    assertEquals("employee", leftNode.getTableName());
+    ScanNode leftNode = joinNode.getLeftChild();
+    assertEquals("default.employee", leftNode.getTableName());
     assertEquals(NodeType.SCAN, joinNode.getRightChild().getType());
-    ScanNode rightNode = (ScanNode) joinNode.getRightChild();
-    assertEquals("dept", rightNode.getTableName());
+    ScanNode rightNode = joinNode.getRightChild();
+    assertEquals("default.dept", rightNode.getTableName());
     
     LogicalNode node = PlannerUtil.findTopNode(root, NodeType.ROOT);
     assertEquals(NodeType.ROOT, node.getType());

@@ -51,9 +51,18 @@ public class CatalogUtil {
     return identifier.toLowerCase();
   }
 
-  public static boolean isQualifiedTableName(String tableName) {
+  public static boolean isFQTableName(String tableName) {
     int lastDelimiterIdx = tableName.lastIndexOf(IDENTIFIER_DELIMITER);
     return lastDelimiterIdx > -1;
+  }
+
+  public static String [] splitFQTableName(String qualifiedName) {
+    String [] splitted = CatalogUtil.splitTableName(CatalogUtil.normalizeIdentifier(qualifiedName));
+    if (splitted.length == 1) {
+      throw new IllegalArgumentException("createTable() requires a qualified table name, but it is \""
+          + qualifiedName + "\".");
+    }
+    return splitted;
   }
 
   public static String [] splitTableName(String tableName) {
@@ -68,14 +77,14 @@ public class CatalogUtil {
     }
   }
 
-  public static String buildQualifiedIdentifier(String... identifiers) {
+  public static String buildFQName(String... identifiers) {
     boolean first = true;
     StringBuilder sb = new StringBuilder();
     for(String id : identifiers) {
       if (first) {
         first = false;
       } else {
-        sb.append(", ");
+        sb.append(IDENTIFIER_DELIMITER);
       }
 
       sb.append(id);

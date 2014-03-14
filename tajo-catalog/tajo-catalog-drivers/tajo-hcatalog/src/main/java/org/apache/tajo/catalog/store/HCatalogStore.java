@@ -243,8 +243,7 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
     }
     TableMeta meta = new TableMeta(storeType, options);
 
-    TableDesc tableDesc = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, databaseName + "." + tableName, schema,
-        meta, path);
+    TableDesc tableDesc = new TableDesc(databaseName + "." + tableName, schema, meta, path);
     if (stats != null) {
       tableDesc.setStats(stats);
     }
@@ -328,8 +327,16 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
 
       org.apache.hadoop.hive.metastore.api.Table table = new org.apache.hadoop.hive.metastore.api.Table();
 
-      table.setDbName(tableDesc.getDatabaseName());
-      table.setTableName(tableDesc.getTableName());
+      String [] splitted = CatalogUtil.splitTableName(CatalogUtil.normalizeIdentifier(table.getTableName()));
+      if (splitted.length == 1) {
+        throw new IllegalArgumentException("createTable() requires a qualified table name, but it is \""
+            + table.getTableName() + "\".");
+      }
+      String databaseName = splitted[0];
+      String tableName = splitted[1];
+
+      table.setDbName(databaseName);
+      table.setTableName(tableName);
       // TODO: set owner
       //table.setOwner();
 

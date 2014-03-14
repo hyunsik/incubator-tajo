@@ -20,7 +20,6 @@ package org.apache.tajo.client;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.compress.GzipCodec;
-import org.apache.tajo.TajoConstants;
 import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.partition.PartitionMethodDesc;
 import org.apache.tajo.catalog.proto.CatalogProtos;
@@ -34,29 +33,42 @@ import static org.junit.Assert.assertEquals;
 
 
 public class TestDDLBuilder {
-  @Test
-  public void testBuildDDL() throws Exception {
-    Schema schema = new Schema();
-    schema.addColumn("name", TajoDataTypes.Type.BLOB);
-    schema.addColumn("addr", TajoDataTypes.Type.TEXT);
-    TableMeta meta = CatalogUtil.newTableMeta(CatalogProtos.StoreType.CSV);
-    meta.putOption("csv.delimiter", "|");
-    meta.putOption(TableMeta.COMPRESSION_CODEC, GzipCodec.class.getName());
+  private static final Schema schema1;
+  private static final TableMeta meta1;
+  private static final PartitionMethodDesc partitionMethod1;
 
-    TableDesc desc = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, "table1", schema, meta, new Path("/table1"));
+  static {
+    schema1 = new Schema();
+    schema1.addColumn("name", TajoDataTypes.Type.BLOB);
+    schema1.addColumn("addr", TajoDataTypes.Type.TEXT);
+
+    meta1 = CatalogUtil.newTableMeta(CatalogProtos.StoreType.CSV);
+    meta1.putOption("csv.delimiter", "|");
+    meta1.putOption(TableMeta.COMPRESSION_CODEC, GzipCodec.class.getName());
 
     Schema expressionSchema = new Schema();
     expressionSchema.addColumn("key", TajoDataTypes.Type.INT4);
     expressionSchema.addColumn("key2", TajoDataTypes.Type.TEXT);
-    PartitionMethodDesc partitionMethod = new PartitionMethodDesc(
+    partitionMethod1 = new PartitionMethodDesc(
         "db1",
         "table1",
         CatalogProtos.PartitionType.COLUMN,
         "key,key2",
         expressionSchema);
-    desc.setPartitionMethod(partitionMethod);
+  }
 
-    assertEquals(FileUtil.readTextFile(new File("src/test/resources/results/testBuildDDL.result")),
-        DDLBuilder.buildDDL(desc));
+  @Test
+  public void testBuildDDLForExternalTable() throws Exception {
+    TableDesc desc = new TableDesc("db1.table1", schema1, meta1, new Path("/table1"));
+    desc.setExternal(true);
+    assertEquals(FileUtil.readTextFile(new File("src/test/resources/results/testBuildDDLForExternalTable.result")),
+        DDLBuilder.buildDDLForExternalTable(desc));
+  }
+
+  @Test
+  public void testBuildDDLForBaseTable() throws Exception {
+    TableDesc desc = new TableDesc("db1.table2", schema1, meta1, new Path("/table1"));
+    assertEquals(FileUtil.readTextFile(new File("src/test/resources/results/testBuildDDLForBaseTable.result")),
+        DDLBuilder.buildDDLForBaseTable(desc));
   }
 }

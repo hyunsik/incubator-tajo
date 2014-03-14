@@ -210,6 +210,12 @@ public abstract class AbstractCatalogClient implements CatalogService {
   }
 
   @Override
+  public TableDesc getTableDesc(String qualifiedName) {
+    String [] splitted = CatalogUtil.splitFQTableName(qualifiedName);
+    return getTableDesc(splitted[0], splitted[1]);
+  }
+
+  @Override
   public final PartitionMethodDesc getPartitionMethod(final String databaseName, final String tableName) {
     try {
       return new ServerCallable<PartitionMethodDesc>(this.pool, catalogServerAddr, CatalogProtocol.class, false) {
@@ -308,14 +314,18 @@ public abstract class AbstractCatalogClient implements CatalogService {
   }
 
   @Override
-  public final boolean dropTable(final String databaseName, final String tableName) {
+  public boolean dropTable(String tableName) {
+    String [] splitted = CatalogUtil.splitFQTableName(tableName);
+    final String databaseName = splitted[0];
+    final String simpleName = splitted[1];
+
     try {
       return new ServerCallable<Boolean>(this.pool, catalogServerAddr, CatalogProtocol.class, false) {
         public Boolean call(NettyClientBase client) throws ServiceException {
 
           TableIdentifierProto.Builder builder = TableIdentifierProto.newBuilder();
           builder.setDatabaseName(databaseName);
-          builder.setTableName(tableName);
+          builder.setTableName(simpleName);
 
           CatalogProtocolService.BlockingInterface stub = getStub(client);
           return stub.dropTable(null, builder.build()).getValue();
@@ -329,6 +339,10 @@ public abstract class AbstractCatalogClient implements CatalogService {
 
   @Override
   public final boolean existsTable(final String databaseName, final String tableName) {
+    if (CatalogUtil.isFQTableName(tableName)) {
+      throw new IllegalArgumentException(
+          "tableName cannot be composed of multiple parts, but it is \"" + tableName + "\"");
+    }
     try {
       return new ServerCallable<Boolean>(this.pool, catalogServerAddr, CatalogProtocol.class, false) {
         public Boolean call(NettyClientBase client) throws ServiceException {
@@ -345,6 +359,11 @@ public abstract class AbstractCatalogClient implements CatalogService {
       LOG.error(e.getMessage(), e);
       return false;
     }
+  }
+
+  public final boolean existsTable(final String tableName) {
+    String [] splitted = CatalogUtil.splitFQTableName(tableName);
+    return existsTable(splitted[0], splitted[1]);
   }
 
   @Override

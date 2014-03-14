@@ -24,7 +24,6 @@ import org.apache.tajo.engine.planner.PlanString;
 import org.apache.tajo.util.TUtil;
 
 public class StoreTableNode extends PersistentStoreNode implements Cloneable {
-  @Expose protected String databaseName;
   @Expose protected String tableName;
   @Expose private PartitionMethodDesc partitionDesc;
 
@@ -38,14 +37,6 @@ public class StoreTableNode extends PersistentStoreNode implements Cloneable {
 
   public boolean hasTargetTable() {
     return tableName != null;
-  }
-
-  public void setDatabaseName(String databaseName) {
-    this.databaseName = databaseName;
-  }
-
-  public String getDatabaseName() {
-    return this.databaseName;
   }
 
   public void setTableName(String tableName) {

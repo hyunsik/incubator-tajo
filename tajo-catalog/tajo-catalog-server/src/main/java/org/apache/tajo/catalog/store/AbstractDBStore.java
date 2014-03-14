@@ -41,9 +41,7 @@ import org.apache.tajo.exception.UnimplementedException;
 import org.apache.tajo.util.FileUtil;
 import org.apache.tajo.util.Pair;
 
-import java.io.File;
 import java.io.IOException;
-import java.net.URL;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -937,7 +935,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       }
 
       int tableId = res.getInt(1);
-      tableBuilder.setTableName(CatalogUtil.buildQualifiedIdentifier(databaseName, res.getString(2).trim()));
+      tableBuilder.setTableName(CatalogUtil.buildFQName(databaseName, res.getString(2).trim()));
       TableType tableType = TableType.valueOf(res.getString(3));
       if (tableType == TableType.EXTERNAL) {
         tableBuilder.setIsExternal(true);
@@ -972,7 +970,8 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
         schemaBuilder.addFields(resultToColumnProto(res));
       }
 
-      tableBuilder.setSchema(CatalogUtil.getQualfiedSchema(databaseName + "." + tableName, schemaBuilder.build()));
+      tableBuilder.setSchema(
+          CatalogUtil.getQualfiedSchema(databaseName + "." + tableName, schemaBuilder.build()));
 
       res.close();
       pstmt.close();

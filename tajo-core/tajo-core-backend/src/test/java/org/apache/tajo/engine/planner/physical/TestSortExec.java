@@ -92,7 +92,9 @@ public class TestSortExec {
     appender.flush();
     appender.close();
 
-    TableDesc desc = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, "employee", schema, employeeMeta, tablePath);
+    TableDesc desc = new TableDesc(
+        CatalogUtil.buildFQName(TajoConstants.DEFAULT_DATABASE_NAME, "employee"), schema, employeeMeta,
+        tablePath);
     catalog.createTable(desc);
 
     analyzer = new SQLAnalyzer();
@@ -105,7 +107,7 @@ public class TestSortExec {
 
   @Test
   public final void testNext() throws IOException, PlanningException {
-    FileFragment[] frags = StorageManager.splitNG(conf, "employee", employeeMeta, tablePath, Integer.MAX_VALUE);
+    FileFragment[] frags = StorageManager.splitNG(conf, "default.employee", employeeMeta, tablePath, Integer.MAX_VALUE);
     Path workDir = CommonTestingUtil.getTestDir("target/test-data/TestSortExec");
     TaskAttemptContext ctx = new TaskAttemptContext(conf, LocalTajoTestingUtility
         .newQueryUnitAttemptId(), new FileFragment[] { frags[0] }, workDir);

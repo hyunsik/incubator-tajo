@@ -19,12 +19,10 @@
 package org.apache.tajo.master;
 
 import com.google.common.base.Preconditions;
-import com.google.protobuf.ServiceException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.tajo.QueryId;
@@ -33,7 +31,6 @@ import org.apache.tajo.TajoProtos;
 import org.apache.tajo.algebra.Expr;
 import org.apache.tajo.annotation.Nullable;
 import org.apache.tajo.catalog.*;
-import org.apache.tajo.catalog.exception.AlreadyExistsTableException;
 import org.apache.tajo.catalog.exception.NoSuchTableException;
 import org.apache.tajo.catalog.partition.PartitionMethodDesc;
 import org.apache.tajo.catalog.statistics.TableStats;
@@ -301,14 +298,16 @@ public class GlobalEngine extends AbstractService {
   public TableDesc createTableOnPath(Session session, String tableName, Schema schema, TableMeta meta,
                                      Path path, boolean isExternal, PartitionMethodDesc partitionDesc)
       throws IOException {
-
-    String [] splitted = CatalogUtil.splitTableName(CatalogUtil.normalizeIdentifier(tableName));
-    if (splitted.length == 1) {
-      throw new IllegalArgumentException("createTable() requires a qualified table name, but it is \""
-          + tableName + "\".");
+    String databaseName;
+    String simpleTableName;
+    if (CatalogUtil.isFQTableName(tableName)) {
+      String [] splitted = CatalogUtil.splitFQTableName(tableName);
+      databaseName = splitted[0];
+      simpleTableName = splitted[1];
+    } else {
+      databaseName = session.getCurrentDatabase();
+      simpleTableName = tableName;
     }
-    String databaseName = splitted[0];
-    String simpleTableName = splitted[1];
 
     if (catalog.existsTable(databaseName, simpleTableName)) {
       databaseName = session.getCurrentDatabase();
@@ -335,7 +334,7 @@ public class GlobalEngine extends AbstractService {
 
     TableStats stats = new TableStats();
     stats.setNumBytes(totalSize);
-    TableDesc desc = new TableDesc(CatalogUtil.buildQualifiedIdentifier(databaseName, simpleTableName),
+    TableDesc desc = new TableDesc(CatalogUtil.buildFQName(databaseName, simpleTableName),
         schema, meta, path, isExternal);
     desc.setStats(stats);
     if (partitionDesc != null) {
@@ -384,12 +383,24 @@ public class GlobalEngine extends AbstractService {
   public void dropTable(Session session, String tableName, boolean purge) {
     CatalogService catalog = context.getCatalog();
 
-    if (!catalog.existsTable(session.getCurrentDatabase(), tableName)) {
-      throw new NoSuchTableException(tableName);
+    String databaseName;
+    String simpleTableName;
+    if (CatalogUtil.isFQTableName(tableName)) {
+      String [] splitted = CatalogUtil.splitFQTableName(tableName);
+      databaseName = splitted[0];
+      simpleTableName = splitted[1];
+    } else {
+      databaseName = session.getCurrentDatabase();
+      simpleTableName = tableName;
+    }
+    String qualifiedName = CatalogUtil.buildFQName(databaseName, simpleTableName);
+
+    if (!catalog.existsTable(qualifiedName)) {
+      throw new NoSuchTableException(qualifiedName);
     }
 
-    Path path = catalog.getTableDesc(session.getCurrentDatabase(), tableName).getPath();
-    catalog.dropTable(session.getCurrentDatabase(), tableName);
+    Path path = catalog.getTableDesc(qualifiedName).getPath();
+    catalog.dropTable(qualifiedName);
 
     if (purge) {
       try {
@@ -400,8 +411,7 @@ public class GlobalEngine extends AbstractService {
       }
     }
 
-    LOG.info(String.format("relation \"%s.%s\" is " + (purge ? " purged." : " dropped."),
-        session.getCurrentDatabase(), tableName));
+    LOG.info(String.format("relation \"%s\" is " + (purge ? " purged." : " dropped."), qualifiedName));
   }
 
   public interface DistributedQueryHook {
@@ -440,8 +450,9 @@ public class GlobalEngine extends AbstractService {
     public void hook(QueryContext queryContext, LogicalPlan plan) throws Exception {
       LogicalRootNode rootNode = plan.getRootBlock().getRoot();
       CreateTableNode createTableNode = rootNode.getChild();
-      String databaseName = createTableNode.getDatabaseName();
-      String tableName = createTableNode.getTableName();
+      String [] splitted  = CatalogUtil.splitFQTableName(createTableNode.getTableName());
+      String databaseName = splitted[0];
+      String tableName = splitted[1];
       queryContext.setOutputTable(tableName);
       queryContext.setOutputPath(
           StorageUtil.concatPath(TajoConf.getWarehouseDir(context.getConf()), databaseName, tableName));

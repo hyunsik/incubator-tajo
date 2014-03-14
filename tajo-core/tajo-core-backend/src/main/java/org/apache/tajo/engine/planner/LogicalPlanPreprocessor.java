@@ -19,10 +19,7 @@
 package org.apache.tajo.engine.planner;
 
 import org.apache.tajo.algebra.*;
-import org.apache.tajo.catalog.CatalogService;
-import org.apache.tajo.catalog.Column;
-import org.apache.tajo.catalog.Schema;
-import org.apache.tajo.catalog.TableDesc;
+import org.apache.tajo.catalog.*;
 import org.apache.tajo.engine.eval.EvalNode;
 import org.apache.tajo.engine.eval.EvalType;
 import org.apache.tajo.engine.eval.FieldEval;
@@ -98,21 +95,29 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
     QueryBlock block = ctx.currentBlock;
     Collection<QueryBlock> queryBlocks = ctx.plan.getQueryBlocks();
     if (asteriskExpr.hasQualifier()) {
-      relationOp = block.getRelation(asteriskExpr.getQualifier());
+      String qualifier;
+
+      if (CatalogUtil.isFQTableName(asteriskExpr.getQualifier())) {
+        qualifier = asteriskExpr.getQualifier();
+      } else {
+        qualifier = CatalogUtil.buildFQName(ctx.session.getCurrentDatabase(), asteriskExpr.getQualifier());
+      }
+
+      relationOp = block.getRelation(qualifier);
 
       // if a column name is outside of this query block
       if (relationOp == null) {
         // TODO - nested query can only refer outer query block? or not?
         for (QueryBlock eachBlock : queryBlocks) {
-          if (eachBlock.existsRelation(asteriskExpr.getQualifier())) {
-            relationOp = eachBlock.getRelation(asteriskExpr.getQualifier());
+          if (eachBlock.existsRelation(qualifier)) {
+            relationOp = eachBlock.getRelation(qualifier);
           }
         }
       }
 
       // If we cannot find any relation against a qualified column name
       if (relationOp == null) {
-        throw new NoSuchColumnException(asteriskExpr.toString());
+        throw new NoSuchColumnException(CatalogUtil.buildFQName(qualifier, "*"));
       }
 
       Schema schema = relationOp.getTableSchema();
@@ -330,10 +335,16 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
   @Override
   public LogicalNode visitRelation(PreprocessContext ctx, Stack<Expr> stack, Relation expr)
       throws PlanningException {
-
     Relation relation = expr;
-    TableDesc desc = catalog.getTableDesc(ctx.session.getCurrentDatabase(), relation.getName());
 
+    String actualRelationName;
+    if (CatalogUtil.isFQTableName(expr.getName())) {
+      actualRelationName = relation.getName();
+    } else {
+      actualRelationName = CatalogUtil.buildFQName(ctx.session.getCurrentDatabase(), relation.getName());
+    }
+
+    TableDesc desc = catalog.getTableDesc(actualRelationName);
     ScanNode scanNode = ctx.plan.createNode(ScanNode.class);
     if (relation.hasAlias()) {
       scanNode.init(desc, relation.getAlias());
@@ -357,7 +368,7 @@ class LogicalPlanPreprocessor extends BaseAlgebraVisitor<LogicalPlanPreprocessor
 
     // a table subquery should be dealt as a relation.
     TableSubQueryNode node = ctx.plan.createNode(TableSubQueryNode.class);
-    node.init(expr.getName(), child);
+    node.init(CatalogUtil.buildFQName(ctx.session.getCurrentDatabase(), expr.getName()), child);
     ctx.currentBlock.addRelation(node);
     return node;
   }

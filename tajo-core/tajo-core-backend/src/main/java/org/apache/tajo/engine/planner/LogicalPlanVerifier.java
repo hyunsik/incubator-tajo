@@ -239,7 +239,7 @@ public class LogicalPlanVerifier extends BasicLogicalPlanVisitor<LogicalPlanVeri
                                       CreateTableNode node, Stack<LogicalNode> stack) throws PlanningException {
     super.visitCreateTable(context, plan, block, node, stack);
 
-    if (catalog.existsTable(DEFAULT_DATABASE_NAME, node.getTableName())) {
+    if (catalog.existsTable(node.getTableName())) {
       context.state.addVerification("relation \"" + node.getTableName() + "\" already exists");
     }
 
@@ -249,7 +249,7 @@ public class LogicalPlanVerifier extends BasicLogicalPlanVisitor<LogicalPlanVeri
   @Override
   public LogicalNode visitDropTable(Context context, LogicalPlan plan, LogicalPlan.QueryBlock block,
                                     DropTableNode node, Stack<LogicalNode> stack) {
-    if (!catalog.existsTable(DEFAULT_DATABASE_NAME, node.getTableName())) {
+    if (!catalog.existsTable(node.getTableName())) {
       context.state.addVerification("table \"" + node.getTableName() + "\" does not exist");
     }
 

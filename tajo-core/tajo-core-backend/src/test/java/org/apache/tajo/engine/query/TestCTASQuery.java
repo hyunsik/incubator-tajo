@@ -35,6 +35,7 @@ import java.sql.ResultSet;
 import java.util.Map;
 
 import static org.apache.tajo.TajoConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.catalog.CatalogUtil.buildFQName;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -48,13 +49,14 @@ public class TestCTASQuery extends QueryTestCaseBase {
   @Test
   public final void testCtasWithoutTableDefinition() throws Exception {
     ResultSet res = executeQuery();
-
     res.close();
-    CatalogService catalog = testBase.getTestingCluster().getMaster().getCatalog();
-    TableDesc desc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, "testCtasWithoutTableDefinition");
-    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, "testCtasWithoutTableDefinition"));
 
-    assertTrue(desc.getSchema().contains("testCtasWithoutTableDefinition.col1"));
+    CatalogService catalog = testBase.getTestingCluster().getMaster().getCatalog();
+    String tableName = buildFQName(DEFAULT_DATABASE_NAME, "testCtasWithoutTableDefinition");
+    TableDesc desc = catalog.getTableDesc(tableName);
+    assertTrue(catalog.existsTable(tableName));
+
+    assertTrue(desc.getSchema().contains("default.testCtasWithoutTableDefinition.col1"));
     PartitionMethodDesc partitionDesc = desc.getPartitionMethod();
     assertEquals(partitionDesc.getPartitionType(), CatalogProtos.PartitionType.COLUMN);
     assertEquals("key", partitionDesc.getExpressionSchema().getColumns().get(0).getSimpleName());

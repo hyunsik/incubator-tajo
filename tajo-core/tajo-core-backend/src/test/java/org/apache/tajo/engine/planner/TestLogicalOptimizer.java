@@ -76,17 +76,19 @@ public class TestLogicalOptimizer {
 
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV);
     TableDesc people = new TableDesc(
-        CatalogUtil.buildQualifiedIdentifier(TajoConstants.DEFAULT_DATABASE_NAME, "employee"), schema, meta,
+        CatalogUtil.buildFQName(TajoConstants.DEFAULT_DATABASE_NAME, "employee"), schema, meta,
         CommonTestingUtil.getTestDir());
     catalog.createTable(people);
 
     TableDesc student =
-        new TableDesc(DEFAULT_DATABASE_NAME, "dept", schema2, StoreType.CSV, new Options(),
+        new TableDesc(
+            CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "dept"), schema2, StoreType.CSV, new Options(),
             CommonTestingUtil.getTestDir());
     catalog.createTable(student);
 
     TableDesc score =
-        new TableDesc(DEFAULT_DATABASE_NAME, "score", schema3, StoreType.CSV, new Options(),
+        new TableDesc(
+            CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "score"), schema3, StoreType.CSV, new Options(),
             CommonTestingUtil.getTestDir());
     catalog.createTable(score);
 

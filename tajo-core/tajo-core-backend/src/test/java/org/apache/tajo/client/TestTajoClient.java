@@ -269,7 +269,7 @@ public class TestTajoClient {
     assertTrue(client.existTable(tableName));
 
     client.updateQuery("drop table " + tableName);
-    assertFalse(client.existTable(tableName));
+    assertFalse(client.existTable("tableName"));
     FileSystem localFS = FileSystem.getLocal(conf);
     assertTrue(localFS.exists(tablePath));
   }
@@ -385,7 +385,7 @@ public class TestTajoClient {
 
     TableDesc desc = client.getTableDesc(tableName1);
     assertNotNull(desc);
-    assertEquals(tableName1, desc.getName());
+    assertEquals(CatalogUtil.buildFQName(TajoConstants.DEFAULT_DATABASE_NAME, tableName1), desc.getName());
     assertTrue(desc.getStats().getNumBytes() > 0);
   }
 

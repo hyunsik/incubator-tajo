@@ -651,7 +651,7 @@ public class TajoClient implements Closeable {
     }.withRetries();
   }
 
-  public TableDesc getTableDesc(final String tableName) throws SQLException, ServiceException {
+  public TableDesc getTableDesc(final String tableName) throws ServiceException {
     return new ServerCallable<TableDesc>(connPool, tajoMasterAddr,
         TajoMasterClientProtocol.class, false, true) {
       public TableDesc call(NettyClientBase client) throws ServiceException, SQLException {

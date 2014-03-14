@@ -85,15 +85,18 @@ public class TestLogicalPlanner {
     schema3.addColumn("score", Type.INT4);
 
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV);
-    TableDesc people = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, "employee", schema, meta,
+    TableDesc people = new TableDesc(
+        CatalogUtil.buildFQName(TajoConstants.DEFAULT_DATABASE_NAME, "employee"), schema, meta,
         CommonTestingUtil.getTestDir());
     catalog.createTable(people);
 
-    TableDesc student = new TableDesc(DEFAULT_DATABASE_NAME, "dept", schema2, StoreType.CSV, new Options(),
+    TableDesc student = new TableDesc(
+        CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "dept"), schema2, StoreType.CSV, new Options(),
         CommonTestingUtil.getTestDir());
     catalog.createTable(student);
 
-    TableDesc score = new TableDesc(DEFAULT_DATABASE_NAME, "score", schema3, StoreType.CSV, new Options(),
+    TableDesc score = new TableDesc(
+        CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "score"), schema3, StoreType.CSV, new Options(),
         CommonTestingUtil.getTestDir());
     catalog.createTable(score);
 
@@ -111,7 +114,9 @@ public class TestLogicalPlanner {
     tpch.loadOutSchema();
     for (String table : tpchTables) {
       TableMeta m = CatalogUtil.newTableMeta(StoreType.CSV);
-      TableDesc d = CatalogUtil.newTableDesc(table, tpch.getSchema(table), m, CommonTestingUtil.getTestDir());
+      TableDesc d = CatalogUtil.newTableDesc(
+          CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, table), tpch.getSchema(table), m,
+          CommonTestingUtil.getTestDir());
       catalog.createTable(d);
     }
 
@@ -160,7 +165,7 @@ public class TestLogicalPlanner {
 
     assertEquals(NodeType.SCAN, selNode.getChild().getType());
     ScanNode scanNode = selNode.getChild();
-    assertEquals("employee", scanNode.getTableName());
+    assertEquals(CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "employee"), scanNode.getTableName());
   }
 
   public static void assertSchema(Schema expected, Schema schema) {
@@ -204,10 +209,10 @@ public class TestLogicalPlanner {
 
     assertEquals(NodeType.SCAN, joinNode.getLeftChild().getType());
     ScanNode leftNode = joinNode.getLeftChild();
-    assertEquals("employee", leftNode.getTableName());
+    assertEquals(CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "employee"), leftNode.getTableName());
     assertEquals(NodeType.SCAN, joinNode.getRightChild().getType());
     ScanNode rightNode = joinNode.getRightChild();
-    assertEquals("dept", rightNode.getTableName());
+    assertEquals(CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "dept"), rightNode.getTableName());
 
     // three relations
     expr = sqlAnalyzer.parse(QUERIES[2]);
@@ -231,18 +236,18 @@ public class TestLogicalPlanner {
 
     assertEquals(NodeType.SCAN, joinNode.getRightChild().getType());
     ScanNode scan1 = joinNode.getRightChild();
-    assertEquals("score", scan1.getTableName());
+    assertEquals(CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "score"), scan1.getTableName());
 
     JoinNode leftNode2 = joinNode.getLeftChild();
     assertEquals(NodeType.JOIN, leftNode2.getType());
 
     assertEquals(NodeType.SCAN, leftNode2.getLeftChild().getType());
     ScanNode leftScan = leftNode2.getLeftChild();
-    assertEquals("employee", leftScan.getTableName());
+    assertEquals(CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "employee"), leftScan.getTableName());
 
     assertEquals(NodeType.SCAN, leftNode2.getRightChild().getType());
     ScanNode rightScan = leftNode2.getRightChild();
-    assertEquals("dept", rightScan.getTableName());
+    assertEquals(CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "dept"), rightScan.getTableName());
   }
 
 
@@ -279,17 +284,17 @@ public class TestLogicalPlanner {
     assertEquals(NodeType.SCAN, join.getRightChild().getType());
     assertTrue(join.hasJoinQual());
     ScanNode scan = join.getRightChild();
-    assertEquals("score", scan.getTableName());
+    assertEquals("default.score", scan.getTableName());
 
     assertEquals(NodeType.JOIN, join.getLeftChild().getType());
     join = join.getLeftChild();
     assertEquals(JoinType.INNER, join.getJoinType());
     assertEquals(NodeType.SCAN, join.getLeftChild().getType());
     ScanNode outer = join.getLeftChild();
-    assertEquals("employee", outer.getTableName());
+    assertEquals("default.employee", outer.getTableName());
     assertEquals(NodeType.SCAN, join.getRightChild().getType());
     ScanNode inner = join.getRightChild();
-    assertEquals("dept", inner.getTableName());
+    assertEquals("default.dept", inner.getTableName());
   }
 
   @Test
@@ -309,17 +314,17 @@ public class TestLogicalPlanner {
     assertEquals(JoinType.INNER, join.getJoinType());
     assertEquals(NodeType.SCAN, join.getRightChild().getType());
     ScanNode scan = join.getRightChild();
-    assertEquals("score", scan.getTableName());
+    assertEquals("default.score", scan.getTableName());
 
     assertEquals(NodeType.JOIN, join.getLeftChild().getType());
     join = join.getLeftChild();
     assertEquals(JoinType.INNER, join.getJoinType());
     assertEquals(NodeType.SCAN, join.getLeftChild().getType());
     ScanNode outer = join.getLeftChild();
-    assertEquals("employee", outer.getTableName());
+    assertEquals("default.employee", outer.getTableName());
     assertEquals(NodeType.SCAN, join.getRightChild().getType());
     ScanNode inner = join.getRightChild();
-    assertEquals("dept", inner.getTableName());
+    assertEquals("default.dept", inner.getTableName());
     assertTrue(join.hasJoinQual());
     assertEquals(EvalType.EQUAL, join.getJoinQual().getType());
   }
@@ -341,17 +346,17 @@ public class TestLogicalPlanner {
     assertEquals(JoinType.RIGHT_OUTER, join.getJoinType());
     assertEquals(NodeType.SCAN, join.getRightChild().getType());
     ScanNode scan = join.getRightChild();
-    assertEquals("score", scan.getTableName());
+    assertEquals("default.score", scan.getTableName());
 
     assertEquals(NodeType.JOIN, join.getLeftChild().getType());
     join = join.getLeftChild();
     assertEquals(JoinType.LEFT_OUTER, join.getJoinType());
     assertEquals(NodeType.SCAN, join.getLeftChild().getType());
     ScanNode outer = join.getLeftChild();
-    assertEquals("employee", outer.getTableName());
+    assertEquals("default.employee", outer.getTableName());
     assertEquals(NodeType.SCAN, join.getRightChild().getType());
     ScanNode inner = join.getRightChild();
-    assertEquals("dept", inner.getTableName());
+    assertEquals("default.dept", inner.getTableName());
     assertTrue(join.hasJoinQual());
     assertEquals(EvalType.EQUAL, join.getJoinQual().getType());
   }
@@ -388,10 +393,10 @@ public class TestLogicalPlanner {
 
     assertEquals(NodeType.SCAN, joinNode.getLeftChild().getType());
     ScanNode leftNode = joinNode.getLeftChild();
-    assertEquals("dept", leftNode.getTableName());
+    assertEquals("default.dept", leftNode.getTableName());
     assertEquals(NodeType.SCAN, joinNode.getRightChild().getType());
     ScanNode rightNode = joinNode.getRightChild();
-    assertEquals("score", rightNode.getTableName());
+    assertEquals("default.score", rightNode.getTableName());
 
     //LogicalOptimizer.optimize(context, plan);
   }
@@ -419,10 +424,10 @@ public class TestLogicalPlanner {
 
     assertEquals(NodeType.SCAN, joinNode.getLeftChild().getType());
     ScanNode leftNode = joinNode.getLeftChild();
-    assertEquals("dept", leftNode.getTableName());
+    assertEquals(CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "dept"), leftNode.getTableName());
     assertEquals(NodeType.SCAN, joinNode.getRightChild().getType());
     ScanNode rightNode = joinNode.getRightChild();
-    assertEquals("score", rightNode.getTableName());
+    assertEquals(CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "score"), rightNode.getTableName());
   }
 
 
@@ -462,10 +467,10 @@ public class TestLogicalPlanner {
 
     assertEquals(NodeType.SCAN, joinNode.getLeftChild().getType());
     ScanNode leftNode = joinNode.getLeftChild();
-    assertEquals("dept", leftNode.getTableName());
+    assertEquals(CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "dept"), leftNode.getTableName());
     assertEquals(NodeType.SCAN, joinNode.getRightChild().getType());
     ScanNode rightNode = joinNode.getRightChild();
-    assertEquals("score", rightNode.getTableName());
+    assertEquals(CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "score"), rightNode.getTableName());
   }
 
   @Test
@@ -502,7 +507,7 @@ public class TestLogicalPlanner {
     SelectionNode selNode = projNode.getChild();
     assertEquals(NodeType.SCAN, selNode.getChild().getType());
     ScanNode scanNode = selNode.getChild();
-    assertEquals(scanNode.getTableName(), "employee");
+    assertEquals(CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "employee"), scanNode.getTableName());
   }
 
 
@@ -599,7 +604,7 @@ public class TestLogicalPlanner {
 
     assertEquals(NodeType.SCAN, selNode.getChild().getType());
     ScanNode scanNode = selNode.getChild();
-    assertEquals("employee", scanNode.getTableName());
+    assertEquals(CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "employee"), scanNode.getTableName());
   }
 
   static final String ALIAS [] = {
@@ -814,7 +819,7 @@ public class TestLogicalPlanner {
     InsertNode insertNode = getInsertNode(plan);
     assertFalse(insertNode.isOverwrite());
     assertTrue(insertNode.hasTargetTable());
-    assertEquals("score", insertNode.getTableName());
+    assertEquals(CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "score"), insertNode.getTableName());
   }
 
   @Test
@@ -824,7 +829,7 @@ public class TestLogicalPlanner {
     assertEquals(1, plan.getQueryBlocks().size());
     InsertNode insertNode = getInsertNode(plan);
     assertFalse(insertNode.isOverwrite());
-    assertEquals("score", insertNode.getTableName());
+    assertEquals(CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "score"), insertNode.getTableName());
   }
 
   @Test
@@ -834,7 +839,7 @@ public class TestLogicalPlanner {
     assertEquals(1, plan.getQueryBlocks().size());
     InsertNode insertNode = getInsertNode(plan);
     assertFalse(insertNode.isOverwrite());
-    assertEquals("employee", insertNode.getTableName());
+    assertEquals(CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "employee"), insertNode.getTableName());
     assertTrue(insertNode.hasTargetSchema());
     assertEquals(insertNode.getTargetSchema().getColumn(0).getSimpleName(), "name");
     assertEquals(insertNode.getTargetSchema().getColumn(1).getSimpleName(), "deptname");
@@ -858,7 +863,7 @@ public class TestLogicalPlanner {
     InsertNode insertNode = getInsertNode(plan);
     assertTrue(insertNode.isOverwrite());
     assertTrue(insertNode.hasTargetTable());
-    assertEquals("employee", insertNode.getTableName());
+    assertEquals(CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, "employee"), insertNode.getTableName());
     assertTrue(insertNode.hasTargetSchema());
     assertEquals(insertNode.getTargetSchema().getColumn(0).getSimpleName(), "name");
     assertEquals(insertNode.getTargetSchema().getColumn(1).getSimpleName(), "deptname");

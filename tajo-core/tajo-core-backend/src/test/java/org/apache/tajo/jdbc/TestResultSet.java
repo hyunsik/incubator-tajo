@@ -91,7 +91,8 @@ public class TestResultSet {
     stats.setAvgRows(tupleNum);
     stats.setNumBlocks(1000);
     stats.setNumShuffleOutputs(100);
-    desc = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, "score", scoreSchema, scoreMeta, p);
+    desc = new TableDesc(CatalogUtil.buildFQName(TajoConstants.DEFAULT_DATABASE_NAME, "score"),
+        scoreSchema, scoreMeta, p);
     desc.setStats(stats);
   }
 

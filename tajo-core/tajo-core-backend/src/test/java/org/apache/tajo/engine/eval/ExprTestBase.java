@@ -28,7 +28,6 @@ import org.apache.tajo.datum.TextDatum;
 import org.apache.tajo.engine.json.CoreGsonHelper;
 import org.apache.tajo.engine.parser.SQLAnalyzer;
 import org.apache.tajo.engine.planner.*;
-import org.apache.tajo.engine.planner.logical.LogicalNode;
 import org.apache.tajo.engine.utils.SchemaUtil;
 import org.apache.tajo.master.TajoMaster;
 import org.apache.tajo.master.session.Session;
@@ -41,7 +40,6 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 
 import java.io.IOException;
-import java.util.Stack;
 
 import static org.apache.tajo.TajoConstants.DEFAULT_DATABASE_NAME;
 import static org.apache.tajo.TajoConstants.DEFAULT_TABLESPACE_NAME;
@@ -140,10 +138,11 @@ public class ExprTestBase {
                        char delimiter, boolean condition) throws IOException {
     LazyTuple lazyTuple;
     VTuple vtuple  = null;
+    String qualifiedTableName = CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, tableName);
     Schema inputSchema = null;
     if (schema != null) {
       inputSchema = SchemaUtil.clone(schema);
-      inputSchema.setQualifier(tableName);
+      inputSchema.setQualifier(qualifiedTableName);
 
       int targetIdx [] = new int[inputSchema.size()];
       for (int i = 0; i < targetIdx.length; i++) {
@@ -161,8 +160,8 @@ public class ExprTestBase {
           vtuple.put(i, lazyTuple.get(i));
         }
       }
-      cat.createTable(new TableDesc(DEFAULT_DATABASE_NAME, tableName, inputSchema, CatalogProtos.StoreType.CSV,
-          new Options(), CommonTestingUtil.getTestDir()));
+      cat.createTable(new TableDesc(qualifiedTableName, inputSchema,
+          CatalogProtos.StoreType.CSV, new Options(), CommonTestingUtil.getTestDir()));
     }
 
     Target [] targets;
@@ -189,7 +188,7 @@ public class ExprTestBase {
       }
     } finally {
       if (schema != null) {
-        cat.dropTable(DEFAULT_DATABASE_NAME, tableName);
+        cat.dropTable(qualifiedTableName);
       }
     }
   }

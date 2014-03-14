@@ -531,9 +531,8 @@ public class Query implements EventHandler<QueryEvent> {
 
         TableDesc finalTable;
         if (insertNode.hasTargetTable()) {
-          String databaseName = insertNode.getDatabaseName();
           String tableName = insertNode.getTableName();
-          finalTable = catalog.getTableDesc(databaseName, tableName);
+          finalTable = catalog.getTableDesc(tableName);
         } else {
           String tableName = query.getId().toString();
           finalTable = new TableDesc(tableName, lastStage.getSchema(), meta, finalOutputDir);
@@ -544,7 +543,7 @@ public class Query implements EventHandler<QueryEvent> {
         finalTable.setStats(stats);
 
         if (insertNode.hasTargetTable()) {
-          catalog.dropTable(insertNode.getDatabaseName(), insertNode.getTableName());
+          catalog.dropTable(insertNode.getTableName());
           catalog.createTable(finalTable);
         }
 

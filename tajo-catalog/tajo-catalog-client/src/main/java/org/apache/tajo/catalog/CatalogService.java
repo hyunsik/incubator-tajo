@@ -91,6 +91,14 @@ public interface CatalogService {
   TableDesc getTableDesc(String databaseName, String tableName);
 
   /**
+   * Get a table description by name
+   * @return a table description
+   * @see TableDesc
+   * @throws Throwable
+   */
+  TableDesc getTableDesc(String qualifiedName);
+
+  /**
    *
    * @return All table names which belong to a given database.
    */
@@ -116,13 +124,15 @@ public interface CatalogService {
    * @param tableName table name
    * @throws Throwable
    */
-  boolean dropTable(String databaseName, String tableName);
+  boolean dropTable(String tableName);
 
   boolean existsTable(String databaseName, String tableName);
 
+  boolean existsTable(String tableName);
+
   PartitionMethodDesc getPartitionMethod(String databaseName, String tableName);
 
-  boolean existPartitionMethod(String databaseName, String tableId);
+  boolean existPartitionMethod(String databaseName, String tableName);
 
   boolean createIndex(IndexDesc index);
 

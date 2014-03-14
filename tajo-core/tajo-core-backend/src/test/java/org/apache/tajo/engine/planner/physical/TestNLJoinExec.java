@@ -98,7 +98,7 @@ public class TestNLJoinExec {
     }
     appender.flush();
     appender.close();
-    employee = CatalogUtil.newTableDesc("employee", schema, employeeMeta, employeePath);
+    employee = CatalogUtil.newTableDesc("default.employee", schema, employeeMeta, employeePath);
     catalog.createTable(employee);
     
     Schema peopleSchema = new Schema();
@@ -122,7 +122,7 @@ public class TestNLJoinExec {
     appender.flush();
     appender.close();
     
-    people = CatalogUtil.newTableDesc("people", peopleSchema, peopleMeta, peoplePath);
+    people = CatalogUtil.newTableDesc("default.people", peopleSchema, peopleMeta, peoplePath);
     catalog.createTable(people);
     analyzer = new SQLAnalyzer();
     planner = new LogicalPlanner(catalog);
@@ -143,9 +143,9 @@ public class TestNLJoinExec {
   
   @Test
   public final void testNLCrossJoin() throws IOException, PlanningException {
-    FileFragment[] empFrags = StorageManager.splitNG(conf, "e", employee.getMeta(), employee.getPath(),
+    FileFragment[] empFrags = StorageManager.splitNG(conf, "default.e", employee.getMeta(), employee.getPath(),
         Integer.MAX_VALUE);
-    FileFragment[] peopleFrags = StorageManager.splitNG(conf, "p", people.getMeta(), people.getPath(),
+    FileFragment[] peopleFrags = StorageManager.splitNG(conf, "default.p", people.getMeta(), people.getPath(),
         Integer.MAX_VALUE);
     
     FileFragment[] merged = TUtil.concat(empFrags, peopleFrags);
@@ -172,9 +172,9 @@ public class TestNLJoinExec {
 
   @Test
   public final void testNLInnerJoin() throws IOException, PlanningException {
-    FileFragment[] empFrags = StorageManager.splitNG(conf, "e", employee.getMeta(), employee.getPath(),
+    FileFragment[] empFrags = StorageManager.splitNG(conf, "default.e", employee.getMeta(), employee.getPath(),
         Integer.MAX_VALUE);
-    FileFragment[] peopleFrags = StorageManager.splitNG(conf, "p", people.getMeta(), people.getPath(),
+    FileFragment[] peopleFrags = StorageManager.splitNG(conf, "default.p", people.getMeta(), people.getPath(),
         Integer.MAX_VALUE);
     
     FileFragment[] merged = TUtil.concat(empFrags, peopleFrags);

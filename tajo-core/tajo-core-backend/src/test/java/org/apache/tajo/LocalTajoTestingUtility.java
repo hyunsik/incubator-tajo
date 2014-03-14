@@ -32,7 +32,6 @@ import org.apache.tajo.client.TajoClient;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.engine.planner.global.MasterPlan;
 import org.apache.tajo.master.session.Session;
-import org.apache.tajo.master.session.SessionManager;
 import org.apache.tajo.util.TajoIdUtils;
 
 import java.io.IOException;
@@ -105,7 +104,9 @@ public class LocalTajoTestingUtility {
       // It gives more various situations to unit tests.
       TableStats stats = new TableStats();
       stats.setNumBytes(TPCH.tableVolumes.get(names[i]));
-      TableDesc tableDesc = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, names[i], schemas[i], meta, tablePath);
+      TableDesc tableDesc = new TableDesc(
+          CatalogUtil.buildFQName(TajoConstants.DEFAULT_DATABASE_NAME, names[i]), schemas[i], meta,
+          tablePath);
       tableDesc.setStats(stats);
       util.getMaster().getCatalog().createTable(tableDesc);
     }

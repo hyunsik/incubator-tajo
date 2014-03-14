@@ -80,7 +80,9 @@ public class TestGlobalPlanner {
       TableMeta m = CatalogUtil.newTableMeta(CatalogProtos.StoreType.CSV);
       TableStats stats = new TableStats();
       stats.setNumBytes(volumes[i]);
-      TableDesc d = CatalogUtil.newTableDesc(tables[i], tpch.getSchema(tables[i]), m, CommonTestingUtil.getTestDir());
+      TableDesc d = CatalogUtil.newTableDesc(
+          CatalogUtil.buildFQName(DEFAULT_DATABASE_NAME, tables[i]), tpch.getSchema(tables[i]), m,
+          CommonTestingUtil.getTestDir());
       d.setStats(stats);
       catalog.createTable(d);
     }

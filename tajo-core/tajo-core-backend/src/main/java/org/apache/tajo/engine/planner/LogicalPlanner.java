@@ -47,7 +47,6 @@ import org.apache.tajo.util.TUtil;
 
 import java.util.*;
 
-import static org.apache.tajo.TajoConstants.DEFAULT_DATABASE_NAME;
 import static org.apache.tajo.algebra.CreateTable.PartitionType;
 import static org.apache.tajo.engine.planner.ExprNormalizer.ExprNormalizedResult;
 import static org.apache.tajo.engine.planner.LogicalPlan.BlockType;
@@ -112,7 +111,7 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   @VisibleForTesting
   public LogicalPlan createPlan(Session session, Expr expr, boolean debug) throws PlanningException {
 
-    LogicalPlan plan = new LogicalPlan(this);
+    LogicalPlan plan = new LogicalPlan(session.getCurrentDatabase(), this);
 
     QueryBlock rootBlock = plan.newAndGetBlock(LogicalPlan.ROOT_BLOCK);
     PreprocessContext preProcessorCtx = new PreprocessContext(session, plan, rootBlock);
@@ -1299,8 +1298,13 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
     CreateTableNode createTableNode = context.queryBlock.getNodeFromExpr(expr);
 
     // Set a table name to be created.
-    createTableNode.setDatabaseName(context.session.getCurrentDatabase());
-    createTableNode.setTableName(expr.getTableName());
+    if (CatalogUtil.isFQTableName(expr.getTableName())) {
+      createTableNode.setTableName(expr.getTableName());
+    } else {
+      createTableNode.setTableName(
+          CatalogUtil.buildFQName(context.session.getCurrentDatabase(), expr.getTableName()));
+    }
+
 
     if (expr.hasStorageType()) { // If storage type (using clause) is specified
       createTableNode.setStorageType(CatalogUtil.getStoreType(expr.getStorageType()));
@@ -1446,7 +1450,13 @@ public class LogicalPlanner extends BaseAlgebraVisitor<LogicalPlanner.PlanContex
   @Override
   public LogicalNode visitDropTable(PlanContext context, Stack<Expr> stack, DropTable dropTable) {
     DropTableNode dropTableNode = context.queryBlock.getNodeFromExpr(dropTable);
-    dropTableNode.init(dropTable.getTableName(), dropTable.isPurge());
+    String qualified;
+    if (CatalogUtil.isFQTableName(dropTable.getTableName())) {
+      qualified = dropTable.getTableName();
+    } else {
+      qualified = CatalogUtil.buildFQName(context.session.getCurrentDatabase(), dropTable.getTableName());
+    }
+    dropTableNode.init(qualified, dropTable.isPurge());
     return dropTableNode;
   }
 

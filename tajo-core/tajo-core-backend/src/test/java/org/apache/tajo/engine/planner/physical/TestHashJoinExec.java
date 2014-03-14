@@ -97,7 +97,7 @@ public class TestHashJoinExec {
 
     appender.flush();
     appender.close();
-    employee = CatalogUtil.newTableDesc("employee", employeeSchema, employeeMeta, employeePath);
+    employee = CatalogUtil.newTableDesc("default.employee", employeeSchema, employeeMeta, employeePath);
     catalog.createTable(employee);
 
     Schema peopleSchema = new Schema();
@@ -121,7 +121,7 @@ public class TestHashJoinExec {
     appender.flush();
     appender.close();
 
-    people = CatalogUtil.newTableDesc("people", peopleSchema, peopleMeta, peoplePath);
+    people = CatalogUtil.newTableDesc("default.people", peopleSchema, peopleMeta, peoplePath);
     catalog.createTable(people);
     analyzer = new SQLAnalyzer();
     planner = new LogicalPlanner(catalog);
@@ -146,8 +146,8 @@ public class TestHashJoinExec {
     Enforcer enforcer = new Enforcer();
     enforcer.enforceJoinAlgorithm(joinNode.getPID(), JoinAlgorithm.IN_MEMORY_HASH_JOIN);
 
-    FileFragment[] empFrags = StorageManager.splitNG(conf, "e", employee.getMeta(), employee.getPath(), Integer.MAX_VALUE);
-    FileFragment[] peopleFrags = StorageManager.splitNG(conf, "p", people.getMeta(), people.getPath(), Integer.MAX_VALUE);
+    FileFragment[] empFrags = StorageManager.splitNG(conf, "default.e", employee.getMeta(), employee.getPath(), Integer.MAX_VALUE);
+    FileFragment[] peopleFrags = StorageManager.splitNG(conf, "default.p", people.getMeta(), people.getPath(), Integer.MAX_VALUE);
     FileFragment[] merged = TUtil.concat(empFrags, peopleFrags);
 
     Path workDir = CommonTestingUtil.getTestDir("target/test-data/testHashInnerJoin");
@@ -187,9 +187,9 @@ public class TestHashJoinExec {
     Enforcer enforcer = new Enforcer();
     enforcer.enforceJoinAlgorithm(joinNode.getPID(), JoinAlgorithm.IN_MEMORY_HASH_JOIN);
 
-    FileFragment[] peopleFrags = StorageManager.splitNG(conf, "p", people.getMeta(), people.getPath(),
+    FileFragment[] peopleFrags = StorageManager.splitNG(conf, "default.p", people.getMeta(), people.getPath(),
         Integer.MAX_VALUE);
-    FileFragment[] empFrags = StorageManager.splitNG(conf, "e", employee.getMeta(), employee.getPath(),
+    FileFragment[] empFrags = StorageManager.splitNG(conf, "default.e", employee.getMeta(), employee.getPath(),
         Integer.MAX_VALUE);
     FileFragment[] merged = TUtil.concat(empFrags, peopleFrags);
 
@@ -226,7 +226,7 @@ public class TestHashJoinExec {
     String [] right = PlannerUtil.getRelationLineage(joinNode.getRightChild());
 
     boolean leftSmaller;
-    if (left[0].equals("p")) {
+    if (left[0].equals("default.p")) {
       leftSmaller = true;
     } else {
       leftSmaller = false;
@@ -250,16 +250,16 @@ public class TestHashJoinExec {
       assertEquals(ordered[0], joinExec.getLeftChild());
       assertEquals(ordered[1], joinExec.getRightChild());
 
-      assertEquals("p", left[0]);
-      assertEquals("e", right[0]);
+      assertEquals("default.p", left[0]);
+      assertEquals("default.e", right[0]);
     } else {
       PhysicalExec [] ordered = phyPlanner.switchJoinSidesIfNecessary(ctx, joinNode, joinExec.getLeftChild(),
           joinExec.getRightChild());
       assertEquals(ordered[1], joinExec.getLeftChild());
       assertEquals(ordered[0], joinExec.getRightChild());
 
-      assertEquals("e", left[0]);
-      assertEquals("p", right[0]);
+      assertEquals("default.e", left[0]);
+      assertEquals("default.p", right[0]);
     }
 
     if (leftSmaller) {

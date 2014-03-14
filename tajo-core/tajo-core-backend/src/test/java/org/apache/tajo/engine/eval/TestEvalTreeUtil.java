@@ -102,7 +102,8 @@ public class TestEvalTreeUtil {
     schema.addColumn("age", TajoDataTypes.Type.INT4);
 
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV);
-    TableDesc desc = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, "people", schema, meta,
+    TableDesc desc = new TableDesc(
+        CatalogUtil.buildFQName(TajoConstants.DEFAULT_DATABASE_NAME, "people"), schema, meta,
         CommonTestingUtil.getTestDir());
     catalog.createTable(desc);
 
@@ -159,23 +160,23 @@ public class TestEvalTreeUtil {
   @Test
   public final void testChangeColumnRef() throws CloneNotSupportedException {
     EvalNode copy = (EvalNode)expr1.clone();
-    EvalTreeUtil.changeColumnRef(copy, "people.score", "newscore");
+    EvalTreeUtil.changeColumnRef(copy, "default.people.score", "newscore");
     Set<Column> set = EvalTreeUtil.findUniqueColumns(copy);
     assertEquals(1, set.size());
     assertTrue(set.contains(new Column("newscore", TajoDataTypes.Type.INT4)));
 
     copy = (EvalNode)expr2.clone();
-    EvalTreeUtil.changeColumnRef(copy, "people.age", "sum_age");
+    EvalTreeUtil.changeColumnRef(copy, "default.people.age", "sum_age");
     set = EvalTreeUtil.findUniqueColumns(copy);
     assertEquals(2, set.size());
-    assertTrue(set.contains(new Column("people.score", TajoDataTypes.Type.INT4)));
+    assertTrue(set.contains(new Column("default.people.score", TajoDataTypes.Type.INT4)));
     assertTrue(set.contains(new Column("sum_age", TajoDataTypes.Type.INT4)));
 
     copy = (EvalNode)expr3.clone();
-    EvalTreeUtil.changeColumnRef(copy, "people.age", "sum_age");
+    EvalTreeUtil.changeColumnRef(copy, "default.people.age", "sum_age");
     set = EvalTreeUtil.findUniqueColumns(copy);
     assertEquals(2, set.size());
-    assertTrue(set.contains(new Column("people.score", TajoDataTypes.Type.INT4)));
+    assertTrue(set.contains(new Column("default.people.score", TajoDataTypes.Type.INT4)));
     assertTrue(set.contains(new Column("sum_age", TajoDataTypes.Type.INT4)));
   }
 
@@ -183,17 +184,17 @@ public class TestEvalTreeUtil {
   public final void testFindAllRefColumns() {    
     Set<Column> set = EvalTreeUtil.findUniqueColumns(expr1);
     assertEquals(1, set.size());
-    assertTrue(set.contains(new Column("people.score", TajoDataTypes.Type.INT4)));
+    assertTrue(set.contains(new Column("default.people.score", TajoDataTypes.Type.INT4)));
     
     set = EvalTreeUtil.findUniqueColumns(expr2);
     assertEquals(2, set.size());
-    assertTrue(set.contains(new Column("people.score", TajoDataTypes.Type.INT4)));
-    assertTrue(set.contains(new Column("people.age", TajoDataTypes.Type.INT4)));
+    assertTrue(set.contains(new Column("default.people.score", TajoDataTypes.Type.INT4)));
+    assertTrue(set.contains(new Column("default.people.age", TajoDataTypes.Type.INT4)));
     
     set = EvalTreeUtil.findUniqueColumns(expr3);
     assertEquals(2, set.size());
-    assertTrue(set.contains(new Column("people.score", TajoDataTypes.Type.INT4)));
-    assertTrue(set.contains(new Column("people.age", TajoDataTypes.Type.INT4)));
+    assertTrue(set.contains(new Column("default.people.score", TajoDataTypes.Type.INT4)));
+    assertTrue(set.contains(new Column("default.people.age", TajoDataTypes.Type.INT4)));
   }
   
   public static final String [] QUERIES = {
@@ -224,7 +225,7 @@ public class TestEvalTreeUtil {
     Expr expr = analyzer.parse(QUERIES[1]);
     LogicalPlan plan = planner.createPlan(session, expr, true);
     Target [] targets = plan.getRootBlock().getRawTargets();
-    Column col1 = new Column("people.score", TajoDataTypes.Type.INT4);
+    Column col1 = new Column("default.people.score", TajoDataTypes.Type.INT4);
     Collection<EvalNode> exprs =
         EvalTreeUtil.getContainExpr(targets[0].getEvalTree(), col1);
     EvalNode node = exprs.iterator().next();
@@ -232,11 +233,11 @@ public class TestEvalTreeUtil {
     assertEquals(EvalType.PLUS, node.getLeftExpr().getType());
     assertEquals(new ConstEval(DatumFactory.createInt4(4)), node.getRightExpr());
 
-    Column col2 = new Column("people.age", TajoDataTypes.Type.INT4);
+    Column col2 = new Column("default.people.age", TajoDataTypes.Type.INT4);
     exprs = EvalTreeUtil.getContainExpr(targets[1].getEvalTree(), col2);
     node = exprs.iterator().next();
     assertEquals(EvalType.GTH, node.getType());
-    assertEquals("people.age", node.getLeftExpr().getName());
+    assertEquals("default.people.age", node.getLeftExpr().getName());
     assertEquals(new ConstEval(DatumFactory.createInt4(5)), node.getRightExpr());
   }
   
@@ -246,7 +247,7 @@ public class TestEvalTreeUtil {
     EvalNode node = getRootSelection(QUERIES[5]);
     EvalNode [] cnf = AlgebraicUtil.toConjunctiveNormalFormArray(node);
     
-    Column col1 = new Column("people.score", TajoDataTypes.Type.INT4);
+    Column col1 = new Column("default.people.score", TajoDataTypes.Type.INT4);
     
     assertEquals(2, cnf.length);
     EvalNode first = cnf[0];
@@ -285,8 +286,8 @@ public class TestEvalTreeUtil {
     EvalNode [] cnf = AlgebraicUtil.toDisjunctiveNormalFormArray(node);
     assertEquals(2, cnf.length);
 
-    assertEquals("people.score (INT4) > 1 AND people.score (INT4) < 3", cnf[0].toString());
-    assertEquals("7 < people.score (INT4) AND people.score (INT4) < 10", cnf[1].toString());
+    assertEquals("default.people.score (INT4) > 1 AND default.people.score (INT4) < 3", cnf[0].toString());
+    assertEquals("7 < default.people.score (INT4) AND default.people.score (INT4) < 10", cnf[1].toString());
   }
   
   @Test
@@ -302,7 +303,7 @@ public class TestEvalTreeUtil {
     Expr expr = analyzer.parse(QUERIES[1]);
     LogicalPlan plan = planner.createPlan(session, expr, true);
     targets = plan.getRootBlock().getRawTargets();
-    Column col1 = new Column("people.score", TajoDataTypes.Type.INT4);
+    Column col1 = new Column("default.people.score", TajoDataTypes.Type.INT4);
     Collection<EvalNode> exprs =
         EvalTreeUtil.getContainExpr(targets[0].getEvalTree(), col1);
     node = exprs.iterator().next();
@@ -318,7 +319,7 @@ public class TestEvalTreeUtil {
   
   @Test
   public final void testTranspose() throws PlanningException {
-    Column col1 = new Column("people.score", TajoDataTypes.Type.INT4);
+    Column col1 = new Column("default.people.score", TajoDataTypes.Type.INT4);
     EvalNode node = getRootSelection(QUERIES[3]);
     // we expect that score < 3
     EvalNode transposed = AlgebraicUtil.transpose(node, col1);
