@@ -75,7 +75,8 @@ public class TestLogicalOptimizer {
     schema3.addColumn("phone", Type.INT4);
 
     TableMeta meta = CatalogUtil.newTableMeta(StoreType.CSV);
-    TableDesc people = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, "employee", schema, meta,
+    TableDesc people = new TableDesc(
+        CatalogUtil.buildQualifiedIdentifier(TajoConstants.DEFAULT_DATABASE_NAME, "employee"), schema, meta,
         CommonTestingUtil.getTestDir());
     catalog.createTable(people);
 

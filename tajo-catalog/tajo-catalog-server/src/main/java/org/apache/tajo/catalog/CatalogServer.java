@@ -420,8 +420,13 @@ public class CatalogServer extends AbstractService {
     @Override
     public BoolProto createTable(RpcController controller, TableDescProto request)throws ServiceException {
 
-      String databaseName = CatalogUtil.normalizeIdentifier(request.getDatabaseName());
-      String tableName = CatalogUtil.normalizeIdentifier(request.getTableName());
+      String [] splitted = CatalogUtil.splitTableName(CatalogUtil.normalizeIdentifier(request.getTableName()));
+      if (splitted.length == 1) {
+        throw new IllegalArgumentException("createTable() requires a qualified table name, but it is \""
+            + request.getTableName() + "\".");
+      }
+      String databaseName = splitted[0];
+      String tableName = splitted[1];
 
       wlock.lock();
       try {

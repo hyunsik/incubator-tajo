@@ -141,7 +141,6 @@ public class TestHCatalogStore {
   public void testAddTable1() throws Exception {
     TableDesc table = new TableDesc();
 
-    table.setDatabaseName(DB_NAME);
     table.setName(CUSTOMER);
 
     Options options = new Options();
@@ -169,7 +168,6 @@ public class TestHCatalogStore {
   public void testAddTable2() throws Exception {
     TableDesc table = new TableDesc();
 
-    table.setDatabaseName(DB_NAME);
     table.setName(REGION);
 
     Options options = new Options();
@@ -193,7 +191,6 @@ public class TestHCatalogStore {
   public void testAddTable3() throws Exception {
     TableDesc table = new TableDesc();
 
-    table.setDatabaseName(DB_NAME);
     table.setName(SUPPLIER);
 
     Options options = new Options();
@@ -221,7 +218,6 @@ public class TestHCatalogStore {
   public void testAddTableByPartition() throws Exception {
     TableDesc table = new TableDesc();
 
-    table.setDatabaseName(DB_NAME);
     table.setName(NATION);
 
     Options options = new Options();

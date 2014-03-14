@@ -457,7 +457,6 @@ public class Query implements EventHandler<QueryEvent> {
 
         TableDesc resultTableDesc =
             new TableDesc(
-                TajoConstants.DEFAULT_DATABASE_NAME,
                 query.getId().toString(),
                 lastStage.getSchema(),
                 meta,
@@ -491,7 +490,6 @@ public class Query implements EventHandler<QueryEvent> {
 
         TableDesc tableDescTobeCreated =
             new TableDesc(
-                createTableNode.getDatabaseName(),
                 createTableNode.getTableName(),
                 createTableNode.getTableSchema(),
                 meta,
@@ -538,8 +536,7 @@ public class Query implements EventHandler<QueryEvent> {
           finalTable = catalog.getTableDesc(databaseName, tableName);
         } else {
           String tableName = query.getId().toString();
-          finalTable = new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, tableName, lastStage.getSchema(), meta,
-              finalOutputDir);
+          finalTable = new TableDesc(tableName, lastStage.getSchema(), meta, finalOutputDir);
         }
 
         long volume = getTableVolume(query.systemConf, finalOutputDir);

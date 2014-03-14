@@ -51,6 +51,39 @@ public class CatalogUtil {
     return identifier.toLowerCase();
   }
 
+  public static boolean isQualifiedTableName(String tableName) {
+    int lastDelimiterIdx = tableName.lastIndexOf(IDENTIFIER_DELIMITER);
+    return lastDelimiterIdx > -1;
+  }
+
+  public static String [] splitTableName(String tableName) {
+    int lastDelimiterIdx = tableName.lastIndexOf(IDENTIFIER_DELIMITER);
+    if (lastDelimiterIdx > -1) {
+      return new String [] {
+          tableName.substring(0, lastDelimiterIdx),
+          tableName.substring(lastDelimiterIdx + 1, tableName.length())
+      };
+    } else {
+      return new String [] {tableName};
+    }
+  }
+
+  public static String buildQualifiedIdentifier(String... identifiers) {
+    boolean first = true;
+    StringBuilder sb = new StringBuilder();
+    for(String id : identifiers) {
+      if (first) {
+        first = false;
+      } else {
+        sb.append(", ");
+      }
+
+      sb.append(id);
+    }
+
+    return sb.toString();
+  }
+
   /**
    * Extract a qualification name from an identifier.
    *
@@ -141,7 +174,7 @@ public class CatalogUtil {
   }
 
   public static TableDesc newTableDesc(String tableName, Schema schema, TableMeta meta, Path path) {
-    return new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, tableName, schema, meta, path);
+    return new TableDesc(tableName, schema, meta, path);
   }
 
   public static TableDesc newTableDesc(TableDescProto proto) {

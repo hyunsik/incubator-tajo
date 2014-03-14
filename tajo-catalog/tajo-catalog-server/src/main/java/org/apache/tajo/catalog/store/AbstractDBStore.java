@@ -573,8 +573,13 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       conn = getConnection();
       conn.setAutoCommit(false);
 
-      String databaseName = CatalogUtil.normalizeIdentifier(table.getDatabaseName());
-      String tableName = CatalogUtil.normalizeIdentifier(table.getTableName());
+      String [] splitted = CatalogUtil.splitTableName(CatalogUtil.normalizeIdentifier(table.getTableName()));
+      if (splitted.length == 1) {
+        throw new IllegalArgumentException("createTable() requires a qualified table name, but it is \""
+            + table.getTableName() + "\".");
+      }
+      String databaseName = splitted[0];
+      String tableName = splitted[1];
 
       int dbid = getDatabaseId(databaseName);
 
@@ -910,7 +915,6 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       tableBuilder = CatalogProtos.TableDescProto.newBuilder();
 
       Pair<Integer, String> databaseIdAndUri = getDatabaseIdAndUri(databaseName);
-      tableBuilder.setDatabaseName(databaseName);
 
       //////////////////////////////////////////
       // Geting Table Description
@@ -933,7 +937,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
       }
 
       int tableId = res.getInt(1);
-      tableBuilder.setTableName(res.getString(2).trim());
+      tableBuilder.setTableName(CatalogUtil.buildQualifiedIdentifier(databaseName, res.getString(2).trim()));
       TableType tableType = TableType.valueOf(res.getString(3));
       if (tableType == TableType.EXTERNAL) {
         tableBuilder.setIsExternal(true);
@@ -968,7 +972,7 @@ public abstract class AbstractDBStore extends CatalogConstants implements Catalo
         schemaBuilder.addFields(resultToColumnProto(res));
       }
 
-      tableBuilder.setSchema(CatalogUtil.getQualfiedSchema(tableName, schemaBuilder.build()));
+      tableBuilder.setSchema(CatalogUtil.getQualfiedSchema(databaseName + "." + tableName, schemaBuilder.build()));
 
       res.close();
       pstmt.close();

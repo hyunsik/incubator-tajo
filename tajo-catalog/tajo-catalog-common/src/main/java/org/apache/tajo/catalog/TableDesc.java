@@ -40,8 +40,6 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
   private final Log LOG = LogFactory.getLog(TableDesc.class);
 
   protected TableDescProto.Builder builder = null;
-
-  @Expose protected String databaseName;                     // required
 	@Expose protected String tableName;                        // required
   @Expose protected Schema schema;
   @Expose protected TableMeta meta;                          // required
@@ -54,10 +52,9 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
 		builder = TableDescProto.newBuilder();
 	}
 
-  public TableDesc(String databaseName, String tableName, Schema schema, TableMeta meta,
+  public TableDesc(String tableName, Schema schema, TableMeta meta,
                    Path path, boolean external) {
     this();
-    this.databaseName = databaseName;
     this.tableName = tableName.toLowerCase();
     this.schema = schema;
     this.meta = meta;
@@ -65,17 +62,16 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
     this.external = external;
   }
 
-	public TableDesc(String databaseName, String tableName, Schema schema, TableMeta meta, Path path) {
-		this(databaseName, CatalogUtil.normalizeIdentifier(tableName),
-        schema, meta, path, true);
+	public TableDesc(String tableName, Schema schema, TableMeta meta, Path path) {
+		this(CatalogUtil.normalizeIdentifier(tableName), schema, meta, path, true);
 	}
 	
-	public TableDesc(String databaseName, String tableName, Schema schema, StoreType type, Options options, Path path) {
-	  this(databaseName, tableName, schema, new TableMeta(type, options), path);
+	public TableDesc(String tableName, Schema schema, StoreType type, Options options, Path path) {
+	  this(tableName, schema, new TableMeta(type, options), path);
 	}
 	
 	public TableDesc(TableDescProto proto) {
-	  this(proto.getDatabaseName(), proto.getTableName(), new Schema(proto.getSchema()),
+	  this(proto.getTableName(), new Schema(proto.getSchema()),
         new TableMeta(proto.getMeta()), new Path(proto.getPath()), proto.getIsExternal());
     if(proto.hasStats()) {
       this.stats = new TableStats(proto.getStats());
@@ -84,14 +80,6 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
       this.partitionMethodDesc = new PartitionMethodDesc(proto.getPartition());
     }
 	}
-
-  public void setDatabaseName(String databaseName) {
-    this.databaseName = databaseName;
-  }
-
-  public String getDatabaseName() {
-    return this.databaseName;
-  }
 	
 	public void setName(String tableId) {
 	  // tajo deems all identifiers as lowcase characters
@@ -217,9 +205,6 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
       builder = TableDescProto.newBuilder();
     }
 
-    if (this.databaseName != null) {
-      builder.setDatabaseName(this.databaseName);
-    }
     if (this.tableName != null) {
       builder.setTableName(this.tableName);
     }

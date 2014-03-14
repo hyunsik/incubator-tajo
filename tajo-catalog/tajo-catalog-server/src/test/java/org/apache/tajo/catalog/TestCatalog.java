@@ -168,8 +168,7 @@ public class TestCatalog {
     schema1.addColumn(FieldName3, Type.INT8);
     Path path = new Path(CommonTestingUtil.getTestDir(), tableName);
     TableDesc table = new TableDesc(
-        databaseName,
-        tableName,
+        CatalogUtil.buildQualifiedIdentifier(databaseName,tableName),
         schema1,
         new TableMeta(StoreType.CSV, new Options()),
         path, true);
@@ -289,8 +288,7 @@ public class TestCatalog {
 		schema1.addColumn(FieldName3, Type.INT8);
     Path path = new Path(CommonTestingUtil.getTestDir(), "table1");
     TableDesc meta = new TableDesc(
-        DEFAULT_DATABASE_NAME,
-        "getTable",
+        CatalogUtil.buildQualifiedIdentifier(DEFAULT_DATABASE_NAME, "getTable"),
         schema1,
         StoreType.CSV,
         new Options(),
@@ -466,7 +464,8 @@ public class TestCatalog {
             CatalogProtos.PartitionType.HASH, "id", partSchema);
 
     TableDesc desc =
-        new TableDesc(DEFAULT_DATABASE_NAME, tableName, schema, meta,
+        new TableDesc(
+            CatalogUtil.buildQualifiedIdentifier(DEFAULT_DATABASE_NAME, tableName), schema, meta,
             new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
 
@@ -504,7 +503,8 @@ public class TestCatalog {
             CatalogProtos.PartitionType.HASH, "id", partSchema);
 
     TableDesc desc =
-        new TableDesc(DEFAULT_DATABASE_NAME, tableName, schema, meta,
+        new TableDesc(
+            CatalogUtil.buildQualifiedIdentifier(DEFAULT_DATABASE_NAME, tableName), schema, meta,
             new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
 
@@ -542,7 +542,8 @@ public class TestCatalog {
             CatalogProtos.PartitionType.LIST, "id", partSchema);
 
     TableDesc desc =
-        new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, tableName, schema, meta,
+        new TableDesc(
+            CatalogUtil.buildQualifiedIdentifier(TajoConstants.DEFAULT_DATABASE_NAME, tableName), schema, meta,
             new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
     assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
@@ -579,7 +580,8 @@ public class TestCatalog {
             "id", partSchema);
 
     TableDesc desc =
-        new TableDesc(TajoConstants.DEFAULT_DATABASE_NAME, tableName, schema, meta,
+        new TableDesc(
+            CatalogUtil.buildQualifiedIdentifier(TajoConstants.DEFAULT_DATABASE_NAME, tableName), schema, meta,
             new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
     assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
@@ -617,7 +619,8 @@ public class TestCatalog {
             CatalogProtos.PartitionType.COLUMN, "id", partSchema);
 
     TableDesc desc =
-        new TableDesc(DEFAULT_DATABASE_NAME, tableName, schema, meta,
+        new TableDesc(
+            CatalogUtil.buildQualifiedIdentifier(DEFAULT_DATABASE_NAME, tableName), schema, meta,
             new Path(CommonTestingUtil.getTestDir(), "addedtable"));
     desc.setPartitionMethod(partitionDesc);
     assertFalse(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));

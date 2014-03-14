@@ -120,15 +120,22 @@ public class MemStore implements CatalogStore {
   }
 
   @Override
-  public void createTable(CatalogProtos.TableDescProto desc) throws CatalogException {
-    String dbName = CatalogUtil.normalizeIdentifier(desc.getDatabaseName());
-    Map<String, CatalogProtos.TableDescProto> database = checkAndGetDatabaseNS(databases, dbName);
+  public void createTable(CatalogProtos.TableDescProto request) throws CatalogException {
+    String [] splitted = CatalogUtil.splitTableName(CatalogUtil.normalizeIdentifier(request.getTableName()));
+    if (splitted.length == 1) {
+      throw new IllegalArgumentException("createTable() requires a qualified table name, but it is \""
+          + request.getTableName() + "\".");
+    }
+    String databaseName = splitted[0];
+    String tableName = splitted[1];
 
-    String tbName = CatalogUtil.normalizeIdentifier(desc.getTableName());
+    Map<String, CatalogProtos.TableDescProto> database = checkAndGetDatabaseNS(databases, databaseName);
+
+    String tbName = CatalogUtil.normalizeIdentifier(tableName);
     if (database.containsKey(tbName)) {
       throw new AlreadyExistsTableException(tbName);
     }
-    database.put(tbName, desc);
+    database.put(tbName, request);
   }
 
   @Override
@@ -161,7 +168,7 @@ public class MemStore implements CatalogStore {
       CatalogProtos.TableDescProto unqualified = database.get(tableName);
       CatalogProtos.TableDescProto.Builder builder = CatalogProtos.TableDescProto.newBuilder();
       CatalogProtos.SchemaProto schemaProto =
-          CatalogUtil.getQualfiedSchema(tableName, unqualified.getSchema());
+          CatalogUtil.getQualfiedSchema(databaseName + "." + tableName, unqualified.getSchema());
       builder.mergeFrom(unqualified);
       builder.setSchema(schemaProto);
       return builder.build();

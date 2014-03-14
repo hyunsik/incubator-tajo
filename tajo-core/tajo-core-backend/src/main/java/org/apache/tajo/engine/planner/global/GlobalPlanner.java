@@ -145,8 +145,7 @@ public class GlobalPlanner {
         "Channel schema (" + channel.getSrcId().getId() + " -> " + channel.getTargetId().getId() +
             ") is not initialized");
     TableMeta meta = new TableMeta(channel.getStoreType(), new Options());
-    TableDesc desc = new TableDesc(DEFAULT_DATABASE_NAME, channel.getSrcId().toString(), channel.getSchema(), meta,
-        new Path("/"));
+    TableDesc desc = new TableDesc(channel.getSrcId().toString(), channel.getSchema(), meta, new Path("/"));
     ScanNode scanNode = plan.createNode(ScanNode.class);
     scanNode.init(desc);
     return scanNode;

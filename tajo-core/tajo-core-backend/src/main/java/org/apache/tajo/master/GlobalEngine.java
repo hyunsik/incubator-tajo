@@ -294,15 +294,24 @@ public class GlobalEngine extends AbstractService {
       createTable.setPath(tablePath);
     }
 
-    return createTableOnPath(session.getCurrentDatabase(), createTable.getTableName(), createTable.getTableSchema(),
+    return createTableOnPath(session, createTable.getTableName(), createTable.getTableSchema(),
         meta, createTable.getPath(), createTable.isExternal(), createTable.getPartitionMethod());
   }
 
-  public TableDesc createTableOnPath(String databaseName, String tableName, Schema schema, TableMeta meta,
+  public TableDesc createTableOnPath(Session session, String tableName, Schema schema, TableMeta meta,
                                      Path path, boolean isExternal, PartitionMethodDesc partitionDesc)
       throws IOException {
-    if (catalog.existsTable(databaseName, tableName)) {
-      throw new AlreadyExistsTableException(tableName);
+
+    String [] splitted = CatalogUtil.splitTableName(CatalogUtil.normalizeIdentifier(tableName));
+    if (splitted.length == 1) {
+      throw new IllegalArgumentException("createTable() requires a qualified table name, but it is \""
+          + tableName + "\".");
+    }
+    String databaseName = splitted[0];
+    String simpleTableName = splitted[1];
+
+    if (catalog.existsTable(databaseName, simpleTableName)) {
+      databaseName = session.getCurrentDatabase();
     }
 
     FileSystem fs = path.getFileSystem(context.getConf());
@@ -326,7 +335,8 @@ public class GlobalEngine extends AbstractService {
 
     TableStats stats = new TableStats();
     stats.setNumBytes(totalSize);
-    TableDesc desc = new TableDesc(databaseName, tableName, schema, meta, path, isExternal);
+    TableDesc desc = new TableDesc(CatalogUtil.buildQualifiedIdentifier(databaseName, simpleTableName),
+        schema, meta, path, isExternal);
     desc.setStats(stats);
     if (partitionDesc != null) {
       desc.setPartitionMethod(partitionDesc);
