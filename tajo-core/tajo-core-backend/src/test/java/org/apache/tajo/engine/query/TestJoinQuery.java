@@ -20,6 +20,7 @@ package org.apache.tajo.engine.query;
 
 import org.apache.tajo.IntegrationTest;
 import org.apache.tajo.QueryTestCaseBase;
+import org.apache.tajo.TajoConstants;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
@@ -27,6 +28,11 @@ import java.sql.ResultSet;
 
 @Category(IntegrationTest.class)
 public class TestJoinQuery extends QueryTestCaseBase {
+
+  public TestJoinQuery() {
+    super(TajoConstants.DEFAULT_DATABASE_NAME);
+  }
+
   @Test
   public final void testCrossJoin() throws Exception {
     ResultSet res = executeQuery();
@@ -264,4 +270,16 @@ public class TestJoinQuery extends QueryTestCaseBase {
     cleanupQuery(res);
   }
 
+  @Test
+  public final void testJoinOnMultipleDatabases() throws Exception {
+    executeString("CREATE DATABASE JOINS");
+    assertDatabaseExists("JOINS");
+    executeString("CREATE TABLE JOINS.part_ as SELECT * FROM part");
+    assertTableExists("JOINS.part_");
+    executeString("CREATE TABLE JOINS.supplier_ as SELECT * FROM supplier");
+    assertTableExists("JOINS.supplier_");
+    ResultSet res = executeQuery();
+    assertResultSet(res);
+    cleanupQuery(res);
+  }
 }

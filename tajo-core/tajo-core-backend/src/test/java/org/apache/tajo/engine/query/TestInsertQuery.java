@@ -36,6 +36,7 @@ import org.junit.experimental.categories.Category;
 import java.io.IOException;
 import java.sql.ResultSet;
 
+import static org.apache.tajo.TajoConstants.DEFAULT_DATABASE_NAME;
 import static org.junit.Assert.*;
 
 @Category(IntegrationTest.class)
@@ -57,13 +58,13 @@ public class TestInsertQuery {
     res.close();
     TajoTestingCluster cluster = tpch.getTestingCluster();
     CatalogService catalog = cluster.getMaster().getCatalog();
-    assertTrue(catalog.existsTable(tableName));
+    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
 
     res = tpch.execute("insert overwrite into " + tableName
         + " select l_orderkey, l_partkey, l_quantity from lineitem");
     res.close();
 
-    TableDesc desc = catalog.getTableDesc(tableName);
+    TableDesc desc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName);
     assertEquals(5, desc.getStats().getNumRows().intValue());
   }
 
@@ -74,12 +75,12 @@ public class TestInsertQuery {
     res.close();
     TajoTestingCluster cluster = tpch.getTestingCluster();
     CatalogService catalog = cluster.getMaster().getCatalog();
-    assertTrue(catalog.existsTable(tableName));
-    TableDesc originalDesc = catalog.getTableDesc(tableName);
+    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    TableDesc originalDesc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName);
 
     res = tpch.execute("insert overwrite into " + tableName + " select l_orderkey from lineitem");
     res.close();
-    TableDesc desc = catalog.getTableDesc(tableName);
+    TableDesc desc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName);
     assertEquals(5, desc.getStats().getNumRows().intValue());
     assertEquals(originalDesc.getSchema(), desc.getSchema());
   }
@@ -91,12 +92,12 @@ public class TestInsertQuery {
     res.close();
     TajoTestingCluster cluster = tpch.getTestingCluster();
     CatalogService catalog = cluster.getMaster().getCatalog();
-    assertTrue(catalog.existsTable(tableName));
-    TableDesc originalDesc = catalog.getTableDesc(tableName);
+    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    TableDesc originalDesc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName);
 
     res = tpch.execute("insert overwrite into " + tableName + " (col1, col3) select l_orderkey, l_quantity from lineitem");
     res.close();
-    TableDesc desc = catalog.getTableDesc(tableName);
+    TableDesc desc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName);
     assertEquals(5, desc.getStats().getNumRows().intValue());
 
     res = tpch.execute("select * from " + tableName);
@@ -143,11 +144,11 @@ public class TestInsertQuery {
     res.close();
     TajoTestingCluster cluster = tpch.getTestingCluster();
     CatalogService catalog = cluster.getMaster().getCatalog();
-    assertTrue(catalog.existsTable(tableName));
+    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
 
     res = tpch.execute("insert overwrite into " + tableName + " select * from lineitem where l_orderkey = 3");
     res.close();
-    TableDesc desc = catalog.getTableDesc(tableName);
+    TableDesc desc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName);
     assertEquals(2, desc.getStats().getNumRows().intValue());
   }
 
@@ -161,8 +162,8 @@ public class TestInsertQuery {
 
     TajoTestingCluster cluster = tpch.getTestingCluster();
     CatalogService catalog = cluster.getMaster().getCatalog();
-    assertTrue(catalog.existsTable(tableName));
-    TableDesc orderKeys = catalog.getTableDesc(tableName);
+    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    TableDesc orderKeys = catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName);
     assertEquals(5, orderKeys.getStats().getNumRows().intValue());
 
     // this query will result in the two rows.
@@ -171,8 +172,8 @@ public class TestInsertQuery {
     assertFalse(res.next());
     res.close();
 
-    assertTrue(catalog.existsTable(tableName));
-    orderKeys = catalog.getTableDesc(tableName);
+    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
+    orderKeys = catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName);
     assertEquals(2, orderKeys.getStats().getNumRows().intValue());
   }
 
@@ -183,11 +184,11 @@ public class TestInsertQuery {
     res.close();
     TajoTestingCluster cluster = tpch.getTestingCluster();
     CatalogService catalog = cluster.getMaster().getCatalog();
-    assertTrue(catalog.existsTable(tableName));
+    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
 
     res = tpch.execute("insert overwrite into " + tableName + " select * from lineitem where l_orderkey = 3");
     res.close();
-    TableDesc desc = catalog.getTableDesc(tableName);
+    TableDesc desc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName);
     assertEquals(2, desc.getStats().getNumRows().intValue());
   }
 
@@ -208,11 +209,11 @@ public class TestInsertQuery {
     res.close();
     TajoTestingCluster cluster = tpch.getTestingCluster();
     CatalogService catalog = cluster.getMaster().getCatalog();
-    assertTrue(catalog.existsTable(tableName));
+    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
 
     res = tpch.execute("insert overwrite into " + tableName + " select  l_orderkey, l_partkey, l_quantity from lineitem where l_orderkey = 3");
     res.close();
-    TableDesc desc = catalog.getTableDesc(tableName);
+    TableDesc desc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, tableName);
     assertEquals(2, desc.getStats().getNumRows().intValue());
 
     FileSystem fs = FileSystem.get(tpch.getTestingCluster().getConfiguration());

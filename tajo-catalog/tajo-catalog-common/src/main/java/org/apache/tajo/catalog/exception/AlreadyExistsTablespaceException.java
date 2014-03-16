@@ -18,19 +18,13 @@
 
 package org.apache.tajo.catalog.exception;
 
-import org.apache.tajo.exception.InternalException;
 
-public class InvalidTableException extends InternalException {
+public class AlreadyExistsTablespaceException extends CatalogException {
 
-	private static final long serialVersionUID = -6326266814969872171L;
-
-	public InvalidTableException() {
+  public AlreadyExistsTablespaceException() {
 	}
 
-	/**
-	 * @param message
-	 */
-	public InvalidTableException(String message) {
-		super(message);
+	public AlreadyExistsTablespaceException(String dbName) {
+		super(String.format("Already exists tablespace \"%s\"", dbName));
 	}
 }

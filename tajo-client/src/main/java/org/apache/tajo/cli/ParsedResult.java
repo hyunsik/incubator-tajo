@@ -16,11 +16,32 @@
  * limitations under the License.
  */
 
-package org.apache.tajo.util;
+package org.apache.tajo.cli;
 
-import static org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.BoolProto;
 
-public class ProtoBufUtil {
-  public static final BoolProto TRUE = BoolProto.newBuilder().setValue(true).build();
-  public static final BoolProto FALSE = BoolProto.newBuilder().setValue(true).build();
+public class ParsedResult {
+  public static enum StatementType {
+    META,
+    STATEMENT
+  }
+
+  private final StatementType type;
+  private final String statement;
+
+  public ParsedResult(StatementType type, String statement) {
+    this.type = type;
+    this.statement = statement;
+  }
+
+  public StatementType getType() {
+    return type;
+  }
+
+  public String getStatement() {
+    return statement;
+  }
+
+  public String toString() {
+    return "(" + type.name() + ") " + statement;
+  }
 }

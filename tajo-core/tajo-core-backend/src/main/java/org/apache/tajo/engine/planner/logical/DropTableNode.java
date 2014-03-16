@@ -22,19 +22,25 @@ import org.apache.tajo.engine.planner.PlanString;
 
 public class DropTableNode extends LogicalNode {
   private String tableName;
+  private boolean ifExists;
   private boolean purge;
 
   public DropTableNode(int pid) {
     super(pid, NodeType.DROP_TABLE);
   }
 
-  public void init(String tableName, boolean purge) {
+  public void init(String tableName, boolean ifExists, boolean purge) {
     this.tableName = tableName;
+    this.ifExists = ifExists;
     this.purge = purge;
   }
 
   public String getTableName() {
     return this.tableName;
+  }
+
+  public boolean isIfExists() {
+    return this.ifExists;
   }
 
   public boolean isPurge() {
@@ -43,13 +49,16 @@ public class DropTableNode extends LogicalNode {
 
   @Override
   public PlanString getPlanString() {
-    return new PlanString(this).appendTitle(purge ? " (PURGE)" : "");
+    return new PlanString(this).appendTitle(ifExists ? " IF EXISTS" : "").appendTitle(purge ? " PURGE" : "");
   }
 
   public boolean equals(Object obj) {
     if (obj instanceof DropTableNode) {
       DropTableNode other = (DropTableNode) obj;
-      return super.equals(other) && this.tableName.equals(other.tableName) && this.purge == other.purge;
+      return super.equals(other) &&
+          this.tableName.equals(other.tableName) &&
+          this.ifExists == other.ifExists &&
+          this.purge == other.purge;
     } else {
       return false;
     }
@@ -59,13 +68,14 @@ public class DropTableNode extends LogicalNode {
   public Object clone() throws CloneNotSupportedException {
     DropTableNode dropTableNode = (DropTableNode) super.clone();
     dropTableNode.tableName = tableName;
+    dropTableNode.ifExists = ifExists;
     dropTableNode.purge = purge;
     return dropTableNode;
   }
 
   @Override
   public String toString() {
-    return "DROP TABLE " + tableName + (purge ? " PURGE" : "");
+    return "DROP TABLE " + (ifExists ? "IF EXISTS " : "") + tableName + (purge ? " PURGE" : "");
   }
 
   @Override

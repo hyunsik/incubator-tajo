@@ -23,6 +23,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.tajo.IntegrationTest;
 import org.apache.tajo.QueryTestCaseBase;
+import org.apache.tajo.TajoConstants;
 import org.apache.tajo.TajoTestingCluster;
 import org.apache.tajo.catalog.CatalogService;
 import org.apache.tajo.catalog.TableDesc;
@@ -34,6 +35,8 @@ import org.junit.experimental.categories.Category;
 import java.sql.ResultSet;
 import java.util.Map;
 
+import static org.apache.tajo.TajoConstants.DEFAULT_DATABASE_NAME;
+import static org.apache.tajo.catalog.CatalogUtil.buildFQName;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -44,16 +47,21 @@ import static org.junit.Assert.assertTrue;
 @Category(IntegrationTest.class)
 public class TestCTASQuery extends QueryTestCaseBase {
 
+  public TestCTASQuery() {
+    super(TajoConstants.DEFAULT_DATABASE_NAME);
+  }
+
   @Test
   public final void testCtasWithoutTableDefinition() throws Exception {
     ResultSet res = executeQuery();
-
     res.close();
-    CatalogService catalog = testBase.getTestingCluster().getMaster().getCatalog();
-    TableDesc desc = catalog.getTableDesc("testCtasWithoutTableDefinition");
-    assertTrue(catalog.existsTable("testCtasWithoutTableDefinition"));
 
-    assertTrue(desc.getSchema().contains("testCtasWithoutTableDefinition.col1"));
+    CatalogService catalog = testBase.getTestingCluster().getMaster().getCatalog();
+    String tableName = buildFQName(DEFAULT_DATABASE_NAME, "testCtasWithoutTableDefinition");
+    TableDesc desc = catalog.getTableDesc(tableName);
+    assertTrue(catalog.existsTable(tableName));
+
+    assertTrue(desc.getSchema().contains("default.testCtasWithoutTableDefinition.col1"));
     PartitionMethodDesc partitionDesc = desc.getPartitionMethod();
     assertEquals(partitionDesc.getPartitionType(), CatalogProtos.PartitionType.COLUMN);
     assertEquals("key", partitionDesc.getExpressionSchema().getColumns().get(0).getSimpleName());
@@ -91,8 +99,8 @@ public class TestCTASQuery extends QueryTestCaseBase {
 
     TajoTestingCluster cluster = testBase.getTestingCluster();
     CatalogService catalog = cluster.getMaster().getCatalog();
-    TableDesc desc = catalog.getTableDesc("testCtasWithColumnedPartition");
-    assertTrue(catalog.existsTable("testCtasWithColumnedPartition"));
+    TableDesc desc = catalog.getTableDesc(DEFAULT_DATABASE_NAME, "testCtasWithColumnedPartition");
+    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, "testCtasWithColumnedPartition"));
     PartitionMethodDesc partitionDesc = desc.getPartitionMethod();
     assertEquals(partitionDesc.getPartitionType(), CatalogProtos.PartitionType.COLUMN);
     assertEquals("key", partitionDesc.getExpressionSchema().getColumns().get(0).getSimpleName());

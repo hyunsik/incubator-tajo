@@ -20,6 +20,7 @@ package org.apache.tajo.engine.query;
 
 import org.apache.tajo.IntegrationTest;
 import org.apache.tajo.QueryTestCaseBase;
+import org.apache.tajo.TajoConstants;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
@@ -27,6 +28,10 @@ import java.sql.ResultSet;
 
 @Category(IntegrationTest.class)
 public class TestSortQuery extends QueryTestCaseBase {
+
+  public TestSortQuery() {
+    super(TajoConstants.DEFAULT_DATABASE_NAME);
+  }
 
   @Test
   public final void testSort() throws Exception {
