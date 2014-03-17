@@ -64,7 +64,8 @@ public class TestTajoJdbc extends QueryTestCaseBase {
 
   @Test
   public void testStatement() throws Exception {
-    String connUri = buildConnectionUri(tajoMasterAddress.getHostName(), tajoMasterAddress.getPort(), DEFAULT_DATABASE_NAME);
+    String connUri = buildConnectionUri(tajoMasterAddress.getHostName(), tajoMasterAddress.getPort(),
+        DEFAULT_DATABASE_NAME);
     Connection conn = DriverManager.getConnection(connUri);
 
     Statement stmt = null;
@@ -483,5 +484,8 @@ public class TestTajoJdbc extends QueryTestCaseBase {
     Connection jdbcTest2Conn = DriverManager.getConnection(jdbcTest2ConnUri);
     assertEquals("jdbc_test2", jdbcTest2Conn.getCatalog());
     jdbcTest2Conn.close();
+
+    executeString("DROP DATABASE jdbc_test1");
+    executeString("DROP DATABASE jdbc_test2");
   }
 }

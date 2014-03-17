@@ -36,16 +36,14 @@ import org.apache.tajo.ipc.ClientProtos;
 import org.apache.tajo.jdbc.TajoResultSet;
 import org.apache.tajo.util.FileUtil;
 
-import java.io.File;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.PrintWriter;
+import java.io.*;
 import java.lang.reflect.Constructor;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.util.*;
 
 import static org.apache.tajo.cli.ParsedResult.StatementType.META;
+import static org.apache.tajo.cli.ParsedResult.StatementType.STATEMENT;
 import static org.apache.tajo.cli.SimpleParser.ParsingState;
 
 public class TajoCli {
@@ -58,6 +56,7 @@ public class TajoCli {
   private final ConsoleReader reader;
   private final InputStream sin;
   private final PrintWriter sout;
+  private TajoFileHistory history;
 
   // Current States
   private String currentDatabase;
@@ -192,7 +191,8 @@ public class TajoCli {
     try {
       String historyPath = HOME_DIR + File.separator + HISTORY_FILE;
       if ((new File(HOME_DIR)).exists()) {
-        reader.setHistory(new FileHistory(new File(historyPath)));
+        history = new TajoFileHistory(new File(historyPath));
+        reader.setHistory(history);
       } else {
         System.err.println("ERROR: home directory : '" + HOME_DIR +"' does not exist.");
       }
@@ -219,6 +219,10 @@ public class TajoCli {
     Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
       @Override
       public void run() {
+        try {
+          history.flush();
+        } catch (IOException e) {
+        }
         client.close();
       }
     }));
@@ -248,7 +252,14 @@ public class TajoCli {
         continue;
       }
 
-      executeParsedResults(parser.parseLines(line));
+      List<ParsedResult> parsedResults = parser.parseLines(line);
+
+      if (parsedResults.size() > 0) {
+        for (ParsedResult parsed : parsedResults) {
+          history.addStatement(parsed.getStatement() + (parsed.getType() == STATEMENT ? ";":""));
+        }
+      }
+      executeParsedResults(parsedResults);
       currentPrompt = updatePrompt(parser.getState());
     }
     return code;

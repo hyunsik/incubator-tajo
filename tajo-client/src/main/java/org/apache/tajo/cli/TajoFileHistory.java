@@ -18,30 +18,22 @@
 
 package org.apache.tajo.cli;
 
+import jline.console.history.FileHistory;
 
-public class ParsedResult {
-  public static enum StatementType {
-    META,
-    STATEMENT
+import java.io.File;
+import java.io.IOException;
+
+public class TajoFileHistory extends FileHistory {
+
+  public TajoFileHistory(File file) throws IOException {
+    super(file);
   }
 
-  private final StatementType type;
-  private final String statement;
-
-  public ParsedResult(StatementType type, String statement) {
-    this.type = type;
-    this.statement = statement;
+  public void add(CharSequence item) {
+    // skip add
   }
 
-  public StatementType getType() {
-    return type;
-  }
-
-  public String getStatement() {
-    return statement.trim();
-  }
-
-  public String toString() {
-    return "(" + type.name() + ") " + statement;
+  public void addStatement(String item) {
+    internalAdd(item);
   }
 }

@@ -33,13 +33,18 @@ import org.apache.hcatalog.data.schema.HCatFieldSchema;
 import org.apache.hcatalog.data.schema.HCatSchema;
 import org.apache.tajo.catalog.*;
 import org.apache.tajo.catalog.Schema;
+import org.apache.tajo.catalog.exception.AlreadyExistsDatabaseException;
 import org.apache.tajo.catalog.exception.CatalogException;
+import org.apache.tajo.catalog.exception.NoSuchDatabaseException;
 import org.apache.tajo.catalog.partition.PartitionMethodDesc;
 import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.catalog.statistics.TableStats;
 import org.apache.tajo.common.TajoDataTypes;
 import org.apache.tajo.common.exception.NotImplementedException;
+import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.exception.InternalException;
+import org.apache.tajo.exception.UnimplementedException;
+import org.apache.thrift.TException;
 
 import java.io.IOException;
 import java.util.*;
@@ -52,6 +57,7 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
   protected Configuration conf;
   private static final int CLIENT_POOL_SIZE = 2;
   private final HCatalogStoreClientPool clientPool;
+  private final String defaultTableSpaceUri;
 
   public HCatalogStore(final Configuration conf)
       throws InternalException {
@@ -62,6 +68,7 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
       throws InternalException {
     this.conf = conf;
     this.clientPool = pool;
+    this.defaultTableSpaceUri = conf.get(TajoConf.ConfVars.WAREHOUSE_DIR.varname);
   }
 
   @Override
@@ -284,42 +291,82 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
 
   @Override
   public void createTablespace(String spaceName, String spaceUri) throws CatalogException {
-
+    throw new UnimplementedException("createTablespace() is not implemented yet");
   }
 
   @Override
   public boolean existTablespace(String spaceName) throws CatalogException {
-    return false;
+    throw new UnimplementedException("existTablespace() is not implemented yet");
   }
 
   @Override
   public void dropTablespace(String spaceName) throws CatalogException {
-
+    throw new UnimplementedException("dropTablespace() is not implemented yet");
   }
 
   @Override
   public Collection<String> getAllTablespaceNames() throws CatalogException {
-    return null;
+    throw new UnimplementedException("getAllTablespaceNames() is not implemented yet");
   }
 
   @Override
   public void createDatabase(String databaseName, String tablespaceName) throws CatalogException {
+    HCatalogStoreClientPool.HCatalogStoreClient client;
 
+    try {
+      Database database = new Database(
+          databaseName,
+          "",
+          defaultTableSpaceUri + "/" + databaseName,
+          new HashMap<String, String>());
+      client = clientPool.getClient();
+      client.getHiveClient().createDatabase(database);
+    } catch (AlreadyExistsException e) {
+      throw new AlreadyExistsDatabaseException(databaseName);
+    } catch (Throwable t) {
+      throw new CatalogException(t);
+    }
   }
 
   @Override
   public boolean existDatabase(String databaseName) throws CatalogException {
-    return false;
+    HCatalogStoreClientPool.HCatalogStoreClient client;
+
+    client = clientPool.getClient();
+    try {
+      Database database = client.getHiveClient().getDatabase(databaseName);
+      return database != null;
+    } catch (NoSuchDatabaseException e) {
+      throw new NoSuchDatabaseException(databaseName);
+    } catch (Throwable t) {
+      throw new CatalogException(t);
+    }
   }
 
   @Override
   public void dropDatabase(String databaseName) throws CatalogException {
+    HCatalogStoreClientPool.HCatalogStoreClient client;
 
+    try {
+      client = clientPool.getClient();
+      client.getHiveClient().dropDatabase(databaseName);
+    } catch (NoSuchObjectException e) {
+      throw new NoSuchDatabaseException(databaseName);
+    } catch (Throwable t) {
+      throw new CatalogException(databaseName);
+    }
   }
 
   @Override
   public Collection<String> getAllDatabaseNames() throws CatalogException {
-    return null;
+    HCatalogStoreClientPool.HCatalogStoreClient client;
+
+    try {
+      client = clientPool.getClient();
+      return client.getHiveClient().getAllDatabases();
+    } catch (MetaException e) {
+      throw new CatalogException(e);
+    }
   }
 
   @Override

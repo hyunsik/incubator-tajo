@@ -50,7 +50,7 @@ public class TestSimpleParser {
     assertEquals(ParsedResult.StatementType.META, res3.get(1).getType());
     assertEquals("\\c", res3.get(1).getStatement());
     assertEquals(ParsedResult.StatementType.META, res3.get(2).getType());
-    assertEquals("\\f  ", res3.get(2).getStatement());
+    assertEquals("\\f", res3.get(2).getStatement());
 
     List<ParsedResult> res4 = SimpleParser.parseScript("\\\td;");
     assertEquals(1, res4.size());
@@ -81,7 +81,7 @@ public class TestSimpleParser {
     assertEquals(ParsedResult.StatementType.STATEMENT, res4.get(0).getType());
     assertEquals("select * from \ntest1", res4.get(0).getStatement());
     assertEquals(ParsedResult.StatementType.STATEMENT, res4.get(1).getType());
-    assertEquals("select * from test2\n", res4.get(1).getStatement());
+    assertEquals("select * from test2", res4.get(1).getStatement());
 
     List<ParsedResult> res5 =
         SimpleParser.parseScript("\t\t\n\rselect * from \ntest1;\\d test;select * from test2;\n\nselect 1;");

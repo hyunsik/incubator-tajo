@@ -167,6 +167,11 @@ public class SimpleParser {
           appender.append(str.subSequence(lineStartIdx, endIdx).toString());
         } else {
           appender.append(str.subSequence(lineStartIdx, idx).toString());
+
+          // if it is not within quote and there is no space between lines, add a space.
+          if (state == ParsingState.STATEMENT && (appender.charAt(appender.length() - 1) != ' ')) {
+            appender.append(" ");
+          }
         }
       }
 
