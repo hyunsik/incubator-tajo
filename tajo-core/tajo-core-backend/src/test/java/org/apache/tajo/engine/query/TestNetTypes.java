@@ -20,13 +20,14 @@ package org.apache.tajo.engine.query;
 
 import org.apache.tajo.QueryTestCaseBase;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.sql.ResultSet;
 
 public class TestNetTypes extends QueryTestCaseBase {
 
-  @Before
+  @Override
   public final void setup() throws Exception {
     executeDDL("table1_ddl.sql", "table1.tbl");
     executeDDL("table2_ddl.sql", "table2.tbl");

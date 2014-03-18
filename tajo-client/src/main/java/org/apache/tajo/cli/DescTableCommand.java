@@ -21,17 +21,15 @@ package org.apache.tajo.cli;
 import org.apache.tajo.catalog.Column;
 import org.apache.tajo.catalog.TableDesc;
 import org.apache.tajo.catalog.partition.PartitionMethodDesc;
-import org.apache.tajo.client.TajoClient;
 import org.apache.tajo.util.FileUtil;
 import org.apache.tajo.util.TUtil;
 
-import java.io.PrintWriter;
 import java.util.List;
 import java.util.Map;
 
 public class DescTableCommand extends TajoShellCommand {
-  public DescTableCommand(TajoClient client, PrintWriter sout) {
-    super(client, sout);
+  public DescTableCommand(TajoCli.TajoCliContext context) {
+    super(context);
   }
 
   @Override
@@ -49,7 +47,7 @@ public class DescTableCommand extends TajoShellCommand {
         sout.println(toFormattedString(desc));
       }
     } else if (cmd.length == 1) {
-      List<String> tableList = client.getTableList();
+      List<String> tableList = client.getTableList(null);
       if (tableList.size() == 0) {
         sout.println("No Relation Found");
       }

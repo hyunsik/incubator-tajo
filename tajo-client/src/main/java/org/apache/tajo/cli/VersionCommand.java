@@ -25,8 +25,8 @@ import java.io.PrintWriter;
 
 public class VersionCommand extends TajoShellCommand {
 
-  public VersionCommand(TajoClient client, PrintWriter sout) {
-    super(client, sout);
+  public VersionCommand(TajoCli.TajoCliContext context) {
+    super(context);
   }
 
   @Override
