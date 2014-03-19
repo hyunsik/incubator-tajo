@@ -168,7 +168,7 @@ public class TajoMaster extends CompositeService {
 
       catalogServer = new CatalogServer(initBuiltinFunctions());
       addIfService(catalogServer);
-      catalog = new LocalCatalogWrapper(catalogServer);
+      catalog = new LocalCatalogWrapper(catalogServer, systemConf);
 
       sessionManager = new SessionManager(dispatcher);
       addIfService(sessionManager);
