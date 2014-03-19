@@ -300,7 +300,7 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
 
   @Override
   public void createDatabase(String databaseName, String tablespaceName) throws CatalogException {
-    HCatalogStoreClientPool.HCatalogStoreClient client;
+    HCatalogStoreClientPool.HCatalogStoreClient client = null;
 
     try {
       Database database = new Database(
@@ -314,12 +314,16 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
       throw new AlreadyExistsDatabaseException(databaseName);
     } catch (Throwable t) {
       throw new CatalogException(t);
+    } finally {
+      if (client != null) {
+        client.release();
+      }
     }
   }
 
   @Override
   public boolean existDatabase(String databaseName) throws CatalogException {
-    HCatalogStoreClientPool.HCatalogStoreClient client;
+    HCatalogStoreClientPool.HCatalogStoreClient client = null;
 
     try {
       client = clientPool.getClient();
@@ -327,12 +331,16 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
       return databaseNames.contains(databaseName);
     } catch (Throwable t) {
       throw new CatalogException(t);
+    } finally {
+      if (client != null) {
+        client.release();
+      }
     }
   }
 
   @Override
   public void dropDatabase(String databaseName) throws CatalogException {
-    HCatalogStoreClientPool.HCatalogStoreClient client;
+    HCatalogStoreClientPool.HCatalogStoreClient client = null;
 
     try {
       client = clientPool.getClient();
@@ -341,18 +349,26 @@ public class HCatalogStore extends CatalogConstants implements CatalogStore {
       throw new NoSuchDatabaseException(databaseName);
     } catch (Throwable t) {
       throw new CatalogException(databaseName);
+    } finally {
+      if (client != null) {
+        client.release();
+      }
     }
   }
 
   @Override
   public Collection<String> getAllDatabaseNames() throws CatalogException {
-    HCatalogStoreClientPool.HCatalogStoreClient client;
+    HCatalogStoreClientPool.HCatalogStoreClient client = null;
 
     try {
       client = clientPool.getClient();
       return client.getHiveClient().getAllDatabases();
     } catch (MetaException e) {
       throw new CatalogException(e);
+    } finally {
+      if (client != null) {
+        client.release();
+      }
     }
   }
 
