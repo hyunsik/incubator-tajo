@@ -352,10 +352,10 @@ public class TajoTestingCluster {
         throw new IOException(cnfe);
       }
     } else { // for derby
-      c.setVar(ConfVars.CATALOG_ADDRESS, "localhost:0");
       c.set(CatalogConstants.STORE_CLASS, "org.apache.tajo.catalog.store.MemStore");
       c.set(CatalogConstants.CATALOG_URI, "jdbc:derby:" + testBuildDir.getAbsolutePath() + "/db");
     }
+    c.setVar(ConfVars.CATALOG_ADDRESS, "localhost:0");
   }
 
   private void startTajoWorkers(int numSlaves) throws Exception {
