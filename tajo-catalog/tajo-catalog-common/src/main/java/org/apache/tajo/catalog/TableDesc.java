@@ -38,25 +38,30 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
   private final Log LOG = LogFactory.getLog(TableDesc.class);
 
   protected TableDescProto.Builder builder = null;
-  
 	@Expose protected String tableName;                        // required
   @Expose protected Schema schema;
   @Expose protected TableMeta meta;                          // required
-  @Expose protected Path uri;                                // required
+  @Expose protected Path uri;                                // optional
   @Expose	protected TableStats stats;                        // optional
   @Expose protected PartitionMethodDesc partitionMethodDesc; // optional
+  @Expose protected Boolean external;                        // optional
 
 	public TableDesc() {
 		builder = TableDescProto.newBuilder();
 	}
-	
-	public TableDesc(String tableName, Schema schema, TableMeta info, Path path) {
-		this();
-		// tajo deems all identifiers as lowcase characters
-	  this.tableName = tableName.toLowerCase();
+
+  public TableDesc(String tableName, Schema schema, TableMeta meta,
+                   Path path, boolean external) {
+    this();
+    this.tableName = tableName.toLowerCase();
     this.schema = schema;
-	  this.meta = info;
-	  this.uri = path;
+    this.meta = meta;
+    this.uri = path;
+    this.external = external;
+  }
+
+	public TableDesc(String tableName, Schema schema, TableMeta meta, Path path) {
+		this(CatalogUtil.normalizeIdentifier(tableName), schema, meta, path, true);
 	}
 	
 	public TableDesc(String tableName, Schema schema, StoreType type, Options options, Path path) {
@@ -64,7 +69,8 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
 	}
 	
 	public TableDesc(TableDescProto proto) {
-	  this(proto.getId(), new Schema(proto.getSchema()), new TableMeta(proto.getMeta()), new Path(proto.getPath()));
+	  this(proto.getTableName(), new Schema(proto.getSchema()),
+        new TableMeta(proto.getMeta()), new Path(proto.getPath()), proto.getIsExternal());
     if(proto.hasStats()) {
       this.stats = new TableStats(proto.getStats());
     }
@@ -141,6 +147,14 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
     this.partitionMethodDesc = partitionMethodDesc;
   }
 
+  public void setExternal(boolean external) {
+    this.external = external;
+  }
+
+  public boolean isExternal() {
+    return external;
+  }
+
   public int hashCode() {
     return Objects.hashCode(tableName, schema, meta, uri, stats, partitionMethodDesc);
   }
@@ -154,6 +168,7 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
       eq = eq && meta.equals(other.meta);
       eq = eq && uri.equals(other.uri);
       eq = eq && TUtil.checkEquals(partitionMethodDesc, other.partitionMethodDesc);
+      eq = eq && TUtil.checkEquals(external, other.external);
       return eq && TUtil.checkEquals(stats, other.stats);
     }
     
@@ -169,6 +184,7 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
     desc.uri = uri;
     desc.stats = stats != null ? (TableStats) stats.clone() : null;
     desc.partitionMethodDesc = partitionMethodDesc != null ? (PartitionMethodDesc) partitionMethodDesc.clone() : null;
+    desc.external = external != null ? external : null;
 	  return desc;
 	}
 
@@ -186,8 +202,9 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
     if (builder == null) {
       builder = TableDescProto.newBuilder();
     }
+
     if (this.tableName != null) {
-      builder.setId(this.tableName);
+      builder.setTableName(this.tableName);
     }
     if (this.schema != null) {
       builder.setSchema(schema.getProto());
@@ -203,6 +220,9 @@ public class TableDesc implements ProtoObject<TableDescProto>, GsonObject, Clone
     }
     if (this.partitionMethodDesc != null) {
       builder.setPartition(this.partitionMethodDesc.getProto());
+    }
+    if (this.external != null) {
+      builder.setIsExternal(external);
     }
 
     return builder.build();

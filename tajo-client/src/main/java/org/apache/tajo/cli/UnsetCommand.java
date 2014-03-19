@@ -16,11 +16,37 @@
  * limitations under the License.
  */
 
-package org.apache.tajo.util;
+package org.apache.tajo.cli;
 
-import static org.apache.tajo.rpc.protocolrecords.PrimitiveProtos.BoolProto;
+import com.google.common.collect.Lists;
 
-public class ProtoBufUtil {
-  public static final BoolProto TRUE = BoolProto.newBuilder().setValue(true).build();
-  public static final BoolProto FALSE = BoolProto.newBuilder().setValue(true).build();
+public class UnsetCommand extends TajoShellCommand {
+
+  public UnsetCommand(TajoCli.TajoCliContext context) {
+    super(context);
+  }
+
+  @Override
+  public String getCommand() {
+    return "\\unset";
+  }
+
+  @Override
+  public void invoke(String[] cmd) throws Exception {
+    if (cmd.length == 2) {
+      client.unsetSessionVariables(Lists.newArrayList(cmd[1]));
+    } else {
+      sout.println("usage: \\unset NAME");
+    }
+  }
+
+  @Override
+  public String getUsage() {
+    return "";
+  }
+
+  @Override
+  public String getDescription() {
+    return "unset a session variable";
+  }
 }

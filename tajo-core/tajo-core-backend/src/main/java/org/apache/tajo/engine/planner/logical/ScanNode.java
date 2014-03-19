@@ -55,10 +55,18 @@ public class ScanNode extends RelationNode implements Projectable {
 	public void init(TableDesc desc, String alias) {
     this.tableDesc = desc;
     this.alias = CatalogUtil.normalizeIdentifier(alias);
+
+    if (!CatalogUtil.isFQTableName(this.tableDesc.getName())) {
+      throw new IllegalArgumentException("the name in TableDesc must be qualified, but it is \"" +
+          desc.getName() + "\"");
+    }
+
+    String databaseName = CatalogUtil.extractQualifier(this.tableDesc.getName());
+    String qualifiedAlias = CatalogUtil.buildFQName(databaseName, alias);
     this.setInSchema(tableDesc.getSchema());
-    this.getInSchema().setQualifier(alias);
+    this.getInSchema().setQualifier(qualifiedAlias);
     this.setOutSchema(new Schema(getInSchema()));
-    logicalSchema = SchemaUtil.getQualifiedLogicalSchema(tableDesc, alias);
+    logicalSchema = SchemaUtil.getQualifiedLogicalSchema(tableDesc, qualifiedAlias);
 	}
 	
 	public String getTableName() {
@@ -70,7 +78,12 @@ public class ScanNode extends RelationNode implements Projectable {
 	}
 
   public String getCanonicalName() {
-    return hasAlias() ? alias : tableDesc.getName();
+    if (CatalogUtil.isFQTableName(this.tableDesc.getName())) {
+      String databaseName = CatalogUtil.extractQualifier(this.tableDesc.getName());
+      return hasAlias() ? CatalogUtil.buildFQName(databaseName, alias) : tableDesc.getName();
+    } else {
+      return hasAlias() ? alias : tableDesc.getName();
+    }
   }
 
   public Schema getTableSchema() {

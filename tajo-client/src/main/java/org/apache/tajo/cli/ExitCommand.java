@@ -18,14 +18,10 @@
 
 package org.apache.tajo.cli;
 
-import org.apache.tajo.client.TajoClient;
-
-import java.io.PrintWriter;
-
 public class ExitCommand extends TajoShellCommand {
 
-  public ExitCommand(TajoClient client, PrintWriter sout) {
-    super(client, sout);
+  public ExitCommand(TajoCli.TajoCliContext context) {
+    super(context);
   }
 
   @Override
