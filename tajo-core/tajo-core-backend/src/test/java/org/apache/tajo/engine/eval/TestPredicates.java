@@ -86,9 +86,9 @@ public class TestPredicates extends ExprTestBase {
     testSimpleEval("select (not (1 > null)) is null;", new String[] {"t"});
 
     Schema schema1 = new Schema();
-    schema1.addColumn("col1", INT4);
-    schema1.addColumn("col2", INT4);
-    schema1.addColumn("col3", INT4);
+    schema1.addColumn("COL1", INT4);
+    schema1.addColumn("COL2", INT4);
+    schema1.addColumn("COL3", INT4);
 
     testEval(schema1,
         "table1", "123,123,456,-123",
@@ -110,10 +110,10 @@ public class TestPredicates extends ExprTestBase {
   @Test
   public void testComparisonEqual() throws IOException {
     Schema schema1 = new Schema();
-    schema1.addColumn("col1", INT4);
-    schema1.addColumn("col2", INT4);
-    schema1.addColumn("col3", INT4);
-    schema1.addColumn("col4", INT4);
+    schema1.addColumn("COL1", INT4);
+    schema1.addColumn("COL2", INT4);
+    schema1.addColumn("COL3", INT4);
+    schema1.addColumn("COL4", INT4);
     testEval(schema1,
         "table1", "123,123,456,-123",
         "select col1 = col2, col1 = col3, col1 = col4 from table1",
@@ -127,10 +127,10 @@ public class TestPredicates extends ExprTestBase {
   @Test
   public void testComparisonNotEqual() throws IOException {
     Schema schema1 = new Schema();
-    schema1.addColumn("col1", INT4);
-    schema1.addColumn("col2", INT4);
-    schema1.addColumn("col3", INT4);
-    schema1.addColumn("col4", INT4);
+    schema1.addColumn("COL1", INT4);
+    schema1.addColumn("COL2", INT4);
+    schema1.addColumn("COL3", INT4);
+    schema1.addColumn("COL4", INT4);
     testEval(schema1,
         "table1", "123,123,456,-123",
         "select col1 <> col2, col1 <> col3, col1 <> col4 from table1",
@@ -144,10 +144,10 @@ public class TestPredicates extends ExprTestBase {
   @Test
   public void testComparisonLessThan() throws IOException {
     Schema schema1 = new Schema();
-    schema1.addColumn("col1", INT4);
-    schema1.addColumn("col2", INT4);
-    schema1.addColumn("col3", INT4);
-    schema1.addColumn("col4", INT4);
+    schema1.addColumn("COL1", INT4);
+    schema1.addColumn("COL2", INT4);
+    schema1.addColumn("COL3", INT4);
+    schema1.addColumn("COL4", INT4);
     testEval(schema1,
         "table1", "123,123,456,-123",
         "select col1 < col2, col1 < col3, col1 < col4 from table1",
@@ -161,10 +161,10 @@ public class TestPredicates extends ExprTestBase {
   @Test
   public void testComparisonLessThanEqual() throws IOException {
     Schema schema1 = new Schema();
-    schema1.addColumn("col1", INT4);
-    schema1.addColumn("col2", INT4);
-    schema1.addColumn("col3", INT4);
-    schema1.addColumn("col4", INT4);
+    schema1.addColumn("COL1", INT4);
+    schema1.addColumn("COL2", INT4);
+    schema1.addColumn("COL3", INT4);
+    schema1.addColumn("COL4", INT4);
     testEval(schema1,
         "table1", "123,123,456,-123",
         "select col1 <= col2, col1 <= col3, col1 <= col4 from table1",
@@ -178,10 +178,10 @@ public class TestPredicates extends ExprTestBase {
   @Test
   public void testComparisonGreaterThan() throws IOException {
     Schema schema1 = new Schema();
-    schema1.addColumn("col1", INT4);
-    schema1.addColumn("col2", INT4);
-    schema1.addColumn("col3", INT4);
-    schema1.addColumn("col4", INT4);
+    schema1.addColumn("COL1", INT4);
+    schema1.addColumn("COL2", INT4);
+    schema1.addColumn("COL3", INT4);
+    schema1.addColumn("COL4", INT4);
     testEval(schema1,
         "table1", "123,123,456,-123",
         "select col1 > col2, col3 > col2, col1 > col4 from table1",
@@ -195,10 +195,10 @@ public class TestPredicates extends ExprTestBase {
   @Test
   public void testComparisonGreaterThanEqual() throws IOException {
     Schema schema1 = new Schema();
-    schema1.addColumn("col1", INT4);
-    schema1.addColumn("col2", INT4);
-    schema1.addColumn("col3", INT4);
-    schema1.addColumn("col4", INT4);
+    schema1.addColumn("COL1", INT4);
+    schema1.addColumn("COL2", INT4);
+    schema1.addColumn("COL3", INT4);
+    schema1.addColumn("COL4", INT4);
     testEval(schema1,
         "table1", "123,123,456,-123",
         "select col1 >= col2, col3 >= col2, col1 >= col4 from table1",
@@ -216,9 +216,9 @@ public class TestPredicates extends ExprTestBase {
   @Test
   public void testBetween() throws IOException {
     Schema schema2 = new Schema();
-    schema2.addColumn("col1", TEXT);
-    schema2.addColumn("col2", TEXT);
-    schema2.addColumn("col3", TEXT);
+    schema2.addColumn("COL1", TEXT);
+    schema2.addColumn("COL2", TEXT);
+    schema2.addColumn("COL3", TEXT);
 
     // constant checker
     testEval(schema2, "table1", "b,a,c", "select col1 between 'a' and 'c' from table1", new String[]{"t"});
@@ -240,10 +240,10 @@ public class TestPredicates extends ExprTestBase {
   @Test
   public void testBetween2() throws IOException { // for TAJO-249
     Schema schema3 = new Schema();
-    schema3.addColumn("date_a", INT4);
-    schema3.addColumn("date_b", INT4);
-    schema3.addColumn("date_c", INT4);
-    schema3.addColumn("date_d", INT4);
+    schema3.addColumn("DATE_A", INT4);
+    schema3.addColumn("DATE_B", INT4);
+    schema3.addColumn("DATE_C", INT4);
+    schema3.addColumn("DATE_D", INT4);
 
     String query = "select " +
         "case " +
@@ -279,9 +279,9 @@ public class TestPredicates extends ExprTestBase {
   @Test
   public void testInPredicate() throws IOException {
     Schema schema2 = new Schema();
-    schema2.addColumn("col1", TEXT);
-    schema2.addColumn("col2", TEXT);
-    schema2.addColumn("col3", TEXT);
+    schema2.addColumn("COL1", TEXT);
+    schema2.addColumn("COL2", TEXT);
+    schema2.addColumn("COL3", TEXT);
 
     testEval(schema2, "table1", "a,b,c", "select col1 in ('a'), col2 in ('a', 'c') from table1", new String[]{"t","f"});
     testEval(schema2, "table1", "a,,c", "select col1 in ('a','b','c'), (col2 in ('a', 'c')) is null from table1",
@@ -295,8 +295,8 @@ public class TestPredicates extends ExprTestBase {
   @Test
   public void testIsNullPredicate() throws IOException {
     Schema schema1 = new Schema();
-    schema1.addColumn("col1", INT4);
-    schema1.addColumn("col2", INT4);
+    schema1.addColumn("COL1", INT4);
+    schema1.addColumn("COL2", INT4);
     testEval(schema1, "table1", "123,", "select col1 is null, col2 is null as a from table1",
         new String[]{"f", "t"});
     testEval(schema1, "table1", "123,", "select col1 is not null, col2 is not null as a from table1",
@@ -306,8 +306,8 @@ public class TestPredicates extends ExprTestBase {
   @Test
   public void testIsNullPredicateWithFunction() throws IOException {
     Schema schema2 = new Schema();
-    schema2.addColumn("col1", TEXT);
-    schema2.addColumn("col2", TEXT);
+    schema2.addColumn("COL1", TEXT);
+    schema2.addColumn("COL2", TEXT);
     testEval(schema2, "table1", "_123,", "select ltrim(col1, '_') is null, upper(col2) is null as a from table1",
         new String[]{"f", "t"});
 
@@ -345,8 +345,8 @@ public class TestPredicates extends ExprTestBase {
   @Test
   public void testBooleanTestOnTable() throws IOException {
     Schema schema = new Schema();
-    schema.addColumn("col1", BOOLEAN);
-    schema.addColumn("col2", BOOLEAN);
+    schema.addColumn("COL1", BOOLEAN);
+    schema.addColumn("COL2", BOOLEAN);
     testEval(schema, "table1", "t,f", "select col1 is true, col2 is false from table1", new String [] {"t", "t"});
     testEval(schema, "table1", "t,f", "select col1 is not true, col2 is not false from table1",
         new String [] {"f", "f"});

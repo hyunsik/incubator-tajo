@@ -224,7 +224,7 @@ public class TestSQLAnalyzer {
   @Test
   public void testCreateTable3() throws IOException {
     String sql = FileUtil.readTextFile(new File("src/test/resources/queries/default/create_table_3.sql"));
-    parseQuery(sql);
+    System.out.println(parseQuery(sql));
   }
 
   @Test
@@ -278,7 +278,7 @@ public class TestSQLAnalyzer {
     assertTrue(createTable.hasPartition());
     assertEquals(CreateTable.PartitionType.HASH, createTable.getPartitionMethod().getPartitionType());
     CreateTable.HashPartition hashPartition = createTable.getPartitionMethod();
-    assertEquals("col1", hashPartition.getColumns()[0].getCanonicalName());
+    assertEquals("COL1", hashPartition.getColumns()[0].getCanonicalName());
     assertTrue(hashPartition.hasQuantifier());
   }
 
@@ -291,7 +291,7 @@ public class TestSQLAnalyzer {
     assertTrue(createTable.hasPartition());
     assertEquals(CreateTable.PartitionType.HASH, createTable.getPartitionMethod().getPartitionType());
     CreateTable.HashPartition hashPartition = createTable.getPartitionMethod();
-    assertEquals("col1", hashPartition.getColumns()[0].getCanonicalName());
+    assertEquals("COL1", hashPartition.getColumns()[0].getCanonicalName());
     assertTrue(hashPartition.hasSpecifiers());
     assertEquals(3, hashPartition.getSpecifiers().size());
   }
@@ -305,7 +305,7 @@ public class TestSQLAnalyzer {
     assertTrue(createTable.hasPartition());
     assertEquals(CreateTable.PartitionType.RANGE, createTable.getPartitionMethod().getPartitionType());
     CreateTable.RangePartition rangePartition = createTable.getPartitionMethod();
-    assertEquals("col1", rangePartition.getColumns()[0].getCanonicalName());
+    assertEquals("COL1", rangePartition.getColumns()[0].getCanonicalName());
     assertEquals(3, rangePartition.getSpecifiers().size());
   }
 
@@ -318,7 +318,7 @@ public class TestSQLAnalyzer {
     assertTrue(createTable.hasPartition());
     assertEquals(CreateTable.PartitionType.LIST, createTable.getPartitionMethod().getPartitionType());
     CreateTable.ListPartition listPartition = createTable.getPartitionMethod();
-    assertEquals("col1", listPartition.getColumns()[0].getCanonicalName());
+    assertEquals("COL1", listPartition.getColumns()[0].getCanonicalName());
     assertEquals(2, listPartition.getSpecifiers().size());
     Iterator<CreateTable.ListPartitionSpecifier> iterator = listPartition.getSpecifiers().iterator();
     CreateTable.ListPartitionSpecifier specifier = iterator.next();
@@ -344,9 +344,9 @@ public class TestSQLAnalyzer {
     assertEquals(CreateTable.PartitionType.COLUMN, createTable.getPartitionMethod().getPartitionType());
     CreateTable.ColumnPartition columnPartition = createTable.getPartitionMethod();
     assertEquals(3, columnPartition.getColumns().length);
-    assertEquals("col3", columnPartition.getColumns()[0].getColumnName());
-    assertEquals("col4", columnPartition.getColumns()[1].getColumnName());
-    assertEquals("col5", columnPartition.getColumns()[2].getColumnName());
+    assertEquals("COL3", columnPartition.getColumns()[0].getColumnName());
+    assertEquals("COL4", columnPartition.getColumns()[1].getColumnName());
+    assertEquals("COL5", columnPartition.getColumns()[2].getColumnName());
   }
 
   @Test

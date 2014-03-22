@@ -64,7 +64,8 @@ public abstract class ColPartitionStoreExec extends UnaryPhysicalExec {
     keyNames = new String[keyNum];
     for (int i = 0; i < keyNum; i++) {
       Column column = this.plan.getPartitionMethod().getExpressionSchema().getColumn(i);
-      keyNames[i] = column.getSimpleName();
+      // Must be changed to lower case letters for the compatibility with Apache Hive
+      keyNames[i] = column.getSimpleName().toLowerCase();
 
       if (this.plan.getType() == NodeType.INSERT) {
         InsertNode insertNode = ((InsertNode)plan);

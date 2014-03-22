@@ -1,1 +1,1 @@
-select l_orderkey + l_partkey as plus from lineitem;
+select l_orderkey + l_partkey as "plus" from lineitem;

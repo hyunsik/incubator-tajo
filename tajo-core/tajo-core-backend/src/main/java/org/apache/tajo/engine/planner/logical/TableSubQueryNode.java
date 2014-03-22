@@ -37,7 +37,7 @@ public class TableSubQueryNode extends RelationNode implements Projectable {
   }
 
   public void init(String tableName, LogicalNode subQuery) {
-    this.tableName = CatalogUtil.normalizeIdentifier(tableName);
+    this.tableName = tableName;
     if (subQuery != null) {
       this.subQuery = subQuery;
       setOutSchema(SchemaUtil.clone(this.subQuery.getOutSchema()));

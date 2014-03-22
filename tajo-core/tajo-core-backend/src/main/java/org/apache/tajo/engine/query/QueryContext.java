@@ -102,7 +102,7 @@ public class QueryContext extends Options {
    * @param tableName The target table name
    */
   public void setOutputTable(String tableName) {
-    put(OUTPUT_TABLE_NAME, CatalogUtil.normalizeIdentifier(tableName));
+    put(OUTPUT_TABLE_NAME, tableName);
   }
 
   public String getOutputTable() {

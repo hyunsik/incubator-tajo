@@ -1,4 +1,4 @@
-l_orderkey,l_linenumber
+L_ORDERKEY,L_LINENUMBER
 -------------------------------
 1,1
 1,2
