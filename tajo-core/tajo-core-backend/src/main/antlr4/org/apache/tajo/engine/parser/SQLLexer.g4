@@ -406,7 +406,7 @@ LineComment
 */
 
 Regular_Identifier
-  : ('a'..'z'|'A'..'Z'|'_') ('a'..'z'|'A'..'Z'|Digit|'_')* { setText(getText().toUpperCase()); }
+  : ('a'..'z'|'A'..'Z'|'_') ('a'..'z'|'A'..'Z'|Digit|'_')* { setText(getText().toLowerCase()); }
   ;
 
 Quoted_Identifier

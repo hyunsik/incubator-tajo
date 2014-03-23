@@ -6,6 +6,6 @@ select
     when r_regionkey = 3 then 'three'
     when r_regionkey = 4 then 'four'
     else 'zero'
-  end as "cond"
+  end as cond
 from
   region;

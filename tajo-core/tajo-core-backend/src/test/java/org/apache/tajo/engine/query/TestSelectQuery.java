@@ -233,8 +233,8 @@ public class TestSelectQuery extends QueryTestCaseBase {
     res.close();
     TajoTestingCluster cluster = testBase.getTestingCluster();
     CatalogService catalog = cluster.getMaster().getCatalog();
-    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, "ORDERKEYS"));
-    TableDesc orderKeys = catalog.getTableDesc(DEFAULT_DATABASE_NAME, "ORDERKEYS");
+    assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, "orderkeys"));
+    TableDesc orderKeys = catalog.getTableDesc(DEFAULT_DATABASE_NAME, "orderkeys");
     if (!cluster.isHCatalogStoreRunning()) {
       assertEquals(5, orderKeys.getStats().getNumRows().intValue());
     }

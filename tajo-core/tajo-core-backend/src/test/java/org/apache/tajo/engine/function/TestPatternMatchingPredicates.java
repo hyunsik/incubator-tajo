@@ -31,7 +31,7 @@ public class TestPatternMatchingPredicates extends ExprTestBase {
   @Test
   public void testLike() throws IOException {
     Schema schema = new Schema();
-    schema.addColumn("COL1", TEXT);
+    schema.addColumn("col1", TEXT);
 
     // test for null values
     testEval(schema, "table1", ",", "select col1 like 'a%' from table1", new String[]{""});

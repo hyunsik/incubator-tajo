@@ -47,7 +47,7 @@ public class CatalogUtil {
    * @return The normalized identifier
    */
   public static String normalizeIdentifier(String identifier) {
-    return isDelimited(identifier) ? stripQuote(identifier) : identifier.toUpperCase();
+    return isDelimited(identifier) ? stripQuote(identifier).toLowerCase() : identifier.toLowerCase();
   }
 
   public static String stripQuote(String str) {

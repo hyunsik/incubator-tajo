@@ -1,4 +1,4 @@
-L_RETURNFLAG,L_LINESTATUS,COUNT_ORDER
+l_returnflag,l_linestatus,count_order
 -------------------------------
 N,O,3
 R,F,2

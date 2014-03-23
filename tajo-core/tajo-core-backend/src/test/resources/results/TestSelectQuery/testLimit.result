@@ -1,4 +1,4 @@
-L_ORDERKEY,L_SUPPKEY
+l_orderkey,l_suppkey
 -------------------------------
 1,7706
 1,7311

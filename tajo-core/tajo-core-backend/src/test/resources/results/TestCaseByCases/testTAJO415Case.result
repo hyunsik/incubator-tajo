@@ -1,4 +1,4 @@
-C_CUSTKEY,O_ORDERKEY,CNT
+c_custkey,o_orderkey,cnt
 -------------------------------
 1,1,1
 3,3,1

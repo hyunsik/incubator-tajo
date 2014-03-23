@@ -1,4 +1,4 @@
-orderkey,L_PARTKEY
+orderkey,l_partkey
 -------------------------------
 1,1
 1,1

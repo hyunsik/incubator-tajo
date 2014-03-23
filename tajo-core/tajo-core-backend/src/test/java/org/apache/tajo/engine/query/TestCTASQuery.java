@@ -63,10 +63,10 @@ public class TestCTASQuery extends QueryTestCaseBase {
     TableDesc desc = catalog.getTableDesc(qualifiedTableName);
     assertTrue(catalog.existsTable(qualifiedTableName));
 
-    assertTrue(desc.getSchema().contains("DEFAULT.TESTCTASWITHOUTTABLEDEFINITION.COL1"));
+    assertTrue(desc.getSchema().contains("default.testctaswithouttabledefinition.col1"));
     PartitionMethodDesc partitionDesc = desc.getPartitionMethod();
     assertEquals(partitionDesc.getPartitionType(), CatalogProtos.PartitionType.COLUMN);
-    assertEquals("KEY", partitionDesc.getExpressionSchema().getColumns().get(0).getSimpleName());
+    assertEquals("key", partitionDesc.getExpressionSchema().getColumns().get(0).getSimpleName());
 
     FileSystem fs = FileSystem.get(testBase.getTestingCluster().getConfiguration());
     Path path = desc.getPath();
@@ -109,7 +109,7 @@ public class TestCTASQuery extends QueryTestCaseBase {
     assertTrue(catalog.existsTable(DEFAULT_DATABASE_NAME, tableName));
     PartitionMethodDesc partitionDesc = desc.getPartitionMethod();
     assertEquals(partitionDesc.getPartitionType(), CatalogProtos.PartitionType.COLUMN);
-    assertEquals("KEY", partitionDesc.getExpressionSchema().getColumns().get(0).getSimpleName());
+    assertEquals("key", partitionDesc.getExpressionSchema().getColumns().get(0).getSimpleName());
 
     FileSystem fs = FileSystem.get(cluster.getConfiguration());
     Path path = desc.getPath();

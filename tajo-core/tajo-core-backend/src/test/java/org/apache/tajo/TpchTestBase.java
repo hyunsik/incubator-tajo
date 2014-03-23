@@ -55,8 +55,7 @@ public class TpchTestBase {
   }
 
   private TpchTestBase() throws IOException {
-    names = new String[] {
-        "CUSTOMER", "LINEITEM", "NATION", "ORDERS", "PART", "PARTSUPP", "REGION", "SUPPLIER", "EMPTY_ORDERS"};
+    names = new String[] {"customer", "lineitem", "nation", "orders", "part", "partsupp", "region", "supplier", "empty_orders"};
     paths = new String[names.length];
     for (int i = 0; i < names.length; i++) {
       nameMap.put(names[i], i);
@@ -74,10 +73,9 @@ public class TpchTestBase {
     tables = new String[names.length][];
     File file;
     for (int i = 0; i < names.length; i++) {
-      file = new File("src/test/tpch/" + names[i].toLowerCase() + ".tbl");
+      file = new File("src/test/tpch/" + names[i] + ".tbl");
       if(!file.exists()) {
-        file = new File(System.getProperty("user.dir") + "/tajo-core/tajo-core-backend/src/test/tpch/" +
-            names[i].toLowerCase()
+        file = new File(System.getProperty("user.dir") + "/tajo-core/tajo-core-backend/src/test/tpch/" + names[i]
             + ".tbl");
       }
       tables[i] = FileUtil.readTextFile(file).split("\n");

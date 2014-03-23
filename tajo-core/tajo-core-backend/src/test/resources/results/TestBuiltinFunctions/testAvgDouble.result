@@ -1,4 +1,4 @@
-L_ORDERKEY,REVENUE
+l_orderkey,revenue
 -------------------------------
 1,0.065
 3,0.08

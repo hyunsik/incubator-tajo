@@ -1401,9 +1401,9 @@ public class HiveQLAnalyzer extends HiveQLParserBaseVisitor<Expr> {
 
         if (destination.tableFileFormat() != null) {
           if (destination.tableFileFormat().KW_RCFILE() != null) {
-            insert.setStorageType("RCFILE");
+            insert.setStorageType("rcfile");
           } else if (destination.tableFileFormat().KW_TEXTFILE() != null) {
-            insert.setStorageType("CSV");
+            insert.setStorageType("csv");
           }
 
         }
@@ -1426,9 +1426,9 @@ public class HiveQLAnalyzer extends HiveQLParserBaseVisitor<Expr> {
 
       if (ctx.tableFileFormat() != null) {
         if (ctx.tableFileFormat().KW_RCFILE() != null) {
-          createTable.setStorageType("RCFILE");
+          createTable.setStorageType("rcfile");
         } else if (ctx.tableFileFormat().KW_TEXTFILE() != null) {
-          createTable.setStorageType("CSV");
+          createTable.setStorageType("csv");
         }
       }
 

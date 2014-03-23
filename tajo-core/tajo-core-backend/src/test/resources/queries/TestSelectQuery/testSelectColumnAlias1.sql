@@ -1,1 +1,1 @@
-select l_orderkey as "col1", l_orderkey + 1 as "col2" from lineitem;
+select l_orderkey as col1, l_orderkey + 1 as col2 from lineitem;

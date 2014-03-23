@@ -353,8 +353,8 @@ public class TestTajoClient {
 
   @Test
   public final void testGetTableList() throws IOException, ServiceException {
-    String tableName1 = "GetTableList1".toUpperCase();
-    String tableName2 = "GetTableList2".toUpperCase();
+    String tableName1 = "GetTableList1".toLowerCase();
+    String tableName2 = "GetTableList2".toLowerCase();
 
     assertFalse(client.existTable(tableName1));
     assertFalse(client.existTable(tableName2));
@@ -373,7 +373,7 @@ public class TestTajoClient {
 
   @Test
   public final void testGetTableDesc() throws IOException, ServiceException, SQLException {
-    final String tableName1 = "table3";
+    final String tableName1 = CatalogUtil.normalizeIdentifier("table3");
     Path tablePath = writeTmpTable(tableName1);
     LOG.error("Full path:" + tablePath.toUri().getRawPath());
     FileSystem fs = tablePath.getFileSystem(conf);

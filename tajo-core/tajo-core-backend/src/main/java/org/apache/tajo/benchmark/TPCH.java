@@ -38,15 +38,15 @@ public class TPCH extends BenchmarkSet {
   private final Log LOG = LogFactory.getLog(TPCH.class);
   private final String BENCHMARK_DIR = "benchmark/tpch";
 
-  public static final String LINEITEM = "LINEITEM";
-  public static final String CUSTOMER = "CUSTOMER";
-  public static final String NATION = "NATION";
-  public static final String PART = "PART";
-  public static final String REGION = "REGION";
-  public static final String ORDERS = "ORDERS";
-  public static final String PARTSUPP = "PARTSUPP";
-  public static final String SUPPLIER = "SUPPLIER";
-  public static final String EMPTY_ORDERS = "EMPTY_ORDERS";
+  public static final String LINEITEM = "lineitem";
+  public static final String CUSTOMER = "customer";
+  public static final String NATION = "nation";
+  public static final String PART = "part";
+  public static final String REGION = "region";
+  public static final String ORDERS = "orders";
+  public static final String PARTSUPP = "partsupp";
+  public static final String SUPPLIER = "supplier";
+  public static final String EMPTY_ORDERS = "empty_orders";
 
 
   public static final Map<String, Long> tableVolumes = Maps.newHashMap();
@@ -67,106 +67,106 @@ public class TPCH extends BenchmarkSet {
   @Override
   public void loadSchemas() {
     Schema lineitem = new Schema()
-        .addColumn("l_orderkey".toUpperCase(), Type.INT4) // 0
-        .addColumn("l_partkey".toUpperCase(), Type.INT4) // 1
-        .addColumn("l_suppkey".toUpperCase(), Type.INT4) // 2
-        .addColumn("l_linenumber".toUpperCase(), Type.INT4) // 3
-        .addColumn("l_quantity".toUpperCase(), Type.FLOAT8) // 4
-        .addColumn("l_extendedprice".toUpperCase(), Type.FLOAT8) // 5
-        .addColumn("l_discount".toUpperCase(), Type.FLOAT8) // 6
-        .addColumn("l_tax".toUpperCase(), Type.FLOAT8) // 7
+        .addColumn("l_orderkey", Type.INT4) // 0
+        .addColumn("l_partkey", Type.INT4) // 1
+        .addColumn("l_suppkey", Type.INT4) // 2
+        .addColumn("l_linenumber", Type.INT4) // 3
+        .addColumn("l_quantity", Type.FLOAT8) // 4
+        .addColumn("l_extendedprice", Type.FLOAT8) // 5
+        .addColumn("l_discount", Type.FLOAT8) // 6
+        .addColumn("l_tax", Type.FLOAT8) // 7
             // TODO - This is temporal solution. 8 and 9 are actually Char type.
-        .addColumn("l_returnflag".toUpperCase(), Type.TEXT) // 8
-        .addColumn("l_linestatus".toUpperCase(), Type.TEXT) // 9
+        .addColumn("l_returnflag", Type.TEXT) // 8
+        .addColumn("l_linestatus", Type.TEXT) // 9
             // TODO - This is temporal solution. 10,11, and 12 are actually Date type.
-        .addColumn("l_shipdate".toUpperCase(), Type.TEXT) // 10
-        .addColumn("l_commitdate".toUpperCase(), Type.TEXT) // 11
-        .addColumn("l_receiptdate".toUpperCase(), Type.TEXT) // 12
-        .addColumn("l_shipinstruct".toUpperCase(), Type.TEXT) // 13
-        .addColumn("l_shipmode".toUpperCase(), Type.TEXT) // 14
-        .addColumn("l_comment".toUpperCase(), Type.TEXT); // 15
+        .addColumn("l_shipdate", Type.TEXT) // 10
+        .addColumn("l_commitdate", Type.TEXT) // 11
+        .addColumn("l_receiptdate", Type.TEXT) // 12
+        .addColumn("l_shipinstruct", Type.TEXT) // 13
+        .addColumn("l_shipmode", Type.TEXT) // 14
+        .addColumn("l_comment", Type.TEXT); // 15
     schemas.put(LINEITEM, lineitem);
 
     Schema customer = new Schema()
-        .addColumn("c_custkey".toUpperCase(), Type.INT4) // 0
-        .addColumn("c_name".toUpperCase(), Type.TEXT) // 1
-        .addColumn("c_address".toUpperCase(), Type.TEXT) // 2
-        .addColumn("c_nationkey".toUpperCase(), Type.INT4) // 3
-        .addColumn("c_phone".toUpperCase(), Type.TEXT) // 4
-        .addColumn("c_acctbal".toUpperCase(), Type.FLOAT8) // 5
-        .addColumn("c_mktsegment".toUpperCase(), Type.TEXT) // 6
-        .addColumn("c_comment".toUpperCase(), Type.TEXT); // 7
+        .addColumn("c_custkey", Type.INT4) // 0
+        .addColumn("c_name", Type.TEXT) // 1
+        .addColumn("c_address", Type.TEXT) // 2
+        .addColumn("c_nationkey", Type.INT4) // 3
+        .addColumn("c_phone", Type.TEXT) // 4
+        .addColumn("c_acctbal", Type.FLOAT8) // 5
+        .addColumn("c_mktsegment", Type.TEXT) // 6
+        .addColumn("c_comment", Type.TEXT); // 7
     schemas.put(CUSTOMER, customer);
 
     Schema nation = new Schema()
-        .addColumn("n_nationkey".toUpperCase(), Type.INT4) // 0
-        .addColumn("n_name".toUpperCase(), Type.TEXT) // 1
-        .addColumn("n_regionkey".toUpperCase(), Type.INT4) // 2
-        .addColumn("n_comment".toUpperCase(), Type.TEXT); // 3
+        .addColumn("n_nationkey", Type.INT4) // 0
+        .addColumn("n_name", Type.TEXT) // 1
+        .addColumn("n_regionkey", Type.INT4) // 2
+        .addColumn("n_comment", Type.TEXT); // 3
     schemas.put(NATION, nation);
 
     Schema part = new Schema()
-        .addColumn("p_partkey".toUpperCase(), Type.INT4) // 0
-        .addColumn("p_name".toUpperCase(), Type.TEXT) // 1
-        .addColumn("p_mfgr".toUpperCase(), Type.TEXT) // 2
-        .addColumn("p_brand".toUpperCase(), Type.TEXT) // 3
-        .addColumn("p_type".toUpperCase(), Type.TEXT) // 4
-        .addColumn("p_size".toUpperCase(), Type.INT4) // 5
-        .addColumn("p_container".toUpperCase(), Type.TEXT) // 6
-        .addColumn("p_retailprice".toUpperCase(), Type.FLOAT8) // 7
-        .addColumn("p_comment".toUpperCase(), Type.TEXT); // 8
+        .addColumn("p_partkey", Type.INT4) // 0
+        .addColumn("p_name", Type.TEXT) // 1
+        .addColumn("p_mfgr", Type.TEXT) // 2
+        .addColumn("p_brand", Type.TEXT) // 3
+        .addColumn("p_type", Type.TEXT) // 4
+        .addColumn("p_size", Type.INT4) // 5
+        .addColumn("p_container", Type.TEXT) // 6
+        .addColumn("p_retailprice", Type.FLOAT8) // 7
+        .addColumn("p_comment", Type.TEXT); // 8
     schemas.put(PART, part);
 
     Schema region = new Schema()
-        .addColumn("r_regionkey".toUpperCase(), Type.INT4) // 0
-        .addColumn("r_name".toUpperCase(), Type.TEXT) // 1
-        .addColumn("r_comment".toUpperCase(), Type.TEXT); // 2
+        .addColumn("r_regionkey", Type.INT4) // 0
+        .addColumn("r_name", Type.TEXT) // 1
+        .addColumn("r_comment", Type.TEXT); // 2
     schemas.put(REGION, region);
 
     Schema orders = new Schema()
-        .addColumn("o_orderkey".toUpperCase(), Type.INT4) // 0
-        .addColumn("o_custkey".toUpperCase(), Type.INT4) // 1
-        .addColumn("o_orderstatus".toUpperCase(), Type.TEXT) // 2
-        .addColumn("o_totalprice".toUpperCase(), Type.FLOAT8) // 3
+        .addColumn("o_orderkey", Type.INT4) // 0
+        .addColumn("o_custkey", Type.INT4) // 1
+        .addColumn("o_orderstatus", Type.TEXT) // 2
+        .addColumn("o_totalprice", Type.FLOAT8) // 3
             // TODO - This is temporal solution. o_orderdate is actually Date type.
-        .addColumn("o_orderdate".toUpperCase(), Type.TEXT) // 4
-        .addColumn("o_orderpriority".toUpperCase(), Type.TEXT) // 5
-        .addColumn("o_clerk".toUpperCase(), Type.TEXT) // 6
-        .addColumn("o_shippriority".toUpperCase(), Type.INT4) // 7
-        .addColumn("o_comment".toUpperCase(), Type.TEXT); // 8
+        .addColumn("o_orderdate", Type.TEXT) // 4
+        .addColumn("o_orderpriority", Type.TEXT) // 5
+        .addColumn("o_clerk", Type.TEXT) // 6
+        .addColumn("o_shippriority", Type.INT4) // 7
+        .addColumn("o_comment", Type.TEXT); // 8
     schemas.put(ORDERS, orders);
     schemas.put(EMPTY_ORDERS, orders);
 
 
     Schema partsupp = new Schema()
-        .addColumn("ps_partkey".toUpperCase(), Type.INT4) // 0
-        .addColumn("ps_suppkey".toUpperCase(), Type.INT4) // 1
-        .addColumn("ps_availqty".toUpperCase(), Type.INT4) // 2
-        .addColumn("ps_supplycost".toUpperCase(), Type.FLOAT8) // 3
-        .addColumn("ps_comment".toUpperCase(), Type.TEXT); // 4
+        .addColumn("ps_partkey", Type.INT4) // 0
+        .addColumn("ps_suppkey", Type.INT4) // 1
+        .addColumn("ps_availqty", Type.INT4) // 2
+        .addColumn("ps_supplycost", Type.FLOAT8) // 3
+        .addColumn("ps_comment", Type.TEXT); // 4
     schemas.put(PARTSUPP, partsupp);
 
     Schema supplier = new Schema()
-        .addColumn("s_suppkey".toUpperCase(), Type.INT4) // 0
-        .addColumn("s_name".toUpperCase(), Type.TEXT) // 1
-        .addColumn("s_address".toUpperCase(), Type.TEXT) // 2
-        .addColumn("s_nationkey".toUpperCase(), Type.INT4) // 3
-        .addColumn("s_phone".toUpperCase(), Type.TEXT) // 4
-        .addColumn("s_acctbal".toUpperCase(), Type.FLOAT8) // 5
-        .addColumn("s_comment".toUpperCase(), Type.TEXT); // 6
+        .addColumn("s_suppkey", Type.INT4) // 0
+        .addColumn("s_name", Type.TEXT) // 1
+        .addColumn("s_address", Type.TEXT) // 2
+        .addColumn("s_nationkey", Type.INT4) // 3
+        .addColumn("s_phone", Type.TEXT) // 4
+        .addColumn("s_acctbal", Type.FLOAT8) // 5
+        .addColumn("s_comment", Type.TEXT); // 6
     schemas.put(SUPPLIER, supplier);
   }
 
   public void loadOutSchema() {
     Schema q2 = new Schema()
-        .addColumn("s_acctbal".toUpperCase(), Type.FLOAT8)
-        .addColumn("s_name".toUpperCase(), Type.TEXT)
-        .addColumn("n_name".toUpperCase(), Type.TEXT)
-        .addColumn("p_partkey".toUpperCase(), Type.INT4)
-        .addColumn("p_mfgr".toUpperCase(), Type.TEXT)
-        .addColumn("s_address".toUpperCase(), Type.TEXT)
-        .addColumn("s_phone".toUpperCase(), Type.TEXT)
-        .addColumn("s_comment".toUpperCase(), Type.TEXT);
+        .addColumn("s_acctbal", Type.FLOAT8)
+        .addColumn("s_name", Type.TEXT)
+        .addColumn("n_name", Type.TEXT)
+        .addColumn("p_partkey", Type.INT4)
+        .addColumn("p_mfgr", Type.TEXT)
+        .addColumn("s_address", Type.TEXT)
+        .addColumn("s_phone", Type.TEXT)
+        .addColumn("s_comment", Type.TEXT);
     outSchemas.put("q2", q2);
   }
 

@@ -370,7 +370,7 @@ Number
     ;
     
 Identifier
-    : (Letter | Digit) (Letter | Digit | '_')* { setText(getText().toUpperCase()); }
+    : (Letter | Digit) (Letter | Digit | '_')* { setText(getText().toLowerCase()); }
     ;
 
 CharSetName
