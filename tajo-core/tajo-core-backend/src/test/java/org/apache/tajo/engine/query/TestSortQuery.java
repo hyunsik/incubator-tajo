@@ -24,6 +24,7 @@ import org.apache.tajo.TajoConstants;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
+import java.io.IOException;
 import java.sql.ResultSet;
 
 @Category(IntegrationTest.class)
@@ -94,6 +95,13 @@ public class TestSortQuery extends QueryTestCaseBase {
 
   @Test
   public final void testSortAfterGroupbyWithAlias() throws Exception {
+    ResultSet res = executeQuery();
+    assertResultSet(res);
+    cleanupQuery(res);
+  }
+
+  @Test
+  public final void testSortWithAlias2() throws Exception {
     ResultSet res = executeQuery();
     assertResultSet(res);
     cleanupQuery(res);
