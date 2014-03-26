@@ -25,10 +25,12 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.misc.NotNull;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.apache.commons.lang.StringEscapeUtils;
+import org.apache.tajo.TajoConstants;
 import org.apache.tajo.algebra.*;
 import org.apache.tajo.algebra.Aggregation.GroupType;
 import org.apache.tajo.algebra.LiteralValue.LiteralType;
 import org.apache.tajo.catalog.CatalogConstants;
+import org.apache.tajo.catalog.CatalogUtil;
 import org.apache.tajo.engine.parser.SQLParser.*;
 
 import java.util.*;
@@ -801,7 +803,9 @@ public class SQLAnalyzer extends SQLParserBaseVisitor<Expr> {
   @Override
   public ColumnReferenceExpr visitColumn_reference(SQLParser.Column_referenceContext ctx) {
     ColumnReferenceExpr column = new ColumnReferenceExpr(ctx.name.getText());
-    if (ctx.tb_name != null) {
+    if (checkIfExist(ctx.db_name)) {
+      column.setQualifier(CatalogUtil.buildFQName(ctx.db_name.getText(), ctx.tb_name.getText()));
+    } else if (ctx.tb_name != null) {
       column.setQualifier(ctx.tb_name.getText());
     }
 
