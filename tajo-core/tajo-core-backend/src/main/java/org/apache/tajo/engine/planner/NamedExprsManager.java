@@ -173,12 +173,7 @@ public class NamedExprsManager {
     evaluationStateMap.put(refId, false);
 
     // add the entry to idToNames map
-    if (idToNamesMap.containsKey(refId)) {
-      // if alias is given, it will be primary name.
-      idToNamesMap.get(refId).add(0, alias);
-    } else {
-      idToNamesMap.put(refId, TUtil.newList(alias));
-    }
+    TUtil.putToNestedList(idToNamesMap, refId, alias);
 
     return alias;
   }
