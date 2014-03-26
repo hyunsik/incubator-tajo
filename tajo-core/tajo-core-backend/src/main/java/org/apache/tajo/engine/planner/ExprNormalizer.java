@@ -250,9 +250,6 @@ class ExprNormalizer extends SimpleAlgebraVisitor<ExprNormalizer.ExprNormalizedR
       if (ctx.block.namedExprsMgr.contains(expr.getCanonicalName())) {
         NamedExpr namedExpr = ctx.block.namedExprsMgr.getNamedExpr(expr.getCanonicalName());
         return new ColumnReferenceExpr(namedExpr.getAlias());
-      } else if (ctx.block.namedExprsMgr.isAliasedName(expr.getCanonicalName())) {
-        String normalized = ctx.plan.getNormalizedColumnName(ctx.block, expr);
-        expr.setName(normalized);
       } else {
         String normalized = ctx.plan.getNormalizedColumnName(ctx.block, expr);
         expr.setName(normalized);
