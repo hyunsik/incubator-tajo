@@ -141,7 +141,7 @@ public class TestSortQuery extends QueryTestCaseBase {
     executeDDL("create_table_with_asc_desc_keys.sql", "table2");
 
     ResultSet res = executeQuery();
-    System.out.println(resultSetToString(res));
+    assertResultSet(res);
     cleanupQuery(res);
   }
 }
