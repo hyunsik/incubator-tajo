@@ -40,6 +40,7 @@ import org.apache.tajo.ipc.QueryMasterClientProtocol.QueryMasterClientProtocolSe
 import org.apache.tajo.ipc.TajoMasterClientProtocol;
 import org.apache.tajo.ipc.TajoMasterClientProtocol.TajoMasterClientProtocolService;
 import org.apache.tajo.jdbc.SQLStates;
+import org.apache.tajo.jdbc.TajoMemoryResultSet;
 import org.apache.tajo.jdbc.TajoResultSet;
 import org.apache.tajo.rpc.NettyClientBase;
 import org.apache.tajo.rpc.RpcConnectionPool;
@@ -54,6 +55,8 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
+import static org.apache.tajo.ipc.ClientProtos.SubmitQueryResponse.SerializedResultSet;
 
 @ThreadSafe
 public class TajoClient implements Closeable {
@@ -274,28 +277,16 @@ public class TajoClient implements Closeable {
     }.withRetries();
   }
 
-  public ExplainQueryResponse explainQuery(final String sql) throws ServiceException {
-    return new ServerCallable<ExplainQueryResponse>(connPool, tajoMasterAddr,
-        TajoMasterClientProtocol.class, false, true) {
-      public ExplainQueryResponse call(NettyClientBase client) throws ServiceException {
-        checkSessionAndGet(client);
-
-        TajoMasterClientProtocolService.BlockingInterface tajoMasterService = client.getStub();
-        return tajoMasterService.explainQuery(null, convertSessionedString(sql));
-      }
-    }.withRetries();
-  }
-
   /**
    * It submits a query statement and get a response immediately.
    * The response only contains a query id, and submission status.
    * In order to get the result, you should use {@link #getQueryResult(org.apache.tajo.QueryId)}
    * or {@link #getQueryResultAndWait(org.apache.tajo.QueryId)}.
    */
-  public GetQueryStatusResponse executeQuery(final String sql) throws ServiceException {
-    return new ServerCallable<GetQueryStatusResponse>(connPool, tajoMasterAddr,
+  public SubmitQueryResponse executeQuery(final String sql) throws ServiceException {
+    return new ServerCallable<SubmitQueryResponse>(connPool, tajoMasterAddr,
         TajoMasterClientProtocol.class, false, true) {
-      public GetQueryStatusResponse call(NettyClientBase client) throws ServiceException {
+      public SubmitQueryResponse call(NettyClientBase client) throws ServiceException {
         checkSessionAndGet(client);
 
         final QueryRequest.Builder builder = QueryRequest.newBuilder();
@@ -317,9 +308,9 @@ public class TajoClient implements Closeable {
    */
   public ResultSet executeQueryAndGetResult(final String sql)
       throws ServiceException, IOException {
-    GetQueryStatusResponse response = new ServerCallable<GetQueryStatusResponse>(connPool, tajoMasterAddr,
+    SubmitQueryResponse response = new ServerCallable<SubmitQueryResponse>(connPool, tajoMasterAddr,
         TajoMasterClientProtocol.class, false, true) {
-      public GetQueryStatusResponse call(NettyClientBase client) throws ServiceException {
+      public SubmitQueryResponse call(NettyClientBase client) throws ServiceException {
         checkSessionAndGet(client);
 
         final QueryRequest.Builder builder = QueryRequest.newBuilder();
@@ -331,10 +322,29 @@ public class TajoClient implements Closeable {
     }.withRetries();
 
     QueryId queryId = new QueryId(response.getQueryId());
-    if (queryId.equals(QueryIdFactory.NULL_QUERY_ID)) {
-      return this.createNullResultSet(queryId);
+    if (response.getIsForwarded()) {
+      if (queryId.equals(QueryIdFactory.NULL_QUERY_ID)) {
+        return this.createNullResultSet(queryId);
+      } else {
+        return this.getQueryResultAndWait(queryId);
+      }
     } else {
-      return this.getQueryResultAndWait(queryId);
+      if (response.hasResultSet()) {
+        SerializedResultSet resultSet = response.getResultSet();
+        return createMemoryResultSet(resultSet, response.getMaxRowNum());
+      } else if (response.hasTableDesc()) {
+        if (response.hasMaxRowNum()) {
+          TajoResultSet resultSet = new TajoResultSet(this,
+              QueryIdFactory.NULL_QUERY_ID, conf, new TableDesc(response.getTableDesc()), response.getMaxRowNum());
+          return resultSet;
+        } else {
+          TajoResultSet resultSet =
+              new TajoResultSet(this, QueryIdFactory.NULL_QUERY_ID, conf, new TableDesc(response.getTableDesc()));
+          return resultSet;
+        }
+      } else {
+        return this.createNullResultSet(queryId);
+      }
     }
   }
 
@@ -411,7 +421,12 @@ public class TajoClient implements Closeable {
     return new TajoResultSet(this, queryId, conf, tableDesc);
   }
 
-  public ResultSet getQueryResultAndWait(QueryId queryId)
+  public static ResultSet createMemoryResultSet(SerializedResultSet serializedResultSet, int maxRowNum) {
+    return new TajoMemoryResultSet(
+        new Schema(serializedResultSet.getSchema()), serializedResultSet.getSerializedTuplesList(), maxRowNum);
+  }
+
+  private ResultSet getQueryResultAndWait(QueryId queryId)
       throws ServiceException, IOException {
     if (queryId.equals(QueryIdFactory.NULL_QUERY_ID)) {
       return createNullResultSet(queryId);

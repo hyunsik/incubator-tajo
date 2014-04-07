@@ -74,12 +74,6 @@ message UpdateQueryResponse {
   optional string errorMessage = 2;
 }
 
-message SubmitQueryResponse {
-  required ResultCode resultCode = 1;
-  optional QueryIdProto queryId = 2;
-  optional string errorMessage = 3;
-}
-
 message GetQueryResultRequest {
   optional SessionIdProto sessionId = 1;
   required QueryIdProto queryId = 2;
@@ -118,6 +112,27 @@ message GetQueryListResponse {
 message GetQueryStatusRequest {
   optional SessionIdProto sessionId = 1;
   required QueryIdProto queryId = 2;
+}
+
+message SubmitQueryResponse {
+  required ResultCode resultCode = 1;
+  required QueryIdProto queryId = 2;
+  optional bool isForwarded = 3 [default = false];
+
+  optional string queryMasterHost = 4;
+  optional int32 queryMasterPort = 5;
+
+  message SerializedResultSet {
+    optional SchemaProto schema = 1;
+    optional int32 bytesNum = 2;
+    repeated bytes serializedTuples = 3;
+  }
+
+  optional SerializedResultSet resultSet = 6;
+  optional TableDescProto tableDesc = 7;
+  optional int32 maxRowNum = 8;
+
+  optional string errorMessage = 9;
 }
 
 message GetQueryStatusResponse {
