@@ -42,8 +42,6 @@ import static org.apache.tajo.catalog.proto.CatalogProtos.StoreType;
 import static org.apache.tajo.common.TajoDataTypes.Type;
 
 public class CatalogUtil {
-  public final static String IDENTIFIER_DELIMITER = ".";
-  public final static String IDENTIFIER_DELIMITER_REGEXP = "\\.";
 
   /**
    * Normalize an identifier. Normalization means a translation from a identifier to be a refined identifier name.
@@ -68,7 +66,7 @@ public class CatalogUtil {
    * @return The normalized identifier
    */
   public static String normalizeIdentifier(String identifier) {
-    String [] splitted = identifier.split(IDENTIFIER_DELIMITER_REGEXP);
+    String [] splitted = identifier.split(CatalogConstants.IDENTIFIER_DELIMITER_REGEXP);
 
     StringBuilder sb = new StringBuilder();
     boolean first = true;
@@ -76,7 +74,7 @@ public class CatalogUtil {
       if (first) {
         first = false;
       } else {
-        sb.append(IDENTIFIER_DELIMITER);
+        sb.append(CatalogConstants.IDENTIFIER_DELIMITER);
       }
       sb.append(normalizeIdentifierPart(part));
     }
@@ -101,7 +99,7 @@ public class CatalogUtil {
    * @return The denormalized identifier
    */
   public static String denormalizeIdentifier(String identifier) {
-    String [] splitted = identifier.split(IDENTIFIER_DELIMITER_REGEXP);
+    String [] splitted = identifier.split(CatalogConstants.IDENTIFIER_DELIMITER_REGEXP);
 
     StringBuilder sb = new StringBuilder();
     boolean first = true;
@@ -109,7 +107,7 @@ public class CatalogUtil {
       if (first) {
         first = false;
       } else {
-        sb.append(IDENTIFIER_DELIMITER);
+        sb.append(CatalogConstants.IDENTIFIER_DELIMITER);
       }
       sb.append(denormalizePart(part));
     }
@@ -165,11 +163,11 @@ public class CatalogUtil {
   }
 
   public static boolean isFQColumnName(String tableName) {
-    return tableName.split(IDENTIFIER_DELIMITER_REGEXP).length == 3;
+    return tableName.split(CatalogConstants.IDENTIFIER_DELIMITER_REGEXP).length == 3;
   }
 
   public static boolean isFQTableName(String tableName) {
-    int lastDelimiterIdx = tableName.lastIndexOf(IDENTIFIER_DELIMITER);
+    int lastDelimiterIdx = tableName.lastIndexOf(CatalogConstants.IDENTIFIER_DELIMITER);
     return lastDelimiterIdx > -1;
   }
 
@@ -183,7 +181,7 @@ public class CatalogUtil {
   }
 
   public static String [] splitTableName(String tableName) {
-    int lastDelimiterIdx = tableName.lastIndexOf(IDENTIFIER_DELIMITER);
+    int lastDelimiterIdx = tableName.lastIndexOf(CatalogConstants.IDENTIFIER_DELIMITER);
     if (lastDelimiterIdx > -1) {
       return new String [] {
           tableName.substring(0, lastDelimiterIdx),
@@ -201,7 +199,7 @@ public class CatalogUtil {
       if (first) {
         first = false;
       } else {
-        sb.append(IDENTIFIER_DELIMITER);
+        sb.append(CatalogConstants.IDENTIFIER_DELIMITER);
       }
 
       sb.append(id);
@@ -220,7 +218,7 @@ public class CatalogUtil {
    * @return The extracted qualifier
    */
   public static String extractQualifier(String name) {
-    int lastDelimiterIdx = name.lastIndexOf(IDENTIFIER_DELIMITER);
+    int lastDelimiterIdx = name.lastIndexOf(CatalogConstants.IDENTIFIER_DELIMITER);
     if (lastDelimiterIdx > -1) {
       return name.substring(0, lastDelimiterIdx);
     } else {
@@ -238,7 +236,7 @@ public class CatalogUtil {
    * @return The extracted simple name
    */
   public static String extractSimpleName(String name) {
-    int lastDelimiterIdx = name.lastIndexOf(IDENTIFIER_DELIMITER);
+    int lastDelimiterIdx = name.lastIndexOf(CatalogConstants.IDENTIFIER_DELIMITER);
     if (lastDelimiterIdx > -1) {
       // plus one means skipping a delimiter.
       return name.substring(lastDelimiterIdx + 1, name.length());
@@ -249,7 +247,7 @@ public class CatalogUtil {
 
   public static String getCanonicalTableName(String databaseName, String tableName) {
     StringBuilder sb = new StringBuilder(databaseName);
-    sb.append(IDENTIFIER_DELIMITER);
+    sb.append(CatalogConstants.IDENTIFIER_DELIMITER);
     sb.append(tableName);
     return sb.toString();
   }
@@ -351,7 +349,7 @@ public class CatalogUtil {
     revisedSchema.clearFields();
     for (ColumnProto col : schema.getFieldsList()) {
       ColumnProto.Builder builder = ColumnProto.newBuilder(col);
-      builder.setName(tableName + IDENTIFIER_DELIMITER + extractSimpleName(col.getName()));
+      builder.setName(tableName + CatalogConstants.IDENTIFIER_DELIMITER + extractSimpleName(col.getName()));
       revisedSchema.addFields(builder.build());
     }
 
