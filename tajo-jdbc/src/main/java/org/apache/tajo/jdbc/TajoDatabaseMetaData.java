@@ -17,6 +17,7 @@
  */
 package org.apache.tajo.jdbc;
 
+import com.google.common.collect.Lists;
 import com.google.protobuf.ServiceException;
 import org.apache.tajo.TajoConstants;
 import org.apache.tajo.annotation.Nullable;
@@ -29,6 +30,7 @@ import org.apache.tajo.client.TajoClient;
 import org.apache.tajo.common.TajoDataTypes.Type;
 import org.apache.tajo.datum.NullDatum;
 import org.apache.tajo.datum.TextDatum;
+import org.apache.tajo.util.StringUtils;
 
 import java.sql.*;
 import java.util.*;
@@ -251,14 +253,12 @@ public class TajoDatabaseMetaData implements DatabaseMetaData {
   }
 
   @Override
-  public int getMaxStatementLength()
-      throws SQLException {
+  public int getMaxStatementLength() throws SQLException {
     throw new SQLFeatureNotSupportedException("getMaxStatementLength not supported");
   }
 
   @Override
-  public int getMaxStatements()
-      throws SQLException {
+  public int getMaxStatements() throws SQLException {
     throw new SQLFeatureNotSupportedException("getMaxStatements not supported");
   }
 
@@ -353,36 +353,46 @@ public class TajoDatabaseMetaData implements DatabaseMetaData {
                              @Nullable String tableNamePattern, @Nullable String [] types) throws SQLException {
     try {
       final List<MetaDataTuple> resultTables = new ArrayList<MetaDataTuple>();
-      final String resultCatalog;
-      if (catalog == null) {
-        resultCatalog = TajoConstants.DEFAULT_DATABASE_NAME;
-      } else {
-        resultCatalog = catalog;
+      String regtableNamePattern = convertPattern(tableNamePattern == null ? null : tableNamePattern);
+
+      List<String> targetCatalogs = Lists.newArrayList();
+      if (catalog != null) {
+        targetCatalogs.add(catalog);
       }
 
-      String regtableNamePattern =
-          convertPattern(tableNamePattern == null ? null : tableNamePattern);
       try {
         TajoClient tajoClient = conn.getTajoClient();
-        List<String> tableNames = tajoClient.getTableList(resultCatalog);
-        for (String eachTableName: tableNames) {
-          if (eachTableName.matches(regtableNamePattern)) {
-            MetaDataTuple tuple = new MetaDataTuple(5);
 
-            int index = 0;
-            tuple.put(index++, new TextDatum(resultCatalog));         // TABLE_CAT
-            tuple.put(index++, new TextDatum(DEFAULT_SCHEMA_NAME));   // TABLE_SCHEM
-            tuple.put(index++, new TextDatum(eachTableName));         // TABLE_NAME
-            tuple.put(index++, new TextDatum("TABLE"));               // TABLE_TYPE
-            tuple.put(index++, NullDatum.get());                      // REMARKS
+        // if catalog is null, all databases are targets.
+        if (targetCatalogs.isEmpty()) {
+          targetCatalogs.addAll(tajoClient.getAllDatabaseNames());
+        }
 
-            resultTables.add(tuple);
+        for (String databaseName : targetCatalogs) {
+          List<String> tableNames = tajoClient.getTableList(databaseName);
+          for (String eachTableName: tableNames) {
+            if (eachTableName.matches(regtableNamePattern)) {
+              MetaDataTuple tuple = new MetaDataTuple(5);
+
+              int index = 0;
+              tuple.put(index++, new TextDatum(databaseName));         // TABLE_CAT
+              tuple.put(index++, new TextDatum(DEFAULT_SCHEMA_NAME));   // TABLE_SCHEM
+              tuple.put(index++, new TextDatum(eachTableName));         // TABLE_NAME
+              tuple.put(index++, new TextDatum("TABLE"));               // TABLE_TYPE
+              tuple.put(index++, NullDatum.get());                      // REMARKS
+
+              resultTables.add(tuple);
+            }
           }
         }
         Collections.sort(resultTables, new Comparator<MetaDataTuple> () {
           @Override
           public int compare(MetaDataTuple table1, MetaDataTuple table2) {
-            return table1.getText(2).compareTo(table2.getText(2));
+            int compVal = table1.getText(1).compareTo(table2.getText(1));
+            if (compVal == 0) {
+              compVal = table1.getText(2).compareTo(table2.getText(2));
+            }
+            return compVal;
           }
         });
       } catch (Exception e) {
@@ -443,8 +453,7 @@ public class TajoDatabaseMetaData implements DatabaseMetaData {
   }
 
   @Override
-  public ResultSet getTableTypes()
-      throws SQLException {
+  public ResultSet getTableTypes() throws SQLException {
     List<MetaDataTuple> columns = new ArrayList<MetaDataTuple>();
     MetaDataTuple tuple = new MetaDataTuple(1);
     tuple.put(0, new TextDatum("TABLE"));
@@ -474,53 +483,58 @@ public class TajoDatabaseMetaData implements DatabaseMetaData {
   public ResultSet getColumns(@Nullable String catalog, @Nullable String schemaPattern,
                               @Nullable String tableNamePattern, @Nullable String columnNamePattern)
       throws SQLException {
+
+    List<String> targetCatalogs = Lists.newArrayList();
+    if (catalog != null) {
+      targetCatalogs.add(catalog);
+    }
+
     List<MetaDataTuple> columns = new ArrayList<MetaDataTuple>();
     try {
-      if (catalog == null) {
-        catalog = TajoConstants.DEFAULT_DATABASE_NAME;
+      if (targetCatalogs.isEmpty()) {
+        targetCatalogs.addAll(conn.getTajoClient().getAllDatabaseNames());
       }
+      for (String databaseName : targetCatalogs) {
+        String regtableNamePattern = convertPattern(tableNamePattern == null ? null : tableNamePattern);
+        String regcolumnNamePattern = convertPattern(columnNamePattern == null ? null : columnNamePattern);
 
-      String regtableNamePattern =
-          convertPattern(tableNamePattern == null ? null : CatalogUtil.normalizeIdentifier(tableNamePattern));
-      String regcolumnNamePattern =
-          convertPattern(columnNamePattern == null ? null : CatalogUtil.normalizeIdentifier(columnNamePattern));
+        List<String> tables = conn.getTajoClient().getTableList(databaseName);
+        for (String table: tables) {
+          if (table.matches(regtableNamePattern)) {
+            TableDesc tableDesc = conn.getTajoClient().getTableDesc(CatalogUtil.buildFQName(databaseName, table));
+            int pos = 0;
+            for (Column column: tableDesc.getSchema().getColumns()) {
+              if (column.getSimpleName().matches(regcolumnNamePattern)) {
+                MetaDataTuple tuple = new MetaDataTuple(22);
 
-      List<String> tables = conn.getTajoClient().getTableList(catalog);
-      for (String table: tables) {
-        if (table.matches(regtableNamePattern)) {
-          TableDesc tableDesc = conn.getTajoClient().getTableDesc(table);
-          int pos = 0;
-          for (Column column: tableDesc.getSchema().getColumns()) {
-            if (column.getSimpleName().matches(regcolumnNamePattern)) {
-              MetaDataTuple tuple = new MetaDataTuple(22);
-
-              int index = 0;
-              tuple.put(index++, new TextDatum(catalog));  //TABLE_CAT
-              tuple.put(index++, new TextDatum(catalog));  //TABLE_SCHEM
-              tuple.put(index++, new TextDatum(table));  //TABLE_NAME
-              tuple.put(index++, new TextDatum(column.getSimpleName()));  //COLUMN_NAME
-              // TODO - DATA_TYPE
-              tuple.put(index++, new TextDatum("" + ResultSetUtil.tajoTypeToSqlType(column.getDataType())));
-              tuple.put(index++, new TextDatum(ResultSetUtil.toSqlType(column.getDataType())));  //TYPE_NAME
-              tuple.put(index++, new TextDatum("0"));  //COLUMN_SIZE
-              tuple.put(index++, new TextDatum("0"));  //BUFFER_LENGTH
-              tuple.put(index++, new TextDatum("0"));  //DECIMAL_DIGITS
-              tuple.put(index++, new TextDatum("0"));  //NUM_PREC_RADIX
-              tuple.put(index++, new TextDatum("" + DatabaseMetaData.columnNullable));  //NULLABLE
-              tuple.put(index++, NullDatum.get());  //REMARKS
-              tuple.put(index++, NullDatum.get());  //COLUMN_DEF
-              tuple.put(index++, NullDatum.get());  //SQL_DATA_TYPE
-              tuple.put(index++, NullDatum.get());  //SQL_DATETIME_SUB
-              tuple.put(index++, new TextDatum("0"));  //CHAR_OCTET_LENGTH
-              tuple.put(index++, new TextDatum("" + pos));  //ORDINAL_POSITION
-              tuple.put(index++, new TextDatum("YES"));  //IS_NULLABLE
-              tuple.put(index++, NullDatum.get());  //SCOPE_CATLOG
-              tuple.put(index++, NullDatum.get());  //SCOPE_SCHEMA
-              tuple.put(index++, NullDatum.get());  //SCOPE_TABLE
-              tuple.put(index++, new TextDatum("0"));  //SOURCE_DATA_TYPE
-              columns.add(tuple);
+                int index = 0;
+                tuple.put(index++, new TextDatum(databaseName));            // TABLE_CAT
+                tuple.put(index++, new TextDatum(DEFAULT_SCHEMA_NAME));     // TABLE_SCHEM
+                tuple.put(index++, new TextDatum(table));                   // TABLE_NAME
+                tuple.put(index++, new TextDatum(column.getSimpleName()));  // COLUMN_NAME
+                // TODO - DATA_TYPE
+                tuple.put(index++, new TextDatum("" + ResultSetUtil.tajoTypeToSqlType(column.getDataType())));
+                tuple.put(index++, new TextDatum(ResultSetUtil.toSqlType(column.getDataType())));  //TYPE_NAME
+                tuple.put(index++, new TextDatum("0"));                     // COLUMN_SIZE
+                tuple.put(index++, new TextDatum("0"));                     // BUFFER_LENGTH
+                tuple.put(index++, new TextDatum("0"));                     // DECIMAL_DIGITS
+                tuple.put(index++, new TextDatum("0"));                     // NUM_PREC_RADIX
+                tuple.put(index++, new TextDatum("" + DatabaseMetaData.columnNullable));  // NULLABLE
+                tuple.put(index++, NullDatum.get());                        // REMARKS
+                tuple.put(index++, NullDatum.get());                        // COLUMN_DEF
+                tuple.put(index++, NullDatum.get());                        // SQL_DATA_TYPE
+                tuple.put(index++, NullDatum.get());                        // SQL_DATETIME_SUB
+                tuple.put(index++, new TextDatum("0"));                     // CHAR_OCTET_LENGTH
+                tuple.put(index++, new TextDatum("" + pos));                // ORDINAL_POSITION
+                tuple.put(index++, new TextDatum("YES"));                   // IS_NULLABLE
+                tuple.put(index++, NullDatum.get());                        // SCOPE_CATLOG
+                tuple.put(index++, NullDatum.get());                        // SCOPE_SCHEMA
+                tuple.put(index++, NullDatum.get());                        // SCOPE_TABLE
+                tuple.put(index++, new TextDatum("0"));                     // SOURCE_DATA_TYPE
+                columns.add(tuple);
+              }
+              pos++;
             }
-            pos++;
           }
         }
       }

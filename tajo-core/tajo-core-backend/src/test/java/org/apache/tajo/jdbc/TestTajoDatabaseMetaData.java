@@ -18,6 +18,7 @@
 
 package org.apache.tajo.jdbc;
 
+import com.google.common.collect.Sets;
 import org.apache.tajo.QueryTestCaseBase;
 import org.apache.tajo.TajoConstants;
 import org.apache.tajo.util.TUtil;
@@ -26,10 +27,7 @@ import org.junit.Test;
 
 import java.net.InetSocketAddress;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -63,16 +61,20 @@ public class TestTajoDatabaseMetaData extends QueryTestCaseBase {
     assertDatabaseExists("jdbc_test1");
     pstmt.close();
 
-    assertDatabaseNotExists("Jdbc_Test2");
-    pstmt = conn.prepareStatement("CREATE DATABASE \"Jdbc_Test2\"");
-    pstmt.executeUpdate();
-    assertDatabaseExists("Jdbc_Test2");
-    pstmt.close();
+    if (!testingCluster.isHCatalogStoreRunning()) {
+      assertDatabaseNotExists("Jdbc_Test2");
+      pstmt = conn.prepareStatement("CREATE DATABASE \"Jdbc_Test2\"");
+      pstmt.executeUpdate();
+      assertDatabaseExists("Jdbc_Test2");
+      pstmt.close();
+    }
 
     conn.setCatalog("jdbc_test1");
     assertEquals("jdbc_test1", conn.getCatalog());
-    conn.setCatalog("Jdbc_Test2");
-    assertEquals("Jdbc_Test2", conn.getCatalog());
+    if (!testingCluster.isHCatalogStoreRunning()) {
+      conn.setCatalog("Jdbc_Test2");
+      assertEquals("Jdbc_Test2", conn.getCatalog());
+    }
     conn.setCatalog("jdbc_test1");
     assertEquals("jdbc_test1", conn.getCatalog());
 
@@ -80,9 +82,11 @@ public class TestTajoDatabaseMetaData extends QueryTestCaseBase {
     pstmt = conn.prepareStatement("DROP DATABASE jdbc_test1");
     pstmt.executeUpdate();
     pstmt.close();
-    pstmt = conn.prepareStatement("DROP DATABASE \"Jdbc_Test2\"");
-    pstmt.executeUpdate();
-    pstmt.close();
+    if (!testingCluster.isHCatalogStoreRunning()) {
+      pstmt = conn.prepareStatement("DROP DATABASE \"Jdbc_Test2\"");
+      pstmt.executeUpdate();
+      pstmt.close();
+    }
 
     conn.close();
   }
@@ -109,36 +113,47 @@ public class TestTajoDatabaseMetaData extends QueryTestCaseBase {
     pstmt.executeUpdate();
     pstmt.close();
 
-    // create database "jdbc_test2" and its tables
-    assertDatabaseNotExists("Jdbc_Test2");
-    pstmt = defaultConnect.prepareStatement("CREATE DATABASE \"Jdbc_Test2\"");
-    pstmt.executeUpdate();
-    assertDatabaseExists("Jdbc_Test2");
-    pstmt.close();
+    if (!testingCluster.isHCatalogStoreRunning()) {
+      // create database "jdbc_test2" and its tables
+      assertDatabaseNotExists("Jdbc_Test2");
+      pstmt = defaultConnect.prepareStatement("CREATE DATABASE \"Jdbc_Test2\"");
+      pstmt.executeUpdate();
+      assertDatabaseExists("Jdbc_Test2");
+      pstmt.close();
 
-    pstmt = defaultConnect.prepareStatement("CREATE TABLE \"Jdbc_Test2\".table3 (age int)");
-    pstmt.executeUpdate();
-    pstmt.close();
-    pstmt = defaultConnect.prepareStatement("CREATE TABLE \"Jdbc_Test2\".table4 (age int)");
-    pstmt.executeUpdate();
-    pstmt.close();
+      pstmt = defaultConnect.prepareStatement("CREATE TABLE \"Jdbc_Test2\".table3 (age int)");
+      pstmt.executeUpdate();
+      pstmt.close();
+      pstmt = defaultConnect.prepareStatement("CREATE TABLE \"Jdbc_Test2\".table4 (age int)");
+      pstmt.executeUpdate();
+      pstmt.close();
+    }
 
     // verify getCatalogs()
     dbmd = defaultConnect.getMetaData();
     List<String> newDatabases = getListFromResultSet(dbmd.getCatalogs(), "TABLE_CAT");
 
     newDatabases.removeAll(existingDatabases);
-    assertEquals(2, newDatabases.size());
+    if (!testingCluster.isHCatalogStoreRunning()) {
+      assertEquals(2, newDatabases.size());
+    } else {
+      assertEquals(1, newDatabases.size());
+    }
     assertTrue(newDatabases.contains("jdbc_test1"));
-    assertTrue(newDatabases.contains("Jdbc_Test2"));
+    if (!testingCluster.isHCatalogStoreRunning()) {
+      assertTrue(newDatabases.contains("Jdbc_Test2"));
+    }
 
     // verify getTables()
     ResultSet res = defaultConnect.getMetaData().getTables("jdbc_test1", null, null, null);
     assertResultSet(res, "getTables1.result");
     res.close();
-    res = defaultConnect.getMetaData().getTables("Jdbc_Test2", null, null, null);
-    assertResultSet(res, "getTables2.result");
-    res.close();
+
+    if (!testingCluster.isHCatalogStoreRunning()) {
+      res = defaultConnect.getMetaData().getTables("Jdbc_Test2", null, null, null);
+      assertResultSet(res, "getTables2.result");
+      res.close();
+    }
 
     defaultConnect.close();
 
@@ -149,14 +164,23 @@ public class TestTajoDatabaseMetaData extends QueryTestCaseBase {
     assertEquals("jdbc_test1", jdbcTest1Conn.getCatalog());
     jdbcTest1Conn.close();
 
-    String jdbcTest2ConnUri =
-        TestTajoJdbc.buildConnectionUri(tajoMasterAddress.getHostName(), tajoMasterAddress.getPort(), "Jdbc_Test2");
-    Connection jdbcTest2Conn = DriverManager.getConnection(jdbcTest2ConnUri);
-    assertEquals("Jdbc_Test2", jdbcTest2Conn.getCatalog());
-    jdbcTest2Conn.close();
-
+    client.selectDatabase("default");
+    executeString("DROP TABLE jdbc_test1.table1");
+    executeString("DROP TABLE jdbc_test1.table2");
     executeString("DROP DATABASE jdbc_test1");
-    executeString("DROP DATABASE \"Jdbc_Test2\"");
+
+    if (!testingCluster.isHCatalogStoreRunning()) {
+      String jdbcTest2ConnUri =
+          TestTajoJdbc.buildConnectionUri(tajoMasterAddress.getHostName(), tajoMasterAddress.getPort(), "Jdbc_Test2");
+      Connection jdbcTest2Conn = DriverManager.getConnection(jdbcTest2ConnUri);
+      assertEquals("Jdbc_Test2", jdbcTest2Conn.getCatalog());
+      jdbcTest2Conn.close();
+
+      client.selectDatabase("default");
+      executeString("DROP TABLE \"Jdbc_Test2\".table3");
+      executeString("DROP TABLE \"Jdbc_Test2\".table4");
+      executeString("DROP DATABASE \"Jdbc_Test2\"");
+    }
   }
 
   @Test
@@ -165,16 +189,167 @@ public class TestTajoDatabaseMetaData extends QueryTestCaseBase {
         TajoConstants.DEFAULT_DATABASE_NAME);
     Connection conn = DriverManager.getConnection(connUri);
 
-    String databaseName = getCurrentDatabase();
-
+    Map<String,List<String>> tables = new HashMap<String,List<String>>();
     assertDatabaseNotExists("db_1");
     executeString("CREATE DATABASE db_1");
     assertDatabaseExists("db_1");
     for (int i = 0; i < 3; i++) {
-      executeString("CREATE TABLE tb_" + i + " (age int)");
+      String tableName = "tb_" + i;
+      TUtil.putToNestedList(tables, "db_1", tableName);
+      executeString("CREATE TABLE db_1." + tableName + " (age int)");
     }
     for (int i = 0; i < 3; i++) {
-      executeString("CREATE TABLE table_" + i + "_ptn (age int)");
+      String tableName = "table_" + i + "_ptn";
+      TUtil.putToNestedList(tables, "db_1", tableName);
+      executeString("CREATE TABLE db_1." + tableName + " (age int)");
     }
+
+    assertDatabaseNotExists("db_2");
+    executeString("CREATE DATABASE db_2");
+    assertDatabaseExists("db_2");
+    for (int i = 0; i < 3; i++) {
+      String tableName = "tb_" + i;
+      TUtil.putToNestedList(tables, "db_2", tableName);
+      executeString("CREATE TABLE db_2." + tableName + " (age int)");
+    }
+    for (int i = 0; i < 3; i++) {
+      String tableName = "table_" + i + "_ptn";
+      TUtil.putToNestedList(tables, "db_2", tableName);
+      executeString("CREATE TABLE db_2." + tableName + " (age int)");
+    }
+
+    // all wildcard test
+    Set<String> tableList =
+        Sets.newHashSet(getListFromResultSet(conn.getMetaData().getTables("db_2", null, "%", null), "TABLE_NAME"));
+    assertEquals(Sets.newHashSet(tables.get("db_2")), tableList);
+
+    // leading wildcard test
+    tableList =
+        Sets.newHashSet(getListFromResultSet(conn.getMetaData().getTables("db_2", null, "%_ptn", null), "TABLE_NAME"));
+    assertEquals(Sets.newHashSet("table_0_ptn", "table_1_ptn", "table_2_ptn"), tableList);
+
+    // tailing wildcard test
+    tableList =
+        Sets.newHashSet(getListFromResultSet(conn.getMetaData().getTables("db_2", null, "tb_%", null), "TABLE_NAME"));
+    assertEquals(Sets.newHashSet("tb_0", "tb_1", "tb_2"), tableList);
+
+    ResultSet resultSet = conn.getMetaData().getTables(null, null, "tb\\_%", null);
+    int i = 0;
+    while(resultSet.next()) {
+      tables.get(resultSet.getString("TABLE_CAT")).contains(resultSet.getString("TABLE_NAME"));
+      i++;
+    }
+    assertEquals(6, i);
+
+    executeString("DROP DATABASE db_1");
+    executeString("DROP DATABASE db_2");
+  }
+
+  @Test
+  public void testGetColumnsWithPattern() throws Exception {
+    String connUri = TestTajoJdbc.buildConnectionUri(tajoMasterAddress.getHostName(), tajoMasterAddress.getPort(),
+        TajoConstants.DEFAULT_DATABASE_NAME);
+    Connection conn = DriverManager.getConnection(connUri);
+
+    // Below creates the following 12 tables
+    // db<i>.tb<j>, i = {1,2}, 0 <= j < 2
+    // db<i>.table_<j>, i = {1,2}, 0 <= j < 2
+
+    Map<String,List<String>> tables = new HashMap<String,List<String>>();
+    assertDatabaseNotExists("db1");
+    executeString("CREATE DATABASE db1").close();
+    assertDatabaseExists("db1");
+    for (int i = 3; i < 6; i++) {
+      String tableName = "tb" + i;
+      TUtil.putToNestedList(tables, "db1", tableName);
+      executeString("CREATE TABLE db1." + tableName +
+          " (db1_" + tableName + "_col1 int, db1_" + tableName + "_col2 int)").close();
+      assertTableExists("db1." + tableName);
+    }
+    for (int i = 3; i < 6; i++) {
+      String tableName = "table" + i;
+      TUtil.putToNestedList(tables, "db1", tableName);
+      executeString("CREATE TABLE db1." + tableName +
+          " (db1_" + tableName + "_col1 int, db1_" + tableName + "_col2 int)").close();
+      assertTableExists("db1." + tableName);
+    }
+
+    assertDatabaseNotExists("db2");
+    executeString("CREATE DATABASE db2").close();
+    assertDatabaseExists("db2");
+    for (int i = 3; i < 6; i++) {
+      String tableName = "tb" + i;
+      TUtil.putToNestedList(tables, "db2", tableName);
+      executeString("CREATE TABLE db2." + tableName
+          + " (db2_" + tableName + "_col1 int, db2_" + tableName + "_col2 int)").close();
+      assertTableExists("db2." + tableName);
+    }
+    for (int i = 3; i < 6; i++) {
+      String tableName = "table" + i;
+      TUtil.putToNestedList(tables, "db2", tableName);
+      executeString("CREATE TABLE db2." + tableName +
+          " (db2_" + tableName + "_col1 int, db2_" + tableName + "_col2 int)").close();
+      assertTableExists("db2." + tableName);
+    }
+
+    // all wildcard test on columns
+    Set<String> columnList =
+        Sets.newHashSet(getListFromResultSet(conn.getMetaData().getColumns("db2", null, "tb3", "%"),
+            "COLUMN_NAME"));
+    assertEquals(Sets.newHashSet("db2_tb3_col1", "db2_tb3_col2"), columnList);
+
+    // leading wildcard test on columns
+    columnList =
+        Sets.newHashSet(getListFromResultSet(conn.getMetaData().getColumns("db2", null, "tb3", "%col1"),
+            "COLUMN_NAME"));
+    assertEquals(Sets.newHashSet("db2_tb3_col1"), columnList);
+
+    // tailing wildcard test on columns
+    columnList =
+        Sets.newHashSet(getListFromResultSet(conn.getMetaData().getColumns("db2", null, "tb3", "db2\\_tb3\\_%"),
+            "COLUMN_NAME"));
+    assertEquals(Sets.newHashSet("db2_tb3_col1", "db2_tb3_col2"), columnList);
+    columnList =
+        Sets.newHashSet(getListFromResultSet(conn.getMetaData().getColumns("db2", null, "%", "db2\\_tb3\\_%"),
+            "COLUMN_NAME"));
+    assertEquals(Sets.newHashSet("db2_tb3_col1", "db2_tb3_col2"), columnList);
+
+    // leading wildcard test on tables
+    columnList =
+        Sets.newHashSet(getListFromResultSet(conn.getMetaData().getColumns("db1", null, "%3", "%"),
+            "COLUMN_NAME"));
+    assertEquals(
+        Sets.newHashSet(
+            "db1_tb3_col1", "db1_tb3_col2",
+            "db1_table3_col1", "db1_table3_col2"),
+        columnList);
+    columnList =
+        Sets.newHashSet(getListFromResultSet(conn.getMetaData().getColumns("db2", null, "%3", "%"),
+            "COLUMN_NAME"));
+    assertEquals(
+        Sets.newHashSet(
+            "db2_tb3_col1", "db2_tb3_col2",
+            "db2_table3_col1", "db2_table3_col2"),
+        columnList);
+
+    // tailing wildcard test on tables
+    columnList =
+        Sets.newHashSet(getListFromResultSet(conn.getMetaData().getColumns("db2", null, "table%", "%"),
+            "COLUMN_NAME"));
+    assertEquals(
+        Sets.newHashSet(
+            "db2_table3_col1", "db2_table3_col2",
+            "db2_table4_col1", "db2_table4_col2",
+            "db2_table5_col1", "db2_table5_col2"),
+        columnList);
+
+    // wildcard test on database
+    columnList =
+        Sets.newHashSet(getListFromResultSet(conn.getMetaData().getColumns(null, null, "%3", "db1_tb3%"),
+            "COLUMN_NAME"));
+    assertEquals(Sets.newHashSet("db1_tb3_col1", "db1_tb3_col2"), columnList);
+
+    executeString("DROP DATABASE db1");
+    executeString("DROP DATABASE db2");
   }
 }

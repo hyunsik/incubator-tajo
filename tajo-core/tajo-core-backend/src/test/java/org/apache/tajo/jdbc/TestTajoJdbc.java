@@ -64,6 +64,7 @@ public class TestTajoJdbc extends QueryTestCaseBase {
     String connUri = buildConnectionUri(tajoMasterAddress.getHostName(), tajoMasterAddress.getPort(),
         DEFAULT_DATABASE_NAME);
     Connection conn = DriverManager.getConnection(connUri);
+    assertTrue(conn.isValid(100));
 
     Statement stmt = null;
     ResultSet res = null;
@@ -108,6 +109,7 @@ public class TestTajoJdbc extends QueryTestCaseBase {
     String connUri = buildConnectionUri(tajoMasterAddress.getHostName(), tajoMasterAddress.getPort(),
         TajoConstants.DEFAULT_DATABASE_NAME);
     Connection conn = DriverManager.getConnection(connUri);
+    assertTrue(conn.isValid(100));
 
     PreparedStatement stmt = null;
     ResultSet res = null;
@@ -188,18 +190,20 @@ public class TestTajoJdbc extends QueryTestCaseBase {
     String connUri = buildConnectionUri(tajoMasterAddress.getHostName(), tajoMasterAddress.getPort(),
         TajoConstants.DEFAULT_DATABASE_NAME);
     Connection conn = DriverManager.getConnection(connUri);
+    assertTrue(conn.isValid(100));
+
     DatabaseMetaData dbmd = conn.getMetaData();
 
     ResultSet rs = null;
 
     try {
-      rs = dbmd.getTables(null, null, null, null);
+      rs = dbmd.getTables("default", null, null, null);
 
       ResultSetMetaData rsmd = rs.getMetaData();
       int numCols = rsmd.getColumnCount();
       assertEquals(5, numCols);
 
-      Set<String> retrivedViaJavaAPI = new HashSet<String>(client.getTableList(DEFAULT_DATABASE_NAME));
+      Set<String> retrivedViaJavaAPI = new HashSet<String>(client.getTableList("default"));
 
       Set<String> retrievedViaJDBC = new HashSet<String>();
       while(rs.next()) {
@@ -211,6 +215,9 @@ public class TestTajoJdbc extends QueryTestCaseBase {
         rs.close();
       }
     }
+
+    assertTrue(conn.isValid(100));
+    conn.close();
   }
 
   @Test
@@ -218,8 +225,9 @@ public class TestTajoJdbc extends QueryTestCaseBase {
     String connUri = buildConnectionUri(tajoMasterAddress.getHostName(), tajoMasterAddress.getPort(),
         TajoConstants.DEFAULT_DATABASE_NAME);
     Connection conn = DriverManager.getConnection(connUri);
-    DatabaseMetaData dbmd = conn.getMetaData();
+    assertTrue(conn.isValid(100));
 
+    DatabaseMetaData dbmd = conn.getMetaData();
     ResultSet rs = null;
 
     try {
@@ -250,6 +258,10 @@ public class TestTajoJdbc extends QueryTestCaseBase {
         rs.close();
       }
     }
+
+    assertTrue(conn.isValid(100));
+    conn.close();
+    assertFalse(conn.isValid(100));
   }
 
   @Test
@@ -301,8 +313,12 @@ public class TestTajoJdbc extends QueryTestCaseBase {
         }
       }
     } finally {
+      assertTrue(conns[0].isValid(100));
       conns[0].close();
+      assertFalse(conns[0].isValid(100));
+      assertTrue(conns[1].isValid(100));
       conns[1].close();
+      assertFalse(conns[1].isValid(100));
     }
   }
 
@@ -357,10 +373,14 @@ public class TestTajoJdbc extends QueryTestCaseBase {
       }
     } finally {
       if(!conns[0].isClosed()) {
+        assertTrue(conns[0].isValid(100));
         conns[0].close();
+        assertFalse(conns[0].isValid(100));
       }
       if(!conns[1].isClosed()) {
+        assertTrue(conns[1].isValid(100));
         conns[1].close();
+        assertFalse(conns[1].isValid(100));
       }
     }
   }

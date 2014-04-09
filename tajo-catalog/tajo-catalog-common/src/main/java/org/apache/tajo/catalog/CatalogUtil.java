@@ -66,6 +66,9 @@ public class CatalogUtil {
    * @return The normalized identifier
    */
   public static String normalizeIdentifier(String identifier) {
+    if (identifier == null || identifier.equals("")) {
+      return identifier;
+    }
     String [] splitted = identifier.split(CatalogConstants.IDENTIFIER_DELIMITER_REGEXP);
 
     StringBuilder sb = new StringBuilder();
