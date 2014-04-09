@@ -357,11 +357,11 @@ public class TajoDatabaseMetaData implements DatabaseMetaData {
       if (catalog == null) {
         resultCatalog = TajoConstants.DEFAULT_DATABASE_NAME;
       } else {
-        resultCatalog = CatalogUtil.normalizeIdentifier(catalog);
+        resultCatalog = catalog;
       }
 
       String regtableNamePattern =
-          convertPattern(tableNamePattern == null ? null : CatalogUtil.normalizeIdentifier(tableNamePattern));
+          convertPattern(tableNamePattern == null ? null : tableNamePattern);
       try {
         TajoClient tajoClient = conn.getTajoClient();
         List<String> tableNames = tajoClient.getTableList(resultCatalog);
