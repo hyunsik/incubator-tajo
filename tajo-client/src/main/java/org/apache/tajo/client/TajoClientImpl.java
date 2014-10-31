@@ -32,12 +32,17 @@ import org.apache.tajo.catalog.partition.PartitionMethodDesc;
 import org.apache.tajo.catalog.proto.CatalogProtos;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.conf.TajoConf.ConfVars;
+import org.apache.tajo.ipc.ClientProtos;
 import org.apache.tajo.ipc.ClientProtos.BriefQueryInfo;
 import org.apache.tajo.ipc.ClientProtos.GetQueryResultResponse;
 import org.apache.tajo.ipc.ClientProtos.SubmitQueryResponse;
 import org.apache.tajo.ipc.ClientProtos.WorkerResourceInfo;
+import org.apache.tajo.ipc.QueryMasterClientProtocol;
+import org.apache.tajo.ipc.TajoMasterClientProtocol;
 import org.apache.tajo.jdbc.TajoMemoryResultSet;
 import org.apache.tajo.jdbc.TajoResultSet;
+import org.apache.tajo.rpc.NettyClientBase;
+import org.apache.tajo.rpc.ServerCallable;
 import org.apache.tajo.util.NetUtils;
 
 import java.io.IOException;
@@ -45,6 +50,9 @@ import java.net.InetSocketAddress;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
+
+import static org.apache.tajo.ipc.ClientProtos.QueryHistoryProto;
+import static org.apache.tajo.ipc.ClientProtos.QueryInfoProto;
 
 @ThreadSafe
 public class TajoClientImpl extends SessionConnection implements TajoClient, QueryClient, CatalogAdminClient {
@@ -211,5 +219,13 @@ public class TajoClientImpl extends SessionConnection implements TajoClient, Que
 
   public List<CatalogProtos.FunctionDescProto> getFunctions(final String functionName) throws ServiceException {
     return catalogClient.getFunctions(functionName);
+  }
+
+  public QueryInfoProto getQueryInfo(final QueryId queryId) throws ServiceException {
+    return queryClient.getQueryInfo(queryId);
+  }
+
+  public QueryHistoryProto getQueryHistory(final QueryId queryId) throws ServiceException {
+    return queryClient.getQueryHistory(queryId);
   }
 }

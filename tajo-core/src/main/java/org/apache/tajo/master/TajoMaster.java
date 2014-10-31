@@ -18,7 +18,6 @@
 
 package org.apache.tajo.master;
 
-import com.google.protobuf.ServiceException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -36,10 +35,12 @@ import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.util.Clock;
 import org.apache.hadoop.yarn.util.RackResolver;
 import org.apache.hadoop.yarn.util.SystemClock;
-import org.apache.tajo.catalog.*;
-import org.apache.tajo.engine.function.FunctionLoader;
+import org.apache.tajo.catalog.CatalogServer;
+import org.apache.tajo.catalog.CatalogService;
+import org.apache.tajo.catalog.LocalCatalogWrapper;
 import org.apache.tajo.conf.TajoConf;
 import org.apache.tajo.conf.TajoConf.ConfVars;
+import org.apache.tajo.engine.function.FunctionLoader;
 import org.apache.tajo.master.ha.HAService;
 import org.apache.tajo.master.ha.HAServiceHDFSImpl;
 import org.apache.tajo.master.metrics.CatalogMetricsGaugeSet;
@@ -51,6 +52,8 @@ import org.apache.tajo.master.session.SessionManager;
 import org.apache.tajo.rpc.RpcChannelFactory;
 import org.apache.tajo.storage.StorageManager;
 import org.apache.tajo.util.*;
+import org.apache.tajo.util.history.HistoryReader;
+import org.apache.tajo.util.history.HistoryWriter;
 import org.apache.tajo.util.metrics.TajoSystemMetrics;
 import org.apache.tajo.webapp.QueryExecutorServlet;
 import org.apache.tajo.webapp.StaticHttpServer;
@@ -125,6 +128,10 @@ public class TajoMaster extends CompositeService {
 
   private JvmPauseMonitor pauseMonitor;
 
+  private HistoryWriter historyWriter;
+
+  private HistoryReader historyReader;
+
   public TajoMaster() throws Exception {
     super(TajoMaster.class.getName());
   }
@@ -179,6 +186,7 @@ public class TajoMaster extends CompositeService {
 
       tajoMasterService = new TajoMasterService(context);
       addIfService(tajoMasterService);
+
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
       throw e;
@@ -309,6 +317,13 @@ public class TajoMaster extends CompositeService {
     } catch (IOException e) {
       LOG.error(e.getMessage(), e);
     }
+
+    historyWriter = new HistoryWriter(getMasterName(), true);
+    historyWriter.init(getConfig());
+    addIfService(historyWriter);
+    historyWriter.start();
+
+    historyReader = new HistoryReader(getMasterName(), context.getConf());
   }
 
   private void writeSystemConf() throws IOException {
@@ -451,6 +466,14 @@ public class TajoMaster extends CompositeService {
 
     public HAService getHAService() {
       return haService;
+    }
+
+    public HistoryWriter getHistoryWriter() {
+      return historyWriter;
+    }
+
+    public HistoryReader getHistoryReader() {
+      return historyReader;
     }
   }
 

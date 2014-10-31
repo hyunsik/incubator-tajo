@@ -18,10 +18,7 @@
 
 package org.apache.tajo.client;
 
-import org.apache.tajo.annotation.ThreadSafe;
+public interface TajoClient extends QueryClient, CatalogAdminClient {
 
-import java.io.Closeable;
 
-@ThreadSafe
-public interface TajoClient extends QueryClient, CatalogAdminClient, Closeable {
 }

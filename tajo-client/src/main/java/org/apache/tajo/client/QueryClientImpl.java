@@ -42,6 +42,7 @@ import org.apache.tajo.util.NetUtils;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 
@@ -618,5 +619,59 @@ public class QueryClientImpl implements QueryClient {
       connection.connPool.releaseConnection(tmClient);
     }
     return status;
+  }
+
+  @Override
+  public QueryInfoProto getQueryInfo(final QueryId queryId) throws ServiceException {
+    return new ServerCallable<QueryInfoProto>(connection.connPool, connection.getTajoMasterAddr(),
+        TajoMasterClientProtocol.class, false, true) {
+      public QueryInfoProto call(NettyClientBase client) throws ServiceException, SQLException {
+        connection.checkSessionAndGet(client);
+
+        ClientProtos.QueryIdRequest.Builder builder = ClientProtos.QueryIdRequest.newBuilder();
+        builder.setSessionId(connection.sessionId);
+        builder.setQueryId(queryId.getProto());
+
+        TajoMasterClientProtocol.TajoMasterClientProtocolService.BlockingInterface tajoMasterService = client.getStub();
+        ClientProtos.GetQueryInfoResponse res = tajoMasterService.getQueryInfo(null,builder.build());
+        if (res.getResultCode() == ClientProtos.ResultCode.OK) {
+          return res.getQueryInfo();
+        } else {
+          abort();
+          throw new ServiceException(res.getErrorMessage());
+        }
+      }
+    }.withRetries();
+  }
+
+  @Override
+  public ClientProtos.QueryHistoryProto getQueryHistory(final QueryId queryId) throws ServiceException {
+    final QueryInfoProto queryInfo = getQueryInfo(queryId);
+
+    if (queryInfo.getHostNameOfQM() == null || queryInfo.getQueryMasterClientPort() == 0) {
+      return null;
+    }
+    InetSocketAddress qmAddress = new InetSocketAddress(
+        queryInfo.getHostNameOfQM(), queryInfo.getQueryMasterClientPort());
+
+    return new ServerCallable<ClientProtos.QueryHistoryProto>(connection.connPool, qmAddress,
+        QueryMasterClientProtocol.class, false, true) {
+      public ClientProtos.QueryHistoryProto call(NettyClientBase client) throws ServiceException, SQLException {
+        connection.checkSessionAndGet(client);
+
+        ClientProtos.QueryIdRequest.Builder builder = ClientProtos.QueryIdRequest.newBuilder();
+        builder.setSessionId(connection.sessionId);
+        builder.setQueryId(queryId.getProto());
+
+        QueryMasterClientProtocol.QueryMasterClientProtocolService.BlockingInterface queryMasterService = client.getStub();
+        ClientProtos.GetQueryHistoryResponse res = queryMasterService.getQueryHistory(null,builder.build());
+        if (res.getResultCode() == ClientProtos.ResultCode.OK) {
+          return res.getQueryHistory();
+        } else {
+          abort();
+          throw new ServiceException(res.getErrorMessage());
+        }
+      }
+    }.withRetries();
   }
 }

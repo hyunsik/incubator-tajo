@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.apache.tajo.TajoIdProtos.SessionIdProto;
+import static org.apache.tajo.ipc.ClientProtos.QueryHistoryProto;
+import static org.apache.tajo.ipc.ClientProtos.QueryInfoProto;
 
 public interface QueryClient extends Closeable {
 
@@ -113,4 +115,8 @@ public interface QueryClient extends Closeable {
   public List<ClientProtos.WorkerResourceInfo> getClusterInfo() throws ServiceException;
 
   public QueryStatus killQuery(final QueryId queryId) throws ServiceException, IOException;
+
+  public QueryInfoProto getQueryInfo(final QueryId queryId) throws ServiceException;
+
+  public QueryHistoryProto getQueryHistory(final QueryId queryId) throws ServiceException;
 }
